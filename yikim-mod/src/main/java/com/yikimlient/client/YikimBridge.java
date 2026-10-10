@@ -50,7 +50,7 @@ public final class YikimBridge {
             Path dir = YikimBridge.stateDir();
             Files.createDirectories(dir, new FileAttribute[0]);
             String instance = System.getProperty("yikimlient.instance", "");
-            String json = "{\n  \"at\": " + System.currentTimeMillis() + ",\n  \"reason\": \"" + YikimJson.escape(reason) + "\",\n  \"mod\": \"1.4.3\",\n  \"instance\": \"" + YikimJson.escape(instance) + "\"\n}\n";
+            String json = "{\n  \"at\": " + System.currentTimeMillis() + ",\n  \"reason\": \"" + YikimJson.escape(reason) + "\",\n  \"mod\": \"1.5.0\",\n  \"instance\": \"" + YikimJson.escape(instance) + "\"\n}\n";
             Files.writeString(dir.resolve("ready"), (CharSequence)json, StandardCharsets.UTF_8, new OpenOption[0]);
         }
         catch (Throwable throwable) {
@@ -77,7 +77,7 @@ public final class YikimBridge {
                 }
                 installJson.append("    { \"source\": \"").append(YikimJson.escape(install[0])).append("\", \"id\": \"").append(YikimJson.escape(install[1])).append("\", \"name\": \"").append(YikimJson.escape(install[2])).append("\" }");
             }
-            String string = "{\n  \"at\": " + System.currentTimeMillis() + ",\n  \"reason\": \"" + YikimJson.escape(reason) + "\",\n  \"instance\": \"" + YikimJson.escape(instance) + "\",\n  \"mod\": \"1.4.3\",\n  \"changes\": [],\n  \"mods\": [\n" + String.valueOf(mods) + "\n  ],\n  \"installs\": [\n" + String.valueOf(installJson) + "\n  ]\n}\n";
+            String string = "{\n  \"at\": " + System.currentTimeMillis() + ",\n  \"reason\": \"" + YikimJson.escape(reason) + "\",\n  \"instance\": \"" + YikimJson.escape(instance) + "\",\n  \"mod\": \"1.5.0\",\n  \"changes\": [],\n  \"mods\": [\n" + String.valueOf(mods) + "\n  ],\n  \"installs\": [\n" + String.valueOf(installJson) + "\n  ]\n}\n";
             Files.writeString(YikimBridge.restartFile(), (CharSequence)string, StandardCharsets.UTF_8, new OpenOption[0]);
             return true;
         }

@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.3.1";
+    public static final String MOD_VERSION = "1.5.0";
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
     private static boolean readyMarked;
     private static boolean firstJoinSeen;
@@ -71,6 +71,8 @@ implements ClientModInitializer {
         YikimUiMetrics.flush();
         YikimKeys.poll(client);
         YikimAbTest.tick(client);
+        // Performans bekçisi: profil değerlerini korur + düşük FPS önerir (asla kare yolunda değil)
+        YikimGuard.tick(client);
         if (!paused) {
             YikimClient.installMainMenu(client);
             if (client.field_1755 == null) {

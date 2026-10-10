@@ -60,6 +60,28 @@ pub fn java_presets() -> Vec<JavaPreset> {
             ],
         },
         JavaPreset {
+            id: "ultra_fps".into(),
+            name: "Ultra FPS (Eski PC)".into(),
+            description: "Zayıf/eski makineler için: küçük heap, kısa GC duraklamaları, minimum arka plan yükü. Entegre grafikli ve 8 GB RAM'li sistemlerde en yüksek kare hızı.".into(),
+            recommended_ram_mb: 2048,
+            args: vec![
+                "-Xms512M".into(),
+                "-Xmx{ram_mb}M".into(),
+                "-XX:+UseG1GC".into(),
+                "-XX:MaxGCPauseMillis=40".into(),
+                "-XX:+ParallelRefProcEnabled".into(),
+                "-XX:+UnlockExperimentalVMOptions".into(),
+                "-XX:+DisableExplicitGC".into(),
+                "-XX:G1NewSizePercent=28".into(),
+                "-XX:G1MaxNewSizePercent=36".into(),
+                "-XX:G1HeapRegionSize=4M".into(),
+                "-XX:G1ReservePercent=15".into(),
+                "-XX:InitiatingHeapOccupancyPercent=20".into(),
+                "-XX:+UseStringDeduplication".into(),
+                "-XX:+PerfDisableSharedMem".into(),
+            ],
+        },
+        JavaPreset {
             id: "low_ram".into(),
             name: "Düşük RAM (Zayıf PC)".into(),
             description: "2 GB civarı RAM ile akıcı oyun. Eski/zayıf bilgisayarlar ve entegre grafikler için optimize edildi."
