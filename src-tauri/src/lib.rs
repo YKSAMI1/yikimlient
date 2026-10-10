@@ -1,0 +1,154 @@
+pub mod auth;
+pub mod commands;
+pub mod config;
+pub mod core;
+pub mod curtain;
+pub mod game_options;
+pub mod instances;
+pub mod launcher;
+pub mod modpacks;
+pub mod repos;
+pub mod server_list;
+pub mod stats;
+pub mod util;
+pub mod yikim_mod;
+
+use std::sync::atomic::{AtomicBool, AtomicUsize};
+use tokio::sync::RwLock;
+
+/// Uygulama durum kökü.
+pub struct AppState {
+    pub config: RwLock<config::YikimConfig>,
+    pub active_downloads: AtomicUsize,
+    pub cancel_all: AtomicBool,
+    pub game_pid: RwLock<Option<u32>>,
+    /// Açık perdenin planı (restart akışı). Perde penceresi cmd_get_curtain_plan ile çeker;
+    /// cmd_curtain_ready kapatınca temizlenir.
+    pub curtain_plan: RwLock<Option<curtain::CurtainPlanView>>,
+}
+
+impl AppState {
+    pub fn new(cfg: config::YikimConfig) -> Self {
+        Self {
+            config: RwLock::new(cfg),
+            active_downloads: AtomicUsize::new(0),
+            cancel_all: AtomicBool::new(false),
+            game_pid: RwLock::new(None),
+            curtain_plan: RwLock::new(None),
+        }
+    }
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let cfg = config::YikimConfig::load_or_default();
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
+        .manage(AppState::new(cfg))
+        .invoke_handler(tauri::generate_handler![
+            commands::cmd_get_state,
+            commands::cmd_save_settings,
+            commands::cmd_list_accounts,
+            commands::cmd_add_offline_account,
+            commands::cmd_ms_login_begin,
+            commands::cmd_ms_login_cancel,
+            commands::cmd_select_account,
+            commands::cmd_remove_account,
+            commands::cmd_create_instance,
+            commands::cmd_delete_instance,
+            commands::cmd_rename_instance,
+            commands::cmd_duplicate_instance,
+            commands::cmd_get_instance,
+            commands::cmd_set_instance_icon,
+            commands::cmd_pick_instance_icon,
+            commands::cmd_pick_instance_cover,
+            commands::cmd_set_instance_cover,
+            commands::cmd_resolve_mod_icons,
+            commands::cmd_list_java_arg_presets,
+            commands::cmd_list_standard_mods,
+            commands::cmd_list_versions,
+            commands::cmd_list_mods,
+            commands::cmd_toggle_mod,
+            commands::cmd_delete_mod,
+            commands::cmd_open_mods_folder,
+            commands::cmd_open_instance_folder,
+            commands::cmd_repos_search,
+            commands::cmd_repos_popular,
+            commands::cmd_repos_get_versions,
+            commands::cmd_repos_install,
+            commands::cmd_install_pack_files,
+            commands::cmd_set_instance_java_preset,
+            commands::cmd_set_instance_ram,
+            commands::cmd_get_app_dir,
+            commands::cmd_list_news,
+            commands::cmd_list_yikim_news,
+            commands::cmd_get_stats,
+            commands::cmd_list_logs,
+            commands::cmd_read_log,
+            commands::cmd_process_restart_request,
+            commands::cmd_restart_curtain_open,
+            commands::cmd_get_curtain_plan,
+            commands::cmd_curtain_ready,
+            commands::cmd_get_system_info,
+            commands::cmd_resolve_java,
+            commands::cmd_pick_java,
+            commands::cmd_launch_instance,
+            commands::cmd_kill_game,
+            commands::cmd_cancel_downloads,
+            commands::cmd_check_updates,
+        ])
+        .setup(|app| {
+            let handle = app.handle().clone();
+            // Teşhis probe'u: `--__yikim_probe <inst_id>` ile başlatılırsa
+            // 5 sn sonra başlatma tetikler, launch-cmd.txt diskе yazılır, sonra çıkar.
+            let mut args = std::env::args().skip(1);
+            if let Some(inst_id) = args
+                .next()
+                .zip(args.next())
+                .filter(|(a, _)| a == "--__yikim_probe")
+                .map(|(_, id)| id)
+            {
+                let h = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    match commands::cmd_launch_instance(h.clone(), inst_id.clone()).await {
+                        Ok(r) => core::yikim_log(format!("probe: launch pid={} id={inst_id}", r.pid)),
+                        Err(e) => core::yikim_log(format!("probe: launch hatası: {e}")),
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                    std::process::exit(0);
+                });
+            }
+            // Asset scope'a gerçek veri klasörünü (core::app_dir) runtime'da ekle.
+            // conf'taki $APPDATA, identifier klasörüne (com.yikimlient.app) çözüldüğü için
+            // .yikimlient dizini statik scope'la kapsanamıyor — bu şart.
+            use tauri::Manager;
+            if let Err(e) = app.asset_protocol_scope().allow_directory(core::app_dir(), true) {
+                core::yikim_log(format!("asset scope eklenemedi: {e}"));
+            }
+            tauri::async_runtime::spawn(async move {
+                // Arka plan ısıtma: sürüm manifesti + haberler (best-effort, UI'yi engellemez).
+                if let Err(e) = repos::warm_caches(&handle).await {
+                    core::yikim_log(format!("cache warm: {e}"));
+                }
+            });
+            // Oyun içi katalog isteklerini yanıtlayan arka plan izleyicisi
+            commands::spawn_catalog_watcher(app.handle().clone());
+            if let Some(win) = app.get_webview_window("main") {
+                #[cfg(target_os = "windows")]
+                {
+                    // Windows 11 Mica efekti — desteklenmiyorsa sessizce geç
+                    let _ = window_vibrancy::apply_mica(&win, None);
+                }
+                let _ = win.show();
+            }
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("YIKIMLient çalıştırılamadı");
+}

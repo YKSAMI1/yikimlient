@@ -1,0 +1,72 @@
+plugins {
+    id 'fabric-loom' version '1.18.2'
+}
+
+version = "${project.mod_version}+${project.minecraft_version}"
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+// ---------------------------------------------------------------------------
+// Tek kaynak ağacı, sürüme göre tek bir adaptör klasörü.
+//
+//   src/main/java              → bütün sürümlerde aynı olan mod kodu
+//   src/version/<nesil>/java   → yalnızca oyun API'si değiştiği için ayrılan sınıflar
+//                                (YikimAdapter: çizim dönüşümü, ayar numaralandırmaları;
+//                                 YikimScreenBase: pencere girdisi imzaları)
+//
+// Nesil, derlemeye -Padapter=... ile verilir; scripts/build-mod.sh bunu 1.21.x için
+// Yarn imzalarından sınıflandırır. Modun geri kalanı hangi sürümde olduğunu bilmez.
+// ---------------------------------------------------------------------------
+def adapterGeneration = project.findProperty('adapter') ?: 'modern'
+def versionSourceDir = file("src/version/${adapterGeneration}/java")
+
+if (!versionSourceDir.exists()) {
+    throw new GradleException("Minecraft ${project.minecraft_version} için adaptör klasörü yok: ${versionSourceDir}")
+}
+
+sourceSets {
+    main {
+        java.srcDirs = ['src/main/java', versionSourceDir]
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'Fabric'
+        url = 'https://maven.fabricmc.net/'
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    // 1.21.x hâlâ obfuscate edilmiş: isimli kaynak için Mojang'ın resmî eşlemesi.
+    // Loom derlemede intermediary'e geri eşler, oyun çalışırken bunu görmez.
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'minecraft_version', project.minecraft_version
+    inputs.property 'loader_version', project.loader_version
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version,
+                'loader_version': project.loader_version,
+                'minecraft_version': project.minecraft_version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+    it.options.encoding = 'UTF-8'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}

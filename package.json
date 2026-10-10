@@ -1,0 +1,27 @@
+{
+  "name": "yikimlient",
+  "private": true,
+  "version": "0.1.0",
+  "description": "YIKIMLient — ultra-hafif, hızlı ve güzel Minecraft launcher",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "app": "tauri dev",
+    "dist": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.5.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.3.0",
+    "@tauri-apps/plugin-opener": "^2.2.0",
+    "@tauri-apps/plugin-process": "^2.2.0",
+    "@tauri-apps/plugin-shell": "^2.2.1",
+    "@tauri-apps/plugin-store": "^2.2.0",
+    "gsap": "^3.15.0"
+  }
+}

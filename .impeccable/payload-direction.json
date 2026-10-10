@@ -1,0 +1,85 @@
+{
+  "title": "YIKIMLient — Yeni Görsel Dünya",
+  "question": "Zar 'Devre Panosu'nu atadı. Tut, bir alternatifi al veya yeniden çek.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Devre Panosu",
+      "kicker": "THE ROLL",
+      "lineage": "Türk evinin sigorta panosu — hmm, plaka etiketler, faz işaretleri, pilot lambaları",
+      "thesis": "Launcher bir devre panosu gibi davranır: her kurulum bir hat, RAM yükü amper gibi okunur, çöken oyun 'attı' der ve panoda flag atar — OYNA ise ana şalteri kaldırır.",
+      "palette": ["#0e0e10", "#ff7a18", "#f2efe8", "#39d98a", "#e5484d"],
+      "materials": ["mat karbon koyu zemin", "oyma etiket caps + tabular rakamlar", "device-pixel hairline ayraçlar", "durum pilot lambaları"],
+      "viewport": "Standart ray navigasyonu korunur. Ana sayfa panonun ana yüzü: hero kurulum en üstte tek hat olarak — sürüm, RAM yükü çubuğu, mod sayısı, pilot lambası (yeşil: hazır) — ve altında ana şalter: OYNA. Alt hatlar diğer kurulumlar; indirme sırası panonun alt sırası.",
+      "risk": "Yeterince kararlı olmazsa kostüme döner (vida, 3D şalter skeuomorfı yasak); ayrıca panonun 'ev aleti' çağrışımı bazılarına çocukça gelebilir — disiplin mühendislik etiketinden gelir.",
+      "raised": [
+        { "from": "Anons Panosu", "raise": "Canlı değerler (%, MB/s, sürüm) sabit hücrelerde harf harf kaskadla değişir; satır yerinde durur." },
+        { "from": "Cetvel Kağıdı", "raise": "Tüm cetveller tek device-pixel hairline; durumlar basılı işaret: hairline=bekleme, dolu=basılı, üstü çizili=devre dışı; radius sıfır; sönümlü tek eksen hareket." },
+        { "from": "Katalog Holü", "raise": "Keşfet gerçek yoğunlukta pul-grid olarak paketlenir; havai AI kart düzeni yok." },
+        { "from": "havuz: Tek Renk Kanıt", "kept": "Ekrandaki her sayı state'ten canlı gelir; süs istatistik yok." },
+        { "from": "havuz: Bilet Cüzdanı", "kept": "Kurulum durumları kalıcı damga gibi; asla sessizce kaybolmaz." },
+        { "from": "havuz: Yıldız Atlası", "kept": "Görsel ağırlık ölçülen değeri izler — RAM/FPS büyüklüğü veriye göre." }
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "Söküm Sahası",
+      "kicker": "IMPECCABLE'S PICK",
+      "lineage": "yıkım sahası emniyet planı — stencil tipografi, tehlike şeridi, işlik turuncusu",
+      "thesis": "İsim resmini yapar: launcher bir söküm emniyet planı; turuncu burada işlik/işaret rengi, süs değil; kurulumlar 'sökülecek yapı' olarak işaretlenir.",
+      "palette": ["#111114", "#ff7a18", "#e8e6e0", "#ffd60a"],
+      "materials": ["stencil kesme caps", "çapraz tehlike şeridi (yalnız uyarı yüzeyinde)", "beton gri ton kademeleri"],
+      "viewport": "Ana sayfa emniyet planı: hero kurulum büyük işaretli alanda, OYNA stencil damga düğmesi, ikincil eylemler saha etiketleri; kenar bölgeler sade.",
+      "risk": "Marka adının en beklendik okunuşu — bu kategorideki koşuların çoğu tam buraya düşer; 'yapay zeka keskin köşe + turuncu' kalıbına kayma ihtimali en yüksek aday."
+    },
+    {
+      "id": "challenger-splitflap",
+      "label": "Anons Panosu",
+      "verdict": "competitive",
+      "lineage": "istasyon split-flap anons panosu — sabit hücreler, kaskad çevrilen harfler",
+      "thesis": "Kurulumlar ve indirmeler canlı anons panosunda satırlar; her değer değişimi harf harf çevrilir, satır asla yerinden oynamaz.",
+      "palette": ["#141416", "#f5f2ea", "#ffb020", "#e5484d"],
+      "materials": ["mat siyah flap yüzler", "beyaz boya harfler", "amber satır lambası"],
+      "case": "Kaynak belirleme en güçlü aday: kurulum listesi pano olur, bekleme hissi ortadan kalkar; ama kabuğun tamamı için telemetri kadar geniş bir dil vermiyor — panosu tek numarası var.",
+      "risk": "Retro-novelti okuması: sabit hücre disiplini bozulursa kostüm olur."
+    },
+    {
+      "id": "challenger-centrerail",
+      "label": "Cetvel Kağıdı",
+      "verdict": "competitive",
+      "lineage": "geniş marjlı referans dizgisi — hairline kanallar, basılı işaret durumları",
+      "thesis": "Arayüz bir dizgi cetveli: tek device-pixel hairline'lar, baskı işareti durumları, sıfır radius, sönümlü tek eksen hareket.",
+      "palette": ["#0c0c0e", "#f4f1ea", "#ff7a18", "#8a877e"],
+      "materials": ["device-pixel hairline", "basılı işaret durumları", "kesin dizgi ritmi"],
+      "case": "Zanaat disiplini en yüksek aday; okunabilirlik mükemmel. Ama kitap dünyasından geldiği için oyuncu kitlesiyle özdeşleşme zayıf — bir ekseni tutuyor.",
+      "risk": "Kitap sayfası soğukluğu; oyuncu kendini arayüzde görmeyebilir."
+    },
+    {
+      "id": "challenger-catalog",
+      "label": "Katalog Holü",
+      "verdict": "competitive",
+      "lineage": "dergi fuarı kataloğu — pul pul paketlenmiş thumbnail grid, kodlar, biro ile daire",
+      "thesis": "Keşfet, sekiz yüz çizimin kataloğu gibi: gerçek yoğunlukta grid, tablo kodları, seçimler elle daire ile işaretlenmiş.",
+      "palette": ["#101013", "#f0ede4", "#ff7a18", "#6d6b66"],
+      "materials": ["pulanın pul grid", "el işi daire işaretleme", "küçük tip etiketler"],
+      "case": "Gezinme yüzeylerinde en doygun aday — mod arayan kullanıcı için ideal; ama kabuk ve başlatma akışı için bu kadar net bir dil taşımıyor.",
+      "risk": "Haber kâğıdı malzemesi turuncu/siyah taahhüdüyle çatışır; çevirisi koyu kataloğa düşer."
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"],
+    "pool": "Tek Renk Kanıt, Bilet Cüzdanı, Yıldız Atlası yeniden çekme havuzunda bekliyor."
+  },
+  "buildPath": { "value": "code", "toggle": false },
+  "canon": true,
+  "canonCard": {
+    "id": "canon",
+    "label": "Kategori standardı",
+    "thesis": "Modern launcher'ın beklenen düzeni — CurseForge/Discord cilası — kusursuz uygulanmış hali.",
+    "palette": ["#0e0e10", "#f5f5f5", "#ff7a18"],
+    "materials": ["temiz grid", "yumuşak gölge kartlar", "standart bileşen seti"],
+    "viewport": "Beklenen düzen, tam zanaatla: hero kurulum kartı, öneri sıraları, standart ayar formları.",
+    "risk": "Tasarımla rakiplerden ayırt edilemez — 'aşırı yapay zeka duruyor' şikâyetini çözmez."
+  },
+  "steer": true
+}

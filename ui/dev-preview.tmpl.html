@@ -1,0 +1,75 @@
+<!doctype html>
+<!-- BOOT TEST — gerçek Tauri runtime'ını taklit eder, dist bundle'ını çalıştırır.
+     Gerçek bundle'da TauriEvent enum'u __TAURI__.event altındadır; __TAURI__.window'da
+     BİLE OLMADIĞINI taklit etmek için window.TauriEvent bilerek tanımsız bırakıldı. -->
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<title>boot test</title>
+<link rel="stylesheet" href="./dist/assets/__CSS_FILE__" />
+<script>
+  (function () {
+    var state = {
+      config: {
+        theme: "orange", last_selected_account: "a1", default_ram_mb: 4096,
+        keep_launcher_open: true, show_news: true, stats_enabled: true,
+        download_concurrency: 32, java_dir: null, custom_accent: "#ff7a1a",
+      },
+      accounts: [{ id: "a1", name: "TestOyuncu", kind: "offline", uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5" }],
+      instances: [{
+        id: "i1", name: "Test Kurulum", mc_version: "1.21.1", mod_loader: "fabric",
+        ram_mb: 4096, icon: "🔥", cover: null, playtime_ms: 3600000,
+        last_played: Date.now(), standard_mods: true, java_preset_id: "balanced",
+        created_at: Date.now(),
+      }],
+      featured_versions: ["1.21.1"],
+      curseforge: true,
+      sys: { total_ram_mb: 16384, cores: 8 },
+    };
+    var calls = [];
+    function invoke(cmd, args) {
+      calls.push(cmd);
+      if (cmd === "cmd_get_state") return Promise.resolve(state);
+      if (cmd === "cmd_list_news") return Promise.resolve([]);
+      if (String(cmd).startsWith("plugin:")) return Promise.resolve(null);
+      return Promise.resolve([]);
+    }
+    window.__TAURI_INTERNALS__ = {
+      convertFileSrc: function (p) { return "http://asset.localhost/" + encodeURIComponent(p); },
+      transformCallback: function (cb) { return cb; },
+    };
+    window.__TAURI__ = {
+      core: { invoke: invoke },
+      event: {
+        listen: function () { return Promise.resolve(function () {}); },
+        once: function () { return Promise.resolve(function () {}); },
+        emit: function () { return Promise.resolve(); },
+      },
+      // Bilerek TauriEvent YOK — gerçek global bundle davranışı
+      window: {
+        getCurrentWindow: function () {
+          return {
+            minimize: function () {}, toggleMaximize: function () {}, close: function () {},
+            isMaximized: function () { return Promise.resolve(false); },
+            onResized: function () { return Promise.resolve(function () {}); },
+            listen: function () { return Promise.resolve(function () {}); },
+          };
+        },
+      },
+    };
+    window.__BOOT_ERRORS__ = [];
+    window.__BOOT_CALLS__ = calls;
+    window.addEventListener("error", function (e) {
+      window.__BOOT_ERRORS__.push(String((e && e.message) || e.error || e));
+    });
+    window.addEventListener("unhandledrejection", function (e) {
+      window.__BOOT_ERRORS__.push("rejection: " + String(e.reason && (e.reason.stack || e.reason.message) || e.reason));
+    });
+  })();
+</script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="./dist/assets/__JS_FILE__"></script>
+</body>
+</html>

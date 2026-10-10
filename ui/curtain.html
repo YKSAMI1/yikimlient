@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YIKIMLient</title>
+    <link rel="stylesheet" href="/src/theme.css" />
+    <style>
+      /* YIKIMLient YENİDEN BAŞLATMA MERKEZİ — oyun içi mod değişikliği uygulanırken
+         açılan "mini launcher" penceresi. Normal oyun açılışında ASLA açılmaz;
+         yalnızca YIKIM modu "Uygula ve oyunu yeniden başlat" deyip oyun kapandığında
+         belirir. Launcher'ın kendi görünümünü (titlebar + sol ray + panel) taşır. */
+      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+      body {
+        background:
+          radial-gradient(1100px 560px at 22% -8%, rgba(255, 122, 24, 0.09), transparent 58%),
+          radial-gradient(900px 520px at 88% 108%, rgba(255, 122, 24, 0.06), transparent 55%),
+          #060607;
+        display: flex; align-items: center; justify-content: center;
+        font-family: var(--font);
+      }
+
+      /* ---------- mini launcher penceresi ---------- */
+      .win {
+        width: min(880px, 94vw); height: min(560px, 90vh);
+        display: flex; flex-direction: column; overflow: hidden;
+        background: var(--bg1);
+        border: 1px solid var(--hairline-strong);
+        border-radius: 12px;
+        box-shadow: var(--shadow-pop);
+        animation: winIn 0.28s var(--ease) both;
+      }
+      @keyframes winIn {
+        from { opacity: 0; transform: translateY(14px) scale(0.985); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      /* titlebar — launcher'ınkiyle aynı dil */
+      .tb {
+        height: 42px; flex-shrink: 0;
+        display: flex; align-items: center; gap: 10px; padding: 0 14px;
+        background: var(--bg2); border-bottom: 1px solid var(--hairline);
+        user-select: none;
+      }
+      .tb img { width: 20px; height: 20px; border-radius: 5px; object-fit: contain; }
+      .tb .brand-word { font-size: 12.5px; font-weight: 800; letter-spacing: 0.04em; color: var(--text); }
+      .tb .brand-suffix { font-size: 12.5px; font-weight: 500; color: var(--text-faint); }
+      .tb .tb-sub { font-size: 11.5px; color: var(--text-faint); margin-left: 2px; }
+      .tb .spacer { flex: 1; }
+      .tb-lamp { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: lampBlink 1.2s ease-in-out infinite; }
+      @keyframes lampBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+      .tb-label { font-size: 11px; font-weight: 600; color: var(--accent-soft); letter-spacing: 0.3px; }
+
+      /* gövde: sol ray + içerik */
+      .win-body { flex: 1; display: flex; min-height: 0; }
+      .rail {
+        width: 62px; flex-shrink: 0;
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+        padding: 12px 0; background: var(--bg2); border-right: 1px solid var(--hairline);
+      }
+      .rail .ri {
+        width: 42px; height: 38px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--text-faint); font-size: 16px; line-height: 1;
+      }
+      .rail .ri.active { background: var(--accent-dim); color: var(--accent-soft); }
+      .rail .ri-sep { flex: 1; }
+      .rail .ri-lamp { display: flex; flex-direction: column; gap: 4px; align-items: center; color: var(--text-faint); font-size: 9px; }
+      .rail .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+      .content { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 18px 22px 16px; gap: 12px; }
+      .ph h1 { font-size: 15px; font-weight: 750; }
+      .ph p { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
+      .ph b { color: var(--accent-soft); font-weight: 650; }
+
+      /* mod listesi — pano satırları */
+      .list {
+        flex: 1; min-height: 0; overflow-y: auto;
+        background: var(--bg2); border: 1px solid var(--hairline); border-radius: var(--radius);
+      }
+      .row {
+        display: flex; align-items: center; gap: 12px;
+        padding: 9px 14px; border-bottom: 1px solid var(--hairline);
+        animation: rowIn 0.24s var(--ease) both;
+      }
+      .row:last-child { border-bottom: none; }
+      @keyframes rowIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+      .row .st {
+        width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+        background: var(--text-faint);
+      }
+      .row.busy .st { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow, rgba(255,122,24,0.5)); animation: lampBlink 0.9s infinite; }
+      .row.ok .st { background: var(--success); }
+      .row.err .st { background: var(--danger); }
+      .row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text); }
+      .row .file { color: var(--text-faint); font-size: 10.5px; font-family: var(--font-mono); }
+      .row .state { flex-shrink: 0; font-size: 11.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+      .row.busy .state { color: var(--accent-soft); }
+      .row.ok .state { color: var(--success); }
+      .row.err .state { color: var(--danger); }
+      .list .empty { padding: 26px; text-align: center; color: var(--text-faint); font-size: 12.5px; }
+
+      /* alt şerit: ilerleme + durum + kaçış */
+      .foot { display: flex; flex-direction: column; gap: 9px; }
+      .progressbar { height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; position: relative; }
+      .progressbar i {
+        position: absolute; inset: 0; display: block; border-radius: 3px;
+        background: var(--accent); transform-origin: left center; transform: scaleX(0);
+        transition: transform 0.3s var(--ease);
+      }
+      .progressbar.indet i {
+        transform: none;
+        background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        animation: slide 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      }
+      @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+      .foot-line { display: flex; align-items: center; gap: 12px; }
+      .status { flex: 1; font-size: 12px; color: var(--text-dim); transition: opacity 0.18s ease; }
+      .status.err { color: var(--danger); }
+      .close-btn {
+        padding: 6px 14px; font-size: 11.5px; font-weight: 600; font-family: var(--font);
+        color: var(--text-dim); background: transparent; border: 1px solid var(--hairline-strong);
+        border-radius: var(--radius-sm); cursor: pointer; opacity: 0; pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+      .close-btn.show { opacity: 1; pointer-events: auto; }
+      .close-btn:hover { color: var(--text); border-color: var(--text-faint); }
+
+      /* plan yoksa (yanlış açılış koruması) */
+      .win.missing .list .empty::after { content: ""; }
+    </style>
+  </head>
+  <body>
+    <div class="win" id="win">
+      <div class="tb">
+        <img src="/logo.png" draggable="false" />
+        <span class="brand-word">YIKIM</span><span class="brand-suffix">Lient</span>
+        <span class="tb-sub" id="tb-sub">— yeniden başlatma merkezi</span>
+        <span class="spacer"></span>
+        <span class="tb-lamp"></span>
+        <span class="tb-label" id="tb-label">UYGULANIYOR</span>
+      </div>
+      <div class="win-body">
+        <nav class="rail">
+          <div class="ri">⌂</div>
+          <div class="ri active">▦</div>
+          <div class="ri">✦</div>
+          <div class="ri-sep"></div>
+          <div class="ri-lamp"><span class="dot"></span>YIKIM</div>
+        </nav>
+        <main class="content">
+          <div class="ph">
+            <h1 id="ph-title">Değişiklikler uygulanıyor</h1>
+            <p id="ph-sub">Oyun içi YIKIM panelinden gelen değişiklikler uygulanıyor…</p>
+          </div>
+          <div class="list" id="list"><div class="empty">Plan bekleniyor…</div></div>
+          <div class="foot">
+            <div class="progressbar" id="bar"><i id="bar-fill"></i></div>
+            <div class="foot-line">
+              <div class="status" id="status">Hazırlanıyor…</div>
+              <button class="close-btn" id="close-btn">Perdeyi kapat</button>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      const listEl = $("list"), phTitle = $("ph-title"), phSub = $("ph-sub"),
+            statusEl = $("status"), barEl = $("bar"), fillEl = $("bar-fill"),
+            closeBtn = $("close-btn"), tbSub = $("tb-sub"), tbLabel = $("tb-label");
+      const { invoke } = window.__TAURI__.core;
+      const { listen } = window.__TAURI__.event;
+
+      let closed = false;
+      let planLoaded = false;
+      let total = 0, doneCount = 0;
+      const rows = new Map();
+
+      const setStatus = (s, cls = "") => {
+        if (!s) return;
+        statusEl.style.opacity = "0";
+        setTimeout(() => {
+          statusEl.textContent = s;
+          statusEl.className = "status " + cls;
+          statusEl.style.opacity = "1";
+        }, 150);
+      };
+      const closeCurtain = async () => {
+        if (closed) return;
+        closed = true;
+        try { await invoke("cmd_curtain_ready"); } catch {}
+      };
+
+      // ---------- satırlar ----------
+      const rowKey = (p) => p.phase === "install" ? `i:${p.id}` : `t:${p.file || p.id}`;
+      const prettify = (id) => (id || "").replace(/[-_]([a-z0-9])/g, (_, c) => " " + c.toUpperCase())
+        .replace(/^./, (c) => c.toUpperCase());
+
+      const mkRow = (kind, id, file, on) => {
+        if (!listEl.querySelector(".row")) listEl.innerHTML = "";
+        const el = document.createElement("div");
+        el.className = "row";
+        const name = id ? prettify(id) : (file || "").replace(/\.jar$/, "");
+        const tag = kind === "install" ? "KUR" : (on ? "AÇ" : "KAPAT");
+        el.innerHTML = `
+          <span class="st"></span>
+          <span class="name">${name} <span class="file">${file ? file + " " : ""}· ${tag}</span></span>
+          <span class="state">bekliyor</span>`;
+        listEl.appendChild(el);
+        rows.set(rowKey({ phase: kind, id, file }), { el, stateEl: el.querySelector(".state") });
+        total++;
+        fillEl.style.transform = `scaleX(${Math.min(1, doneCount / Math.max(1, total))})`;
+      };
+
+      const setRow = (key, text, cls) => {
+        const r = rows.get(key);
+        if (!r) return;
+        r.stateEl.textContent = text;
+        r.stateEl.className = "state" + (cls ? " " + cls : "");
+        r.el.className = "row" + (cls ? " " + cls : "");
+      };
+      const bump = () => {
+        doneCount++;
+        fillEl.style.transform = `scaleX(${Math.min(1, doneCount / Math.max(1, total))})`;
+      };
+
+      const renderPlan = (plan) => {
+        planLoaded = true;
+        phTitle.textContent = plan.label || "Değişiklikler uygulanıyor";
+        phSub.innerHTML = `<b>${plan.instance_name}</b> için oyun içi değişiklikler uygulanıyor…`;
+        if (plan.toggles?.length || plan.installs?.length) {
+          listEl.innerHTML = "";
+          for (const t of plan.toggles) mkRow("toggle", t.id, t.file, t.on);
+          for (const i of plan.installs) mkRow("install", i.id, "", true);
+        }
+      };
+
+      // planı çek (Rust pencereyi açmadan önce state'e koydu → race yok; yine de birkaç deneme)
+      (async () => {
+        for (let i = 0; i < 12 && !planLoaded; i++) {
+          try {
+            const v = await invoke("cmd_get_curtain_plan");
+            if (v) { renderPlan(v); return; }
+          } catch {}
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        setTimeout(() => { if (!planLoaded) closeCurtain(); }, 4000);
+      })();
+
+      // ---------- canlı akış ----------
+      await listen("curtain-status", (e) => {
+        const p = e.payload || {};
+        const key = rowKey(p);
+        if (p.phase === "toggle") {
+          if (p.state === "start") setRow(key, p.on ? "açılıyor…" : "kapatılıyor…", "busy");
+          else {
+            setRow(key, p.ok ? (p.on ? "açıldı" : "kapatıldı") : (p.note || "atlandı"), p.ok ? "ok" : "err");
+            bump();
+          }
+        } else if (p.phase === "install") {
+          if (p.state === "start") setRow(key, "kuruluyor…", "busy");
+          else {
+            setRow(key, p.ok ? "kuruldu" : (p.note || "hata"), p.ok ? "ok" : "err");
+            bump();
+          }
+        } else if (p.phase === "applied") {
+          rows.forEach((r, k) => {
+            if (r.stateEl.textContent === "bekliyor") setRow(k, "tamam", "ok");
+          });
+          const parts = [];
+          if (p.toggles) parts.push(`${p.toggles} mod değişti`);
+          if (p.installs) parts.push(`${p.installs} mod kuruldu`);
+          setStatus(parts.length ? `Uygulandı — ${parts.join(", ")}` : "Uygulandı");
+        } else if (p.phase === "relaunching") {
+          barEl.classList.add("indet");
+          tbSub.textContent = "— oyun yeniden açılıyor";
+          tbLabel.textContent = "BAŞLATILIYOR";
+          setStatus(`${p.instance || "Oyun"} yeniden açılıyor…`);
+        } else if (p.phase === "relaunch-failed") {
+          barEl.classList.remove("indet");
+          tbLabel.textContent = "HATA";
+          setStatus(`Oyun yeniden açılamadı: ${p.error || "bilinmeyen hata"}`, "err");
+          closeBtn.classList.add("show");
+          setTimeout(closeCurtain, 5000);
+        }
+      });
+
+      closeBtn.addEventListener("click", closeCurtain);
+      setTimeout(() => { if (!closed) closeBtn.classList.add("show"); }, 10000);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,49 @@
+[package]
+name = "yikimlient"
+version = "0.1.0"
+description = "YIKIMLient — ultra-hafif, hızlı ve güzel Minecraft launcher"
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+tauri-plugin-process = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+futures-util = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "gzip", "brotli", "http2", "rustls-tls-webpki-roots"] }
+zip = "2"
+flate2 = "1"
+sha1 = "0.10"
+sha2 = "0.10"
+md-5 = "0.10"
+urlencoding = "2"
+hmac = "0.12"
+hex = "0.4"
+uuid = { version = "1", features = ["v4"] }
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+sysinfo = "0.32"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "ico"] }
+window-vibrancy = "0.5"
+open = "5"
+ed25519-dalek = "2.1.1"
+base64 = "0.23.1"
+fastnbt = "2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

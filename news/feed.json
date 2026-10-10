@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "updated_at": 1760000000,
+  "announcements": [
+    {
+      "id": "hosgeldin",
+      "title": "YIKIMLient'e hoş geldin!",
+      "text": "Bu panelden duyurular, güncelleme notları ve sunucu haberleri yayınlanacak.",
+      "body": "YIKIMLient aktif olarak geliştiriliyor.\n\nBu alandaki duyurular şifreli imzayla korunur; yalnızca geliştirici yayınlayabilir. Güncelleme notları ve önemli duyurular burada belirecek.",
+      "image": "",
+      "link": "",
+      "link_label": "",
+      "date": "2026-10-09",
+      "pinned": true
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+<!doctype html>
+<!-- MOCK HARNESS — vite dev sunucuda gerçek modül grafiğini mock Tauri ile çalıştırır.
+     Boot testi: TauriEvent bilerek tanımsız (gerçek global bundle davranışı). -->
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<title>YIKIMLient — mock</title>
+<script>
+  // Arka plan sekmesinde rAF/timer kısıldığı için animasyon yolları takılır;
+  // mock'ta reduced-motion zorla açık (motion.ts tamamen bypass) + rAF setTimeout köprüsü.
+  var _mm = window.matchMedia;
+  window.matchMedia = function (q) {
+    var m = _mm.call(window, q);
+    if (String(q).indexOf("prefers-reduced-motion") !== -1) {
+      return { matches: true, media: q, addEventListener: function () {}, removeEventListener: function () {}, addListener: function () {}, removeListener: function () {} };
+    }
+    return m;
+  };
+  window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(performance.now()); }, 16); };
+  (function () {
+    var state = {
+      config: {
+        theme: "orange", last_selected_account: "a1", default_ram_mb: 4096,
+        keep_launcher_open: true, show_news: true, stats_enabled: true,
+        download_concurrency: 32, java_dir: null, custom_accent: "#ff7a1a",
+      },
+      accounts: [{ id: "a1", name: "TestOyuncu", kind: "offline", uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5" }],
+      instances: [
+        {
+          id: "i1", name: "Test Kurulum", mc_version: "1.21.1", mod_loader: "fabric",
+          ram_mb: 4096, icon: "🔥", cover: null, playtime_ms: 3600000,
+          last_played: Date.now(), standard_mods: true, java_preset_id: "balanced",
+          created_at: Date.now(),
+        },
+        {
+          id: "i2", name: "PVP Paketi", mc_version: "1.21.11", mod_loader: "fabric",
+          ram_mb: 6144, icon: "⚔️", cover: null, playtime_ms: 7200000,
+          last_played: Date.now() - 86400000, standard_mods: true, java_preset_id: "aggressive",
+          created_at: Date.now() - 604800000,
+        },
+      ],
+      featured_versions: ["1.21.11"],
+      curseforge: true,
+      sys: { total_ram_mb: 16384, cores: 8 },
+    };
+    var calls = [];
+    function invoke(cmd, args) {
+      calls.push(cmd);
+      if (cmd === "cmd_get_state") return Promise.resolve(JSON.parse(JSON.stringify(state)));
+      if (cmd === "cmd_save_settings") { Object.assign(state.config, (args && args.config) || {}); return Promise.resolve(true); }
+      if (cmd === "cmd_list_news") return Promise.resolve([]);
+      if (String(cmd).startsWith("plugin:")) return Promise.resolve(null);
+      return Promise.resolve([]);
+    }
+    window.__TAURI_INTERNALS__ = {
+      convertFileSrc: function (p) { return "http://asset.localhost/" + encodeURIComponent(p); },
+      transformCallback: function (cb) { return cb; },
+    };
+    window.__TAURI__ = {
+      core: { invoke: invoke },
+      event: {
+        listen: function () { return Promise.resolve(function () {}); },
+        once: function () { return Promise.resolve(function () {}); },
+        emit: function () { return Promise.resolve(); },
+      },
+      window: {
+        getCurrentWindow: function () {
+          return {
+            minimize: function () {}, toggleMaximize: function () {}, close: function () {},
+            isMaximized: function () { return Promise.resolve(false); },
+            onResized: function () { return Promise.resolve(function () {}); },
+            listen: function () { return Promise.resolve(function () {}); },
+          };
+        },
+      },
+    };
+    window.__BOOT_ERRORS__ = [];
+    window.__BOOT_CALLS__ = calls;
+    window.addEventListener("error", function (e) {
+      window.__BOOT_ERRORS__.push(String((e && e.message) || e.error || e) + " @" + (e.lineno || "?"));
+    });
+    window.addEventListener("unhandledrejection", function (e) {
+      window.__BOOT_ERRORS__.push("rejection: " + String(e.reason && (e.reason.stack || e.reason.message) || e.reason));
+    });
+  })();
+</script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
