@@ -275,19 +275,42 @@ pub async fn complete_standard_mods(handle: &AppHandle, inst: &Instance) -> u32 
                 .trim_end_matches(".jar")
                 .to_string();
             present.insert(mod_key_norm(&base));
+            // fabric mod ID — okunamazsa dosya adı eşleşmesi zaten yukarıda eklendi
             if let Some(id) = jar_mod_id(&e.path()) {
                 present.insert(mod_key_norm(&id));
             }
             names.push(name);
         }
     }
+    // HATA AYIKLAMA: envanterin ne bulduğunu yaz — tekrar kurma sorununu izleriz
+    core::yikim_log(format!(
+        "paket envanteri: {} dosya, {} benzersiz anahtar",
+        names.len(),
+        present.len()
+    ));
     // 2) eksikleri kur (varsayılan kapalı modlar .jar.disabled olarak kurulur)
+    // NOT: slug yerine hem slug hem dosya-adı önekiyle kontrol — çünkü dosya adları
+    // "sodium-fabric-0.6.13-mc1.21.11" gibi sürüm ekleri taşır ve birebir slug
+    // eşleşmesi yapılamaz. Öneki normalize edip karşılaştır.
     let mut added = 0u32;
     for m in modpacks::standard_mods() {
-        let key = mod_key_norm(&m.slug);
-        if present.contains(&key) {
-            continue; // kurulu — kullanıcının açık/kapalı tercihini ASLA bozma
+        let slug_norm = mod_key_norm(&m.slug);
+        // yöntem 1: fabric id veya dosya adı normalize birebir eşleşir
+        if present.contains(&slug_norm) {
+            continue;
         }
+        // yöntem 2: dosya adı öneki slug'ı İÇERİR (ör: "sodiumfabric..." starts_with "sodium")
+        let found_by_prefix = names.iter().any(|n| {
+            let base = n
+                .trim_end_matches(".disabled")
+                .trim_end_matches(".jar");
+            let bn = mod_key_norm(base);
+            bn.starts_with(&slug_norm) || slug_norm.starts_with(&bn.split(|c: char| c.is_ascii_digit()).next().unwrap_or(""))
+        });
+        if found_by_prefix {
+            continue; // kurulu — kullanıcı tercihi bozulmaz
+        }
+        core::yikim_log(format!("paket eksik: {} (slug={}, anahtar={})", m.name, m.slug, slug_norm));
         match repos::install_mod_into(handle, "modrinth", &m.id, None, inst, &mods_dir).await {
             Ok(file) => {
                 if !m.enabled_by_default {
@@ -301,7 +324,7 @@ pub async fn complete_standard_mods(handle: &AppHandle, inst: &Instance) -> u32 
                     m.name,
                     if m.enabled_by_default { "açık" } else { "kapalı" }
                 ));
-                present.insert(key);
+                present.insert(slug_norm);
             }
             Err(e) => core::yikim_log(format!("paket tamamlama atlandı ({}): {e}", m.name)),
         }

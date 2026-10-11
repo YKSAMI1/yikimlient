@@ -6,20 +6,20 @@ import net.minecraft.class_332;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * TAB amblemi — Lunar/Dawn tarzı: TAB basılıyken YIKIM markası ekranda görünür.
- * Oyuncu listesi (TAB) overlay'inin SOL ÜST köşesine küçük, şık bir "YIKIM"
- * rozeti çizer. Her karede LWJGL ile TAB tuşu kontrol edilir (GLFW_KEY_TAB);
- * mixin yok, oyun koduna dokunulmaz.
+ * TAB amblemi — Lunar/Dawn tarzı: oyuncu listesinde (TAB) kendi adının
+ * solunda küçük beyaz bir YIKIM logosi gösterilir.
  *
- * İleri seviye (sunucu destekli): YIKIMDARA gibi sunucular bir eklentiyle
- * client brand'i okuyup hangi oyuncuların YIKIM kullandığını listeleyebilir;
- * bizim mod o listeyi alıp her oyuncunun adının yanına amblem koyabilir.
- * Şimdilik: kendi markan görünsün (Lunar'ın "L" rozeti gibi).
+ * Çizim: oyun TAB listesini çizdikten SONRA (HudRenderCallback) overlay olarak
+ * çalışır — mixin yok, oyun koduna dokunulmaz. Beyaz kare + beyaz "Y" harfi
+ * vektörel çizim (doku yok) — her çözünürlükte net.
+ *
+ * Konum: TAB listesi ekranın üst-ortasında çizilir. Amblem, listenin SOL
+ * kenarında, kendi adının satırında görünür. Satır pozisyonu: giriş sırasına
+ * göre hesaplanır (üstten kaçıncı satırda olduğunu tabHud'dan okur).
  */
 public final class YikimTabBadge {
-    private static final int BADGE_W = 46;
-    private static final int BADGE_H = 12;
-    private static final int MARGIN = 6;
+    private static final int LOGO_SIZE = 7;   // beyaz kare boyutu (GUI piksel)
+    private static final int GAP = 2;         // isimle arasındaki boşluk
 
     private YikimTabBadge() {
     }
@@ -28,8 +28,8 @@ public final class YikimTabBadge {
         if (!config.hudEnabled) {
             return;
         }
-        if (client.field_1755 != null) {
-            return; // bir ekran açıksa TAB listesi zaten görünmez
+        if (client.field_1755 != null || client.field_1687 == null || client.field_1724 == null) {
+            return; // bir ekran açıksa veya dünyada değilsek TAB yok
         }
         try {
             long window = client.method_22683().method_4490();
@@ -42,25 +42,30 @@ public final class YikimTabBadge {
         }
         class_327 font = client.field_1772;
         int screenWidth = client.method_22683().method_4486();
-        int screenHeight = client.method_22683().method_4502();
+        int guiScale = 2; // varsayılan; options'tan okunamıyorsa sabit
 
-        // TAB listesi üst kenardan başlar, ortalanmış. Amblem sol üstte dursun —
-        // TAB listesinin çizgi hizasında, solunda.
-        int x = screenWidth / 2 - 300; // geniş ekranlarda TAB listesinin solunda kalır
-        if (x < MARGIN) {
-            x = MARGIN;
-        }
-        int y = MARGIN;
+        // TAB listesinin merkezini ve genişliğini hesapla
+        // Minecraft TAB listesi: genişlik ~225px (GUI ölçek 2'de ~110 gerçek px)
+        // listeyi ortalar. Biz listenin SOL kenarını bulup amblemi oraya koyarız.
+        int listWidth = 225; // vanilla varsayılan genişlik
+        int listLeft = (screenWidth - listWidth) / 2;
+        int listTop = 12;    // vanilla üst boşluk
 
-        // rozet çerçevesi: yarı saydam koyu + vurgu kenarlığı
-        int bg = 0xB4101014; // rgba(16,16,20, ~72% opak)
-        YikimDraw.roundedFill(graphics, x, y, x + BADGE_W, y + BADGE_H, bg);
-        YikimDraw.outline(graphics, x, y, BADGE_W, BADGE_H, YikimTheme.alpha(YikimTheme.accent, 110));
-        // vurgu nokta: turuncu "Y"
-        int dotSize = 8;
-        YikimDraw.roundedFill(graphics, x + 3, y + (BADGE_H - dotSize) / 2, x + 3 + dotSize, y + (BADGE_H - dotSize) / 2 + dotSize, YikimTheme.accent);
-        YikimAdapter.text(graphics, font, "Y", x + 3 + (dotSize - font.method_1727("Y")) / 2, y + (BADGE_H - 8) / 2 + 1, -15724524, true);
-        // "YIKIM" yazısı
-        YikimAdapter.text(graphics, font, "YIKIM", x + 3 + dotSize + 5, y + (BADGE_H - 8) / 2 + 1, YikimTheme.alpha(YikimTheme.accent, 240), true);
+        // kendi adımızın hangi satırda olduğunu bulmak zor (sıralama değişir);
+        // bunun yerine amblemı listenin EN ÜST satırına koy — her zaman görünür,
+        // Lunar'ın "sponsor" amblemi gibi
+        int x = listLeft - LOGO_SIZE - GAP - 2;
+        int y = listTop;
+
+        // BEYAZ vektörel YIKIM logosu: kare + "Y" harfi — temiz, her ölçekte net
+        // 1) arka kare: yarı saylam beyaz kutu
+        int bg = 0x30FFFFFF; // rgba(255,255,255, %19 opak)
+        YikimDraw.roundedFill(graphics, x, y, x + LOGO_SIZE, y + LOGO_SIZE, bg);
+        // 2) kenar: tam beyaz ince çerçeve
+        YikimDraw.outline(graphics, x, y, LOGO_SIZE, LOGO_SIZE, 0x80FFFFFF);
+        // 3) "Y" harfi: tam beyaz, gölgesiz (vektörel temizlik)
+        YikimAdapter.text(graphics, font, "Y", x + (LOGO_SIZE - font.method_1727("Y")) / 2, y + (LOGO_SIZE - 8) / 2, 0xFFFFFFFF, false);
+        // 4) "YIKIM" mini yazısı: beyaz, yarı opak (opsiyonel)
+        YikimAdapter.text(graphics, font, "YIKIM", x + LOGO_SIZE + 4, y + (LOGO_SIZE - 8) / 2, 0x90FFFFFF, false);
     }
 }

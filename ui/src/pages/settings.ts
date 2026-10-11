@@ -44,6 +44,19 @@ export function renderSettings(root: HTMLElement): void {
   const legacy: Record<string, string> = { dark: "standart", neon: "anons", light: "pano", orange: "pano" };
   const activeTheme = legacy[cfg.theme] ?? cfg.theme;
   const customOn = !!(cfg.custom_accent || "").trim();
+  // dinamik sürüm — Tauri'nin kendi getVersion()'undan
+  try {
+    const app = (window as any).__TAURI__?.app;
+    if (app?.getVersion) {
+      app.getVersion().then((v: string) => {
+        const el = root.querySelector("#app-version");
+        if (el) el.textContent = `v${v} "Kıvılcım"`;
+      }).catch(() => {
+        const el = root.querySelector("#app-version");
+        if (el) el.textContent = "v? — geliştirici sürümü";
+      });
+    }
+  } catch { /* sessiz */ }
 
   root.innerHTML = `
     <div class="page-wrap">
@@ -134,7 +147,7 @@ export function renderSettings(root: HTMLElement): void {
 
     <div class="card set-card anim-fade-up">
       <h3>${icon("info")} Hakkında</h3>
-      <div class="about-row"><span>YIKIMLient</span><b>v0.1.0 "Kıvılcım"</b></div>
+      <div class="about-row"><span>YIKIMLient</span><b id="app-version">yükleniyor…</b></div>
       <div class="about-row"><span>Tür</span><b>Ultra-hafif Minecraft launcher</b></div>
       <div class="about-row"><span>Motor</span><b>Tauri 2 + Rust (Electron'suz)</b></div>
       <div style="display:flex; gap:10px; margin-top:14px">
