@@ -48,7 +48,7 @@ $latest = @"
   "platforms": {
     "windows-x86_64": {
       "signature": "$signatur",
-      "url": "https://github.com/yikimlient/yikimlient/releases/download/v$versiyon/$(Split-Path $exe -Leaf)"
+      "url": "https://github.com/YKSAMI1/yikimlient/releases/download/v$versiyon/$(Split-Path $exe -Leaf)"
     }
   }
 }
@@ -62,7 +62,7 @@ Write-Host "TAMAM. Yayin klasoru: $cikti"
 Get-ChildItem $cikti | Select-Object Name, @{N="MB";E={[math]::Round($_.Length/1MB,2)}}
 Write-Host ""
 Write-Host "Sonraki adimlar:"
-Write-Host "  1) GitHub'da 'yikimlient/yikimlient' reposuna git"
+Write-Host "  1) GitHub'da 'YKSAMI1/yikimlient' reposuna git"
 Write-Host "  2) Releases > Draft a new release > etiket: v$versiyon"
 Write-Host "  3) Uc dosyayi da yukle (setup.exe + .sig + latest.json)"
 Write-Host "  4) Publish! - butun clientler otomatik gorecek ve guncelleyecek."

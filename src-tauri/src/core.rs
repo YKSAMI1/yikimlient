@@ -120,7 +120,7 @@ pub fn http_client() -> reqwest::Client {
     CLIENT
         .get_or_init(|| {
             reqwest::Client::builder()
-                .user_agent("YIKIMLient/0.1 (+https://github.com/yikimlient)")
+                .user_agent("YIKIMLient/0.2 (+https://github.com/YKSAMI1)")
                 .pool_max_idle_per_host(12)
                 .tcp_nodelay(true)
                 .build()

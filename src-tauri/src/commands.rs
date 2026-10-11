@@ -1104,7 +1104,7 @@ pub async fn cmd_cancel_downloads() -> Result<(), String> {
 pub async fn cmd_check_updates() -> Result<serde_json::Value, String> {
     // en iyi çaba: GitHub releases; olmazsa güncel sürümü bildir
     let current = env!("CARGO_PKG_VERSION");
-    let latest = repos::latest_release_tag("yikimlient", "yikimlient").await;
+    let latest = repos::latest_release_tag("YKSAMI1", "yikimlient").await;
     Ok(serde_json::json!({ "current": current, "latest": latest }))
 }
 

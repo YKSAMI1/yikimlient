@@ -53,7 +53,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQwNDk2OUEzMTE4NThGNTIKUldSU2o0VVJvMmxKMFBEUjFLUnFUdHR4VS8wVFJ2Vi9IaFdjeS9VblNCTy9KVHViWmxNblhUV1kK",
       "endpoints": [
-        "https://github.com/yikimlient/yikimlient/releases/latest/download/latest.json"
+        "https://github.com/YKSAMI1/yikimlient/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

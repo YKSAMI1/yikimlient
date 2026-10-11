@@ -96,7 +96,7 @@ fn strip_html(html: &str, max: usize) -> String {
 /// İmza şeması: JSON dosyasın olduğu klasörde aynı isim + ".sig" uzantılı
 /// 64-baytlık ham ed25519 imza (base64).
 
-pub const NEWS_FEED_URL: &str = "https://raw.githubusercontent.com/yikimlient/news/main/feed.json";
+pub const NEWS_FEED_URL: &str = "https://raw.githubusercontent.com/YKSAMI1/news/main/feed.json";
 /// Ed25519 public key (launcher'a gömülü; özel anahtar BASE ASLA burada değil).
 /// Yayın yaparken kendi anahtarınla imzala; pubkey'i değiştirmek = yeni launcher sürümü.
 pub const NEWS_PUBKEY_HEX: &str = "52f3bf1ab519be85d2a629c848b92e6f38dfa47698500e12afa7b70996ce9ba4";
