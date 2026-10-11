@@ -102,6 +102,7 @@ pub fn run() {
             commands::cmd_kill_game,
             commands::cmd_cancel_downloads,
             commands::cmd_check_updates,
+            commands::cmd_get_community_stats,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

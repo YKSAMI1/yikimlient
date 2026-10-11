@@ -109,6 +109,27 @@ export function renderHome(root: HTMLElement): void {
       </div>
       <div class="news-strip" id="home-news"><div class="spinner" style="margin:30px auto"></div></div>
     </section>
+
+    <!-- Topluluk -->
+    <section class="home-section">
+      <div class="section-head">
+        <h2 class="dim-cap">TOPLULUK</h2>
+      </div>
+      <div class="community-stats" id="community-stats">
+        <div class="card hover community-card">
+          <div class="cs-val" id="cs-downloads">…</div>
+          <div class="cs-label">İndirilme</div>
+        </div>
+        <div class="card hover community-card">
+          <div class="cs-val" id="cs-stars">…</div>
+          <div class="cs-label">GitHub Yıldız</div>
+        </div>
+        <div class="card hover community-card" id="cs-github-link" style="cursor:pointer">
+          <div class="cs-val">${icon("globe")}</div>
+          <div class="cs-label">GitHub'da Aç</div>
+        </div>
+      </div>
+    </section>
     </div>
   `;
 
@@ -148,6 +169,25 @@ export function renderHome(root: HTMLElement): void {
 
   wireHome(root);
   loadHomeNews();
+  loadCommunityStats(root);
+}
+
+async function loadCommunityStats(root: HTMLElement): Promise<void> {
+  try {
+    const stats = await invoke("cmd_get_community_stats");
+    const dl = root.querySelector("#cs-downloads");
+    const st = root.querySelector("#cs-stars");
+    if (dl) dl.textContent = (stats.downloads || 0).toLocaleString("tr-TR");
+    if (st) st.textContent = (stats.stars || 0).toLocaleString("tr-TR");
+  } catch {
+    const dl = root.querySelector("#cs-downloads");
+    const st = root.querySelector("#cs-stars");
+    if (dl) dl.textContent = "—";
+    if (st) st.textContent = "—";
+  }
+  root.querySelector("#cs-github-link")?.addEventListener("click", () => {
+    import("../main").then((m) => m.openExternal("https://github.com/YKSAMI1/yikimlient").catch(() => {}));
+  });
 }
 
 function loaderName(l: string): string {

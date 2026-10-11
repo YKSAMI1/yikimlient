@@ -1102,10 +1102,74 @@ pub async fn cmd_cancel_downloads() -> Result<(), String> {
 
 #[tauri::command]
 pub async fn cmd_check_updates() -> Result<serde_json::Value, String> {
-    // en iyi çaba: GitHub releases; olmazsa güncel sürümü bildir
     let current = env!("CARGO_PKG_VERSION");
     let latest = repos::latest_release_tag("YKSAMI1", "yikimlient").await;
     Ok(serde_json::json!({ "current": current, "latest": latest }))
+}
+
+#[derive(Serialize)]
+pub struct CommunityStats {
+    pub downloads: u64,
+    pub stars: u64,
+}
+
+/// Topluluk istatistikleri: GitHub Releases indirilme sayısı + yıldız.
+/// 5 dakika cache'li — her açılışta GitHub API'sini boşuna yormayalım.
+#[tauri::command]
+pub async fn cmd_get_community_stats() -> Result<CommunityStats, String> {
+    let cache_path = crate::core::app_dir().join("community-stats.json");
+    // cache: 5 dakika
+    if let Ok(text) = std::fs::read_to_string(&cache_path) {
+        if let Ok(js) = serde_json::from_str::<serde_json::Value>(&text) {
+            let at = js["at"].as_i64().unwrap_or(0);
+            if crate::core::now_millis() - at < 300_000 {
+                return Ok(CommunityStats {
+                    downloads: js["downloads"].as_u64().unwrap_or(0),
+                    stars: js["stars"].as_u64().unwrap_or(0),
+                });
+            }
+        }
+    }
+    let mut downloads: u64 = 0;
+    // Releases API: her release'in asset'lerinin download_count toplamı
+    if let Ok(js) = crate::core::http_client()
+        .get("https://api.github.com/repos/YKSAMI1/yikimlient/releases")
+        .header("User-Agent", "YIKIMLient")
+        .send()
+        .await
+    {
+        if js.status().is_success() {
+            if let Ok(rel) = js.json::<serde_json::Value>().await {
+                if let Some(arr) = rel.as_array() {
+                    for r in arr {
+                        if let Some(assets) = r["assets"].as_array() {
+                            for a in assets {
+                                downloads += a["download_count"].as_u64().unwrap_or(0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let mut stars: u64 = 0;
+    if let Ok(js) = crate::core::http_client()
+        .get("https://api.github.com/repos/YKSAMI1/yikimlient")
+        .header("User-Agent", "YIKIMLient")
+        .send()
+        .await
+    {
+        if js.status().is_success() {
+            if let Ok(repo) = js.json::<serde_json::Value>().await {
+                stars = repo["stargazers_count"].as_u64().unwrap_or(0);
+            }
+        }
+    }
+    let _ = crate::util::write_json(
+        &cache_path,
+        &serde_json::json!({ "at": crate::core::now_millis(), "downloads": downloads, "stars": stars }),
+    );
+    Ok(CommunityStats { downloads, stars })
 }
 
 // ---------- Perde (oyun içi mod değişikliği akışı) ----------
