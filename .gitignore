@@ -4,3 +4,16 @@ src-tauri/target/
 *.log
 .DS_Store
 tools/news-private.key
+tools/updater-private.key*
+
+# ajan/araç dosyaları — client kodu değil, repoya girmez
+.agents/
+.freebuff/
+
+# derleme çıktıları ve indirme araçları (yeniden üretilebilir)
+yikim-mod/araclar/
+yikim-mod/derleme/
+
+# binary ve temp — GitHub Release'lerinde durur, git'te değil
+*.exe
+.tmp-*

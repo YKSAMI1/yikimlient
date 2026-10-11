@@ -557,8 +557,59 @@ export async function boot(): Promise<void> {
     registerPages();
     setupShell();
     navigate("home");
+    // Otomatik güncelleme kontrolü (imzalı; GitHub releases'ten) — sessiz kontrol,
+    // güncelleme varsa kullanıcıya sorar, hata asla açılışı bozmaz.
+    void checkForUpdate();
   } catch (e) {
     fatalBoot(e);
+  }
+}
+
+/// GitHub'dan yeni sürüm kontrolü → varsa "indir ve kur" onayı.
+/// İmza doğrulaması Tauri updater içinde: geçersiz imza = kurulum REDDEDİLİR.
+async function checkForUpdate(): Promise<void> {
+  try {
+    const mod = await import("@tauri-apps/plugin-updater");
+    const update = await mod.check();
+    if (!update?.available) return;
+    const { root, close } = openModal(`
+      <h2>Güncelleme Var</h2>
+      <div class="sub">YIKIMLient <b>v${update.version}</b> hazır. Değişiklik notları:</div>
+      <div style="margin:12px 0; max-height:180px; overflow-y:auto; user-select:text; color:var(--text-dim); font-size:12.5px; line-height:1.55">
+        ${(update.body || "Değişiklik notu yok.").split("\n").map((l: string) => `<div>${l}</div>`).join("")}
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:6px">
+        <button class="btn ghost" id="upd-later">Sonra</button>
+        <button class="btn primary" id="upd-go">İndir ve Kur</button>
+      </div>
+    `);
+    root.querySelector("#upd-later")?.addEventListener("click", () => close());
+    root.querySelector("#upd-go")?.addEventListener("click", async () => {
+      const btn = root.querySelector("#upd-go") as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = "İndiriliyor…";
+      try {
+        let received = 0;
+        let total = 0;
+        await update.download((event: any) => {
+          switch (event.event) {
+            case "Started": total = event.data.contentLength ?? 0; break;
+            case "Progress": received += event.data.chunkLength; break;
+            case "Finished": btn.textContent = "Kuruluyor…"; break;
+          }
+          if (total > 0) btn.textContent = `İndiriliyor… %${Math.round((received / total) * 100)}`;
+        });
+        await update.install();
+        toast("Güncelleme kuruldu — launcher yeniden başlıyor");
+        setTimeout(() => { try { T.process.exit(0); } catch { window.location.reload(); } }, 900);
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = "İndir ve Kur";
+        toast(`Güncelleme başarısız: ${e}`, "err");
+      }
+    });
+  } catch {
+    // güncelleme kontrolü sessizce atlanır (çevrimdışı / endpoint yok) — boot bozulmaz
   }
 }
 

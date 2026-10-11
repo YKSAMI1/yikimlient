@@ -1,4 +1,0 @@
-Manifest-Version: 1.0
-Fabric-Jar-Type: classes
-Fabric-Mapping-Namespace: intermediary
-Built-By: YIKIMLient

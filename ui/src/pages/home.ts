@@ -1,10 +1,6 @@
 import { $, currentAccount, el, fileSrc, fmtDuration, headAttrs, headUrl, icon, invoke, lamp, launch, navigate, openLoginModal, state } from "../main";
 import { enterRows, switchPress } from "../motion";
 
-interface NewsItem {
-  title: string; category: string; date: string; text: string; url: string; image: string;
-}
-
 let selectedInstanceId: string | null = null;
 
 export function renderHome(root: HTMLElement): void {
@@ -105,10 +101,10 @@ export function renderHome(root: HTMLElement): void {
       </div>
     </section>` : ""}
 
-    <!-- Haberler -->
+    <!-- Duyurular (yalnızca geliştiricinin imzalı feed'i) -->
     <section class="home-section" ${state.config?.show_news === false ? 'hidden' : ''}>
       <div class="section-head">
-        <h2 class="dim-cap">PANO NOTLARI — HABERLER</h2>
+        <h2 class="dim-cap">YIKIM DUYURULARI</h2>
         <button class="btn ghost sm" id="news-all">Tümü</button>
       </div>
       <div class="news-strip" id="home-news"><div class="spinner" style="margin:30px auto"></div></div>
@@ -184,28 +180,29 @@ async function loadHomeNews(): Promise<void> {
   const strip = $("#home-news");
   if (!strip) return;
   try {
-    const items: NewsItem[] = await invoke("cmd_list_news");
+    // YALNIZCA geliştiricinin imzalı duyuruları (Minecraft haber akışı kaldırıldı).
+    const items: any[] = await invoke("cmd_list_yikim_news");
     strip.innerHTML = "";
     if (!items.length) {
-      strip.innerHTML = `<div class="card"><p>Pano notları şimdilik boş — çevrimdışı olabilirsin.</p></div>`;
+      strip.innerHTML = `<div class="card"><p>Duyuru yok — yenilikler burada belirecek.</p></div>`;
       return;
     }
-    for (const n of items.slice(0, 8)) {
+    items.sort((a: any, b: any) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.date.localeCompare(a.date));
+    for (const a of items.slice(0, 4)) {
       const card = el(`
         <div class="news-card card hover">
-          ${n.image ? `<div class="news-img" style="background-image:url('${n.image}')"></div>` : `<div class="news-img noimg">${icon("news")}</div>`}
+          ${a.image ? `<div class="news-img" style="background-image:url('${a.image}')"></div>` : `<div class="news-img noimg">${icon("news")}</div>`}
           <div class="news-body">
-            <div class="chip">${n.category} · ${n.date}</div>
-            <h3>${n.title}</h3>
+            <div class="chip orange">${a.pinned ? "DUYURU" : "YIKIM"} · ${a.date}</div>
+            <h3>${a.title}</h3>
           </div>
         </div>
       `);
-      card.addEventListener("click", () => {
-        import("../main").then((m) => m.openExternal(n.url).catch(() => {}));
-      });
+      // kart tıklaması dış bağlantı AÇMAZ — Duyurular sayfasına götürür
+      card.addEventListener("click", () => navigate("news"));
       strip.appendChild(card);
     }
   } catch {
-    strip.innerHTML = `<div class="card"><p>Pano notları şimdilik yüklenemedi — çevrimdışı olabilirsin.</p></div>`;
+    strip.innerHTML = `<div class="card"><p>Duyurular şimdilik yüklenemedi — çevrimdışı olabilirsin.</p></div>`;
   }
 }

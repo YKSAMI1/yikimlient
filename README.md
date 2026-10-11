@@ -1,57 +1,75 @@
 # 🔥 YIKIMLient
 
-**Ultra-hafif, ultra-hızlı, göz alıcı Minecraft launcher.** Lunar / Dawn / OneClient seviyesinde bir deneyim — Electron'suz.
-
-## Neden bu kadar hafif?
+**Ultra-hafif, ultra-hızlı Minecraft istemcisi: launcher + oyun içi mod.** Lunar / OneClient deneyimi — Electron'suz.
 
 | | YIKIMLient | Electron tabanlı launcher'lar |
 |---|---|---|
-| RAM (boşta) | ~50–90 MB | 300–700 MB |
-| Başlatma | <1 sn | 3–8 sn |
-| Kurulum boyutu | ~15 MB | 150–250 MB |
+| RAM (boşta) | ~100–150 MB | 300–700 MB |
+| Kurulum boyutu | ~3.5 MB | 150–250 MB |
 | Motor | Tauri 2 + Rust + sistem WebView | Paketli Chromium + Node |
 
 ## Özellikler
 
-- 🎮 **Offline + Microsoft girişi** (device-code akışı; XBL → XSTS → MC zinciri)
-- 📦 **Mod paketleri**: Fabric/Vanilla kurulumlar, ikonlar, kopyalama, silme
-- ☕ **Java argüman presetleri**: Dengeli / Yüksek FPS / Düşük RAM / Düşük Gecikme / Agresif — açıklamalı
-- 🧩 **Standart modlar**: kurulum sırasında otomatik (performans + PVP + görünüm), sonra tek tek aç/kapa
-- 🧭 **Keşfet**: Modrinth + CurseForge arama; mod ve hazır paket tek tıkla kurulum
-- 📥 **Akıllı indirme**: SHA1 doğrulamalı, paralel (32 bağlantı), mevcut dosyaları atlar
-- ☕ **Otomatik Java**: Mojang resmî runtime'ları (her MC sürümü için doğru Java)
-- 📊 **İstatistik**: oynanış süresi, sunucu geçmişi, gün dağılımı — **tamamen event-driven, oyun içinde sıfır I/O**
-- 📰 **Haberler**: Mojang resmî patch note akışı
-- 🎨 **Temalar**: turuncu/siyah default + 4 tema + özel renk; her şey Ayarlar'dan
-- 📜 **Canlı log**: renkli, filtreli, satır sayan akış
+- 🎮 **Offline + Microsoft girişi** (resmî device-code akışı: XBL → XSTS → Minecraft)
+- 📦 **Hazır mod paketi** — tek tıkla kurulum; eklenen modlar mevcut kurulumlara otomatik düşer, çakışanlar emekliye ayrılır. Her bileşen alanının en iyisinden: Sodium, Lithium, FerriteCore, Krypton, ModernFix, EntityCulling, ImmediatelyFast, Noisium, Particle Core, Dynamic FPS, FastQuit…
+- ☕ **JVM profilleri**: Dengeli / Yüksek FPS / Ultra FPS (Eski PC) / Düşük RAM / Düşük Gecikme / Agresif
+- 🛡️ **Ayar profili + bekçi**: her açılışta Türkçe arayüz, sınırsız FPS, VSync kapalı, tüm sarsıntı efektleri kapalı; oyun içi **performans bekçisi** sürüklenen ayarları geri alır (kullanıcı ayar ekranındayken asla karışmaz)
+- 🧩 **Oyun içi YIKIM modu**: Sağ Shift paneli (modlar, katalog, profiller), tam ekran HUD editörü (matris ızgara), widget başına ölçek, FPS/TPS/HUD maliyeti ölçümü, A/B performans testi
+- 🔄 **Oyun içi mod aç/kapa → perde**: oyundan çıkınca değişiklikler canlı uygulanır ve oyun kendini yeniden başlatır (mini launcher penceresiyle)
+- 🌐 **YIKIMDARA sunucusu** otomatik listede
+- 📰 **İmzalı duyurular**: yalnızca geliştiricinin ed25519 imzalı feed'i; Mojang haber akışı yok
+- 🔄 **Otomatik güncelleme**: GitHub Releases'ten, minisign imzalı — geçersiz imza kurulamaz
+
+## 🔒 Veri şeffaflığı (mod ve launcher ne yapar?)
+
+**Toplanan/kullanılan veriler:**
+- **Hesap adı + UUID** (seçili profil için) — yerel `accounts.json`
+- **Oynanış istatistikleri** (süre, sunucu adresi) — *tamamen yerel*, `sessions.jsonl`; hiçbir yere gönderilmez
+- **Kurulum ayarları** (RAM, sürüm, JVM profili) — yerel `yikimlient.json`
+
+**Ağ bağlantıları (yalnızca bu üçü):**
+1. **Modrinth / CurseForge API** — mod arama + indirme (katalog)
+2. **Duyuru feed'i** — `feed.json` + imza (GitHub)
+3. **Güncelleme kontrolü** — GitHub Releases
+
+**Modun dosya erişimi:** yalnızca kendi oyun klasörü içinde: `mods/`, `config/yikimlient.cfg`, `.yikim/` köprü dosyaları (launcher ile iletişim). Oyun ayarlarına yalnızca **onaylanan profil değerleri** yazılır; tuş atamalarına ve kullanıcı tercihlerine dokunulmaz.
+
+**Telemetri YOK.** Analitik, izleme, reklam, veri satışı yok. Microsoft token'ları yalnızca yerelde tutulur.
+
+## Kurulum
+
+Releases sayfasından `YIKIMLient_x64-setup.exe` indir → kur → oyna. Java dahil indirilir.
 
 ## Geliştirme
 
 ```bash
 npm install
-npm run app      # tauri dev
+npm run app              # tauri dev
+npm run dist             # kurulum paketi üret
+cargo test               # Rust testleri (src-tauri/)
 ```
 
-## Dağıtım
-
-```bash
-npm run dist     # NSIS + MSI üretir (src-tauri/target/release/bundle/)
+Oyun içi modun kaynak kodu: `yikim-mod/` (tek komutla derlenir):
+```powershell
+powershell -File yikim-mod\araclar\derle-1.21.11.ps1
 ```
 
-## CurseForge desteği
+Mimari ve performans hedefleri: [`PERFORMANS-MIMARISI.md`](./PERFORMANS-MIMARISI.md)
 
-CF API anahtarı gerektirir (ücretsiz): [console.curseforge.com](https://console.curseforge.com).
-`%APPDATA%/.yikimlient/curseforge_key.txt` içine yaz — Modrinth anahtarsız çalışır.
+## Duyuru yayınlama (yalnızca geliştirici)
 
-## Mimari notlar (FPS vaadi)
-
-- Launcher Rust çekirdeği: `launcher.rs` (indirme/başlatma), `repos.rs` (Modrinth/CF), `stats.rs` (event-driven istatistik)
-- Oyun içi mod (gelecek aşama): tek render hook, sıfır polling, sıfır disk I/O — feature flag ile ölçülebilir
-- Tüm ağırlıklı işler native tarafta; WebView yalnızca UI çizer
+Duyurular ed25519 imzalıdır — yalnızca imza sahibi yayınlayabilir:
+1. `news/feed.json` düzenle
+2. `node tools/news-sign.mjs sign`
+3. `feed.json` + `feed.json.sig` dosyalarını haber reposuna push'la
 
 ## Yol haritası
 
-- [ ] Forge desteği
-- [ ] Oyun içi mod: FPS boost katmanı (ilk hedef Fabric 1.21.x)
-- [ ] Otomatik güncelleme (tauri-plugin-updater entegre, sunucu bekliyor)
+- [ ] `yikim-optimize`: derin render yamaları (mixin) — ölçüm protokolü şartıyla
+- [ ] Diğer MC sürümlerine mod port'u
+- [ ] Android (Rust çekirdek aynı kalır)
 - [ ] Discord RPC
+
+## Lisans
+
+Kod MIT. `PERFORMANS-MIMARISI.md` ve marka adı YIKIMLient'a aittir.
