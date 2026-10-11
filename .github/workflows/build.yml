@@ -34,7 +34,7 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Build
+      - name: Build Windows
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,9 +42,10 @@ jobs:
         with:
           tagName: "latest"
           releaseName: "YIKIMLient"
-          releaseBody: "See the assets to download this version and install."
+          releaseBody: "See assets below to download."
           releaseDraft: false
           prerelease: false
+          args: --bundles nsis
 
   build-linux:
     runs-on: ubuntu-22.04
@@ -73,13 +74,14 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Build
+      - name: Build Linux
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: "latest"
           releaseName: "YIKIMLient"
-          releaseBody: "See the assets to download this version and install."
+          releaseBody: "See assets below to download."
           releaseDraft: false
           prerelease: false
+          args: --bundles appimage,deb
