@@ -9,7 +9,8 @@
     "build": "vite build",
     "check": "tsc --noEmit",
     "app": "tauri dev",
-    "dist": "tauri build"
+    "dist": "tauri build",
+    "tauri": "tauri"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.5.0",
