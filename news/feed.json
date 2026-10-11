@@ -1,16 +1,16 @@
 {
   "version": 1,
-  "updated_at": 1760000000,
+  "updated_at": 1760000001,
   "announcements": [
     {
-      "id": "hosgeldin",
-      "title": "YIKIMLient'e hoş geldin!",
-      "text": "Bu panelden duyurular, güncelleme notları ve sunucu haberleri yayınlanacak.",
-      "body": "YIKIMLient aktif olarak geliştiriliyor.\n\nBu alandaki duyurular şifreli imzayla korunur; yalnızca geliştirici yayınlayabilir. Güncelleme notları ve önemli duyurular burada belirecek.",
+      "id": "v0-2-0-yayinda",
+      "title": "YIKIMLient v0.2.0 Yayında! 🔥",
+      "text": "İlk genel sürüm çıktı! Optimize mod paketi, oyun içi panel, sınırsız FPS ve otomatik güncelleme hazır.",
+      "body": "YIKIMLient v0.2.0 resmi olarak yayınlandı!\n\nNeler var:\n\n• Hazır optimize mod paketi — tek tıkla kurulum (Sodium, Lithium ve 50+ mod)\n• Oyun içi YIKIM paneli — Sağ Shift ile açılır\n• Sınırsız FPS + VSync kapalı — her açılışta garanti\n• YIKIMDARA sunucusu otomatik listede\n• Otomatik güncelleme — yeni sürümler kendiliğinden gelir\n\nSorun bulursan Discord veya GitHub üzerinden bildir!",
       "image": "",
-      "link": "",
-      "link_label": "",
-      "date": "2026-10-09",
+      "link": "https://github.com/YKSAMI1/yikimlient/releases/tag/v0.2.0",
+      "link_label": "Sürümü indir",
+      "date": "2026-10-12",
       "pinned": true
     }
   ]
