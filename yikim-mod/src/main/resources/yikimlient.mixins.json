@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.yikimlient.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "YikimTabListMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
