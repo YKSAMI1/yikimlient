@@ -2,9 +2,11 @@ name: Build
 
 on:
   push:
-    branches: [main]
-    tags: ['v*']
-  workflow_dispatch:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -12,96 +14,72 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-    outputs:
-      tag: ${{ github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: "22"
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - uses: swatinem/rust-cache@v2
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
-      - run: npm ci
+      - name: Install deps
+        run: npm ci
 
-      - name: Build Tauri (Windows)
+      - name: Build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'YIKIMLient ${{ github.ref_name }}'
-          releaseBody: 'Windows + Linux build.'
+          tagName: "latest"
+          releaseName: "YIKIMLient"
+          releaseBody: "See the assets to download this version and install."
           releaseDraft: false
           prerelease: false
-          args: --target x86_64-pc-windows-msvc
-
-      - name: Upload Windows latest.json
-        uses: actions/upload-artifact@v4
-        with:
-          name: latest-windows
-          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.json
 
   build-linux:
-    needs: build-windows
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: "22"
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-gnu
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - uses: swatinem/rust-cache@v2
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
-      - name: Install Linux system dependencies
+      - name: Install Linux deps
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
-      - run: npm ci
+      - name: Install deps
+        run: npm ci
 
-      - name: Build Tauri (Linux)
+      - name: Build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'YIKIMLient ${{ github.ref_name }}'
+          tagName: "latest"
+          releaseName: "YIKIMLient"
+          releaseBody: "See the assets to download this version and install."
           releaseDraft: false
           prerelease: false
-          args: --target x86_64-unknown-linux-gnu
-
-  merge-updater:
-    needs: [build-windows, build-linux]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Merge latest.json (Windows + Linux)
-        run: |
-          echo "TODO: latest.json birlestirme — tauri-action zaten hallediyor"
-          # tauri-action, ayni tag'e yuklenen dosyalari birlestirir
-          # Linux build zaten ayni release'e yukleniyor
-
-      - name: Verify release
-        run: echo "Release tamamlandi: https://github.com/YKSAMI1/yikimlient/releases"
