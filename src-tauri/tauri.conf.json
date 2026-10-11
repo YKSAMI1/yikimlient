@@ -37,7 +37,7 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "targets": ["nsis"],
+    "targets": ["nsis", "appimage", "deb"],
     "resources": ["resources/mods/*"],
     "icon": ["icons/icon.ico", "icons/32x32.png", "icons/128x128.png", "icons/icon.png"],
     "copyright": "© 2026 YIKIMLient",
@@ -48,13 +48,18 @@
         "installMode": "currentUser",
         "languages": ["Turkish", "English"],
         "installerIcon": "icons/icon.ico",
-        "uninstallerIcon": "icons/icon.ico",
-        "headerImage": null,
-        "sidebarImage": null,
-        "installerHooks": null
+        "uninstallerIcon": "icons/icon.ico"
       },
       "webviewInstallMode": {
         "type": "embedBootstrapper"
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      },
+      "appimage": {
+        "bundleMediaFramework": false
       }
     }
   },

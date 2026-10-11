@@ -38,7 +38,26 @@
 
 ## Kurulum
 
+### Windows
 Releases sayfasından `YIKIMLient_x64-setup.exe` indir → kur → oyna. Java dahil indirilir.
+
+### Linux
+Releases sayfasından:
+- **AppImage**: `yikimlient_x.x.x_amd64.AppImage` indir → çalıştır
+- **DEB**: `yikimlient_x.x.x_amd64.deb` → `sudo dpkg -i yikimlient_*.deb`
+
+Gereksinimler (dağıtımdan bağımsız):
+```bash
+# Ubuntu/Debian
+sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0
+
+# Fedora
+sudo dnf install webkit2gtk4.1 gtk3
+
+# Arch
+sudo pacman -S webkit2gtk-4.1 gtk3
+```
+Java otomatik indirilir (Mojang'ın Linux runtime'ı).
 
 ## Geliştirme
 
