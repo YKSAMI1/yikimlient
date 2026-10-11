@@ -19,6 +19,8 @@ pub const FORCED_OPTIONS: &[(&str, &str)] = &[
     ("fovEffectScale", "0.0"),    // erişilebilirlik: FOV efektleri kapalı
     ("screenEffectScale", "0.0"), // erişilebilirlik: sarsıntı/bulanıklık efektleri kapalı
     ("damageTiltStrength", "0.0"), // erişilebilirlik: hasar sarsıntısı kapalı
+    ("darknessEffectScale", "0.0"), // erişilebilirlik: karanlık efekti kapalı
+    ("distortionEffectScale", "0.0"), // erişilebilirlik: distorsiyon (nausea/portal) kapalı
 ];
 
 /// Oyun klasörünün options.txt'sine profil anahtarlarını yaz (idempotent).
