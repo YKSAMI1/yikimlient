@@ -609,7 +609,14 @@ fn which_java() -> Result<PathBuf, String> {
 /// `java -version` çıktısından major sürümü al; gerekenden küçükse false.
 fn java_major_ok(java_bin_dir: &Path, required: u32) -> bool {
     let exe = java_exe(java_bin_dir);
-    let Ok(out) = std::process::Command::new(&exe).arg("-version").output() else {
+    let mut cmd = std::process::Command::new(&exe);
+    cmd.arg("-version");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW — CMD penceresi açılmasın
+    }
+    let Ok(out) = cmd.output() else {
         return false;
     };
     let text = format!(

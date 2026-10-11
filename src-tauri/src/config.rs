@@ -42,7 +42,7 @@ impl Default for YikimConfig {
             window_maximized: false,
             stats_enabled: true,
             java_dir: None,
-            download_concurrency: 32,
+            download_concurrency: 8,
         }
     }
 }
