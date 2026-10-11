@@ -237,6 +237,104 @@ async fn install_standard_mods_inner(
     Ok(())
 }
 
+// ---------- Mod paketi tamamlama (mevcut kurulumlar yeni modları otomatik alır) ----------
+
+/// Dosya adı/slug karşılaştırması için normalize: '-', '_', '.' atılır, küçük harf.
+fn mod_key_norm(s: &str) -> String {
+    s.chars().filter(|c| *c != '-' && *c != '_' && *c != '.').collect::<String>().to_lowercase()
+}
+
+/// Jar'ın fabric.mod.json içindeki "id" alanı (varlık tespitinde ikinci kanıt).
+fn jar_mod_id(path: &std::path::Path) -> Option<String> {
+    let file = std::fs::File::open(path).ok()?;
+    let mut zip = zip::ZipArchive::new(file).ok()?;
+    let mut entry = zip.by_name("fabric.mod.json").ok()?;
+    let mut text = String::new();
+    std::io::Read::read_to_string(&mut entry, &mut text).ok()?;
+    let js: serde_json::Value = serde_json::from_str(&text).ok()?;
+    js.get("id").and_then(|v| v.as_str()).map(|s| s.to_string())
+}
+
+/// Mevcut KURULUMDA standart paketin eksik modlarını tamamla ve emekli modları ayır.
+/// Her başlatmada çalışır: paket listesine yeni eklenen mod (ör. ukulib) eski
+/// kurulumlara da otomatik düşer; listeden emekliye ayrılan modlar retired_mods/'a taşınır.
+/// Dönüş: kurulan mod sayısı.
+pub async fn complete_standard_mods(handle: &AppHandle, inst: &Instance) -> u32 {
+    let mods_dir = inst.mods_dir();
+    // 1) envanter: normalize dosya adları + fabric id'ler
+    let mut present: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut names: Vec<String> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&mods_dir) {
+        for e in rd.flatten() {
+            let name = e.file_name().to_string_lossy().to_string();
+            if !name.ends_with(".jar") && !name.ends_with(".jar.disabled") {
+                continue;
+            }
+            let base = name
+                .trim_end_matches(".disabled")
+                .trim_end_matches(".jar")
+                .to_string();
+            present.insert(mod_key_norm(&base));
+            if let Some(id) = jar_mod_id(&e.path()) {
+                present.insert(mod_key_norm(&id));
+            }
+            names.push(name);
+        }
+    }
+    // 2) eksikleri kur (varsayılan kapalı modlar .jar.disabled olarak kurulur)
+    let mut added = 0u32;
+    for m in modpacks::standard_mods() {
+        let key = mod_key_norm(&m.slug);
+        if present.contains(&key) {
+            continue; // kurulu — kullanıcının açık/kapalı tercihini ASLA bozma
+        }
+        match repos::install_mod_into(handle, "modrinth", &m.id, None, inst, &mods_dir).await {
+            Ok(file) => {
+                if !m.enabled_by_default {
+                    let from = mods_dir.join(&file);
+                    let to = mods_dir.join(format!("{file}.disabled"));
+                    let _ = std::fs::rename(&from, &to);
+                }
+                added += 1;
+                core::yikim_log(format!(
+                    "paket tamamlandı: {} kuruldu ({})",
+                    m.name,
+                    if m.enabled_by_default { "açık" } else { "kapalı" }
+                ));
+                present.insert(key);
+            }
+            Err(e) => core::yikim_log(format!("paket tamamlama atlandı ({}): {e}", m.name)),
+        }
+    }
+    // 3) emekli modları ayır (silme yok — retired_mods/ klasörüne taşı)
+    let mut retired = 0u32;
+    let retired_dir = inst.dir().join("retired_mods");
+    for prefix in modpacks::retired_mod_prefixes() {
+        let pkey = mod_key_norm(prefix);
+        for name in &names {
+            let base = name
+                .trim_end_matches(".disabled")
+                .trim_end_matches(".jar")
+                .to_string();
+            if !mod_key_norm(&base).starts_with(&pkey) {
+                continue;
+            }
+            let _ = std::fs::create_dir_all(&retired_dir);
+            if std::fs::rename(mods_dir.join(name), retired_dir.join(name)).is_ok() {
+                retired += 1;
+                core::yikim_log(format!("emekli mod ayrıldı ({name}) → retired_mods/"));
+            }
+        }
+    }
+    if added > 0 || retired > 0 {
+        core::yikim_log(format!(
+            "mod paketi güncellendi: {} kuruldu, {} emekliye ayrıldı",
+            added, retired
+        ));
+    }
+    added
+}
+
 #[tauri::command]
 pub async fn cmd_delete_instance(id: String) -> Result<(), String> {
     instances::delete(&id)
@@ -909,9 +1007,20 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
     let cfg = YikimConfig::load_or_default();
     let java_dir = launcher::resolve_java_dirs(&component, major, cfg.java_dir.clone()).await?;
 
-    // standart modlar (ilk başlatmada eksikse tamamla)
-    if inst.standard_mods && inst.mod_loader == "fabric" && inst.mods_dir().read_dir().map(|mut d| d.next().is_none()).unwrap_or(true) {
-        install_standard_mods_inner(&app, &inst).await?;
+    // Standart mod paketi: mods/ boşsa TAM kurulum, doluysa EKSİKLERİ tamamla
+    // (yeni eklenen modlar — örn. ukulib — mevcut kurulumlara da otomatik düşer;
+    //  emekliye ayrılanlar — örn. c2me — retired_mods/'a taşınır)
+    if inst.standard_mods && inst.mod_loader == "fabric" {
+        let mods_empty = inst
+            .mods_dir()
+            .read_dir()
+            .map(|mut d| d.next().is_none())
+            .unwrap_or(true);
+        if mods_empty {
+            install_standard_mods_inner(&app, &inst).await?;
+        } else {
+            let _ = complete_standard_mods(&app, &inst).await;
+        }
     }
 
     // TEK kapalı mekanizması: eski disabled_mods/ kalıntılarını mods/*.jar.disabled'e taşı

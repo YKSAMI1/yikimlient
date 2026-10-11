@@ -333,12 +333,6 @@ pub fn standard_mods() -> Vec<StandardMod> {
             category: "gorunum".into(), enabled_by_default: true,
         },
         StandardMod {
-            id: "zoomify".into(), slug: "zoomify".into(),
-            name: "Zoomify".into(),
-            description: "Akıcı zoom (C tuşu); uzak oyuncuları/sniper koridorunu görmek için PVP şartı.".into(),
-            category: "gorunum".into(), enabled_by_default: true,
-        },
-        StandardMod {
             id: "modmenu".into(), slug: "modmenu".into(),
             name: "Mod Menu".into(),
             description: "Oyun içinde mod listesi + ayar butonu; kurulu modları oyun içinden yönet.".into(),
@@ -413,15 +407,9 @@ pub fn standard_mods() -> Vec<StandardMod> {
             category: "yardarci".into(), enabled_by_default: false,
         },
         StandardMod {
-            id: "ixeris".into(), slug: "ixeris".into(),
-            name: "Ixeris".into(),
-            description: "Küçük kullanıcı arayüzü ve oyun iyileştirmeleri.".into(),
-            category: "gorunum".into(), enabled_by_default: true,
-        },
-        StandardMod {
             id: "gnetum".into(), slug: "gnetum".into(),
             name: "Gnetum".into(),
-            description: "HUD elemanlarını (scoreboard, actionbar) daha düzenli gösterir.".into(),
+            description: "HUD güncellemelerini karelere dağıtarak yükü azaltır; scoreboard/actionbar düzeni.".into(),
             category: "gorunum".into(), enabled_by_default: true,
         },
         StandardMod {
@@ -453,12 +441,6 @@ pub fn standard_mods() -> Vec<StandardMod> {
             name: "Entity Model Features (EMF)".into(),
             description: "Community optimizasyon modlarıyla uyumlu mob model değişimleri (Optifine uyumluluk).".into(),
             category: "gorunum".into(), enabled_by_default: true,
-        },
-        StandardMod {
-            id: "zfastnoise".into(), slug: "zfastnoise".into(),
-            name: "Fast Noise".into(),
-            description: "Noise/dünya üretimini hızlandırır; yeni chunk yaratımında FPS destekler.".into(),
-            category: "performans".into(), enabled_by_default: true,
         },
         StandardMod {
             id: "effecttimerplus".into(), slug: "effecttimerplus".into(),
@@ -509,6 +491,16 @@ pub fn standard_mods() -> Vec<StandardMod> {
             category: "gorunum".into(), enabled_by_default: false,
         },
     ]
+}
+
+/// Emekliye ayrılan standart modlar (dosya adı önekleri). Nedenleri:
+/// - zoomify: bizim modun YERLEŞİK zoom'u ile C tuşu çakışması (işlevsel kopya)
+/// - zfastnoise: Noisium ile aynı işi yapıyor (dünya üretimi) → çakışma + sıfır fayda
+/// - ixeris: 1.21.9+ yeni giriş sistemi (KeyInput/MouseInput) riski; panel girişlerimize zarar verebilir
+/// - c2me-fabric: kalite/kararlılık gözetimi ile çıkarıldı
+/// Kurulumda rastlanırsa `retired_mods/` klasörüne TAŞINIR (silinmez — geri dönüş her zaman açık).
+pub fn retired_mod_prefixes() -> Vec<&'static str> {
+    vec!["zoomify", "zfastnoise", "ixeris", "c2me-fabric"]
 }
 
 /// Launcher içinde sunduğumuz başlangıç sürümleri (quick pick).

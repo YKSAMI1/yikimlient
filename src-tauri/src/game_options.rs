@@ -13,6 +13,8 @@ pub const FORCED_OPTIONS: &[(&str, &str)] = &[
     ("lang", "tr_tr"),             // oyun dili: Türkçe (1.20.5+ küçük harf kod)
     ("maxFps", "260"),             // 260 = sınırsız (oyun içinde "Sınırsız" görünür)
     ("enableVsync", "false"),      // dikey senkronizasyon kapalı
+    ("inactivityFpsLimit", "\"minimized\""), // 1.21.2+ AFK sınırlayıcı: oyuncu hareketsizken 200 FPS'e düşürür!
+                                           // şartname §3.2.3: sınır YALNIZCA pencere küçültülünce → "minimized"
     ("guiScale", "2"),             // arayüz ölçeği: 2
     ("fovEffectScale", "0.0"),    // erişilebilirlik: FOV efektleri kapalı
     ("screenEffectScale", "0.0"), // erişilebilirlik: sarsıntı/bulanıklık efektleri kapalı
@@ -80,6 +82,7 @@ mod tests {
         assert!(out.contains("lang:tr_tr"));
         assert!(out.contains("maxFps:260"));
         assert!(out.contains("enableVsync:false"));
+        assert!(out.contains("inactivityFpsLimit:\"minimized\""));
         assert!(out.contains("guiScale:2"));
         assert!(out.contains("fovEffectScale:0.0"));
         assert!(out.contains("screenEffectScale:0.0"));
