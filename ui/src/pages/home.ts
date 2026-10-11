@@ -63,10 +63,12 @@ export function renderHome(root: HTMLElement): void {
       </div>
       ${sel ? `
       <div class="play-ring-wrap">
-        <button class="play-ring" id="h-play" title="${sel.name} — OYNA">
-          <span class="pr-icon">${icon("play")}</span>
-          <span class="pr-label">OYNA</span>
-          <span class="pr-sub">${sel.name}</span>
+        <button class="play-ring ${launch.activeId ? "disabled" : ""}" id="h-play"
+          title="${launch.activeId ? "Oyun zaten açık" : `${sel.name} — OYNA`}"
+          ${launch.activeId ? "disabled" : ""}>
+          <span class="pr-icon">${launch.activeId ? icon("clock") : icon("play")}</span>
+          <span class="pr-label">${launch.activeId ? "AÇIK" : "OYNA"}</span>
+          <span class="pr-sub">${launch.activeId ? "çalışıyor" : sel.name}</span>
         </button>
         ${launch.activeId === sel.id ? `
         <button class="stop-ring" id="h-stop" title="Oyunu kapat">

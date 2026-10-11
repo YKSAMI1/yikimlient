@@ -75,7 +75,9 @@ function renderGrid(root: HTMLElement): void {
             <span title="Toplam süre">${fmtDuration(inst.playtime_ms)}</span>
           </div>
           <div class="inst-actions">
-            <button class="btn primary card-play">${icon("play")} Oyna</button>
+            <button class="btn primary card-play" ${launch.activeId ? "disabled" : ""}>
+              ${launch.activeId ? `${icon("clock")} Açık` : `${icon("play")} Oyna`}
+            </button>
             ${playing ? `<button class="btn danger card-stop" title="Oyunu kapat">${icon("stop")} Durdur</button>` : ""}
             <button class="btn ghost card-manage">Yönet</button>
           </div>
@@ -167,7 +169,7 @@ function renderDetail(root: HTMLElement, id: string): void {
         </div>
       </div>
       <div style="flex:1"></div>
-      <button class="btn primary lg" id="detail-play">${icon("play")} Oyna</button>
+      <button class="btn primary lg" id="detail-play" ${launch.activeId ? "disabled" : ""}>${launch.activeId ? `${icon("clock")} Oyun Açık` : `${icon("play")} Oyna`}</button>
       ${launch.activeId === inst.id ? `<button class="btn danger lg" id="detail-stop" title="Oyunu kapat">${icon("stop")} Durdur</button>` : ""}
     </div>
     <div class="tabs anim-fade-up">

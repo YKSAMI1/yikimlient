@@ -412,6 +412,11 @@ export async function launchInstance(instanceId: string): Promise<void> {
     openLoginModal();
     return;
   }
+  // ÇİFT BAŞLATMA KORUMASI: oyun zaten çalışıyorsa veya açılıyorsa yeni başlatma yok
+  if (launch.activeId) {
+    toast("Oyun zaten açık — önce mevcut oyunu kapat", "err");
+    return;
+  }
   const seq = ++launchSeq;
   launch.activeId = instanceId;
   const { root, close } = openModal(`
