@@ -51,8 +51,7 @@ public final class YikimHud {
                 YikimAdapter.pop(graphics);
             }
         }
-        // TAB amblemi: TAB basılıyken YIKIM markası görünsün (Lunar/Dawn tarzı)
-        YikimTabBadge.render(graphics, client, config);
+        // (TAB rozeti KALDIRILDI — kullanıcı talebi)
         YikimMetrics.recordHudCost(System.nanoTime() - started);
         String notification = YikimMetrics.notification();
         if (!notification.isEmpty() && config.hudEnabled) {

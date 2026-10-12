@@ -1030,9 +1030,9 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
     let cfg = YikimConfig::load_or_default();
     let java_dir = launcher::resolve_java_dirs(&component, major, cfg.java_dir.clone()).await?;
 
-    // Standart mod paketi: mods/ boşsa TAM kurulum, doluysa EKSİKLERİ tamamla
-    // (yeni eklenen modlar — örn. ukulib — mevcut kurulumlara da otomatik düşer;
-    //  emekliye ayrılanlar — örn. c2me — retired_mods/'a taşınır)
+    // Standart mod paketi: YALNIZCA mods/ klasörü BOŞKEN (ilk kurulumda) tam kurulum.
+    // Mevcut kurulumlara ASLA müdahale etme — kullanıcı neyi sildiyse/eklediyse onun kararı.
+    // YIKIM modu hariç (ensure_installed onun kendi işi).
     if inst.standard_mods && inst.mod_loader == "fabric" {
         let mods_empty = inst
             .mods_dir()
@@ -1041,14 +1041,9 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
             .unwrap_or(true);
         if mods_empty {
             install_standard_mods_inner(&app, &inst).await?;
-        } else {
-            let _ = complete_standard_mods(&app, &inst).await;
         }
+        // DOLUYSA: HİÇBİR ŞEY YAPMA — tamamlama/migrasyon/emekli YOK
     }
-
-    // TEK kapalı mekanizması: eski disabled_mods/ kalıntılarını mods/*.jar.disabled'e taşı
-    // (oyun içi mod listesi kapatılan modları böyle görür)
-    migrate_disabled_mods(&inst);
 
     // YIKIM çekirdeği — her başlatmada garanti (eski kurulumlar da bu yolla kavrıyor)
     if let Err(e) = yikim_mod::ensure_installed(&app, &inst) {
