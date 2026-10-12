@@ -40,9 +40,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
-          tagName: "latest"
-          releaseName: "YIKIMLient"
-          releaseBody: "See assets below to download."
+          tagName: ${{ github.ref_name }}
+          releaseName: 'YIKIMLient ${{ github.ref_name }}'
+          releaseBody: 'See assets below to download.'
           releaseDraft: false
           prerelease: false
           args: --bundles nsis
@@ -80,9 +80,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
-          tagName: "latest"
-          releaseName: "YIKIMLient"
-          releaseBody: "See assets below to download."
+          tagName: ${{ github.ref_name }}
+          releaseName: 'YIKIMLient ${{ github.ref_name }}'
+          releaseBody: 'See assets below to download.'
           releaseDraft: false
           prerelease: false
           args: --bundles appimage,deb
