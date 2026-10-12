@@ -496,10 +496,24 @@ function stageName(s: string): string {
   } as Record<string, string>)[s] || s;
 }
 
-// Oyun kapandı → arayüz durumunu tazele. Restart/perde akışı TAMAMEN Rust
-// çekirdeğinde yürür (curtain::handle_game_exit): perdeyi açar, mod değişikliklerini
-// uygular ve oyunu sessizce geri başlatır — launcher penceresi gizli olsa bile.
+// Oyun kapandı → arayüzü tazele. Restart akışı Rust çekirdeğinde yürür.
+// "game-started" = restart sonrası yeni oyun süreci → Play kilitli kalmalı
+// "game-exit" yalnızca NORMAAL kapanışta activeId'i temizler.
+let restartInProgress = false;
+listen("curtain-status", (e: any) => {
+  if (e.payload?.phase === "started") (window as any).__yikimRestart = true;
+  if (e.payload?.phase === "closed") (window as any).__yikimRestart = false;
+});
+
+listen("game-started", (e: any) => {
+  // restart sonrası yeni oyun süreci → Play kilitli kalsın
+  launch.activeId = e.payload;
+  void refreshState(true);
+});
+
 listen("game-exit", async () => {
+  // restart akışı devam ediyorsa activeId'i TEMİZLEME — oyun geri açılacak
+  if ((window as any).__yikimRestart) return;
   launch.activeId = null;
   void refreshState(true);
 });

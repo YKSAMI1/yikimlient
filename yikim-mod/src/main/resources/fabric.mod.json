@@ -1,26 +1,19 @@
 ﻿{
-    "schemaVersion":  1,
-    "id":  "yikimlient",
-    "version":  "1.7.0+1.21.11",
-    "name":  "YIKIM Client",
-    "description":  "YIKIMLient\u0027in oyun içi çekirdeği. Sağ Shift ile YIKIM paneli; çakışmayan HUD düzeni, tam ekran HUD editörü, TAB listesi rozeti, kare hızı teşhisi, oyun içi Modrinth/CurseForge kataloğu ve başlatıcı ile dosya köprüsü.",
-    "authors":  [
-                    "YIKIMLient"
-                ],
-    "license":  "MIT",
-    "environment":  "client",
-    "entrypoints":  {
-                        "client":  [
-                                       "com.yikimlient.client.YikimClient"
-                                   ]
-                    },
-    "mixins":  [
-                   "yikimlient.mixins.json"
-               ],
-    "depends":  {
-                    "fabricloader":  "\u003e=0.19.5",
-                    "fabric-api":  "*",
-                    "minecraft":  "1.21.11",
-                    "java":  "\u003e=21"
-                }
+  "schemaVersion": 1,
+  "id": "yikimlient",
+  "version": "1.8.0+1.21.11",
+  "name": "YIKIM Client",
+  "description": "YIKIMLient'in oyun içi çekirdeği. Sağ Shift ile YIKIM paneli; çakışmayan HUD düzeni, tam ekran HUD editörü, kare hızı teşhisi, oyun içi katalog ve başlatıcı ile dosya köprüsü.",
+  "authors": ["YIKIMLient"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.yikimlient.client.YikimClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "fabric-api": "*",
+    "minecraft": "1.21.11",
+    "java": ">=21"
+  }
 }

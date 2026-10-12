@@ -177,7 +177,7 @@ public final class YikimMainMenu {
             return;
         }
         this.cacheStamp = now;
-        this.cacheSubtitle = "CLIENT  \u2022  v1.3.1";
+        this.cacheSubtitle = "CLIENT  \u2022  v" + YikimClient.MOD_VERSION;
         this.cacheFps = YikimMetrics.fps();
         this.cacheFooterLeft = "YIKIMLient  \u2022  Minecraft " + YikimVideo.gameVersion() + "  \u2022  " + this.cacheFps + " FPS";
         this.cacheProfile = YikimPresets.currentId();

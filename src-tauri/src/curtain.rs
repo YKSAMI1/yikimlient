@@ -433,10 +433,17 @@ pub async fn handle_game_exit(app: &AppHandle, instance_id: &str) {
                 "curtain-status",
                 &serde_json::json!({ "phase": "relaunching", "instance": view.instance_name }),
             );
+            // ÖNEMLİK: oyunun açıldığını bildir → frontend Play butonunu kilitlesin
+            let _ = app.emit("game-started", &view.instance_id);
             match crate::commands::cmd_launch_instance(app.clone(), view.instance_id.clone()).await {
                 Ok(_) => {
+                    // PERDE OYUN AÇILANA KADAR AÇIK KALSIN (45 sn — oyun penceresi
+                    // perdenin üstüne gelince zaten görünmez; biz sadece 45 sn sonra
+                    // kendimizi kapatırız ki ekranı kaplamaya devam etmeyelim)
+                    yikim_log("restart: oyun süreci doğdu, perde 45 sn daha açık kalacak".into());
+                    tokio::time::sleep(std::time::Duration::from_secs(45)).await;
                     close_curtain(app).await;
-                    yikim_log("restart tamamlandı: oyun yeniden açıldı".into());
+                    yikim_log("restart tamamlandı: perde kapandı".into());
                 }
                 Err(e) => {
                     yikim_log(format!("oyun yeniden açılamadı: {e}"));
