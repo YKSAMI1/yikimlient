@@ -3,6 +3,7 @@ pub mod commands;
 pub mod config;
 pub mod core;
 pub mod curtain;
+pub mod discord_rpc;
 pub mod game_options;
 pub mod instances;
 pub mod launcher;

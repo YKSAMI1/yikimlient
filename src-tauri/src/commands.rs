@@ -415,16 +415,28 @@ pub async fn cmd_pick_instance_cover(app: AppHandle, instance_id: String) -> Res
     let (tx, rx) = std::sync::mpsc::channel::<Option<String>>();
     app.dialog()
         .file()
-        .set_title("Kapak fotoğrafı seç")
-        .add_filter("Görsel", &["png", "jpg", "jpeg", "webp"])
+        .set_title("Kapak seç (PNG/JPG/GIF/MP4)")
+        .add_filter("Görsel & Video", &["png", "jpg", "jpeg", "webp", "gif", "mp4", "webm"])
         .pick_file(move |path| {
             let _ = tx.send(path.map(|p| p.to_string()));
         });
     let picked = rx.recv().ok().flatten().ok_or("seçim iptal edildi")?;
     let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
-    let dest = core::ensure_subdir(&inst.dir(), "media").join("cover.jpg");
-    copy_image_to(&picked, &dest, 1280)?;
-    instances::update(&instance_id, |i| i.cover = Some(dest.to_string_lossy().to_string()))
+    let lower = picked.to_lowercase();
+    let is_video = lower.ends_with(".mp4") || lower.ends_with(".webm");
+    let is_gif = lower.ends_with(".gif");
+    if is_video || is_gif {
+        // Animasyonlu kapak: dosyayı olduğu gibi kopyala (dönüştürme YOK — animasyon korunur)
+        let ext = if is_video { "mp4" } else { "gif" };
+        let dest = core::ensure_subdir(&inst.dir(), "media").join(format!("cover.{}", ext));
+        std::fs::copy(&picked, &dest).map_err(|e| format!("kapak kopyalanamadı: {e}"))?;
+        instances::update(&instance_id, |i| i.cover = Some(dest.to_string_lossy().to_string()))
+    } else {
+        // Statik görsel: mevcut akış (JPG'ye dönüştür + optimize)
+        let dest = core::ensure_subdir(&inst.dir(), "media").join("cover.jpg");
+        copy_image_to(&picked, &dest, 1280)?;
+        instances::update(&instance_id, |i| i.cover = Some(dest.to_string_lossy().to_string()))
+    }
 }
 
 /// Paket logosunu (URL) kurulum klasörüne media/icon.png olarak indir (256px).

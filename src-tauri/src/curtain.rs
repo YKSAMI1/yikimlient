@@ -417,6 +417,8 @@ pub async fn process_restart(app: &AppHandle) -> Result<Option<CurtainPlan>, Str
 /// Bu akış TAMAMEN Rust çekirdeğinde yürür — ana pencere gizli olsa bile
 /// perde açılır ve zincir kesintisiz sürer.
 pub async fn handle_game_exit(app: &AppHandle, instance_id: &str) {
+    // Discord RPC: oyun kapandı → presence'i kapat
+    crate::discord_rpc::stop();
     if peek_restart_request().is_none() {
         show_main(app);
         yikim_log(format!("oyun kapandı (restart isteği yok): {instance_id}"));

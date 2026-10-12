@@ -4,6 +4,39 @@ import { loaderIcon } from "../loader-icons";
 
 let selectedId: string | null = null;
 
+/// Kapak render — MP4/GIF (animasyonlu) + PNG/JPG (statik).
+/// MP4: <video> ile sonsuz döngü, sessiz, ekran dolduran.
+/// GIF: <img> (tarayıcı natif döngü yapar).
+/// Optimizasyon: IntersectionObserver — ekranda DEĞİLSE video dururulur.
+function renderCover(cover: string): string {
+  const src = fileSrc(cover);
+  const lower = cover.toLowerCase();
+  if (lower.endsWith(".mp4") || lower.endsWith(".webm")) {
+    return `<div class="inst-cover video-cover"><video src="${src}" autoplay loop muted playsinline disablepictureinpicture preload="metadata"></video></div>`;
+  }
+  if (lower.endsWith(".gif")) {
+    return `<div class="inst-cover gif-cover"><img src="${src}" draggable="false" alt="" /></div>`;
+  }
+  return `<div class="inst-cover" style="background-image:url('${src}')"></div>`;
+}
+
+/// Ekranda görünmeyen MP4'leri durdur — CPU/RAM tasarrufu.
+function optimizeVideos(root: HTMLElement): void {
+  const videos = root.querySelectorAll(".video-cover video");
+  if (!videos.length) return;
+  const obs = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const v = entry.target as HTMLVideoElement;
+      if (entry.isIntersecting) {
+        v.play().catch(() => {});
+      } else {
+        v.pause();
+      }
+    }
+  }, { threshold: 0.05 });
+  videos.forEach((v) => obs.observe(v));
+}
+
 export function renderInstances(root: HTMLElement): void {
   // "Kurulumu Yönet" gibi dış bağlantılarla gelindiyse hedefi al
   if (nav.param && state.instances.find((i) => i.id === nav.param)) {
@@ -57,7 +90,7 @@ function renderGrid(root: HTMLElement): void {
       const playing = launch.activeId === inst.id;
       const card = el(`
         <div class="inst-card card hover ${inst.cover ? "has-cover" : ""}" data-id="${inst.id}" title="${inst.name} — yönet">
-          ${inst.cover ? `<div class="inst-cover" style="background-image:url('${fileSrc(inst.cover)}')"></div>` : ""}
+          ${inst.cover ? renderCover(inst.cover) : ""}
           <div class="inst-top">
             <div class="inst-icon">${iconHtml}</div>
             <div class="inst-info">
@@ -102,6 +135,7 @@ function renderGrid(root: HTMLElement): void {
       grid.appendChild(card);
     }
     enterRows(Array.from(grid.querySelectorAll(".inst-card")));
+  optimizeVideos(grid); // ekranda olmayan videoları durdur
   }
   root.querySelector("#btn-new")?.addEventListener("click", () => openCreateWizard());
 

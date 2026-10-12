@@ -1051,5 +1051,8 @@ pub async fn launch_game(
         }
     });
 
+    // Discord Rich Presence: oyun açıldı → Discord'da "YIKIMLient oynuyor" göster
+    crate::discord_rpc::start(&inst.name, &version_id, "");
+
     Ok(pid)
 }

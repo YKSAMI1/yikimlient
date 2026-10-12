@@ -1,94 +1,149 @@
 # 🔥 YIKIMLient
 
-**Ultra-hafif, ultra-hızlı Minecraft istemcisi: launcher + oyun içi mod.** Lunar / OneClient deneyimi — Electron'suz.
+**Ultra-hafif, ultra-hızlı Minecraft launcher + oyun içi mod.** Lunar / OneClient seviyesinde deneyim — Electron'suz.
 
-| | YIKIMLient | Electron tabanlı launcher'lar |
+> **"Minecraft'ı en yüksek kare hızında, en düşük gecikmeyle ve hiçbir ayarla uğraşmadan oynatan istemci."**
+
+## Neden YIKIMLient?
+
+| | YIKIMLient | Electron launcher'lar |
 |---|---|---|
 | RAM (boşta) | ~100–150 MB | 300–700 MB |
-| Kurulum boyutu | ~3.5 MB | 150–250 MB |
+| Kurulum boyutu | ~5 MB | 150–250 MB |
+| Açılış süresi | <1 sn | 3–8 sn |
 | Motor | Tauri 2 + Rust + sistem WebView | Paketli Chromium + Node |
+| Oyun içi mod | ✅ YIKIM çekirdek modu | ❌ yok |
 
-## Özellikler
+## ✨ Özellikler
 
-- 🎮 **Offline + Microsoft girişi** (resmî device-code akışı: XBL → XSTS → Minecraft)
-- 📦 **Hazır mod paketi** — tek tıkla kurulum; eklenen modlar mevcut kurulumlara otomatik düşer, çakışanlar emekliye ayrılır. Her bileşen alanının en iyisinden: Sodium, Lithium, FerriteCore, Krypton, ModernFix, EntityCulling, ImmediatelyFast, Noisium, Particle Core, Dynamic FPS, FastQuit…
-- ☕ **JVM profilleri**: Dengeli / Yüksek FPS / Ultra FPS (Eski PC) / Düşük RAM / Düşük Gecikme / Agresif
-- 🛡️ **Ayar profili + bekçi**: her açılışta Türkçe arayüz, sınırsız FPS, VSync kapalı, tüm sarsıntı efektleri kapalı; oyun içi **performans bekçisi** sürüklenen ayarları geri alır (kullanıcı ayar ekranındayken asla karışmaz)
-- 🧩 **Oyun içi YIKIM modu**: Sağ Shift paneli (modlar, katalog, profiller), tam ekran HUD editörü (matris ızgara), widget başına ölçek, FPS/TPS/HUD maliyeti ölçümü, A/B performans testi
-- 🔄 **Oyun içi mod aç/kapa → perde**: oyundan çıkınca değişiklikler canlı uygulanır ve oyun kendini yeniden başlatır (mini launcher penceresiyle)
-- 🌐 **YIKIMDARA sunucusu** otomatik listede
-- 📰 **İmzalı duyurular**: yalnızca geliştiricinin ed25519 imzalı feed'i; Mojang haber akışı yok
-- 🔄 **Otomatik güncelleme**: GitHub Releases'ten, minisign imzalı — geçersiz imza kurulamaz
+### 🎮 Oyun Yönetimi
+- **Offline + Microsoft girişi** — resmî device-code akışı (XBL → XSTS → MC), çoklu hesap
+- **Hazır optimize mod paketi** — tek tıkla kurulum: Sodium, Lithium, FerriteCore, Krypton, ModernFix, EntityCulling, ImmediatelyFast, Noisium, Particle Core, Dynamic FPS, FastQuit ve 40+ daha fazlası
+- **Oyun içi mod yönetimi** — Sağ Shift panelinden mod aç/kapa → oyun otomatik yeniden başlar
+- **Modrinth + CurseForge kataloğu** — oyun İÇİNDEN mod ara + kur ( ikonlarla)
+- **Otomatik Java** — Mojang resmî runtime'ları her MC sürümü için doğru Java indirir
+- **JVM profilleri** — Dengeli / Yüksek FPS / Ultra FPS (Eski PC) / Düşük RAM / Düşük Gecikme / Agresif
 
-## 🔒 Veri şeffaflığı (mod ve launcher ne yapar?)
+### 🛡️ Performans Sistemi
+- **Ayar profili** — her açılışta: Türkçe arayüz, sınırsız FPS (260), VSync kapalı, GUI ölçek 2, tüm sarsıntı efektleri kapalı
+- **Performans bekçisi** — oyun açıkken profil değerlerini korur; başka bir mod ayarları bozarsa geri alır
+- **Düşük FPS danışmanı** — FPS < 60 sürekli 10 sn → otomatik öneri
+- **AFK sınırlayıcı kapalı** — oyun içinde dururken bile sınırsız FPS (yalnızca pencere küçültülünce kısıtla)
+- **Mod çakışma temizliği** — Zoomify, FastNoise, Ixeris gibi çakışanlar otomatik emekliye ayrılır
+- **A/B performans testi** — oyun içinde HUD açık/kapalı FPS ölçümü
 
-**Toplanan/kullanılan veriler:**
-- **Hesap adı + UUID** (seçili profil için) — yerel `accounts.json`
-- **Oynanış istatistikleri** (süre, sunucu adresi) — *tamamen yerel*, `sessions.jsonl`; hiçbir yere gönderilmez
-- **Kurulum ayarları** (RAM, sürüm, JVM profili) — yerel `yikimlient.json`
+### 🎨 Arayüz
+- **4 tema dünyası** — Devre Panosu (varsayılan) / Söküm Sahası / Anons Panosu / Kategori Standardı
+- **Özel vurgu rengi** — Ayarlar'dan herhangi bir renk seç
+- **Tema senkronu** — launcher teması oyuna canlı yansır (mod `.yikim/theme.json` okur)
+- **Animasyonlu kapaklar** — MP4, GIF, PNG, JPG kapak fotoğrafları; ekranda değilse video otomatik durur
+- **Canlı ikonlar** — her mod için gerçek Modrinth ikonu (WebP→PNG dönüşümü dahil)
+- **Tam ekran HUD editörü** — Sağ Shift → HUD sekmesi → matris ızgaralı editör (sürükle, tekerlekle ölçekle)
+- **Topluluk kartı** — indirme sayısı + GitHub yıldızları
 
-**Ağ bağlantıları (yalnızca bu üçü):**
-1. **Modrinth / CurseForge API** — mod arama + indirme (katalog)
-2. **Duyuru feed'i** — `feed.json` + imza (GitHub)
-3. **Güncelleme kontrolü** — GitHub Releases
+### 🔄 Otomasyon
+- **Otomatik güncelleme** — GitHub Releases'ten minisign imzalı; geçersiz imza kurulamaz
+- **Mod paketi tamamlayıcı** — yeni mod eklenirse mevcut kurulumlara otomatik düşer
+- **YIKIMDARA sunucusu** — Çok Oyunculu listesinde otomatik hazır
+- **Discord Rich Presence** — oyun açıkken Discord'da "YIKIMLient oynuyor" + logo + indirme butonu
 
-**Modun dosya erişimi:** yalnızca kendi oyun klasörü içinde: `mods/`, `config/yikimlient.cfg`, `.yikim/` köprü dosyaları (launcher ile iletişim). Oyun ayarlarına yalnızca **onaylanan profil değerleri** yazılır; tuş atamalarına ve kullanıcı tercihlerine dokunulmaz.
+### 📰 Duyuru Sistemi
+- Ed25519 **imzalı duyurular** — yalnızca geliştirici yayınlayabilir, Mojang haber akışı yok
+- Ana sayfa + Duyurular sekmesi = aynı imzalı feed
+- İmzasız içerik teknik olarak imkansız
 
-**Telemetri YOK.** Analitik, izleme, reklam, veri satışı yok. Microsoft token'ları yalnızca yerelde tutulur.
+## 🔒 Veri Şeffaflığı
 
-## Kurulum
+### Toplanan veriler (TAMAMEN YEREL):
+| Veri | Nerede | Gönderilir mi? |
+|---|---|---|
+| Hesap adı + UUID | `accounts.json` | ❌ HAYIR |
+| Oynanış istatistikleri | `sessions.jsonl` | ❌ HAYIR |
+| Kurulum ayarları | `yikimlient.json` | ❌ HAYIR |
+| Oyun içi ayarlar | `config/yikimlient.cfg` | ❌ HAYIR |
+
+### Ağ bağlantıları (yalnızca bu üçü):
+1. **Modrinth / CurseForge API** — mod arama + indirme
+2. **GitHub** — duyurular + güncelleme kontrolü + istatistik
+3. **Discord IPC** — Rich Presence (yerel, internete gitmez)
+
+### Mod'un dosya erişimi:
+- `mods/` — kendi jar'ı + kullanıcı modları
+- `config/yikimlient.cfg` — oyun içi ayarlar
+- `.yikim/` — launcher köprü dosyaları (tema, restart istekleri, katalog yanıtları)
+- **Telemetri YOK.** Analitik, izleme, reklam, veri satışı yok.
+
+## 📥 Kurulum
 
 ### Windows
-Releases sayfasından `YIKIMLient_x64-setup.exe` indir → kur → oyna. Java dahil indirilir.
+1. [Releases](https://github.com/YKSAMI1/yikimlient/releases) sayfasından `YIKIMLient_x64-setup.exe` indir
+2. Kur → aç → oyna. Java dahil her şey otomatik.
 
 ### Linux
-Releases sayfasından:
-- **AppImage**: `yikimlient_x.x.x_amd64.AppImage` indir → çalıştır
-- **DEB**: `yikimlient_x.x.x_amd64.deb` → `sudo dpkg -i yikimlient_*.deb`
+1. [Releases](https://github.com/YKSAMI1/yikimlient/releases) sayfasından:
+   - **AppImage**: `yikimlient_amd64.AppImage` → `chmod +x` → çalıştır
+   - **DEB**: `yikimlient_amd64.deb` → `sudo dpkg -i`
 
-Gereksinimler (dağıtımdan bağımsız):
 ```bash
-# Ubuntu/Debian
-sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0
-
-# Fedora
-sudo dnf install webkit2gtk4.1 gtk3
-
-# Arch
-sudo pacman -S webkit2gtk-4.1 gtk3
+# Gerekli kütüphaneler
+sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0  # Ubuntu/Debian
+sudo dnf install webkit2gtk4.1 gtk3               # Fedora
+sudo pacman -S webkit2gtk-4.1 gtk3               # Arch
 ```
-Java otomatik indirilir (Mojang'ın Linux runtime'ı).
 
-## Geliştirme
+## 🛠️ Geliştirme
 
 ```bash
 npm install
-npm run app              # tauri dev
-npm run dist             # kurulum paketi üret
-cargo test               # Rust testleri (src-tauri/)
+npm run app              # tauri dev — geliştirme modu
+npm run dist             # kurulum paketi üret (Windows NSIS)
+npm run check            # TypeScript tip kontrolü
+cargo test               # Rust birim testleri (src-tauri/)
 ```
 
-Oyun içi modun kaynak kodu: `yikim-mod/` (tek komutla derlenir):
+### Oyun içi mod derleme:
 ```powershell
 powershell -File yikim-mod\araclar\derle-1.21.11.ps1
 ```
 
-Mimari ve performans hedefleri: [`PERFORMANS-MIMARISI.md`](./PERFORMANS-MIMARISI.md)
+### Mimari:
+```
+samiclient/
+├── src-tauri/           # Rust çekirdeği (launcher mantığı)
+│   ├── src/launcher.rs  # oyun indirme + başlatma motoru
+│   ├── src/modpacks.rs  # mod paketi + JVM preset tanımları
+│   ├── src/curtain.rs   # perde sistemi (mod aç/kapa → otomatik restart)
+│   ├── src/discord_rpc.rs # Discord Rich Presence
+│   └── src/game_options.rs # oyun ayar profili
+├── ui/                   # React/TypeScript arayüz (Vite)
+├── yikim-mod/            # Oyun içi Fabric mod (Java 21)
+│   └── src/main/java/    # mod kaynak kodu
+└── news/                 # imzalı duyuru feed'i
+```
 
-## Duyuru yayınlama (yalnızca geliştirici)
+### Performans mimarisi:
+- **Katman 0** — Launcher: JVM bayrakları + options.txt profili
+- **Katman 1** — Ekosistem: her bileşen alanının en iyisi (Sodium, Lithium, vs.)
+- **Katman 2** — YIKIM modu: HUD, bekçi, profiller, ölçüm (kare yolu maliyeti ~%0)
+- **Katman 3** — (Planlanan) `yikim-optimize`: derin render yamaları
 
-Duyurular ed25519 imzalıdır — yalnızca imza sahibi yayınlayabilir:
-1. `news/feed.json` düzenle
-2. `node tools/news-sign.mjs sign`
-3. `feed.json` + `feed.json.sig` dosyalarını haber reposuna push'la
+Detaylı performans planı: [`PERFORMANS-MIMARISI.md`](./PERFORMANS-MIMARISI.md)
 
-## Yol haritası
+## 🗺️ Yol Haritası
 
 - [ ] `yikim-optimize`: derin render yamaları (mixin) — ölçüm protokolü şartıyla
-- [ ] Diğer MC sürümlerine mod port'u
+- [ ] Diğer MC sürümlerine mod port'u (1.21.1 – 1.21.10)
 - [ ] Android (Rust çekirdek aynı kalır)
-- [ ] Discord RPC
+- [ ] Sunucu eklentisi: YIKIM kullanıcı algılama (TAB rozeti için)
 
-## Lisans
+## 🐞 Sorun Bildir
 
-Kod MIT. `PERFORMANS-MIMARISI.md` ve marka adı YIKIMLient'a aittir.
+- **GitHub Issues**: https://github.com/YKSAMI1/yikimlient/issues
+- **Discord**: yakında!
+- **Log dosyası**: `%APPDATA%\.yikimlient\logs\yikimlient.log` (Windows) / `~/.local/share/.yikimlient/logs/` (Linux)
+
+Her hata bildirimi YIKIMLient'ı herkes için daha iyi yapar! 🔥
+
+## 📄 Lisans
+
+Kod MIT. `PERFORMANS-MIMARISI.md` ve "YIKIMLient" markası sahibine aittir.
