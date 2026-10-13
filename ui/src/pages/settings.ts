@@ -242,25 +242,42 @@ export function renderSettings(root: HTMLElement): void {
   });
 
   root.querySelector("#check-upd")?.addEventListener("click", async () => {
-    toast("Kontrol ediliyor…");
+    toast("Güncelleme kontrol ediliyor…");
     try {
-      const r = await invoke("cmd_check_updates");
-      if (r.latest && r.latest !== `v${r.current}`) {
-        const { close } = openModal(`
-          <h2>Yeni sürüm var</h2>
-          <div class="sub">${r.latest} yayında (sende: v${r.current})</div>
-          <a href="https://github.com/yikimlient/yikimlient/releases" target="_blank" style="color:var(--accent)" id="rel-link">İndirme sayfasına git</a>
+      const mod = await import("@tauri-apps/plugin-updater");
+      const update = await mod.check();
+      if (update?.available) {
+        const { root: mRoot, close } = openModal(`
+          <h2>Güncelleme Var</h2>
+          <div class="sub">YIKIMLient <b>v${update.version}</b> hazır. Değişiklik notları:</div>
+          <div style="margin:12px 0; max-height:160px; overflow-y:auto; user-select:text; color:var(--text-dim); font-size:12.5px; line-height:1.55">
+            ${(update.body || "Değişiklik notu yok.").split("\n").map((l: string) => `<div>${l}</div>`).join("")}
+          </div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:6px">
+            <button class="btn ghost" id="upd-later">Sonra</button>
+            <button class="btn primary" id="upd-go">İndir ve Kur</button>
+          </div>
         `);
-        void close;
-        root.querySelector("#rel-link")?.addEventListener("click", (e) => {
-          e.preventDefault();
-          openExternal("https://github.com/yikimlient/yikimlient/releases").catch(() => {});
+        mRoot.querySelector("#upd-later")?.addEventListener("click", () => close());
+        mRoot.querySelector("#upd-go")?.addEventListener("click", async () => {
+          const btn = mRoot.querySelector("#upd-go") as HTMLButtonElement;
+          btn.disabled = true;
+          btn.textContent = "İndiriliyor…";
+          try {
+            await update.downloadAndInstall();
+            toast("Güncelleme kuruldu — launcher yeniden başlıyor");
+            setTimeout(() => { try { (window as any).__TAURI__.process.exit(0); } catch { location.reload(); } }, 900);
+          } catch (e) {
+            btn.disabled = false;
+            btn.textContent = "İndir ve Kur";
+            toast(`Güncelleme başarısız: ${e}`, "err");
+          }
         });
       } else {
-        toast("Güncelsin — en son sürümü kullanıyorsun");
+        toast("YIKIMLient güncel ✓");
       }
-    } catch {
-      toast("Kontrol edilemedi (çevrimdışı?)", "err");
+    } catch (e) {
+      toast(`Güncelleme kontrolü başarısız: ${e}`, "err");
     }
   });
   root.querySelector("#open-dir")?.addEventListener("click", async () => {

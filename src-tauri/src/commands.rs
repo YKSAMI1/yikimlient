@@ -199,7 +199,8 @@ pub async fn cmd_create_instance(
     Ok(CreateInstanceResponse { instance: created, standard_mods_started: started })
 }
 
-/// Standart modları kur (enabled → mods/, değilse disabled_mods/).
+/// Standart modları kur (enabled → mods/, kapalı → mods/x.jar.disabled).
+/// TEK mekanizma: toggle, oyun içi panel, perde — hepsi `.jar.disabled` kullanır.
 async fn install_standard_mods_inner(
     handle: &AppHandle,
     inst: &Instance,
@@ -213,8 +214,8 @@ async fn install_standard_mods_inner(
     }
     let mods = modpacks::standard_mods();
     let total = mods.len() as u32;
-    let disabled_dir = inst.dir().join("disabled_mods");
-    let _ = std::fs::create_dir_all(&disabled_dir);
+    let mods_dir = inst.mods_dir();
+    let _ = std::fs::create_dir_all(&mods_dir);
     for (i, m) in mods.iter().enumerate() {
         let _ = handle.emit(
             "standard-mods-progress",
@@ -225,9 +226,18 @@ async fn install_standard_mods_inner(
                 current: m.name.clone(),
             },
         );
-        let target_dir = if m.enabled_by_default { inst.mods_dir() } else { disabled_dir.clone() };
-        if let Err(e) = repos::install_mod_into(handle, "modrinth", &m.id, None, inst, &target_dir).await {
-            core::yikim_log(format!("standart mod atlandı ({}): {e}", m.name));
+        // HER MOD mods/'a iner — kapalıysa .disabled son ekiyle (toggle'la birebir aynı)
+        match repos::install_mod_into(handle, "modrinth", &m.id, None, inst, &mods_dir).await {
+            Ok(file) => {
+                if !m.enabled_by_default {
+                    let from = mods_dir.join(&file);
+                    let to = mods_dir.join(format!("{file}.disabled"));
+                    let _ = std::fs::rename(&from, &to);
+                }
+            }
+            Err(e) => {
+                core::yikim_log(format!("standart mod atlandı ({}): {e}", m.name));
+            }
         }
     }
     let _ = handle.emit(
