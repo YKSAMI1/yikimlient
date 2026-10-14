@@ -446,15 +446,31 @@ pub async fn handle_game_exit(app: &AppHandle, instance_id: &str) {
                 "curtain-status",
                 &serde_json::json!({ "phase": "relaunching", "instance": view.instance_name }),
             );
-            // ÖNEMLİK: oyunun açıldığını bildir → frontend Play butonunu kilitlesin
             let _ = app.emit("game-started", &view.instance_id);
             match crate::commands::cmd_launch_instance(app.clone(), view.instance_id.clone()).await {
                 Ok(_) => {
-                    // PERDE OYUN AÇILANA KADAR AÇIK KALSIN (45 sn — oyun penceresi
-                    // perdenin üstüne gelince zaten görünmez; biz sadece 45 sn sonra
-                    // kendimizi kapatırız ki ekranı kaplamaya devam etmeyelim)
-                    yikim_log("restart: oyun süreci doğdu, perde 45 sn daha açık kalacak".into());
-                    tokio::time::sleep(std::time::Duration::from_secs(45)).await;
+                    // PERDE: oyunun ana menüsü gelene kadar açık kal.
+                    // Mod ana menü hazır olunca .yikim/ready dosyası yazar.
+                    // 500ms'de bir kontrol, 60 sn timeout (mod yoksa veya crash olursa kapanmasın).
+                    yikim_log("restart: oyun süreci doğdu, ana menü bekleniyor...".into());
+                    let inst = crate::instances::Instance::load(&view.instance_id);
+                    let ready_path = inst.map(|i| crate::curtain::ready_path(&i));
+                    let start = std::time::Instant::now();
+                    loop {
+                        // ready dosyası var mı? (mod ana menüyü çizince yazar)
+                        if let Some(ref rp) = ready_path {
+                            if rp.is_file() {
+                                yikim_log("restart: ana menü hazır, perde kapanıyor".into());
+                                break;
+                            }
+                        }
+                        // timeout: 60 sn sonra zorla kapat
+                        if start.elapsed().as_secs() >= 60 {
+                            yikim_log("restart: 60 sn timeout, perde kapanıyor".into());
+                            break;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    }
                     close_curtain(app).await;
                     yikim_log("restart tamamlandı: perde kapandı".into());
                 }
@@ -466,7 +482,7 @@ pub async fn handle_game_exit(app: &AppHandle, instance_id: &str) {
                     );
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     close_curtain(app).await;
-                    show_main(app); // kullanıcı launcher'dan hatayı görebilsin
+                    show_main(app);
                 }
             }
         }

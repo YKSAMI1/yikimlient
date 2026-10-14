@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.8.1";
+    public static final String MOD_VERSION = "1.8.2";
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
     private static boolean readyMarked;
     private static boolean firstJoinSeen;
@@ -64,24 +64,24 @@ implements ClientModInitializer {
         }
         long started = System.nanoTime();
         boolean bl = paused = YikimConfig.get().paused || YikimAbTest.modPaused();
-        if (!paused) {
-            YikimTheme.sync();
+        long now = System.currentTimeMillis();
+        // PERFORMANS: disk/IO işlemleri yalnızca 1 sn'de bir — her tick'te ASLA
+        if (!paused && now - lastHeavyTick >= 1000L) {
+            lastHeavyTick = now;
+            YikimTheme.sync();       // dosya mtime kontrolü (1/sn)
+            YikimGuard.tick(client);  // ayar kontrolü (1/sn, içte 20 sn throttle)
         }
-        YikimMetrics.tick(client);
-        YikimUiMetrics.flush();
-        YikimKeys.poll(client);
-        YikimAbTest.tick(client);
-        // Performans bekçisi: profil değerlerini korur + düşük FPS önerir (asla kare yolunda değil)
-        YikimGuard.tick(client);
+        // HAFİF işlemler her tick'te (yer bellek, disk YOK):
+        YikimKeys.poll(client);       // tuş algılama — her tick şart
+        YikimClient.markReadyWhenPossible(client);
+        // KATALOG TİCK KALDIRILDI — disk yoklaması Rust tarafında zaten var (spawn_catalog_watcher)
+        // Bu satır oyunda her tick dosya kontrolü yapıyordu = FPS DÜŞÜŞÜ
         if (!paused) {
             YikimClient.installMainMenu(client);
-            if (client.field_1755 == null) {
-                YikimCatalog.tick(client);
-            }
         }
-        YikimClient.markReadyWhenPossible(client);
         YikimMetrics.recordTickCost(System.nanoTime() - started);
     }
+    private static long lastHeavyTick;
 
     private static void installMainMenu(class_310 client) {
         if (!(client.field_1755 instanceof class_442) || !YikimConfig.get().customMainMenu) {

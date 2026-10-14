@@ -357,6 +357,7 @@ input[type="range"] { accent-color: var(--accent); cursor: pointer; }
 .pc-fail { font-size: 12px; color: var(--text-faint); padding: 8px 2px; }
 .exp-toolbar { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .exp-toolbar .search-in { flex: 1; min-width: 220px; }
+.exp-toolbar .search-in .input { padding: 10px 14px; font-size: 14px; font-weight: 500; }
 .exp-toolbar select.input { width: 130px; flex-shrink: 0; }
 .kind-toggle {
   display: flex; background: var(--bg1); border: 1px solid var(--hairline-strong);
