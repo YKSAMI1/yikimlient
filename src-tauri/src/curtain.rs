@@ -114,20 +114,31 @@ pub fn read_restart_request(inst: &crate::instances::Instance) -> Option<Restart
 }
 
 /// Tek bir mod kararını uygula: `.jar` ↔ `.jar.disabled` yeniden adlandırma.
-/// YIKIM'ın kendi jar'ı ve fabric-api asla kapatılmaz (çağıran filtreler, mod tarafı da garantiler).
-/// Ok(true) = uygulandı · Ok(false) = kaynak dosya yok (atlandı) · Err = I/O hatası.
+/// DİKKAT: d.file oyun içi moddan gelir — ".jar" (açık) veya ".jar.disabled" (kapalı).
+/// Önce suffix temizle, sonra doğru kaynak/hedef oluştur.
+/// Ok(true) = uygulandı · Ok(false) = kaynak dosya yok · Err = I/O hatası.
 pub fn toggle_one(inst: &crate::instances::Instance, d: &ModDecision) -> Result<bool, String> {
     let mods_dir = inst.mods_dir();
     // güvenlik: yalnız mods/ klasörü içindeki .jar dosyalarıyla çalış
-    let name = std::path::Path::new(&d.file)
+    let full_name = std::path::Path::new(&d.file)
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_default();
-    if name.is_empty() {
+    if full_name.is_empty() {
         return Ok(false);
     }
-    let active = mods_dir.join(&name);
-    let disabled = mods_dir.join(format!("{name}.disabled"));
+    // suffix temizle: "ad.jar.disabled" → "ad"  |  "ad.jar" → "ad"
+    let base = full_name
+        .strip_suffix(".jar.disabled")
+        .or_else(|| full_name.strip_suffix(".jar"))
+        .or_else(|| full_name.strip_suffix(".disabled"))
+        .map(str::to_string)
+        .unwrap_or_else(|| full_name.clone());
+    if base.is_empty() {
+        return Ok(false);
+    }
+    let active = mods_dir.join(format!("{base}.jar"));
+    let disabled = mods_dir.join(format!("{base}.jar.disabled"));
     let (from, to) = if d.on {
         (disabled, active)
     } else {
@@ -138,7 +149,7 @@ pub fn toggle_one(inst: &crate::instances::Instance, d: &ModDecision) -> Result<
     }
     std::fs::rename(&from, &to)
         .map(|_| true)
-        .map_err(|e| format!("{name}: {e}"))
+        .map_err(|e| format!("{base}: {e}"))
 }
 
 // ---------- Perde planı (pencere bunu çizer; Rust state'te tutar) ----------

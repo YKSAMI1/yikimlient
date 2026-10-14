@@ -711,17 +711,22 @@ fn icon_cache_name(url: &str) -> String {
 #[tauri::command]
 pub async fn cmd_toggle_mod(instance_id: String, filename: String, enabled: bool) -> Result<(), String> {
     let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
-    // TEK kapalı mekanizması: mods/<ad>.jar ↔ mods/<ad>.jar.disabled
-    // (oyun içi YIKIM modu ve restart köprüsü bu biçimi okur/yazar)
+    // TEK mekanizma: mods/<ad>.jar ↔ mods/<ad>.jar.disabled
+    // filename UI'dan gelir: "ad.jar" (açık) veya "ad.jar.disabled" (kapalı)
+    // ÖNCE .jar.disabled, SONRA .jar suffix'ini temizle → base = "ad" (uzantısız)
     let base = filename
-        .strip_suffix(".disabled")
+        .strip_suffix(".jar.disabled")
+        .or_else(|| filename.strip_suffix(".jar"))
+        .or_else(|| filename.strip_suffix(".disabled"))
         .map(str::to_string)
         .unwrap_or_else(|| filename.clone());
     let mods = inst.mods_dir();
+    let active_path = mods.join(format!("{base}.jar"));
+    let disabled_path = mods.join(format!("{base}.jar.disabled"));
     let (from, to) = if enabled {
-        (mods.join(format!("{base}.jar.disabled")), mods.join(format!("{base}.jar")))
+        (disabled_path, active_path)
     } else {
-        (mods.join(format!("{base}.jar")), mods.join(format!("{base}.jar.disabled")))
+        (active_path, disabled_path)
     };
     if from.exists() {
         std::fs::rename(&from, &to).map_err(|e| e.to_string())?;
@@ -1052,9 +1057,9 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
     let cfg = YikimConfig::load_or_default();
     let java_dir = launcher::resolve_java_dirs(&component, major, cfg.java_dir.clone()).await?;
 
-    // Standart mod paketi: YALNIZCA mods/ klasörü BOŞKEN (ilk kurulumda) tam kurulum.
-    // Mevcut kurulumlara ASLA müdahale etme — kullanıcı neyi sildiyse/eklediyse onun kararı.
-    // YIKIM modu hariç (ensure_installed onun kendi işi).
+    // Oyun içi ikonlar: YALNIZCA İLK kurulumda (mods boşken) indirilir.
+    // Sonraki açılışlarda ASLA — 50+ API çağrısı interneti doyuruyor ve FPS düşürüyor.
+    // İkonlar zaten cache'li, mod yerel dosyadan okur.
     if inst.standard_mods && inst.mod_loader == "fabric" {
         let mods_empty = inst
             .mods_dir()
@@ -1063,8 +1068,9 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
             .unwrap_or(true);
         if mods_empty {
             install_standard_mods_inner(&app, &inst).await?;
+            // İkonları SADECE ilk kurulumda indir
+            write_mod_icons(&inst).await;
         }
-        // DOLUYSA: HİÇBİR ŞEY YAPMA — tamamlama/migrasyon/emekli YOK
     }
 
     // YIKIM çekirdeği — her başlatmada garanti (eski kurulumlar da bu yolla kavrıyor)
@@ -1072,9 +1078,7 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
         core::yikim_log(format!("YIKIM modu doğrulanamadı (başlatma engellenmedi): {e}"));
     }
 
-    // Oyun içi ikonlar: launcher indirir (ağ) — mod yalnızca yerel dosyadan doku kurar.
-    // Bloklayıcı: oyun açıldığında panel ikonları ilk seferde hazır olsun (~1-3 sn).
-    write_mod_icons(&inst).await;
+    // (İkonlar zaten ilk kurulumda indirildi — her açılışta 50+ API çağrısı YOK)
 
     // Köprü: tema + kurulum kimliğini modla paylaş (mod .yikim/theme.json'u okur)
     crate::curtain::write_theme_json(&inst, &cfg);
