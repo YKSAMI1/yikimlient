@@ -290,6 +290,7 @@ async function tabContent(content: HTMLElement, inst: any): Promise<void> {
         </div>
         <span style="flex:1"></span>
         <button class="btn ghost sm" id="content-open">${icon("folder")} Klasörü Aç</button>
+        <button class="btn ghost sm" id="content-search" title="Modrinth'te ara ve indir">${icon("search")} Keşfet'te Ara</button>
         <button class="btn primary sm" id="content-add">${icon("plus")} ${meta.id === "saves" ? "Dünya Ekle" : "Paket Ekle"}</button>
       </div>
       <div class="mod-list" id="content-list"></div>
@@ -302,6 +303,13 @@ async function tabContent(content: HTMLElement, inst: any): Promise<void> {
     });
     content.querySelector("#content-open")?.addEventListener("click", () =>
       invoke("cmd_open_content_folder", { instanceId: inst.id, kind: contentKind }).catch(() => {}));
+    content.querySelector("#content-search")?.addEventListener("click", () => {
+      // Keşfet sayfasını bu içerik türüyle önden ayarlı aç
+      const exploreKind = contentKind === "resourcepacks" ? "resourcepack"
+        : contentKind === "shaderpacks" ? "shader" : "world";
+      nav.param = `kind:${exploreKind}`;
+      navigate("explore");
+    });
     content.querySelector("#content-add")?.addEventListener("click", async () => {
       try {
         await invoke("cmd_add_content_file", { instanceId: inst.id, kind: contentKind });

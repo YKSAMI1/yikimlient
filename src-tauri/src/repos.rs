@@ -502,6 +502,13 @@ pub async fn search_all(
     offset: usize,
     limit: usize,
 ) -> Result<(Vec<RepoSearchResult>, bool), String> {
+    // İçerik türleri (doku paketi/shader/dünya/datapack) → Yalnız Modrinth:
+    // CurseForge'un classId haritası bu türlerde güvenilir değil, boş sonuç yerine
+    // sağlam kaynağı sunmak daha iyi.
+    if matches!(kind, "resourcepack" | "shader" | "world" | "datapack") {
+        let mr = modrinth_search(query, kind, versions, loader, offset, limit).await?;
+        return Ok((mr, curseforge_available()));
+    }
     let (mr, cf) = tokio::join!(
         modrinth_search(query, kind, versions, loader, offset, limit),
         curseforge_search(query, kind, versions, loader, offset, limit)
@@ -539,8 +546,8 @@ pub async fn versions_for(
 
 // ---------- İndirme ----------
 
-/// Tek dosya indir, progress event'leriyle.
-async fn download_file(url: &str, dest: &std::path::Path, label: &str) -> Result<(), String> {
+/// Tek dosya indir, progress event'leriyle (içerik indirmeleri de kullanır).
+pub(crate) async fn download_file(url: &str, dest: &std::path::Path, label: &str) -> Result<(), String> {
     if let Some(parent) = dest.parent() {
         let _ = std::fs::create_dir_all(parent);
     }

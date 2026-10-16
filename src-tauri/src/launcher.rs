@@ -1124,6 +1124,13 @@ pub async fn launch_game(
     let pid = child.id();
     yikim_log(format!("oyun PID: {pid}"));
 
+    // Discord Rich Presence: oyun açıldı → "YIKIMLient ile oynuyor" (tek seferlik set, internet trafiği yok)
+    crate::discord_rpc::start(
+        &inst.name,
+        &inst.mc_version,
+        &session.server.lock().unwrap().clone(),
+    );
+
     // canlı log: stdout + stderr → log dosyası + event; sunucu tespiti
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();

@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.8.3";
+    public static final String MOD_VERSION = "1.9.0";
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
     private static boolean readyMarked;
     private static boolean firstJoinSeen;
@@ -72,6 +72,8 @@ implements ClientModInitializer {
             YikimGuard.tick(client);  // ayar kontrolü (1/sn, içte 20 sn throttle)
         }
         // HAFİF işlemler her tick'te (yer bellek, disk YOK):
+        YikimMetrics.tick(client);   // FPS sayacı + CPS + bildirimler (1 sn'de bir gerçek iş — v1.8.2'de yanlışlıkla çıkarılmıştı, HUD 0 gösteriyordu)
+        YikimAbTest.tick(client);    // A/B faz ilerlemesi (çalışmıyorken anında döner)
         YikimKeys.poll(client);       // tuş algılama — her tick şart
         YikimClient.markReadyWhenPossible(client);
         // KATALOG TİCK KALDIRILDI — disk yoklaması Rust tarafında zaten var (spawn_catalog_watcher)

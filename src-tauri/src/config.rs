@@ -17,6 +17,8 @@ pub struct YikimConfig {
     pub hide_on_launch: bool,
     pub full_screen_game: bool,
     pub show_news: bool,
+    /// Discord Rich Presence — "YIKIMLient ile oynuyor" (yalnız yerel IPC,
+    /// internet trafiği yoktur). Kullanıcı isteğiyle geri geldi.
     pub discord_rpc: bool,
     pub last_selected_account: String,
     pub window_maximized: bool,
@@ -41,7 +43,7 @@ impl Default for YikimConfig {
             hide_on_launch: false,
             full_screen_game: false,
             show_news: true,
-            discord_rpc: false,
+            discord_rpc: true,
             last_selected_account: String::new(),
             window_maximized: false,
             stats_enabled: true,

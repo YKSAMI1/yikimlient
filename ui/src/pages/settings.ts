@@ -137,6 +137,7 @@ export function renderSettings(root: HTMLElement): void {
       ${toggleRow("show-news", "Ana sayfada haberleri göster", cfg.show_news)}
       ${toggleRow("stats-enabled", "İstatistik toplansın (tamamen yerel)", cfg.stats_enabled)}
       ${toggleRow("use-java25", "Microsoft OpenJDK 25 kullan (mod paketleri için optimize)", cfg.use_java25 !== false)}
+      ${toggleRow("discord-rpc", "Discord'da 'YIKIMLient ile oynuyor' göster (internet kullanmaz)", cfg.discord_rpc !== false)}
       <div class="row-between" style="margin-top:8px">
         <span>İndirme hızı (paralel bağlantı)</span>
         <div class="ram-row" style="width:260px">
@@ -235,6 +236,7 @@ export function renderSettings(root: HTMLElement): void {
   wireToggle(root, "show-news", "show_news");
   wireToggle(root, "stats-enabled", "stats_enabled");
   wireToggle(root, "use-java25", "use_java25");
+  wireToggle(root, "discord-rpc", "discord_rpc");
 
   const dlc = root.querySelector("#dlc-range") as HTMLInputElement;
   dlc.addEventListener("input", () => (root.querySelector("#dlc-val") as HTMLElement).textContent = dlc.value);

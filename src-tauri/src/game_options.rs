@@ -28,11 +28,19 @@ pub const FORCED_OPTIONS: &[(&str, &str)] = &[
 /// Hata oyunu ASLA engellemez — yalnızca loglanır.
 pub fn ensure_profile(game_dir: &Path) {
     let path = game_dir.join("options.txt");
-    let mut lines: Vec<String> = std::fs::read_to_string(&path)
-        .map(|t| t.lines().map(str::to_string).collect())
-        .unwrap_or_default();
+    let existing = std::fs::read_to_string(&path).unwrap_or_default();
+    let mut lines: Vec<String> = existing
+        .lines()
+        .map(str::to_string)
+        .collect();
     let mut changed = 0usize;
     for (key, value) in FORCED_OPTIONS {
+        // DİL TEK SEFERLİK (v0.3.1): options.txt'de zaten bir lang satırı varsa
+        // (oyuncu oyun içinden dil değiştirmiş olabilir) ASLA üstüne yazma —
+        // sadece oyunun ilk açılışında (satır hiç yoksa) Türkçe yazılır.
+        if *key == "lang" && existing.lines().any(|l| l.split(':').next().map(str::trim) == Some("lang")) {
+            continue;
+        }
         let wanted = format!("{key}:{value}");
         let mut found = false;
         for line in lines.iter_mut() {

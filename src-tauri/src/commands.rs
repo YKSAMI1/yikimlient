@@ -1104,6 +1104,59 @@ pub async fn cmd_import_pack_file(
     }
 }
 
+/// Keşfet'ten içerik indirme: doku paketi / shader / datapack / dünya.
+#[tauri::command]
+pub async fn cmd_repos_install_content(
+    app: AppHandle,
+    instance_id: String,
+    source: String,
+    project_id: String,
+    version_id: String,
+    kind: String,
+) -> Result<(), String> {
+    let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
+    let versions = repos::versions_for(&source, &project_id, &kind, "", &inst.mc_version).await?;
+    let version = if version_id.is_empty() {
+        versions.first().ok_or("paket sürümü yok")?
+    } else {
+        versions.iter().find(|v| v.id == version_id).ok_or("paket sürümü yok")?
+    };
+    let file = version.files.first().ok_or("paket dosyası yok")?;
+    let tmp = crate::core::app_dir().join("tmp-content-download");
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).map_err(|e| e.to_string())?;
+    let dest_file = tmp.join(&file.filename);
+    repos::download_file(&file.url, &dest_file, "content").await?;
+    let inst_dir = inst.dir();
+    let result: Result<(), String> = match kind.as_str() {
+        "resourcepack" => {
+            let d = inst_dir.join("resourcepacks");
+            std::fs::create_dir_all(&d).map_err(|e| e.to_string())?;
+            std::fs::copy(&dest_file, d.join(&file.filename)).map(|_| ()).map_err(|e| e.to_string())
+        }
+        "shader" => {
+            let d = inst_dir.join("shaderpacks");
+            std::fs::create_dir_all(&d).map_err(|e| e.to_string())?;
+            std::fs::copy(&dest_file, d.join(&file.filename)).map(|_| ()).map_err(|e| e.to_string())
+        }
+        "datapack" => {
+            let d = inst_dir.join("datapacks");
+            std::fs::create_dir_all(&d).map_err(|e| e.to_string())?;
+            std::fs::copy(&dest_file, d.join(&file.filename)).map(|_| ()).map_err(|e| e.to_string())
+        }
+        "world" => {
+            // dünya zip'i (level.dat kökte) → saves/<ad>/ altına aç
+            let world_name = file.filename.trim_end_matches(".zip").to_string();
+            let d = inst_dir.join("saves").join(&world_name);
+            std::fs::create_dir_all(&d).map_err(|e| e.to_string())?;
+            unzip_to_dir(&dest_file, &d)
+        }
+        _ => Err("geçersiz içerik türü".into()),
+    };
+    let _ = std::fs::remove_dir_all(&tmp);
+    result
+}
+
 #[tauri::command]
 pub async fn cmd_get_app_dir() -> Result<String, String> {
     Ok(core::app_dir().to_string_lossy().to_string())
@@ -1720,4 +1773,48 @@ pub async fn cmd_read_log(instance_id: String, file_id: String) -> Result<String
         ));
     }
     Ok(content)
+}
+
+/// Zip arşivini hedef klasöre aç (içinde tek kök klasör varsa onu sadeleştirir).
+fn unzip_to_dir(zip_path: &std::path::Path, dest: &std::path::Path) -> Result<(), String> {
+    let f = std::fs::File::open(zip_path).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
+    // kök klasör tespiti: tüm dosya girişleri aynı "X/" ile başlıyorsa bir seviye sadeleştir
+    let mut root: Option<String> = None;
+    for i in 0..archive.len() {
+        let name = archive.by_index(i).map_err(|e| e.to_string())?.name().to_string();
+        if name.is_empty() || name.ends_with('/') { continue; }
+        match &root {
+            None => { root = name.split('/').next().map(|s| s.to_string()); }
+            Some(r) => {
+                if !name.starts_with(r.as_str()) { root = None; break; }
+            }
+        }
+    }
+    for i in 0..archive.len() {
+        let mut zf = archive.by_index(i).map_err(|e| e.to_string())?;
+        let rel = match zf.enclosed_name() {
+            Some(p) => p.to_path_buf(),
+            None => continue,
+        };
+        // kök klasörü kırpmak saves/<ad>/level.dat yapısını garanti eder
+        let rel = match &root {
+            Some(r) => match rel.strip_prefix(r) {
+                Ok(p) if !p.as_os_str().is_empty() => p.to_path_buf(),
+                _ => continue,
+            },
+            None => rel,
+        };
+        let out = dest.join(&rel);
+        if zf.is_dir() {
+            let _ = std::fs::create_dir_all(&out);
+            continue;
+        }
+        if let Some(p) = out.parent() {
+            let _ = std::fs::create_dir_all(p);
+        }
+        let mut w = std::fs::File::create(&out).map_err(|e| e.to_string())?;
+        std::io::copy(&mut zf, &mut w).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }

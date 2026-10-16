@@ -14,6 +14,9 @@ pub mod stats;
 pub mod util;
 pub mod yikim_mod;
 
+/// Launcher sürümü (Cargo.toml) — Discord presence ve loglar için.
+pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use tokio::sync::RwLock;
 
@@ -106,6 +109,7 @@ pub fn run() {
             commands::cmd_get_community_stats,
             commands::cmd_pick_pack_file,
             commands::cmd_import_pack_file,
+            commands::cmd_repos_install_content,
             commands::cmd_list_content_files,
             commands::cmd_add_content_file,
             commands::cmd_delete_content_file,

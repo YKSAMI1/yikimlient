@@ -11,15 +11,18 @@ interface RepoVersion {
   source: string;
 }
 
-let kind = "mod";            // "mod" | "modpack"
+let kind = "mod";            // "mod" | "modpack" | "resourcepack" | "shader" | "world" | "datapack"
 let lastQuery = "";
 let lastResults: SearchResult[] = [];
 
 export function renderExplore(root: HTMLElement): void {
-  // nav.param iki kalıp: "kind:modpack" (paketler sayfasından) veya instance id ("Mod Ekle")
+  // nav.param iki kalıp: "kind:X" (paketler/içerik sayfalarından) veya instance id ("Mod Ekle")
   let presetInstance = nav.param;
-  if (presetInstance === "kind:modpack") {
-    kind = "modpack";
+  if (presetInstance?.startsWith("kind:")) {
+    const k = presetInstance.slice(5);
+    if (["mod", "modpack", "resourcepack", "shader", "world", "datapack"].includes(k)) {
+      kind = k;
+    }
     presetInstance = undefined;
   }
   nav.param = undefined;
@@ -33,6 +36,10 @@ export function renderExplore(root: HTMLElement): void {
       <div class="kind-toggle">
         <button class="kt ${kind === "mod" ? "sel" : ""}" data-k="mod">${icon("puzzle")} Modlar</button>
         <button class="kt ${kind === "modpack" ? "sel" : ""}" data-k="modpack">${icon("box")} Paketler</button>
+        <button class="kt ${kind === "resourcepack" ? "sel" : ""}" data-k="resourcepack">Doku Paketleri</button>
+        <button class="kt ${kind === "shader" ? "sel" : ""}" data-k="shader">Shaderlar</button>
+        <button class="kt ${kind === "world" ? "sel" : ""}" data-k="world">Dünyalar</button>
+        <button class="kt ${kind === "datapack" ? "sel" : ""}" data-k="datapack">Datapack</button>
       </div>
       <input class="input search-in exp-hero-q" id="exp-q" placeholder="Ara: sodium, pvp, bedwars…" />
     </div>
@@ -124,7 +131,11 @@ async function doSearch(root: HTMLElement, query: string): Promise<void> {
   const grid = root.querySelector("#exp-results") as HTMLElement;
   grid.innerHTML = `<div class="spinner" style="grid-column:1/-1; margin:40px auto"></div>`;
   const version = (root.querySelector("#exp-ver") as HTMLSelectElement).value;
-  const loader = (root.querySelector("#exp-loader") as HTMLSelectElement).value;
+  const rawLoader = (root.querySelector("#exp-loader") as HTMLSelectElement).value;
+  // içerik türlerinde (doku/shader/dünya/datapack) loader kategorisi anlamsızdır
+  // ve Modrinth facet'i sonuçları boşaltır → boş geç
+  const isContent = ["resourcepack", "shader", "world", "datapack"].includes(kind);
+  const loader = isContent ? "" : rawLoader;
   try {
     const resp = await invoke("cmd_repos_search", {
       query, kind, versions: version ? [version] : [], loader, offset: 0, limit: 40,
@@ -171,16 +182,19 @@ function fmtDownloads(n: number): string {
 async function openProject(r: SearchResult): Promise<void> {
   const { root, close } = openModal(`
     <h2>${r.title}</h2>
-    <div class="sub">${r.source === "modrinth" ? "Modrinth" : "CurseForge"} · ${r.kind === "modpack" ? "Mod Paketi" : "Mod"}</div>
+    <div class="sub">${r.source === "modrinth" ? "Modrinth" : "CurseForge"} · ${({ mod: "Mod", modpack: "Mod Paketi", resourcepack: "Doku Paketi", shader: "Shader", world: "Dünya", datapack: "Datapack" } as Record<string, string>)[r.kind] || r.kind}</div>
     <div class="spinner" style="margin:24px auto"></div>
     <div id="ver-list" class="ver-list"></div>
   `);
   const version = (document.querySelector("#exp-ver") as HTMLSelectElement)?.value || "";
-  const loader = (document.querySelector("#exp-loader") as HTMLSelectElement)?.value ||
+  const rawLoader = (document.querySelector("#exp-loader") as HTMLSelectElement)?.value ||
     (state.instances[0]?.mod_loader === "forge" ? "forge" : "fabric");
+  // içerik türlerinde loader facet'i sonuç boşaltır → boş geç
+  const isContent = ["resourcepack", "shader", "world", "datapack"].includes(r.kind);
+  const loader = isContent ? "" : rawLoader;
   try {
     const versions: RepoVersion[] = await invoke("cmd_repos_get_versions", {
-      source: r.source, projectId: r.id, kind: r.kind, loader: r.kind === "modpack" ? "" : loader, gameVersion: version,
+      source: r.source, projectId: r.id, kind: r.kind, loader: r.kind === "mod" ? loader : "", gameVersion: version,
     });
     const list = root.querySelector("#ver-list") as HTMLElement;
     list.innerHTML = "";
@@ -224,7 +238,12 @@ async function installFlow(r: SearchResult, v: RepoVersion, closeParent: () => v
       <h2>Hangi kuruluma?</h2>
       <div class="sub">${r.title} → ${v.name || v.version_number}</div>
       <select class="input" id="tgt">
-        ${state.instances.map((i) => `<option value="${i.id}">${i.icon} ${i.name} (${i.mod_loader} ${i.mc_version})</option>`).join("")}
+        ${state.instances.map((i) => {
+          // icon bir dosya yoluysa (media/con.png) option metninde GÖSTERME —
+          // kullanıcı bunu "rastgele dosya yolu" olarak görüyordu
+          const ic = i.icon && !i.icon.includes("/") && !i.icon.includes("\\") ? `${i.icon} ` : "";
+          return `<option value="${i.id}">${ic}${i.name} (${i.mod_loader} ${i.mc_version})</option>`;
+        }).join("")}
       </select>
       <div style="display:flex; gap:10px; margin-top:16px">
         <button class="btn ghost" id="cxl" style="flex:1">Vazgeç</button>
@@ -238,12 +257,24 @@ async function installFlow(r: SearchResult, v: RepoVersion, closeParent: () => v
       btn.disabled = true;
       btn.innerHTML = `<span class="spinner"></span> İndiriliyor…`;
       try {
-        await invoke("cmd_repos_install", {
-          instanceId: tgt, source: r.source, projectId: r.id, versionId: v.id,
-        });
+        if (r.kind === "resourcepack" || r.kind === "shader" || r.kind === "world" || r.kind === "datapack") {
+          await invoke("cmd_repos_install_content", {
+            instanceId: tgt, source: r.source, projectId: r.id, versionId: v.id, kind: r.kind,
+          });
+        } else {
+          await invoke("cmd_repos_install", {
+            instanceId: tgt, source: r.source, projectId: r.id, versionId: v.id,
+          });
+        }
         close();
         closeParent();
-        toast(`Kuruldu: ${r.title}`);
+        const hedef: Record<string, string> = {
+          resourcepack: "Doku paketleri klasörüne indirildi",
+          shader: "Shader klasörüne indirildi",
+          world: "Dünyalar klasörüne indirildi",
+          datapack: "Datapacks klasörüne indirildi",
+        };
+        toast(hedef[r.kind] || `Kuruldu: ${r.title}`);
       } catch (e) {
         toast(String(e), "err");
         btn.disabled = false;

@@ -1,107 +1,121 @@
 //! Discord Rich Presence — oyun açıkken Discord profilinde
-//! "YIKIMLient oynuyor" + logo + "İndir" butonu gösterir.
+//! "YIKIMLient ile oynuyor" + sürüm + logo gösterir.
 //!
-//! Kullanıcı HİÇBİR ŞEY yapmaz: oyun açılınca otomatik bağlanır,
-//! oyun kapanınca otomatik kesilir. Discord kapalıysa sessizce atlar.
-//!
-//! Discord Application ID: Discord Developer Portal'dan alınır.
-//! (discord.com/developers/applications → "YIKIMLient" oluştur → Client ID)
+//! İNTERNET İLKESİ (kullanıcı talebi): Discord RPC yalnızca YEREL IPC
+//! (named pipe) ile Discord uygulamasına konuşur — bu süreçten internete
+//! giden hiçbir periyodik istek YOKTUR. Presence yalnızca durum DEĞİŞİNCE
+//! bir kez gönderilir (oyun açıldı / dünya-sunucu değişti / oyun kapandı);
+//! eski sürümdeki 60 sn'lik yenileme döngüsü kaldırıldı.
+//! Discord kapalıysa sessizce atlanır — oyun akışı ve ping asla etkilenmez.
 
 use crate::core::yikim_log;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Discord Application Client ID — Discord Developer Portal'dan alınır.
-/// TODO: Discord uygulaması oluşturulunca gerçek ID ile değiştir.
-pub const DISCORD_APP_ID: &str = "1394387000000000000"; // placeholder — gerçek ID ile değiştir
+/// Discord Application Client ID — YIKIMLient uygulaması.
+pub const DISCORD_APP_ID: &str = "1560649366899920926";
 
 static RPC_ACTIVE: AtomicBool = AtomicBool::new(false);
 
-/// Oyun açıldığında Discord Rich Presence başlat.
-/// Discord kapalıysa veya hata olursa sessizce atlanır — oyun akışı asla etkilenmez.
+/// Oyun açıldığında Discord Rich Presence başlat (tek seferlik set_activity).
+/// Discord kapalıysa veya hata olursa sessizce atlanır.
 pub fn start(instance_name: &str, mc_version: &str, server: &str) {
-    if RPC_ACTIVE.load(Ordering::Relaxed) {
+    if !crate::config::YikimConfig::load_or_default().discord_rpc {
+        return;
+    }
+    if RPC_ACTIVE.swap(true, Ordering::Relaxed) {
         return; // zaten aktif
     }
     let name = instance_name.to_string();
     let version = mc_version.to_string();
     let srv = server.to_string();
-    RPC_ACTIVE.store(true, Ordering::Relaxed);
     std::thread::spawn(move || {
-        let result = run_presence(&name, &version, &srv);
-        if let Err(e) = result {
+        if let Err(e) = run_presence(&name, &version, &srv) {
             yikim_log(format!("Discord RPC: {e}"));
         }
-        RPC_ACTIVE.store(false, Ordering::Relaxed);
+        // bağlantı yalnızca oyun süreci boyunca yaşar; stop() temizler
     });
 }
 
-/// Oyun kapanınca Discord RPC'yi kes.
+/// Oyun kapanınca presence'i temizle (Discord profili anında boşalır).
 pub fn stop() {
-    // RPC thread'i kendi kendine kapanır (process exit ile).
-    // Burada sadece log bırak — Discord IPC bağlantısı thread'in sonunda kapanır.
-    yikim_log("Discord RPC: oyun kapandı, presence kapanıyor".into());
+    if !RPC_ACTIVE.swap(false, Ordering::Relaxed) {
+        return;
+    }
+    std::thread::spawn(|| {
+        if let Err(e) = clear_presence() {
+            yikim_log(format!("Discord RPC temizleme: {e}"));
+        } else {
+            yikim_log("Discord RPC: presence temizlendi".into());
+        }
+    });
 }
 
 fn run_presence(instance: &str, version: &str, server: &str) -> Result<(), String> {
     use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 
-    let mut client = DiscordIpcClient::new(DISCORD_APP_ID)
-        .map_err(|e| format!("Discord IPC client oluşturulamadı: {e}"))?;
+    // placeholder ID → Discord böyle bir uygulamayı tanımaz; sessizce geç
+    if DISCORD_APP_ID.chars().all(|c| c.is_ascii_digit()) && DISCORD_APP_ID.ends_with("000000") {
+        yikim_log("Discord RPC: uygulama ID'si henüz ayarlanmamış".into());
+        return Ok(());
+    }
+    let app_id = std::env::var("YIKIM_DISCORD_APP_ID")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| DISCORD_APP_ID.to_string());
 
+    let mut client = DiscordIpcClient::new(&app_id)
+        .map_err(|e| format!("IPC client oluşturulamadı: {e}"))?;
     client
         .connect()
-        .map_err(|e| format!("Discord'a bağlanılamadı (Discord açık mı?): {e}"))?;
-
+        .map_err(|_| "Discord'a bağlanılamadı (Discord açık mı?)".to_string())?;
     yikim_log("Discord RPC: bağlandı".into());
 
-    // Aktivite detayları
+    // Kullanıcı talebi: "YIKIMLient ile oynuyor" + altında sürüm
+    let state_text = format!("YIKIMLient {} ile oynuyor", crate::APP_VERSION);
     let details = if server.is_empty() {
-        format!("Minecraft {}", version)
+        format!("Minecraft {} — {}", version, instance)
     } else {
         format!("Minecraft {} — {}", version, server)
     };
-
-    let state_text = format!("YIKIMLient — {}", instance);
-
-    let payload = activity::Activity::new()
+    let act = activity::Activity::new()
         .details(&details)
         .state(&state_text)
-        .timestamps(activity::Timestamps::new().start(chrono::Utc::now().timestamp_millis()))
         .assets(
             activity::Assets::new()
                 .large_image("yikimlient_logo")
-                .large_text("YIKIMLient — Ultra-hızlı Minecraft launcher")
+                .large_text("YIKIMLient — Ultra-hızlı Minecraft launcher"),
         )
-        .buttons(vec![
-            activity::Button::new("⬇ YIKIMLient İndir", "https://github.com/YKSAMI1/yikimlient"),
-            activity::Button::new("🌐 YIKIMDARA'ya Katıl", "https://yikimdara.com.tr"),
-        ]);
-
+        .buttons(vec![activity::Button::new(
+            "YIKIMLient İndir",
+            "https://github.com/YKSAMI1/yikimlient",
+        )]);
     client
-        .set_activity(payload)
-        .map_err(|e| format!("Discord presence ayarlanamadı: {e}"))?;
+        .set_activity(act)
+        .map_err(|e| format!("presence ayarlanamadı: {e}"))?;
+    yikim_log("Discord RPC: presence aktif (yenileme döngüsü YOK — internet trafiği 0)".into());
 
-    yikim_log("Discord RPC: presence aktif".into());
-
-    // Thread burada bekler — oyun süresi boyunca Discord'a bağlı kalır.
-    // Oyun kapanınca `stop()` çağrılır → process sonlanır → IPC kapanır.
-    // Gerçekte: Discord IPC bağlantısı process sonlanınca otomatik kapanır.
-    // Bu thread'i canlı tutmak için sonsuz bekleme yaparız.
-    loop {
-        std::thread::sleep(std::time::Duration::from_secs(60));
-        // Her dakika presence'i yenile (Discord otomatik timeout yapmasın)
-        let refresh = activity::Activity::new()
-            .details(&details)
-            .state(&state_text)
-            .assets(
-                activity::Assets::new()
-                    .large_image("yikimlient_logo")
-                    .large_text("YIKIMLient — Ultra-hızlı Minecraft launcher")
-            )
-            .buttons(vec![
-                activity::Button::new("⬇ YIKIMLient İndir", "https://github.com/YKSAMI1/yikimlient"),
-                activity::Button::new("🌐 YIKIMDARA'ya Katıl", "https://yikimdara.com.tr"),
-            ]);
-        let _ = client.set_activity(refresh);
+    // Oyun süresi boyunca BEKLEMEDE: hiçbir periyodik istek yok.
+    // stop() RPC_ACTIVE'i düşürür; process kapanınca IPC de kapanır.
+    while RPC_ACTIVE.load(Ordering::Relaxed) {
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
+    let _ = client.clear_activity();
+    let _ = client.close();
+    Ok(())
+}
+
+fn clear_presence() -> Result<(), String> {
+    use discord_rich_presence::{DiscordIpc, DiscordIpcClient};
+    let app_id = std::env::var("YIKIM_DISCORD_APP_ID")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| DISCORD_APP_ID.to_string());
+    let mut client = DiscordIpcClient::new(&app_id)
+        .map_err(|e| format!("IPC client oluşturulamadı: {e}"))?;
+    client
+        .connect()
+        .map_err(|_| "Discord'a bağlanılamadı".to_string())?;
+    let _ = client.clear_activity();
+    let _ = client.close();
+    Ok(())
 }

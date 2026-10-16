@@ -26,6 +26,21 @@ public final class YikimHud {
     private YikimHud() {
     }
 
+    // PERFORMANS (v1.9.0): YikimLayout.arrange() her karede yeniden hesaplanıyordu
+    // (pencere boyutu değişmeden sonuç aynı) — ekran boyutu değişmedikçe önbellekten döner.
+    private static int cacheW = -1;
+    private static int cacheH = -1;
+    private static List<YikimLayout.Slot> cacheSlots = List.of();
+
+    private static List<YikimLayout.Slot> arrangeCached(class_327 font, int w, int h) {
+        if (w != YikimHud.cacheW || h != YikimHud.cacheH) {
+            YikimHud.cacheW = w;
+            YikimHud.cacheH = h;
+            YikimHud.cacheSlots = YikimLayout.arrange(font, w, h);
+        }
+        return YikimHud.cacheSlots;
+    }
+
     public static void render(class_332 graphics, class_9779 delta) {
         class_310 client = class_310.method_1551();
         YikimConfig config = YikimConfig.get();
@@ -44,7 +59,7 @@ public final class YikimHud {
         long started = System.nanoTime();
         if (config.hudEnabled) {
             class_327 font = client.field_1772;
-            List<YikimLayout.Slot> slots = YikimLayout.arrange(font, client.method_22683().method_4486(), client.method_22683().method_4502());
+            List<YikimLayout.Slot> slots = YikimHud.arrangeCached(font, client.method_22683().method_4486(), client.method_22683().method_4502());
             for (YikimLayout.Slot slot : slots) {
                 YikimAdapter.push(graphics, slot.x, slot.y, slot.scale);
                 slot.widget.draw(graphics, font, false);
