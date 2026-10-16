@@ -1545,6 +1545,53 @@ pub async fn cmd_curtain_ready(app: AppHandle) -> Result<(), String> {
 
 /// Oyun içi katalog isteklerini (catalog-request.json) izleyip yanıtla (catalog-response.txt).
 /// Ön planda arka plan görevi olarak çalışır; launcher açık kaldığı sürece canlıdır.
+// ---------- katalog arama onbellegi (internet doygunluk korumasi) ----------
+
+type CatalogCache = std::sync::Mutex<std::collections::HashMap<String, (std::time::Instant, Vec<String>, String)>>;
+
+fn catalog_cache() -> &'static CatalogCache {
+    static CACHE: std::sync::OnceLock<CatalogCache> = std::sync::OnceLock::new();
+    CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+fn catalog_cache_get(key: &str) -> Option<(std::time::Instant, Vec<String>, String)> {
+    catalog_cache().lock().ok()?.get(key).cloned()
+}
+
+fn catalog_cache_put(key: &str, rows: Vec<String>, header_err: String) {
+    let mut map = match catalog_cache().lock() {
+        Ok(m) => m,
+        Err(_) => return,
+    };
+    // onbellegi sinirli tut (32 arama) — eski girdiler zaten TTL ile eskir
+    if map.len() > 32 {
+        map.clear();
+    }
+    map.insert(key.to_string(), (std::time::Instant::now(), rows, header_err));
+}
+
+/// Katalog yanitini diske yaz (YikimBridge.readCatalogResponse sozlesmesi):
+/// 1. satir JSON baslik (mod `"id"` ANAHTARINI TIRNAKLI arar), 2+ satir sekme ayracli satirlar.
+fn write_catalog_response(inst_dir: &std::path::Path, id: i64, source: &str, header_err: &str, rows: &[String]) {
+    let resp_path = inst_dir.join(".yikim").join("catalog-response.txt");
+    if let Some(parent) = resp_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let err_clean = header_err
+        .replace('"', "'")
+        .replace(['\n', '\r'], " ");
+    let header = format!(
+        "{{\"id\": {id}, \"source\": \"{source}\", \"error\": \"{err_clean}\", \"total\": {}}}\n",
+        rows.len()
+    );
+    let mut out = header;
+    for row in rows {
+        out.push_str(row);
+        out.push('\n');
+    }
+    let _ = std::fs::write(&resp_path, out);
+}
+
 pub fn spawn_catalog_watcher(_app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
@@ -1576,6 +1623,18 @@ pub fn spawn_catalog_watcher(_app: tauri::AppHandle) {
                 let mc = inst.as_ref().map(|i| i.mc_version.clone()).unwrap_or_default();
                 // sürüm süzgeci: kurulum çözülemediyse süzmesiz ara (sonuç gelmesin diye boş durma)
                 let version_filter: Vec<String> = if mc.is_empty() { vec![] } else { vec![mc.clone()] };
+
+                // INTERNET KORUMASI: ayni arama 10 dk icinde tekrar gelirse AG'A CIKMA -
+                // onbellekten yanitla. Oyun sirasinda katalog ayni aramayi tekrarlarsa
+                // (log'da 2-3 dk arayla tekrar goruldu) internet doyuyordu.
+                let cache_key = format!("{query}|{source}|{limit}|{loader}|{mc}");
+                if let Some((at, rows, header_err)) = catalog_cache_get(&cache_key) {
+                    if at.elapsed() < std::time::Duration::from_secs(600) {
+                        write_catalog_response(&entry.path(), id, &source, &header_err, &rows);
+                        core::yikim_log(format!("katalog onbellekten yanitlandi: {instance_id} (id:{id}, ag yok)"));
+                        continue;
+                    }
+                }
 
                 let mut header_err = "".to_string();
                 let mut rows: Vec<String> = Vec::new();
@@ -1614,6 +1673,8 @@ pub fn spawn_catalog_watcher(_app: tauri::AppHandle) {
                 //   (YikimJson needle = "key"), id kendi istek numarasıyla eşleşmezse
                 //   yanıtı reddeder. Metin değerler tırnaklı, sayılar düz.
                 //   2+ satır: sekme ayraçlı slug, başlık, açıklama, indirme, yazar…
+                catalog_cache_put(&cache_key, rows.clone(), header_err.clone());
+
                 let resp_path = entry.path().join(".yikim").join("catalog-response.txt");
                 if let Some(parent) = resp_path.parent() {
                     let _ = std::fs::create_dir_all(parent);
@@ -1637,16 +1698,19 @@ pub fn spawn_catalog_watcher(_app: tauri::AppHandle) {
                 {
                     let icons_dir = entry.path().join(".yikim").join("icons");
                     let _ = std::fs::create_dir_all(&icons_dir);
-                    let mut icon_jobs = Vec::new();
-                    for r in &icon_urls {
-                        let url = r.clone();
-                        let dir2 = icons_dir.clone();
-                        icon_jobs.push(tokio::spawn(async move {
-                            crate::commands::download_icon_png(&url, &dir2).await;
-                        }));
-                    }
-                    for j in icon_jobs {
-                        let _ = j.await;
+                    // 40 PARALEL DEGIL — 5'lik gruplar halinde indir (internet doygunluk korumasi)
+                    for chunk in icon_urls.chunks(5) {
+                        let mut jobs = Vec::new();
+                        for r in chunk {
+                            let url = r.clone();
+                            let dir2 = icons_dir.clone();
+                            jobs.push(tokio::spawn(async move {
+                                crate::commands::download_icon_png(&url, &dir2).await;
+                            }));
+                        }
+                        for j in jobs {
+                            let _ = j.await;
+                        }
                     }
                 }
                 core::yikim_log(format!("oyun içi katalog yanıtı yazıldı: {instance_id} (id:{id})"));

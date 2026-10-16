@@ -111,7 +111,9 @@ public final class YikimCatalog {
     }
 
     public static void ensureResults() {
-        if (loading) {
+        if (loading || pendingId >= 0L) {
+            // zaten bekleyen bir istek var — aynı aramayı tekrar AG'A YAZMA
+            // (oyun sırasında tekrar eden istekler interneti doyuruyordu)
             return;
         }
         if (query.equals(lastQuery) && !HITS.isEmpty()) {
@@ -122,7 +124,8 @@ public final class YikimCatalog {
 
     public static void search() {
         long now = System.currentTimeMillis();
-        if (loading && now - lastRequestAt < 1500L) {
+        if (loading) {
+            // bekleyen istek varken yeni istek yok — 15 sn timeout zaten temizler
             return;
         }
         dirtyAt = 0L;
