@@ -26,8 +26,13 @@ fn app_id() -> String {
         .unwrap_or_else(|| DISCORD_APP_ID.to_string())
 }
 
-fn activity_build<'a>(details: &'a str, state: &'a str, with_assets: bool) -> activity::Activity<'a> {
-    let mut act = activity::Activity::new().details(details).state(state);
+fn activity_build<'a>(details: &'a str, state: &'a str, with_assets: bool, started_at: i64) -> activity::Activity<'a> {
+    let mut act = activity::Activity::new()
+        .details(details)
+        .state(state)
+        // "OYNUYOR" basligi garantisi + gecen sure sayaci
+        .activity_type(activity::ActivityType::Playing)
+        .timestamps(activity::Timestamps::new().start(started_at));
     if with_assets {
         act = act.assets(
             activity::Assets::new()
@@ -50,6 +55,7 @@ pub fn set_presence(details: &str, state: &str) {
     }
     let details = details.to_string();
     let state = state.to_string();
+    let started_at = chrono::Utc::now().timestamp_millis();
     std::thread::spawn(move || {
         let mut guard = match CLIENT.lock() {
             Ok(g) => g,
@@ -78,9 +84,9 @@ pub fn set_presence(details: &str, state: &str) {
         }
         let Some(client) = guard.as_mut() else { return };
         // önce logo ile dene; uygulama assets'i yüklü değilse logosuz gönder
-        let act = activity_build(&details, &state, true);
+        let act = activity_build(&details, &state, true, started_at);
         let result = client.set_activity(act).or_else(|_| {
-            let plain = activity_build(&details, &state, false);
+            let plain = activity_build(&details, &state, false, started_at);
             client.set_activity(plain)
         });
         match result {
