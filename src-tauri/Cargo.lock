@@ -6521,7 +6521,7 @@ dependencies = [
 
 [[package]]
 name = "yikimlient"
-version = "0.2.9"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "chrono",
@@ -6543,6 +6543,7 @@ dependencies = [
  "sha1",
  "sha2",
  "sysinfo",
+ "tar",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

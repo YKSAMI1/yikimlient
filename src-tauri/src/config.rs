@@ -23,6 +23,10 @@ pub struct YikimConfig {
     pub stats_enabled: bool,
     pub java_dir: Option<String>,      // özel java bin klasörü (boşsa otomatik)
     pub download_concurrency: usize,   // paralel indirme sayısı
+    /// Microsoft Build of OpenJDK 25 (mod paketleri için optimize JVM —
+    /// Java 21+ isteyen sürümlerde Mojang runtime'ı yerine bu kullanılır).
+    /// İndirme başarısızsa otomatik Mojang java-runtime'a düşer.
+    pub use_java25: bool,
 }
 
 impl Default for YikimConfig {
@@ -43,6 +47,7 @@ impl Default for YikimConfig {
             stats_enabled: true,
             java_dir: None,
             download_concurrency: 8,
+            use_java25: true,
         }
     }
 }

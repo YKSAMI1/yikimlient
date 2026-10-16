@@ -123,6 +123,9 @@ pub fn http_client() -> reqwest::Client {
                 .user_agent("YIKIMLient/0.2 (+https://github.com/YKSAMI1)")
                 .pool_max_idle_per_host(12)
                 .tcp_nodelay(true)
+                // Bağlantı kurulumu 10 sn'yi geçmesin (api çağrıları sonsuz asılmasın).
+                // Toplam timeout KOYMADIK — büyük dosya indirmeleri kesilmesin.
+                .connect_timeout(std::time::Duration::from_secs(10))
                 .build()
                 .expect("http client")
         })

@@ -508,6 +508,13 @@ pub async fn resolve_java_dirs(
             return Ok(dir);
         }
     }
+    // 1.5 Microsoft OpenJDK 25 — Java 21+ gerektiren sürümlerde tercih edilir
+    // (mod paketleri için optimize JVM; ayar kapatılırsa veya indirme başarısızsa düşülür)
+    if major >= 21 {
+        if let Some(dir) = ensure_microsoft_java25().await {
+            return Ok(dir);
+        }
+    }
     // 2. Yönetilen runtime zaten var mı
     let rt_dir = runtimes_dir()
         .join(java_platform_key())
@@ -590,6 +597,155 @@ pub async fn resolve_java_dirs(
 pub fn java_exe(bin_dir: &Path) -> PathBuf {
     let exe = if cfg!(windows) { "java.exe" } else { "java" };
     bin_dir.join("bin").join(exe)
+}
+
+/// rt_dir içinde bin/java olan klasörü bul (bin/ doğrudan altta veya jdk-25.x alt klasöründe).
+fn find_java25_dir(rt_dir: &Path) -> Option<PathBuf> {
+    if java_exe(rt_dir).exists() {
+        return Some(rt_dir.to_path_buf());
+    }
+    if let Ok(rd) = std::fs::read_dir(rt_dir) {
+        for e in rd.flatten() {
+            if java_exe(&e.path()).exists() {
+                return Some(e.path());
+            }
+        }
+    }
+    None
+}
+
+/// Microsoft Build of OpenJDK 25 (LTS) — mod paketleri için optimize JVM.
+/// Java 21+ isteyen Minecraft sürümlerinde Mojang runtime'ına tercih edilir
+/// (config `use_java25` ile açılır/kapanır). Windows: zip, diğer: tar.gz.
+/// Herhangi bir adım başarısız olursa None döner → Mojang java-runtime'a düşülür.
+pub async fn ensure_microsoft_java25() -> Option<PathBuf> {
+    let cfg = crate::config::YikimConfig::load_or_default();
+    if !cfg.use_java25 {
+        return None;
+    }
+    let rt_dir = runtimes_dir().join("microsoft-jdk-25");
+    // zaten kurulu mu? (bin/ doğrudan altta YA DA jdk-25.x alt klasöründe)
+    if let Some(dir) = find_java25_dir(&rt_dir) {
+        return Some(dir);
+    }
+    let arch = crate::core::arch_name();
+    let archive_url = if cfg!(windows) {
+        if arch == "arm64" {
+            "https://aka.ms/download-jdk/microsoft-jdk-25-windows-aarch64.zip"
+        } else {
+            "https://aka.ms/download-jdk/microsoft-jdk-25-windows-x64.zip"
+        }
+    } else if os_name() == "osx" {
+        if arch == "arm64" {
+            "https://aka.ms/download-jdk/microsoft-jdk-25-macOS-aarch64.tar.gz"
+        } else {
+            "https://aka.ms/download-jdk/microsoft-jdk-25-macOS-x64.tar.gz"
+        }
+    } else if arch == "arm64" {
+        "https://aka.ms/download-jdk/microsoft-jdk-25-linux-aarch64.tar.gz"
+    } else {
+        "https://aka.ms/download-jdk/microsoft-jdk-25-linux-x64.tar.gz"
+    };
+    yikim_log(format!("Microsoft OpenJDK 25 indiriliyor: {archive_url}"));
+    let tmp = runtimes_dir().join("microsoft-jdk-25.download");
+    let _ = std::fs::remove_dir_all(&tmp);
+    if std::fs::create_dir_all(&tmp).is_err() {
+        return None;
+    }
+    let resp = match http_client().get(archive_url).send().await {
+        Ok(r) if r.status().is_success() => r,
+        Ok(r) => {
+            yikim_log(format!("MS JDK 25 indirme başarısız: HTTP {}", r.status()));
+            return None;
+        }
+        Err(e) => {
+            yikim_log(format!("MS JDK 25 indirme hatası: {e}"));
+            return None;
+        }
+    };
+    let bytes = match resp.bytes().await {
+        Ok(b) => b,
+        Err(e) => {
+            yikim_log(format!("MS JDK 25 gövde hatası: {e}"));
+            return None;
+        }
+    };
+    let xdir = tmp.join("x");
+    if cfg!(windows) {
+        // zip arşivini aç
+        let Ok(mut f) = std::fs::File::create(tmp.join("jdk25.zip")) else { return None };
+        use std::io::Write;
+        if f.write_all(&bytes).is_err() {
+            return None;
+        }
+        drop(f);
+        let Ok(zipf) = std::fs::File::open(tmp.join("jdk25.zip")) else { return None };
+        let Ok(mut z) = zip::ZipArchive::new(zipf) else { return None };
+        for i in 0..z.len() {
+            let Ok(mut zf) = z.by_index(i) else { continue };
+            let Some(rel) = zf.enclosed_name().map(|p| p.to_path_buf()) else { continue };
+            let out = xdir.join(&rel);
+            if zf.is_dir() {
+                let _ = std::fs::create_dir_all(&out);
+                continue;
+            }
+            if let Some(p) = out.parent() {
+                let _ = std::fs::create_dir_all(p);
+            }
+            let Ok(mut w) = std::fs::File::create(&out) else { continue };
+            let _ = std::io::copy(&mut zf, &mut w);
+        }
+    } else {
+        // tar.gz arşivini aç
+        let Ok(mut f) = std::fs::File::create(tmp.join("jdk25.tar.gz")) else { return None };
+        use std::io::Write;
+        if f.write_all(&bytes).is_err() {
+            return None;
+        }
+        drop(f);
+        let Ok(tf) = std::fs::File::open(tmp.join("jdk25.tar.gz")) else { return None };
+        let gz = flate2::read::GzDecoder::new(tf);
+        let mut tar = tar::Archive::new(gz);
+        if tar.unpack(&xdir).is_err() {
+            return None;
+        }
+    }
+    // jdk-25.x.y+7 gibi iç klasörü rt_dir'e taşı
+    let mut inner = None;
+    if let Ok(rd) = std::fs::read_dir(&xdir) {
+        for e in rd.flatten() {
+            if java_exe(&e.path()).exists() {
+                inner = Some(e.path());
+                break;
+            }
+        }
+    }
+    let inner = inner?;
+    let _ = std::fs::remove_dir_all(&rt_dir);
+    if std::fs::rename(&inner, &rt_dir).is_err() {
+        // rename diskler arası başarısız olabilir → kopyala-yapıştır
+        if copy_dir_recursive(&inner, &rt_dir).is_err() {
+            return None;
+        }
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+    yikim_log("Microsoft OpenJDK 25 hazır".into());
+    Some(rt_dir)
+}
+
+/// Klasörü özyinelemeli kopyala (rename diskler arası başarısız olursa yedek yol).
+pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(dst).map_err(|e| e.to_string())?;
+    for e in std::fs::read_dir(src).map_err(|e| e.to_string())?.flatten() {
+        let from = e.path();
+        let to = dst.join(e.file_name());
+        if from.is_dir() {
+            copy_dir_recursive(&from, &to)?;
+        } else {
+            std::fs::copy(&from, &to).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
 
 fn which_java() -> Result<PathBuf, String> {

@@ -104,6 +104,12 @@ pub fn run() {
             commands::cmd_cancel_downloads,
             commands::cmd_check_updates,
             commands::cmd_get_community_stats,
+            commands::cmd_pick_pack_file,
+            commands::cmd_import_pack_file,
+            commands::cmd_list_content_files,
+            commands::cmd_add_content_file,
+            commands::cmd_delete_content_file,
+            commands::cmd_open_content_folder,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

@@ -1,6 +1,6 @@
 [package]
 name = "yikimlient"
-version = "0.2.9"
+version = "0.3.0"
 description = "YIKIMLient â€” ultra-hafif, hÄ±zlÄ± ve gÃ¼zel Minecraft launcher"
 edition = "2021"
 rust-version = "1.77"
@@ -24,6 +24,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "gzip", "brotli", "http2", "rustls-tls-webpki-roots"] }
 zip = "2"
 flate2 = "1"
+tar = "0.4"
 sha1 = "0.10"
 sha2 = "0.10"
 md-5 = "0.10"

@@ -258,6 +258,26 @@ pub async fn resolve_mod_icon_urls(filenames: &[String]) -> std::collections::Ha
 
 // ---------- Modrinth ----------
 
+/// API JSON çağrısı — 15 sn toplam timeout ile (spinner sonsuz dönmesin diye).
+async fn api_json_req(req: reqwest::RequestBuilder) -> Result<serde_json::Value, String> {
+    match tokio::time::timeout(std::time::Duration::from_secs(15), req.send()).await {
+        Err(_) => Err("zaman aşımı (15 sn) — internet bağlantını kontrol et".into()),
+        Ok(Err(e)) => Err(e.to_string()),
+        Ok(Ok(resp)) => {
+            let fut = resp.json::<serde_json::Value>();
+            match tokio::time::timeout(std::time::Duration::from_secs(15), fut).await {
+                Err(_) => Err("yanıt zaman aşımı (15 sn)".into()),
+                Ok(Err(e)) => Err(e.to_string()),
+                Ok(Ok(js)) => Ok(js),
+            }
+        }
+    }
+}
+
+async fn api_json(url: &str) -> Result<serde_json::Value, String> {
+    api_json_req(http_client().get(url)).await
+}
+
 async fn modrinth_search(
     query: &str,
     kind: &str,
@@ -281,8 +301,7 @@ async fn modrinth_search(
         offset,
         limit.min(50),
     );
-    let resp = http_client().get(&url).send().await.map_err(|e| e.to_string())?;
-    let js: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let js: serde_json::Value = api_json(&url).await?;
     let mut out = Vec::new();
     if let Some(hits) = js["hits"].as_array() {
         for h in hits {
@@ -329,8 +348,7 @@ async fn modrinth_versions(
         }
         url.push_str(&params.join("&"));
     }
-    let resp = http_client().get(&url).send().await.map_err(|e| e.to_string())?;
-    let arr: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let arr: serde_json::Value = api_json(&url).await?;
     let mut out = Vec::new();
     if let Some(list) = arr.as_array() {
         for v in list {
@@ -407,11 +425,7 @@ async fn curseforge_search(
         url.push_str(&format!("&gameVersion={}", urlencoding::encode(game_versions[0])));
     }
     let _ = loader;
-    let resp = cf_get(&http_client(), &url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    let js: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let js: serde_json::Value = api_json_req(cf_get(&http_client(), &url)).await?;
     let mut out = Vec::new();
     if let Some(data) = js["data"].as_array() {
         for m in data {
@@ -453,11 +467,7 @@ async fn curseforge_files(
         url.push('?');
         url.push_str(&params.join("&"));
     }
-    let resp = cf_get(&http_client(), &url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    let js: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let js: serde_json::Value = api_json_req(cf_get(&http_client(), &url)).await?;
     let mut out = Vec::new();
     if let Some(data) = js["data"].as_array() {
         for f in data {
@@ -695,7 +705,7 @@ pub async fn install_modpack(
 }
 
 /// Modrinth .mrpack: index.json → files[].downloads + overrides
-async fn install_mrpack(
+pub async fn install_mrpack(
     handle: &tauri::AppHandle,
     pack_file: &std::path::Path,
     inst: &mut crate::instances::Instance,
@@ -797,7 +807,7 @@ async fn install_mrpack(
 }
 
 /// CurseForge pack zip: manifest.json → files[] {projectID,fileID} + overrides/
-async fn install_cfpack(
+pub async fn install_cfpack(
     handle: &tauri::AppHandle,
     pack_file: &std::path::Path,
     inst: &mut crate::instances::Instance,

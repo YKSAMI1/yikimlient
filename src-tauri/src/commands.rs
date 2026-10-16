@@ -662,29 +662,7 @@ pub async fn write_mod_icons(inst: &Instance) {
         let url = url.clone();
         let icons_dir = icons_dir.clone();
         jobs.push(tokio::spawn(async move {
-            let file = icons_dir.join(icon_cache_name(&url));
-            let cached_ok = std::fs::read(&file)
-                .ok()
-                .and_then(|b| b.first_chunk::<8>().map(|m| m[..] == [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
-                .unwrap_or(false);
-            if cached_ok {
-                return;
-            }
-            let Ok(resp) = crate::core::http_client().get(&url).send().await else { return };
-            if !resp.status().is_success() {
-                return;
-            }
-            let Ok(bytes) = resp.bytes().await else { return };
-            // WebP/GIF/JPEG → PNG (mod tarafı yalnız PNG decode eder)
-            let img = match image::load_from_memory(&bytes) {
-                Ok(img) => img,
-                Err(_) => return,
-            };
-            let mut png = Vec::new();
-            if img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).is_err() {
-                return;
-            }
-            let _ = std::fs::write(&file, &png);
+            download_icon_png(&url, &icons_dir).await;
         }));
     }
     for j in jobs {
@@ -692,6 +670,34 @@ pub async fn write_mod_icons(inst: &Instance) {
     }
     let _ = std::fs::write(dir.join("mod-icons.txt"), manifest);
     core::yikim_log("mod ikonları hazır (.yikim/mod-icons.txt + icons/)".into());
+}
+
+/// Tek icon indirir: webp/gif/jpeg → PNG çevirir, modun hash şablonuyla `.yikim/icons/`'a yazar.
+/// Catalog arama sonuçlarının ikonları da bununla iner (mod ağa dokunmaz, yerelden okur).
+pub async fn download_icon_png(url: &str, icons_dir: &std::path::Path) {
+    let file = icons_dir.join(icon_cache_name(url));
+    let cached_ok = std::fs::read(&file)
+        .ok()
+        .and_then(|b| b.first_chunk::<8>().map(|m| m[..] == [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
+        .unwrap_or(false);
+    if cached_ok {
+        return;
+    }
+    let Ok(resp) = crate::core::http_client().get(url).send().await else { return };
+    if !resp.status().is_success() {
+        return;
+    }
+    let Ok(bytes) = resp.bytes().await else { return };
+    // WebP/GIF/JPEG → PNG (mod tarafı yalnız PNG decode eder)
+    let img = match image::load_from_memory(&bytes) {
+        Ok(img) => img,
+        Err(_) => return,
+    };
+    let mut png = Vec::new();
+    if img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).is_err() {
+        return;
+    }
+    let _ = std::fs::write(&file, &png);
 }
 
 /// Java `String.hashCode()` — mod aynı karmayı üretir, dosya adları birebir eşleşir.
@@ -772,6 +778,146 @@ pub async fn cmd_open_mods_folder(instance_id: String) -> Result<(), String> {
 pub async fn cmd_open_instance_folder(instance_id: String) -> Result<(), String> {
     let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
     open::that(inst.dir()).map_err(|e| e.to_string())
+}
+
+// ---------- içerik: doku paketi / shader / dünya ----------
+
+/// İçerik türü → kurulum alt klasörü.
+fn content_dir(inst: &Instance, kind: &str) -> Result<std::path::PathBuf, String> {
+    match kind {
+        "resourcepacks" => Ok(inst.dir().join("resourcepacks")),
+        "shaderpacks" => Ok(inst.dir().join("shaderpacks")),
+        "saves" => Ok(inst.dir().join("saves")),
+        _ => Err("geçersiz içerik türü".into()),
+    }
+}
+
+#[derive(Serialize)]
+pub struct UiContentFile {
+    pub name: String,
+    pub is_dir: bool,
+    pub size: u64,
+    pub modified: i64,
+}
+
+/// Kurulumun içerik dosyalarını listele (doku paketi / shader / dünya).
+#[tauri::command]
+pub async fn cmd_list_content_files(
+    instance_id: String,
+    kind: String,
+) -> Result<Vec<UiContentFile>, String> {
+    let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
+    let dir = content_dir(&inst, &kind)?;
+    let mut out = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for e in entries.flatten() {
+            let p = e.path();
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') {
+                continue;
+            }
+            let is_dir = p.is_dir();
+            // resourcepacks/shaderpacks → zip dosyaları; saves → klasörler (level.dat'lı)
+            match kind.as_str() {
+                "saves" => {
+                    if !is_dir || !p.join("level.dat").exists() {
+                        continue;
+                    }
+                }
+                _ => {
+                    if is_dir || !p.extension().map(|x| x == "zip").unwrap_or(false) {
+                        continue;
+                    }
+                }
+            }
+            let meta = e.metadata().ok();
+            out.push(UiContentFile {
+                name,
+                is_dir,
+                size: meta.as_ref().map(|m| m.len()).unwrap_or(0),
+                modified: meta
+                    .as_ref()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as i64)
+                    .unwrap_or(0),
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// İçerik dosyası ekle: zip seç (doku/shader) veya klasör seç (dünya) → kurulum klasörüne kopyala.
+#[tauri::command]
+pub async fn cmd_add_content_file(
+    app: AppHandle,
+    instance_id: String,
+    kind: String,
+) -> Result<(), String> {
+    use tauri_plugin_dialog::DialogExt;
+    let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
+    let dir = content_dir(&inst, &kind)?;
+    let _ = std::fs::create_dir_all(&dir);
+    let is_world = kind == "saves";
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let d = app.dialog().file();
+        let d = if is_world {
+            d.add_filter("Minecraft Dünyası (klasör)", &[])
+        } else {
+            d.add_filter("Paket (.zip)", &["zip"])
+        };
+        if is_world {
+            d.blocking_pick_folder()
+        } else {
+            d.blocking_pick_file()
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    let Some(picked) = picked else { return Ok(()) };
+    let src = picked.to_string();
+    let src_path = std::path::PathBuf::from(&src);
+    let file_name = src_path
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "paket.zip".into());
+    let dest = dir.join(&file_name);
+    if src_path.is_dir() {
+        crate::launcher::copy_dir_recursive(&src_path, &dest)?;
+    } else {
+        std::fs::copy(&src_path, &dest).map_err(|e| format!("kopyalanamadı: {e}"))?;
+    }
+    Ok(())
+}
+
+/// İçerik dosyasını sil (dosya veya klasör).
+#[tauri::command]
+pub async fn cmd_delete_content_file(
+    instance_id: String,
+    kind: String,
+    name: String,
+) -> Result<(), String> {
+    let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
+    let dir = content_dir(&inst, &kind)?;
+    let p = dir.join(&name);
+    // isim kaçışını engelle: sadece doğrudan alt öğe silinebilir
+    if p.parent() != Some(dir.as_path()) {
+        return Err("geçersiz dosya adı".into());
+    }
+    if p.is_dir() {
+        std::fs::remove_dir_all(&p).map_err(|e| e.to_string())
+    } else {
+        std::fs::remove_file(&p).map_err(|e| e.to_string())
+    }
+}
+
+/// İçerik klasörünü dosya yöneticisinde aç.
+#[tauri::command]
+pub async fn cmd_open_content_folder(instance_id: String, kind: String) -> Result<(), String> {
+    let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
+    let dir = content_dir(&inst, &kind)?;
+    let _ = std::fs::create_dir_all(&dir);
+    open::that(dir).map_err(|e| e.to_string())
 }
 
 // ---------- repos (modrinth / curseforge) ----------
@@ -869,6 +1015,94 @@ pub async fn cmd_install_pack_files(
 }
 
 // ---------- haberler & istatistik & sistem ----------
+
+/// Kullanıcıdan .mrpack / .zip paket dosyası seçmesini iste (yerel import).
+#[tauri::command]
+pub async fn cmd_pick_pack_file(app: AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter("Mod Paketi (.mrpack / .zip)", &["mrpack", "zip"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(picked.map(|p| p.to_string()))
+}
+
+/// Yerel paket dosyasını (.mrpack veya CurseForge .zip) yeni kurulum olarak içe aktar.
+/// Format dosya içeriğinden algılanır: modrinth.index.json → mrpack, manifest.json → cfpack.
+#[tauri::command]
+pub async fn cmd_import_pack_file(
+    app: AppHandle,
+    path: String,
+    name: Option<String>,
+) -> Result<Instance, String> {
+    let p = std::path::PathBuf::from(&path);
+    if !p.is_file() {
+        return Err("dosya bulunamadı".into());
+    }
+    let zipf = std::fs::File::open(&p).map_err(|e| format!("paket okunamadı: {e}"))?;
+    let mut archive = zip::ZipArchive::new(zipf).map_err(|e| format!("paket açılamadı: {e}"))?;
+    let (fmt, inner_name): (String, String) = if archive.by_name("modrinth.index.json").is_ok() {
+        let mut idx = archive.by_name("modrinth.index.json").map_err(|e| e.to_string())?;
+        let mut s = String::new();
+        use std::io::Read;
+        idx.read_to_string(&mut s).map_err(|e| e.to_string())?;
+        let index: serde_json::Value = serde_json::from_str(&s).map_err(|e| e.to_string())?;
+        ("modrinth".into(), index["name"].as_str().unwrap_or("").to_string())
+    } else if archive.by_name("manifest.json").is_ok() {
+        let mut m = archive.by_name("manifest.json").map_err(|e| e.to_string())?;
+        let mut s = String::new();
+        use std::io::Read;
+        m.read_to_string(&mut s).map_err(|e| e.to_string())?;
+        let mf: serde_json::Value = serde_json::from_str(&s).map_err(|e| e.to_string())?;
+        ("curseforge".into(), mf["name"].as_str().unwrap_or("").to_string())
+    } else {
+        return Err("geçersiz paket (modrinth.index.json veya manifest.json bulunamadı)".into());
+    };
+    let inst_name = name
+        .filter(|n| !n.trim().is_empty())
+        .or_else(|| Some(inner_name).filter(|n| !n.trim().is_empty()))
+        .unwrap_or_else(|| {
+            p.file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "Mod Paketi".into())
+        });
+    let mut inst = Instance {
+        id: format!("inst-{}", core::now_millis()),
+        name: inst_name,
+        icon: "📦".into(),
+        source_pack: Some(format!("{fmt}:local")),
+        ..Default::default()
+    };
+    instances::create(inst.clone())?;
+    let result = match fmt.as_str() {
+        "modrinth" => repos::install_mrpack(&app, &p, &mut inst).await,
+        _ => repos::install_cfpack(&app, &p, &mut inst).await,
+    };
+    match result {
+        Ok(()) => {
+            if inst.mod_loader == "fabric" && !inst.loader_version.is_empty() {
+                if let Err(e) =
+                    launcher::install_fabric_profile(&inst.mc_version, &inst.loader_version).await
+                {
+                    core::yikim_log(format!("fabric profile önden indirilemedi: {e}"));
+                }
+            }
+            inst.save()?;
+            if let Err(e) = yikim_mod::ensure_installed(&app, &inst) {
+                core::yikim_log(format!("YIKIM modu kurulamadı (kurulum engellenmedi): {e}"));
+            }
+            Ok(inst)
+        }
+        Err(e) => {
+            let _ = instances::delete(&inst.id);
+            Err(e)
+        }
+    }
+}
 
 #[tauri::command]
 pub async fn cmd_get_app_dir() -> Result<String, String> {
@@ -1292,6 +1526,8 @@ pub fn spawn_catalog_watcher(_app: tauri::AppHandle) {
 
                 let mut header_err = "".to_string();
                 let mut rows: Vec<String> = Vec::new();
+                // katalog ikonlarını önden indirmek için URL listesi
+                let mut icon_urls: Vec<String> = Vec::new();
                 let search_sources: Vec<&str> = if source == "all" {
                     vec!["modrinth", "curseforge"]
                 } else {
@@ -1307,6 +1543,9 @@ pub fn spawn_catalog_watcher(_app: tauri::AppHandle) {
                                 // açıklamada sekme/newline olursa satır parse'ı bozulur — temizle
                                 let desc = r.description.replace(['\t', '\n', '\r'], " ");
                                 let title = r.title.replace(['\t', '\n', '\r'], " ");
+                                if !r.icon_url.is_empty() && !r.icon_url.starts_with("data:") {
+                                    icon_urls.push(r.icon_url.clone());
+                                }
                                 rows.push(format!(
                                     "{}\t{}\t{}\t{}\t{}\t{}\t{}",
                                     r.id, title, desc, r.downloads, r.author, r.source, r.icon_url
@@ -1339,6 +1578,24 @@ pub fn spawn_catalog_watcher(_app: tauri::AppHandle) {
                     out.push('\n');
                 }
                 let _ = std::fs::write(&resp_path, out);
+                // KATALOG İKONLARI: arama sonuçlarının ikonlarını da önden indir.
+                // Mod ağa dokunmaz; YikimIcons yalnız yerel PNG'den doku kurar.
+                // İndirilmezse katalogda yalnız harf rozetleri görünür (kullanıcı hatası).
+                {
+                    let icons_dir = entry.path().join(".yikim").join("icons");
+                    let _ = std::fs::create_dir_all(&icons_dir);
+                    let mut icon_jobs = Vec::new();
+                    for r in &icon_urls {
+                        let url = r.clone();
+                        let dir2 = icons_dir.clone();
+                        icon_jobs.push(tokio::spawn(async move {
+                            crate::commands::download_icon_png(&url, &dir2).await;
+                        }));
+                    }
+                    for j in icon_jobs {
+                        let _ = j.await;
+                    }
+                }
                 core::yikim_log(format!("oyun içi katalog yanıtı yazıldı: {instance_id} (id:{id})"));
             }
         }

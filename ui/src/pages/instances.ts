@@ -60,7 +60,10 @@ function renderGrid(root: HTMLElement): void {
         <h1>Paketler</h1>
         <p>Kurulumlarını yönet, yeni profiller oluştur.</p>
       </div>
-      <button class="btn primary" id="btn-new">${icon("plus")} Yeni Kurulum</button>
+      <div style="display:flex; gap:8px">
+        <button class="btn ghost" id="btn-import" title="Modrinth .mrpack veya CurseForge .zip paket dosyası içe aktar">${icon("box")} Paket İçe Aktar</button>
+        <button class="btn primary" id="btn-new">${icon("plus")} Yeni Kurulum</button>
+      </div>
     </div>
     <div class="inst-grid" id="inst-grid"></div>
     <div class="exp-popular" id="inst-popular">
@@ -138,13 +141,30 @@ function renderGrid(root: HTMLElement): void {
   optimizeVideos(grid); // ekranda olmayan videoları durdur
   }
   root.querySelector("#btn-new")?.addEventListener("click", () => openCreateWizard());
+  root.querySelector("#btn-import")?.addEventListener("click", () => importPackFile().catch(() => {}));
 
   // Popüler mod paketleri — tıklayınca Keşfet'te o paket açılır
   loadPopularPacks();
 }
 
-async function loadPopularPacks(): Promise<void> {
-  const strip = document.querySelector("#popular-strip") as HTMLElement | null;
+/// Yerel .mrpack / CurseForge .zip paket dosyasını içe aktar.
+/// Dosya seçici Rust tarafında (dialog plugin) açılır; format otomatik algılanır.
+async function importPackFile(): Promise<void> {
+  const path = await invoke("cmd_pick_pack_file");
+  if (!path) return; // kullanıcı iptal etti
+  toast("Paket içe aktarılıyor…", "ok");
+  try {
+    const inst = await invoke("cmd_import_pack_file", { path });
+    const { refreshState } = await import("../main");
+    await refreshState();
+    toast(`${(inst as any).name || "Paket"} kuruldu!`, "ok");
+    navigate("instances");
+  } catch (e) {
+    toast(`Paket içe aktarılamadı: ${e}`, "err");
+  }
+}
+
+async function loadPopularPacks(): Promise<void> {  const strip = document.querySelector("#popular-strip") as HTMLElement | null;
   if (!strip) return;
   try {
     const popular: any[] = await invoke("cmd_repos_popular", { kind: "modpack", loader: "" });
@@ -181,7 +201,7 @@ function loaderName(l: string): string {
 
 // ==================== Detay görünümü ====================
 
-type TabId = "mods" | "java" | "log" | "analytics" | "settings";
+type TabId = "mods" | "content" | "java" | "log" | "analytics" | "settings";
 
 function renderDetail(root: HTMLElement, id: string): void {
   const inst = state.instances.find((i) => i.id === id);
@@ -208,6 +228,7 @@ function renderDetail(root: HTMLElement, id: string): void {
     </div>
     <div class="tabs anim-fade-up">
       <button class="tab active" data-tab="mods">${icon("puzzle")} Modlar</button>
+      <button class="tab" data-tab="content">${icon("box")} Doku & Dünya</button>
       <button class="tab" data-tab="java">${icon("mug")} Java</button>
       <button class="tab" data-tab="log">${icon("term")} Log</button>
       <button class="tab" data-tab="analytics">${icon("chart")} Analiz</button>
@@ -235,11 +256,92 @@ function renderDetail(root: HTMLElement, id: string): void {
       t.classList.add("active");
       const tab = (t as HTMLElement).dataset.tab as TabId;
       const content = root.querySelector("#tab-content") as HTMLElement;
-      ({ mods: tabMods, java: tabJava, log: tabLog, analytics: tabAnalytics, settings: tabSettings })[tab](content, inst);
+      ({ mods: tabMods, content: tabContent, java: tabJava, log: tabLog, analytics: tabAnalytics, settings: tabSettings })[tab](content, inst);
     });
   });
   (root.querySelector("#tab-content") as HTMLElement);
   (root.querySelectorAll(".tab")[0] as HTMLElement).click();
+}
+
+// ---------- Doku & Dünya sekmesi ----------
+
+/// Seçili içerik türü sekme değişimlerinde korunsun.
+type ContentKind = "resourcepacks" | "shaderpacks" | "saves";
+let contentKind: ContentKind = "resourcepacks";
+
+const CONTENT_KINDS: Array<{ id: ContentKind; label: string; hint: string }> = [
+  { id: "resourcepacks", label: "Doku Paketleri", hint: "Kaynak paketleri (.zip)" },
+  { id: "shaderpacks", label: "Shaderlar", hint: "Iris/OptiFine shader'ları (.zip)" },
+  { id: "saves", label: "Dünyalar", hint: "Tek oyunculu dünyalar (klasör)" },
+];
+
+async function tabContent(content: HTMLElement, inst: any): Promise<void> {
+  const kindMeta = () => CONTENT_KINDS.find((k) => k.id === contentKind)!;
+  content.innerHTML = `<div class="spinner" style="margin:40px auto"></div>`;
+
+  const draw = async (): Promise<void> => {
+    let files: any[] = [];
+    try { files = await invoke("cmd_list_content_files", { instanceId: inst.id, kind: contentKind }); } catch { /* klasör yok */ }
+    const meta = kindMeta();
+    content.innerHTML = `
+      <div class="mods-toolbar" style="flex-wrap:wrap">
+        <div class="kind-toggle" id="content-kinds">
+          ${CONTENT_KINDS.map((k) => `<button class="kt ${k.id === contentKind ? "sel" : ""}" data-k="${k.id}">${k.label}</button>`).join("")}
+        </div>
+        <span style="flex:1"></span>
+        <button class="btn ghost sm" id="content-open">${icon("folder")} Klasörü Aç</button>
+        <button class="btn primary sm" id="content-add">${icon("plus")} ${meta.id === "saves" ? "Dünya Ekle" : "Paket Ekle"}</button>
+      </div>
+      <div class="mod-list" id="content-list"></div>
+    `;
+    content.querySelectorAll("#content-kinds .kt").forEach((b) => {
+      b.addEventListener("click", () => {
+        contentKind = (b as HTMLElement).dataset.k as ContentKind;
+        draw();
+      });
+    });
+    content.querySelector("#content-open")?.addEventListener("click", () =>
+      invoke("cmd_open_content_folder", { instanceId: inst.id, kind: contentKind }).catch(() => {}));
+    content.querySelector("#content-add")?.addEventListener("click", async () => {
+      try {
+        await invoke("cmd_add_content_file", { instanceId: inst.id, kind: contentKind });
+        await draw();
+      } catch (e) {
+        toast(`Eklenemedi: ${e}`, "err");
+      }
+    });
+    const list = content.querySelector("#content-list") as HTMLElement;
+    if (!files.length) {
+      list.innerHTML = `<div class="card" style="text-align:center; padding:34px">
+        <p>${meta.hint}<br /><span style="color:var(--text-faint); font-size:12px">Henüz içerik yok — yukarıdan ekleyebilirsin.</span></p></div>`;
+      return;
+    }
+    list.innerHTML = "";
+    for (const f of files) {
+      const row = el(`
+        <div class="card mod-row" style="display:flex; align-items:center; gap:12px; padding:12px 14px">
+          <div style="font-size:22px">${f.is_dir ? "🌍" : "📦"}</div>
+          <div style="flex:1; min-width:0">
+            <div style="font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${f.name}</div>
+            <div style="color:var(--text-faint); font-size:11.5px">${f.is_dir ? "dünya" : fmtBytes(f.size)}</div>
+          </div>
+          <button class="btn ghost sm" data-del="${f.name}" title="Sil">${icon("trash")}</button>
+        </div>
+      `);
+      row.querySelector("[data-del]")?.addEventListener("click", async (e) => {
+        const name = (e.currentTarget as HTMLElement).dataset.del as string;
+        if (!confirm(`"${name}" silinsin mi?`)) return;
+        try {
+          await invoke("cmd_delete_content_file", { instanceId: inst.id, kind: contentKind, name });
+          await draw();
+        } catch (err) {
+          toast(`Silinemedi: ${err}`, "err");
+        }
+      });
+      list.appendChild(row);
+    }
+  };
+  await draw();
 }
 
 // ---------- Modlar sekmesi ----------

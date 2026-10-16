@@ -2006,7 +2006,11 @@ public final class YikimPanel {
             boolean hovered = this.hit(mouseX, mouseY);
             int fill = queued ? YikimTheme.alpha(YikimTheme.accent, 34) : (hovered ? -1441129948 : 0x66111118);
             YikimDraw.roundedFill(graphics, this.x, this.y, this.x + this.width, this.y + this.height(), fill);
-            graphics.method_25294(this.x, this.y + 3, this.x + 3, this.y + this.height() - 3, queued ? YikimTheme.accent : YikimTheme.alpha(YikimTheme.accent, 85));
+            // accent çizgisi yalnızca kuyruğa alınmış veya hover'dayken çizilsin —
+            // aksi halde 40 satırın çizgileri birleşip solda "rastgele renkli sütun" görünür
+            if (queued || hovered) {
+                graphics.method_25294(this.x, this.y + 3, this.x + 3, this.y + this.height() - 3, queued ? YikimTheme.accent : YikimTheme.alpha(YikimTheme.accent, 85));
+            }
             int actionWidth = 52;
             // ikon: katalog yanıtının 7. kolonu (Modrinth/CurseForge görseli)
             YikimIcons.draw(graphics, font, "catalog:" + this.hit.slug, this.hit.icon, this.hit.title, this.x + 10, this.y + 4, 22);

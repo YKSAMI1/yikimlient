@@ -136,6 +136,7 @@ export function renderSettings(root: HTMLElement): void {
       ${toggleRow("hide-on-launch", "Oyun sırasında launcher'ı gizle (RAM tasarrufu)", cfg.hide_on_launch)}
       ${toggleRow("show-news", "Ana sayfada haberleri göster", cfg.show_news)}
       ${toggleRow("stats-enabled", "İstatistik toplansın (tamamen yerel)", cfg.stats_enabled)}
+      ${toggleRow("use-java25", "Microsoft OpenJDK 25 kullan (mod paketleri için optimize)", cfg.use_java25 !== false)}
       <div class="row-between" style="margin-top:8px">
         <span>İndirme hızı (paralel bağlantı)</span>
         <div class="ram-row" style="width:260px">
@@ -233,6 +234,7 @@ export function renderSettings(root: HTMLElement): void {
   wireToggle(root, "hide-on-launch", "hide_on_launch");
   wireToggle(root, "show-news", "show_news");
   wireToggle(root, "stats-enabled", "stats_enabled");
+  wireToggle(root, "use-java25", "use_java25");
 
   const dlc = root.querySelector("#dlc-range") as HTMLInputElement;
   dlc.addEventListener("input", () => (root.querySelector("#dlc-val") as HTMLElement).textContent = dlc.value);

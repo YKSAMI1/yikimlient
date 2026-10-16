@@ -72,10 +72,14 @@ public final class YikimMainMenu {
         this.buttons.add(new Button("Tek Oyunculu", "D\u00fcnyalar\u0131n\u0131 a\u00e7", 1, -1, () -> YikimMainMenu.open(YikimAdapter.worldSelectScreen(screen))));
         this.buttons.add(new Button("\u00c7ok Oyunculu", "Sunucu listesi", 2, -1, () -> YikimMainMenu.open(YikimAdapter.multiplayerScreen(screen))));
         this.buttons.add(new Button("YIKIM Men\u00fcs\u00fc", "Performans, g\u00f6r\u00fcn\u00fcm, HUD, modlar", 0, 0, () -> YikimPanel.open(class_310.method_1551(), 0)));
+        this.buttons.add(new Button("H\u0131zl\u0131 Performans", "Haz\u0131r FPS profilleri", 7, 0, () -> YikimPanel.open(class_310.method_1551(), 0)));
         this.buttons.add(new Button("HUD'u d\u00fczenle", "\u00d6\u011feleri yerle\u015ftir", 3, 2, () -> YikimPanel.open(class_310.method_1551(), 2)));
+        this.buttons.add(new Button("G\u00f6r\u00fcn\u00fcm", "Tema, arka plan, HUD \u00f6\u011feleri", 9, 1, () -> YikimPanel.open(class_310.method_1551(), 1)));
         this.buttons.add(new Button("Modlar", "Mod ara ve kur", 4, 4, () -> YikimPanel.open(class_310.method_1551(), 4)));
+        this.buttons.add(new Button("Sistem", "Te\u015fhis ve bak\u0131m", 11, 5, () -> YikimPanel.open(class_310.method_1551(), 5)));
         this.buttons.add(new Button("Ayarlar", "Minecraft ayarlar\u0131", 5, -1, () -> YikimMainMenu.open(YikimAdapter.optionsScreen(screen, class_310.method_1551().field_1690))));
-        this.buttons.add(new Button("\u00c7\u0131k\u0131\u015f", "Oyundan ayr\u0131l", 6, -1, () -> class_310.method_1551().method_1592()));
+        this.buttons.add(new Button("Vanilla Men\u00fc", "Mojang ana men\u00fcs\u00fcne d\u00f6n", 6, -1, () -> YikimMainMenu.open(YikimAdapter.vanillaTitleScreen())));
+        this.buttons.add(new Button("\u00c7\u0131k\u0131\u015f", "Oyundan ayr\u0131l", 8, -1, () -> class_310.method_1551().method_1592()));
         this.chipBackdrop = () -> {
             YikimBackdrop.invalidate();
             YikimMetrics.notify("Arka plan: " + YikimBackdrop.cycle());
