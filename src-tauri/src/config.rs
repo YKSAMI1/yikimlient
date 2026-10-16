@@ -20,6 +20,9 @@ pub struct YikimConfig {
     /// Discord Rich Presence — "YIKIMLient ile oynuyor" (yalnız yerel IPC,
     /// internet trafiği yoktur). Kullanıcı isteğiyle geri geldi.
     pub discord_rpc: bool,
+    /// Discord RPC v1 geciş isareti: eski config'lerde discord_rpc:false yaziliydi
+    /// (hicbir zaman calismadigi icin kullanici secimi degil). Ilk yuklemede duzeltilir.
+    pub discord_rpc_v1: bool,
     pub last_selected_account: String,
     pub window_maximized: bool,
     pub stats_enabled: bool,
@@ -44,6 +47,7 @@ impl Default for YikimConfig {
             full_screen_game: false,
             show_news: true,
             discord_rpc: true,
+            discord_rpc_v1: false,
             last_selected_account: String::new(),
             window_maximized: false,
             stats_enabled: true,
@@ -56,7 +60,17 @@ impl Default for YikimConfig {
 
 impl YikimConfig {
     pub fn load_or_default() -> Self {
-        crate::util::read_json(&config_path()).unwrap_or_default()
+        let mut cfg: Self = crate::util::read_json(&config_path()).unwrap_or_default();
+        // TEK SEFERLIK MIGRASYON: eski config'lerde discord_rpc:false yaziliydi ama
+        // RPC hicbir zaman calismiyordu (start() hic baglanmamisti) — bu bir kullanici
+        // secimi degil. Bir kez true'ya cekilip isaretlenir; sonrasinda kullanici
+        // ayarlardan kapatabilir, o secim saygi gorur.
+        if !cfg.discord_rpc_v1 {
+            cfg.discord_rpc = true;
+            cfg.discord_rpc_v1 = true;
+            let _ = cfg.save();
+        }
+        cfg
     }
 
     pub fn save(&self) -> Result<(), String> {

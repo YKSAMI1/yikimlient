@@ -1,16 +1,16 @@
 $nsis = "C:\Users\USER\Desktop\samiclient\src-tauri\target\release\bundle\nsis"
-$exe = "$nsis\YIKIMLient_0.3.2_x64-setup.exe"
+$exe = "$nsis\YIKIMLient_0.3.3_x64-setup.exe"
 $sig = (Get-Content "$exe.sig" -Raw).Trim()
 $pub = Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ'
-$notes = "Internet doygunluk fix'i: katalog aramalari 10 dk onbellek + ikon indirme 40->5 paralel, Discord RPC bug fix'i (baglanti hatasinda bir daha denenmiyordu), mod v1.9.1 (tekrar eden katalog istekleri engellendi)"
+$notes = "Discord RPC tamir edildi: config'deki eski discord_rpc:false gecişi otomatik duzeltildi, tek kalici baglanti mimarisi (XMCL tarzi), launcher acilista 'YIKIMLient acik' gosterir, oyunda 'ile oynuyor'a gecer"
 $latest = @{
-    version  = "0.3.2"
+    version  = "0.3.3"
     notes    = $notes
     pub_date = $pub
     platforms = @{
         "windows-x86_64" = @{
             signature = $sig
-            url = "https://github.com/YKSAMI1/yikimlient/releases/download/v0.3.2/YIKIMLient_0.3.2_x64-setup.exe"
+            url = "https://github.com/YKSAMI1/yikimlient/releases/download/v0.3.3/YIKIMLient_0.3.3_x64-setup.exe"
         }
     }
 } | ConvertTo-Json -Depth 5

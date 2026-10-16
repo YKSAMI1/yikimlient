@@ -1125,7 +1125,7 @@ pub async fn launch_game(
     yikim_log(format!("oyun PID: {pid}"));
 
     // Discord Rich Presence: oyun açıldı → "YIKIMLient ile oynuyor" (tek seferlik set, internet trafiği yok)
-    crate::discord_rpc::start(
+    crate::discord_rpc::game_presence(
         &inst.name,
         &inst.mc_version,
         &session.server.lock().unwrap().clone(),
