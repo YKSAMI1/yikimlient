@@ -28,6 +28,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.class_310;
 import net.minecraft.class_327;
 import net.minecraft.class_332;
+import net.minecraft.class_4185;
 import net.minecraft.class_437;
 
 public final class YikimMainMenu {
@@ -76,6 +77,16 @@ public final class YikimMainMenu {
         this.buttons.add(new Button("Modlar", "Mod ara ve kur", 4, 4, () -> YikimPanel.open(class_310.method_1551(), 4)));
         this.buttons.add(new Button("Ayarlar", "Minecraft ayarlar\u0131", 5, -1, () -> YikimMainMenu.open(YikimAdapter.optionsScreen(screen, class_310.method_1551().field_1690))));
         this.buttons.add(new Button("\u00c7\u0131k\u0131\u015f", "Oyundan ayr\u0131l", 8, -1, () -> class_310.method_1551().method_1592()));
+        // DİĞER MODLARIN TUŞLARI (Flashback, Mod Menu vb.): vanilla menüye mixin ile
+        // eklenen tuşlar yakalanır ve YIKIM menüsünde de gösterilir.
+        for (class_4185 modButton : YikimModButtons.scan(class_310.method_1551())) {
+            String label = YikimModButtons.label(modButton);
+            if (label.isEmpty()) {
+                continue;
+            }
+            class_4185 target = modButton;
+            this.buttons.add(new Button(label, "Mod tu\u015fu — " + label, 4, -1, () -> YikimModButtons.press(target)));
+        }
         this.chipBackdrop = () -> {
             YikimBackdrop.invalidate();
             YikimMetrics.notify("Arka plan: " + YikimBackdrop.cycle());
