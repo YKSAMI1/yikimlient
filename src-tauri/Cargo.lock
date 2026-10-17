@@ -550,7 +550,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a347dcabdae9c31b0825fd6a8bed285ec9c2acb89c47827126d52fa4f59cece3"
 dependencies = [
  "fnv",
- "uuid 1.26.1",
+ "uuid",
  "web-time",
 ]
 
@@ -1058,19 +1058,6 @@ dependencies = [
  "option-ext",
  "redox_users 0.5.3",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "discord-rich-presence"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a75db747ecd252c01bfecaf709b07fcb4c634adf0edb5fed47bc9c3052e7076b"
-dependencies = [
- "serde",
- "serde_derive",
- "serde_json",
- "serde_repr",
- "uuid 0.8.2",
 ]
 
 [[package]]
@@ -3961,7 +3948,7 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
- "uuid 1.26.1",
+ "uuid",
 ]
 
 [[package]]
@@ -4743,7 +4730,7 @@ dependencies = [
  "thiserror 2.0.21",
  "time",
  "url",
- "uuid 1.26.1",
+ "uuid",
  "walkdir",
 ]
 
@@ -5006,7 +4993,7 @@ dependencies = [
  "toml 1.1.6+spec-1.1.0",
  "url",
  "urlpattern",
- "uuid 1.26.1",
+ "uuid",
  "walkdir",
 ]
 
@@ -5461,15 +5448,6 @@ name = "utf8_iter"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
-
-[[package]]
-name = "uuid"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
-dependencies = [
- "getrandom 0.2.17",
-]
 
 [[package]]
 name = "uuid"
@@ -6521,12 +6499,11 @@ dependencies = [
 
 [[package]]
 name = "yikimlient"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "base64 0.23.1",
  "chrono",
  "dirs 5.0.1",
- "discord-rich-presence",
  "ed25519-dalek",
  "fastnbt",
  "flate2",
@@ -6554,7 +6531,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tokio",
  "urlencoding",
- "uuid 1.26.1",
+ "uuid",
  "window-vibrancy 0.5.3",
  "zip 2.4.2",
 ]
@@ -6609,7 +6586,7 @@ dependencies = [
  "serde_repr",
  "tracing",
  "uds_windows",
- "uuid 1.26.1",
+ "uuid",
  "windows-sys 0.61.2",
  "winnow 1.0.4",
  "zbus_macros",

@@ -281,7 +281,7 @@ public final class YikimPanel {
         YikimAdapter.text(graphics, font, "YIKIM", 0, 0, -723722, true);
         YikimAdapter.pop(graphics);
         int titleWidth = (int)((float)font.method_1727("YIKIM") * 1.25f);
-        YikimAdapter.text(graphics, font, "v1.3.1", titleX + titleWidth + 6, this.py1 + 12, -9539974, false);
+        YikimAdapter.text(graphics, font, "v" + YikimClient.MOD_VERSION, titleX + titleWidth + 6, this.py1 + 12, -9539974, false);
         int statsWidth = font.method_1727(this.cacheStats);
         int statsX = (this.searchW(font) > 0 ? this.searchX(font) - 12 : this.px2 - 10) - statsWidth;
         if (statsX > titleX + 140) {

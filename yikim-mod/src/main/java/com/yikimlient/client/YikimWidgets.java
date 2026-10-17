@@ -235,7 +235,7 @@ public final class YikimWidgets {
             @Override
             protected void compose(YikimChip chip) {
                 chip.caption = "YIKIM";
-                chip.value = "1.3.1";
+                chip.value = YikimClient.MOD_VERSION;
                 chip.add("MC " + YikimVideo.gameVersion() + " \u2022 Fabric");
             }
         });

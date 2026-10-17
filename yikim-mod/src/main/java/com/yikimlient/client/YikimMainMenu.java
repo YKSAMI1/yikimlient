@@ -39,6 +39,7 @@ public final class YikimMainMenu {
     private final Runnable chipBackdrop;
     private final Runnable chipHud;
     private final List<Hit> hits = new ArrayList<Hit>();
+    private final List<class_4185> modButtons;
     private int hitCount;
     private long openedAt;
     private long hintUntil;
@@ -78,15 +79,8 @@ public final class YikimMainMenu {
         this.buttons.add(new Button("Ayarlar", "Minecraft ayarlar\u0131", 5, -1, () -> YikimMainMenu.open(YikimAdapter.optionsScreen(screen, class_310.method_1551().field_1690))));
         this.buttons.add(new Button("\u00c7\u0131k\u0131\u015f", "Oyundan ayr\u0131l", 8, -1, () -> class_310.method_1551().method_1592()));
         // DİĞER MODLARIN TUŞLARI (Flashback, Mod Menu vb.): vanilla menüye mixin ile
-        // eklenen tuşlar yakalanır ve YIKIM menüsünde de gösterilir.
-        for (class_4185 modButton : YikimModButtons.scan(class_310.method_1551())) {
-            String label = YikimModButtons.label(modButton);
-            if (label.isEmpty()) {
-                continue;
-            }
-            class_4185 target = modButton;
-            this.buttons.add(new Button(label, "Mod tu\u015fu — " + label, 4, -1, () -> YikimModButtons.press(target)));
-        }
+        // eklenen tuşlar OTURUM BOYUNCA BİR KEZ yakalanır ve sağ panelde listelenir.
+        this.modButtons = YikimModButtons.scanOnce(class_310.method_1551());
         this.chipBackdrop = () -> {
             YikimBackdrop.invalidate();
             YikimMetrics.notify("Arka plan: " + YikimBackdrop.cycle());
@@ -169,7 +163,7 @@ public final class YikimMainMenu {
             this.drawChips(graphics, font, this.buttonsTop + blockHeight + 8, buttonWidth, mouseX, mouseY);
         }
         if (this.cardWidth > 0 && this.cardX - (this.columnX + this.columnWidth) >= 24) {
-            this.drawSidePanel(graphics, client, font, this.cardX, this.cardY, this.cardWidth, screenHeight - this.cardY - footerHeight - margin);
+            this.drawSidePanel(graphics, client, font, this.cardX, this.cardY, this.cardWidth, screenHeight - this.cardY - footerHeight - margin, mouseX, mouseY);
         }
         this.drawFooter(graphics, font, screenWidth, screenHeight, footerHeight);
         if (now < this.hintUntil && !this.hint.isEmpty()) {
@@ -257,7 +251,7 @@ public final class YikimMainMenu {
         }
     }
 
-    private void drawSidePanel(class_332 graphics, class_310 client, class_327 font, int x, int y, int width, int availableHeight) {
+    private void drawSidePanel(class_332 graphics, class_310 client, class_327 font, int x, int y, int width, int availableHeight, int mouseX, int mouseY) {
         int shownRows;
         if (availableHeight < 110) {
             return;
@@ -268,9 +262,12 @@ public final class YikimMainMenu {
         int headerHeight = 49;
         int rowHeight = 21;
         int tipHeight = 9 + this.cacheTipLines.size() * 11;
-        int maxRows = Math.max(0, (availableHeight - pad * 2 - headerHeight - 6 - 10 - tipHeight) / rowHeight);
+        int modCount = this.modButtons.size();
+        // MOD TUŞLARI bölümü: başlık + her mod tuşu 20px (sağ panelde, ipucunun altında)
+        int modSectionHeight = modCount > 0 ? 10 + modCount * 20 : 0;
+        int maxRows = Math.max(0, (availableHeight - pad * 2 - headerHeight - 6 - 10 - tipHeight - modSectionHeight) / rowHeight);
         shownRows = Math.min(rows.length, maxRows);
-        int height = pad * 2 + headerHeight + 6 + shownRows * rowHeight + (shownRows > 0 ? 10 : 0) + tipHeight;
+        int height = pad * 2 + headerHeight + 6 + shownRows * rowHeight + (shownRows > 0 ? 10 : 0) + tipHeight + modSectionHeight;
         YikimDraw.roundedFill(graphics, x, y, x + width, y + height, -1073083890);
         YikimDraw.outline(graphics, x, y, width, height, 0x33FFFFFF);
         graphics.method_25294(x, y + 4, x + 3, y + height - 4, YikimTheme.accent);
@@ -295,6 +292,27 @@ public final class YikimMainMenu {
         for (String line : this.cacheTipLines) {
             YikimAdapter.text(graphics, font, line, x + pad, tipY, -6645082, false);
             tipY += 11;
+        }
+        // ---- MOD TUŞLARI: diğer modların (Flashback vb.) menü tuşları, ipucunun altında ----
+        if (modCount > 0) {
+            int modY = tipY + 6;
+            YikimAdapter.text(graphics, font, "MOD TUSLARI", x + pad, modY, YikimTheme.accent, false);
+            modY += 10;
+            for (class_4185 modButton : this.modButtons) {
+                String label = YikimModButtons.label(modButton);
+                boolean hovered = YikimDraw.inside(mouseX, mouseY, x + pad - 2, modY, inner + 4, 18);
+                int chipFill = hovered ? YikimTheme.alpha(YikimTheme.accent, 200) : YikimTheme.alpha(YikimTheme.accent, 26);
+                YikimDraw.roundedFill(graphics, x + pad - 2, modY, x + width - pad + 2, modY + 18, chipFill);
+                YikimDraw.outline(graphics, x + pad - 2, modY, inner + 4, 18, YikimTheme.alpha(YikimTheme.accent, hovered ? 200 : 80));
+                // "modun logosu": mod adının ilk harfi rozet olarak (tema rengine uyumlu)
+                YikimDraw.roundedFill(graphics, x + pad + 2, modY + 2, x + pad + 16, modY + 16, YikimTheme.alpha(YikimTheme.accent, 70));
+                String letter = label.isEmpty() ? "?" : label.substring(0, 1).toUpperCase(Locale.ROOT);
+                YikimAdapter.text(graphics, font, letter, x + pad + 5, modY + 5, hovered ? -15724524 : YikimTheme.alpha(YikimTheme.accent, 220), true);
+                YikimAdapter.text(graphics, font, YikimDraw.clip(font, label, inner - 24), x + pad + 22, modY + 5, hovered ? -15724524 : -723722, !hovered);
+                class_4185 target = modButton;
+                this.addHit(x + pad - 2, modY, inner + 4, 18, () -> YikimModButtons.press(target));
+                modY += 20;
+            }
         }
     }
 

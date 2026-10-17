@@ -39,12 +39,31 @@ public final class YikimModButtons {
         "erişilebilirlik", "erisilebilirlik", "accessibility",
         "realms", "minecraft realms",
         "bildirimler", "notifications",
+        "g\u00fcncelleme yok", "s\u00fcr\u00fcm g\u00fcncel", "up to date",
+        "\u0130nternet sitesi", "internet sitesi", "website",
+        "geri bildirim", "feedback",
     };
 
     private YikimModButtons() {
     }
 
-    /** Modların vanilla menüye enjekte ettiği tuşları topla (menü açılışında bir kez). */
+    /**
+     * OTURUM BOYUNCA BİR KEZ tara: menü her açılışında yeniden vanilla ekran
+     * kurmak pahalı ve gereksiz — modlar oyun boyunca tuş eklemiyor.
+     * İlk çağrıda tarar, sonrakiler önbellekten döner.
+     */
+    static List<class_4185> scanOnce(class_310 client) {
+        if (!YikimModButtons.scanned) {
+            YikimModButtons.scanned = true;
+            YikimModButtons.cached = YikimModButtons.scan(client);
+        }
+        return YikimModButtons.cached;
+    }
+
+    private static boolean scanned;
+    private static List<class_4185> cached = java.util.List.of();
+
+    /** Modların vanilla menüye enjekte ettiği tuşları topla. */
     static List<class_4185> scan(class_310 client) {
         ArrayList<class_4185> out = new ArrayList<class_4185>();
         try {

@@ -1,6 +1,6 @@
 [package]
 name = "yikimlient"
-version = "0.3.5"
+version = "0.3.6"
 description = "YIKIMLient â€” ultra-hafif, hÄ±zlÄ± ve gÃ¼zel Minecraft launcher"
 edition = "2021"
 rust-version = "1.77"
@@ -42,7 +42,6 @@ open = "5"
 ed25519-dalek = "2.1.1"
 base64 = "0.23.1"
 fastnbt = "2"
-discord-rich-presence = "0.2"
 
 [profile.release]
 opt-level = "s"

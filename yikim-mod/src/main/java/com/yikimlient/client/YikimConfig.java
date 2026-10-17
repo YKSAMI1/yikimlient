@@ -153,7 +153,7 @@ public final class YikimConfig {
             Files.createDirectories(path.getParent(), new FileAttribute[0]);
             Path temp = path.resolveSibling("yikimlient.cfg.tmp");
             try (OutputStream out = Files.newOutputStream(temp, new OpenOption[0]);){
-                properties.store(out, "YIKIM Client 1.3.1 \u2014 oyun i\u00e7i ayarlar");
+                properties.store(out, "YIKIM Client " + YikimClient.MOD_VERSION + " \u2014 oyun i\u00e7i ayarlar");
             }
             Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING);
         }
