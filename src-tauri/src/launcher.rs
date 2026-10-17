@@ -595,8 +595,17 @@ pub async fn resolve_java_dirs(
 }
 
 pub fn java_exe(bin_dir: &Path) -> PathBuf {
-    let exe = if cfg!(windows) { "java.exe" } else { "java" };
-    bin_dir.join("bin").join(exe)
+    // Windows'ta javaw.exe tercih edilir: Discord'un oyun algılama veritabanı
+    // javaw.exe'yi "Minecraft" olarak tanır (java.exe'yi TANIMAZ) → Nitro klip
+    // ve Go Live MINECRAFT'ı yakalar, launcher'ı değil. javaw yoksa java'ya düşer.
+    if cfg!(windows) {
+        let javaw = bin_dir.join("bin").join("javaw.exe");
+        if javaw.is_file() {
+            return javaw;
+        }
+        return bin_dir.join("bin").join("java.exe");
+    }
+    bin_dir.join("bin").join("java")
 }
 
 /// rt_dir içinde bin/java olan klasörü bul (bin/ doğrudan altta veya jdk-25.x alt klasöründe).
