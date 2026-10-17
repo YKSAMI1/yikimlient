@@ -34,7 +34,7 @@ public final class YikimModButtons {
         "tek oyunculu", "singleplayer",
         "çok oyunculu", "cok oyunculu", "multiplayer",
         "ayarlar", "options",
-        "çıkış", "cikis", "quit",
+        "çıkış", "cikis", "oyundan çık", "oyundan cik", "quit",
         "dil", "language",
         "erişilebilirlik", "erisilebilirlik", "accessibility",
         "realms", "minecraft realms",
@@ -102,13 +102,47 @@ public final class YikimModButtons {
         if (label == null || label.isEmpty()) {
             return true; // etiketsiz öğe menüye taşınmaz
         }
-        String key = label.toLowerCase(Locale.ROOT);
+        // nokta/boşluk kalıntılarını temizle ("Ayarlar..." → "ayarlar")
+        String key = label.toLowerCase(Locale.ROOT).replace("...", "").trim();
         for (String vanilla : VANILLA_LABELS) {
-            if (key.equals(vanilla)) {
+            // kısa anahtarlar (dil gibi) birebir; uzunlar İÇERİK eşleşmesi —
+            // "Ayarlar", "Oyundan Çık" gibi etiketler boşluk/nokta varyantlarıyla sızabilir
+            if (vanilla.length() <= 4 ? key.equals(vanilla) : key.contains(vanilla)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Buton etiketini kurulu modlarla eşleştirir → modun JAR dosya adı.
+     * YikimIcons bu adla launcher'ın önceden indirdiği gerçek PNG'yi çizer
+     * (mod listesindeki ikonla aynı sistem). Eşleşme yoksa null → harf rozeti.
+     */
+    static String jarIconFor(String label) {
+        if (label == null || label.isEmpty()) {
+            return null;
+        }
+        try {
+            String key = label.toLowerCase(Locale.ROOT);
+            for (net.fabricmc.loader.api.ModContainer mod : net.fabricmc.loader.api.FabricLoader.getInstance().getAllMods()) {
+                String name = mod.getMetadata().getName().toLowerCase(Locale.ROOT);
+                String id = mod.getMetadata().getId().toLowerCase(Locale.ROOT);
+                boolean byName = !name.isEmpty() && (name.contains(key) || key.contains(name));
+                boolean byId = !id.isEmpty() && (id.contains(key) || key.contains(id));
+                if (byName || byId) {
+                    if (mod.getOrigin().getPaths().isEmpty()) continue;
+                    String file = mod.getOrigin().getPaths().get(0).getFileName().toString();
+                    if (file.endsWith(".jar")) {
+                        return file;
+                    }
+                }
+            }
+        }
+        catch (Throwable ignored) {
+            // mod eşleşmesi başarısızsa harf rozeti kullanılır
+        }
+        return null;
     }
 
     /** Mod tuşunun gerçek tıklama davranışını çalıştır. */

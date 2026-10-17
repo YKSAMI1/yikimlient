@@ -14,6 +14,7 @@ import com.yikimlient.client.YikimAdapter;
 import com.yikimlient.client.YikimBackdrop;
 import com.yikimlient.client.YikimConfig;
 import com.yikimlient.client.YikimDraw;
+import com.yikimlient.client.YikimIcons;
 import com.yikimlient.client.YikimMenuIcons;
 import com.yikimlient.client.YikimMetrics;
 import com.yikimlient.client.YikimPanel;
@@ -304,10 +305,16 @@ public final class YikimMainMenu {
                 int chipFill = hovered ? YikimTheme.alpha(YikimTheme.accent, 200) : YikimTheme.alpha(YikimTheme.accent, 26);
                 YikimDraw.roundedFill(graphics, x + pad - 2, modY, x + width - pad + 2, modY + 18, chipFill);
                 YikimDraw.outline(graphics, x + pad - 2, modY, inner + 4, 18, YikimTheme.alpha(YikimTheme.accent, hovered ? 200 : 80));
-                // "modun logosu": mod adının ilk harfi rozet olarak (tema rengine uyumlu)
-                YikimDraw.roundedFill(graphics, x + pad + 2, modY + 2, x + pad + 16, modY + 16, YikimTheme.alpha(YikimTheme.accent, 70));
-                String letter = label.isEmpty() ? "?" : label.substring(0, 1).toUpperCase(Locale.ROOT);
-                YikimAdapter.text(graphics, font, letter, x + pad + 5, modY + 5, hovered ? -15724524 : YikimTheme.alpha(YikimTheme.accent, 220), true);
+                // MODUN GERÇEK LOGOSU: etiket kurulu modla eşleşirse launcher'ın indirdiği
+                // PNG çizilir; eşleşmezse mod adının ilk harfi rozet olarak kalır.
+                String jarName = YikimModButtons.jarIconFor(label);
+                if (jarName != null) {
+                    YikimIcons.draw(graphics, font, jarName, null, label, x + pad + 1, modY + 1, 16);
+                } else {
+                    YikimDraw.roundedFill(graphics, x + pad + 2, modY + 2, x + pad + 16, modY + 16, YikimTheme.alpha(YikimTheme.accent, 70));
+                    String letter = label.isEmpty() ? "?" : label.substring(0, 1).toUpperCase(Locale.ROOT);
+                    YikimAdapter.text(graphics, font, letter, x + pad + 5, modY + 5, hovered ? -15724524 : YikimTheme.alpha(YikimTheme.accent, 220), true);
+                }
                 YikimAdapter.text(graphics, font, YikimDraw.clip(font, label, inner - 24), x + pad + 22, modY + 5, hovered ? -15724524 : -723722, !hovered);
                 class_4185 target = modButton;
                 this.addHit(x + pad - 2, modY, inner + 4, 18, () -> YikimModButtons.press(target));
