@@ -151,8 +151,10 @@ fn activity_json(details: &str, state: &str, with_assets: bool, started_at: i64)
         "timestamps": { "start": started_at },
     });
     if with_assets {
+        // HARİCİ URL: Discord'a elle asset yüklemeye gerek yok — repo'daki logo
+        // doğrudan çekilir ("?" placeholder sorunu kökten çözülür).
         act["assets"] = json!({
-            "large_image": "yikimlient_logo",
+            "large_image": "https://github.com/YKSAMI1/yikimlient/raw/main/src-tauri/icons/icon.png",
             "large_text": "YIKIMLient — Ultra-hızlı Minecraft launcher",
         });
     }

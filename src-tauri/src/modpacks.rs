@@ -134,10 +134,11 @@ pub fn java_presets() -> Vec<JavaPreset> {
                 "-XX:G1HeapRegionSize=32M".into(),
                 "-XX:G1ReservePercent=10".into(),
                 "-XX:InitiatingHeapOccupancyPercent=8".into(),
-                "-XX:G1MixedGCTargetCount=6".into(),
+                // DÜZELTME: "G1MixedGCTargetCount" diye bir bayrak YOK — doğru adı
+                // G1MixedGCCountTarget. Tanınmayan -XX bayrağı JVM'i başlatmayı reddediyordu.
+                "-XX:G1MixedGCCountTarget=6".into(),
                 "-XX:+PerfDisableSharedMem".into(),
                 "-XX:+AlwaysPreTouch".into(),
-                "-XX:AOTMode=off".into(),
             ],
         },
     ]

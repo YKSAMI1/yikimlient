@@ -1133,14 +1133,9 @@ pub async fn launch_game(
     let pid = child.id();
     yikim_log(format!("oyun PID: {pid}"));
 
-    // Discord Rich Presence: oyun açıldı → "YIKIMLient ile oynuyor".
-    // PID = javaw → Discord'un klip/algılaması MINECRAFT'ı yakalar (launcher'ı değil).
-    crate::discord_rpc::game_presence(
-        &inst.name,
-        &inst.mc_version,
-        &session.server.lock().unwrap().clone(),
-        pid,
-    );
+    // Discord presence'i OYUN İÇİN mod gönderir (YikimDiscord — yerel pipe).
+    // Launcher'dan gönderilirse javaw algılaması RPC'yi eziyordu ("Minecraft"
+    // başlığı görünüyordu). Burada tekrar gönderme — çakışma olmasın.
 
     // canlı log: stdout + stderr → log dosyası + event; sunucu tespiti
     let stdout = child.stdout.take();

@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.9.4";
+    public static final String MOD_VERSION = "1.9.5";
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
     private static boolean readyMarked;
     private static boolean firstJoinSeen;
@@ -111,6 +111,14 @@ implements ClientModInitializer {
         if (mainMenu || client.field_1687 != null) {
             readyMarked = true;
             YikimBridge.markReady(client.field_1687 != null ? "dunya" : "ana-menu");
+            // Discord presence'i OYUN SÜRECİNDEN gönder (launcher'dan değil):
+            // RPC, javaw algılamasının önüne geçer → başlık "YIKIMLient" olur;
+            // klip yine Minecraft'ı kaydeder. Yerel pipe — internet YOK.
+            if (client.field_1687 == null) {
+                YikimDiscord.setMenu();
+            } else {
+                YikimDiscord.setPlaying();
+            }
         }
         YikimClient.markFirstJoin(client);
     }
@@ -120,6 +128,8 @@ implements ClientModInitializer {
             return;
         }
         firstJoinSeen = true;
+        // Discord presence: dünyaya/sunucuya girildi → "YIKIMLient ile oynuyor"
+        YikimDiscord.setPlaying();
         YikimConfig config = YikimConfig.get();
         if (config.openOnFirstJoin) {
             YikimMetrics.notify("YIKIM paneli: Sa\u011f Shift");
