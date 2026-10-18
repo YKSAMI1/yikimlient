@@ -885,6 +885,10 @@ fn build_jvm_args(
     // isteklerine ve ready işaretine yazar — launcher böylece hangi kurulumun
     // istek attığını dosya adından değil bu kimlikten bilir.
     out.push(format!("-Dyikimlient.instance={}", inst.id));
+    // Mod paketinin ADI: Discord presence ("YIKIMLient ile oynuyor" detayı)
+    // kurulum adını göstersin diye — boşluksuz base yok, isim JVM argümanına
+    // zararsızdır (tırnak gerekmez; JVM boşluklu -D değerlerini destekler).
+    out.push(format!("-Dyikimlient.instanceName={}", inst.name.replace(['\n', '\r'], " ")));
 
     // version json jvm args
     let natives_str = natives_dir.to_string_lossy().replace('\\', "/");

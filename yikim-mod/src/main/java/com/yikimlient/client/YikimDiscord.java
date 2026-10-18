@@ -45,9 +45,13 @@ public final class YikimDiscord {
                 "YIKIMLient " + YikimClient.MOD_VERSION + " açık");
     }
 
-    /** Dünyaya/sunucuya girildi: "YIKIMLient ile oynuyor". */
+    /** Dünyaya/sunucuya girildi: "YIKIMLient ile oynuyor" + mod paketi adı. */
     public static void setPlaying() {
-        YikimDiscord.set("Minecraft " + YikimVideo.gameVersion(),
+        String pack = System.getProperty("yikimlient.instanceName", "").trim();
+        String details = pack.isEmpty()
+                ? "Minecraft " + YikimVideo.gameVersion()
+                : "Minecraft " + YikimVideo.gameVersion() + " — " + pack;
+        YikimDiscord.set(details,
                 "YIKIMLient " + YikimClient.MOD_VERSION + " ile oynuyor");
     }
 
@@ -70,11 +74,11 @@ public final class YikimDiscord {
             }
             long pid = ProcessHandle.current().pid();
             long now = System.currentTimeMillis();
+            // NOT: assets YOK — Discord bu durumda uygulamanın (botun) profil
+            // fotosunu gösterir. Kullanıcı tercihi: logo = bot pp'si.
             String activity = "{\"type\":0,\"state\":" + YikimDiscord.json(state)
                     + ",\"details\":" + YikimDiscord.json(details)
                     + ",\"timestamps\":{\"start\":" + now + "}"
-                    + ",\"assets\":{\"large_image\":" + YikimDiscord.json(LOGO_URL)
-                    + ",\"large_text\":\"YIKIMLient — Ultra-hızlı Minecraft launcher\"}"
                     + ",\"buttons\":[{\"label\":\"YIKIMLient İndir\",\"url\":\"" + INDIR_URL + "\"}]}";
             String payload = "{\"cmd\":\"SET_ACTIVITY\",\"args\":{\"pid\":" + pid
                     + ",\"activity\":" + activity + "},\"nonce\":\"yikim-" + now + "\"}";

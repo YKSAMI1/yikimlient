@@ -143,26 +143,17 @@ fn ipc_set_activity(sock: &mut IpcSocket, pid: u32, activity: Option<&Value>) ->
 
 // ---------- presence katmanı ----------
 
-fn activity_json(details: &str, state: &str, with_assets: bool, started_at: i64) -> Value {
-    let mut act = json!({
+fn activity_json(details: &str, state: &str, _with_assets: bool, started_at: i64) -> Value {
+    // KULLANICI TERCİHİ: assets (large_image) ASLA gönderilmez — Discord
+    // uygulamanın (botun) profil fotosunu gösterir; "?" placeholder da
+    // kökten imkansız olur.
+    json!({
         "type": 0, // Playing — "OYNUYOR" başlığı
         "state": state,
         "details": details,
         "timestamps": { "start": started_at },
-    });
-    if with_assets {
-        // HARİCİ URL: Discord'a elle asset yüklemeye gerek yok — repo'daki logo
-        // doğrudan çekilir ("?" placeholder sorunu kökten çözülür).
-        act["assets"] = json!({
-            "large_image": "https://github.com/YKSAMI1/yikimlient/raw/main/src-tauri/icons/icon.png",
-            "large_text": "YIKIMLient — Ultra-hızlı Minecraft launcher",
-        });
-    }
-    act["buttons"] = json!([{
-        "label": "YIKIMLient İndir",
-        "url": "https://github.com/YKSAMI1/yikimlient",
-    }]);
-    act
+        "buttons": [{ "label": "YIKIMLient İndir", "url": "https://github.com/YKSAMI1/yikimlient" }],
+    })
 }
 
 /// Presence'i günceller (arka planda). `pid` = etkinliğin ait olduğu SÜREÇ.
