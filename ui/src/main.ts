@@ -1,7 +1,11 @@
 import "./theme.css";
 import "./app.css";
 import "./pages.css";
+import "./system-ui.css";
+import "./world-afis.css";
 import { registerPages } from "./pages";
+import { startDropWatcher } from "./drop";
+import { maybeStartTour } from "./tour";
 import { WINDOW_CONTROLS, icon, ICONS } from "./icons";
 import { cascadeText, enterRows, enterStage, exitStage, switchPress } from "./motion";
 export { icon };
@@ -576,6 +580,9 @@ export async function boot(): Promise<void> {
     registerPages();
     setupShell();
     navigate("home");
+    // Sürükle-bırak motoru + (bir kezlik) ilk açılış rehberi
+    startDropWatcher();
+    maybeStartTour();
     // Otomatik güncelleme kontrolü (imzalı; GitHub releases'ten) — sessiz kontrol,
     // güncelleme varsa kullanıcıya sorar, hata asla açılışı bozmaz.
     void checkForUpdate();

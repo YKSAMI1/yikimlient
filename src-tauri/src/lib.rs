@@ -112,6 +112,8 @@ pub fn run() {
             commands::cmd_repos_install_content,
             commands::cmd_list_content_files,
             commands::cmd_add_content_file,
+            commands::cmd_add_content_path,
+            commands::cmd_route_dropped,
             commands::cmd_delete_content_file,
             commands::cmd_open_content_folder,
         ])

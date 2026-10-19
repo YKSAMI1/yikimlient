@@ -26,6 +26,8 @@ pub struct YikimConfig {
     pub last_selected_account: String,
     pub window_maximized: bool,
     pub stats_enabled: bool,
+    /// İlk açılış rehberi (tur) tamamlandı mı? — bir kez gösterilir, sonra sorulmaz.
+    pub guided_tour_done: bool,
     pub java_dir: Option<String>,      // özel java bin klasörü (boşsa otomatik)
     pub download_concurrency: usize,   // paralel indirme sayısı
     /// Microsoft Build of OpenJDK 25 (mod paketleri için optimize JVM —
@@ -51,6 +53,7 @@ impl Default for YikimConfig {
             last_selected_account: String::new(),
             window_maximized: false,
             stats_enabled: true,
+            guided_tour_done: false,
             java_dir: None,
             download_concurrency: 8,
             use_java25: true,

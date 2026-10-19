@@ -1,0 +1,205 @@
+/* ============================================================
+   DÜNYA 5: AFIŞ — baskı dükkanı / poster.
+   Mevcut dört dünyanın tayından kopuk, sıfırdan dil:
+   1) Kâğıt AÇIK, mürekkep KARA — arayüz bir baskı provasına döner.
+   2) Çizgiler kalın ve sert (2px), gölge ofsetlidir (bulanıklık yok).
+   3) Köşe YOK — her şey keskin; buton bırakıldığında zawcaya bastırılır.
+   ============================================================ */
+:root[data-world="afis"] {
+  --accent: #ff4d00;              /* vermilyon — baskı mürekkebi kırmızısı */
+  --accent-soft: #ff7a2e;
+  --accent-deep: #c93a00;
+  --accent-ink: #fff;
+  --accent-dim: rgba(255, 77, 0, 0.1);
+  --on-accent: #fff;
+
+  /* Kâğıt yüzeyler */
+  --bg0: #f3ecdd;                 /* kâğıt zemin */
+  --bg1: #e9e0cc;                 /* titlebar + rail */
+  --bg2: #faf6ea;                 /* panel/kart kâğıdı */
+  --bg3: #efe6cf;                 /* hover */
+  --bg4: #d8cbab;                 /* kenar/blok */
+  --hairline: rgba(22, 19, 12, 0.55);
+  --hairline-strong: rgba(22, 19, 12, 0.9);
+
+  --text: #16130c;
+  --text-dim: #5c5344;
+  --text-faint: #8a7f6b;
+  --success: #1d9d5c;             /* açık zeminde doygun yeşil */
+  --danger: #d21f2c;
+  --warn: #b98200;
+  --info: #2160b0;
+
+  --radius: 0px;                  /* afişte köşe YOK */
+  --radius-sm: 0px;
+
+  --shadow-pop: 8px 8px 0 rgba(22, 19, 12, 0.95);   /* sert ofset — bulanık yok */
+  --shadow-soft: 5px 5px 0 rgba(22, 19, 12, 0.9);
+
+  color-scheme: light;
+}
+
+/* ---------- Gövde dili: kalın mürekkep çizgiler ---------- */
+:root[data-world="afis"] .titlebar {
+  border-bottom: 2px solid var(--text);
+  background: var(--bg1);
+}
+:root[data-world="afis"] .brand-word {
+  background: var(--accent);
+  color: #fff;
+  padding: 1px 7px 2px;
+  display: inline-block;
+  transform: rotate(-1.4deg);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+:root[data-world="afis"] .brand-suffix { font-weight: 800; }
+
+:root[data-world="afis"] .rail {
+  border-right: 2px solid var(--text);
+  background: var(--bg1);
+}
+:root[data-world="afis"] .rail-logo {
+  border: 2px solid var(--text);
+  border-radius: 0;
+  box-shadow: 3px 3px 0 rgba(22, 19, 12, 0.95);
+  background: var(--bg2);
+}
+:root[data-world="afis"] .rail-item {
+  border: 2px solid transparent;
+  border-radius: 0;
+}
+:root[data-world="afis"] .rail-item .ri-label {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+}
+:root[data-world="afis"] .rail-item:hover { border-color: var(--text); background: var(--bg2); }
+:root[data-world="afis"] .rail-item.active {
+  background: var(--accent);
+  border-color: var(--text);
+  box-shadow: 3px 3px 0 rgba(22, 19, 12, 0.95);
+}
+:root[data-world="afis"] .rail-item.active,
+:root[data-world="afis"] .rail-item.active .ri-icon { color: #fff; }
+/* cetvel kuralı: aktif blokta artık sola şerit yok — blok kendisi vurgu */
+:root[data-world="afis"] .rail-item.active::before { display: none; }
+:root[data-world="afis"] .rail-account {
+  border: 2px solid var(--text);
+  border-radius: 0;
+  background: var(--bg2);
+  box-shadow: 3px 3px 0 rgba(22, 19, 12, 0.95);
+}
+:root[data-world="afis"] .rail-account:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 rgba(22, 19, 12, 0.95); }
+
+/* ---------- Kart: pano baskısı ---------- */
+:root[data-world="afis"] .card {
+  border: 2px solid var(--text);
+  border-radius: 0;
+  background: var(--bg2);
+  box-shadow: var(--shadow-soft);
+}
+:root[data-world="afis"] .card.hover:hover,
+:root[data-world="afis"] .card h3 { font-weight: 800; }
+:root[data-world="afis"] .card.hover:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 rgba(22, 19, 12, 0.95);
+}
+:root[data-world="afis"] h1,
+:root[data-world="afis"] .page-header h1,
+:root[data-world="afis"] .home-hero h1 {
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+}
+/* hafızadaki başlık altı baskı şeridi */
+:root[data-world="afis"] .page-header h1::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 6px;
+  margin-top: 6px;
+  background: var(--accent);
+  box-shadow: 2px 2px 0 rgba(22, 19, 12, 0.95);
+}
+
+/* ---------- Düğmeler: sabit kalıp, bastırmalı ---------- */
+:root[data-world="afis"] .btn {
+  border: 2px solid var(--text);
+  border-radius: 0;
+  background: var(--bg2);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: 3px 3px 0 rgba(22, 19, 12, 0.95);
+  transition: transform 0.08s var(--ease), box-shadow 0.08s var(--ease), background 0.15s;
+}
+:root[data-world="afis"] .btn:hover { background: var(--bg3); transform: translate(-1px, -1px); box-shadow: 4px 4px 0 rgba(22, 19, 12, 0.95); }
+:root[data-world="afis"] .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 rgba(22, 19, 12, 0.95); }
+:root[data-world="afis"] .btn.primary { background: var(--accent); color: #fff; }
+:root[data-world="afis"] .btn.primary:hover { background: var(--accent-deep); }
+:root[data-world="afis"] .btn.primary:active { background: var(--accent-deep); }
+:root[data-world="afis"] .btn.ghost { background: transparent; }
+:root[data-world="afis"] .btn.danger { color: var(--danger); }
+:root[data-world="afis"] .btn.danger:hover { border-color: var(--danger); }
+
+/* ---------- Girdi, çip, şalter, bar ---------- */
+:root[data-world="afis"] .input {
+  border: 2px solid var(--text);
+  border-radius: 0;
+  background: #fffdf6;
+}
+:root[data-world="afis"] .input:focus { border-color: var(--accent); }
+:root[data-world="afis"] .chip {
+  border: 2px solid var(--text);
+  border-radius: 0;
+  background: var(--bg2);
+  color: var(--text);
+  font-weight: 700;
+}
+:root[data-world="afis"] .chip.orange { background: var(--accent); color: #fff; border-color: var(--text); }
+:root[data-world="afis"] .chip.green { border-color: var(--success); color: var(--success); }
+:root[data-world="afis"] .chip.red { border-color: var(--danger); color: var(--danger); }
+:root[data-world="afis"] .switch { border-radius: 0; border: 2px solid var(--text); background: var(--bg4); }
+:root[data-world="afis"] .switch::after { border-radius: 0; background: var(--bg2); }
+:root[data-world="afis"] .switch.on { background: var(--accent); }
+:root[data-world="afis"] .switch.on::after { background: var(--text); }
+:root[data-world="afis"] .progressbar {
+  height: 10px;
+  border: 2px solid var(--text);
+  border-radius: 0;
+  background: #fffdf6;
+}
+:root[data-world="afis"] .progressbar > div { border-radius: 0; }
+:root[data-world="afis"] .pill {
+  border: 2px solid var(--text);
+  border-radius: 0;
+  background: var(--bg2);
+  color: var(--text);
+}
+:root[data-world="afis"] .ram-bar { border-radius: 0; border: 1.5px solid var(--text); }
+:root[data-world="afis"] .ram-bar > span { border-radius: 0; }
+
+/* ---------- Modal & toast: afiş kartonu ---------- */
+:root[data-world="afis"] .modal {
+  border: 2px solid var(--text);
+  border-radius: 0;
+  background: var(--bg2);
+  box-shadow: var(--shadow-pop);
+}
+:root[data-world="afis"] .toast {
+  border: 2px solid var(--text);
+  border-radius: 0;
+  background: var(--bg2);
+  box-shadow: 4px 4px 0 rgba(22, 19, 12, 0.95);
+  color: var(--text);
+}
+:root[data-world="afis"] .or-divider {
+  border-color: var(--text);
+}
+/* scrollbar: kalın mürekkep */
+:root[data-world="afis"] ::-webkit-scrollbar-thumb {
+  background: var(--text); border: none;
+}
+:root[data-world="afis"] ::-webkit-scrollbar { border-left: 2px solid var(--text); }
+:root[data-world="afis"] ::selection { background: var(--text); color: var(--bg2); }

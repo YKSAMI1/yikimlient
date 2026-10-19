@@ -19,6 +19,10 @@ const WORLDS = [
     id: "standart", name: "Kategori Standardı", desc: "Arc/Linear cilası — yumuşak köşe, çelik mavisi",
     bg: "#0e1016", panel: "#171a24", line: "#2b3044", text: "#eceffa", dim: "#666e8a", accent: "#6e8bff",
   },
+  {
+    id: "afis", name: "Afiş Provası", desc: "Sıfırdan yeni tasarım — baskı kâğıdı, sert oferta çizgi, turuncu",
+    bg: "#f3ecdd", panel: "#faf6ea", line: "#16130c", text: "#16130c", dim: "#8a7f6b", accent: "#ff4d00",
+  },
 ];
 
 /// Dünyanın mini önizlemesi: kendi paletiyle pano + 3 hat + lambalar

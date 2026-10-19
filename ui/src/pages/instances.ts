@@ -321,14 +321,18 @@ async function tabContent(content: HTMLElement, inst: any): Promise<void> {
     const list = content.querySelector("#content-list") as HTMLElement;
     if (!files.length) {
       list.innerHTML = `<div class="card" style="text-align:center; padding:34px">
-        <p>${meta.hint}<br /><span style="color:var(--text-faint); font-size:12px">Henüz içerik yok — yukarıdan ekleyebilirsin.</span></p></div>`;
+        <p>${meta.hint}<br /><span style="color:var(--text-faint); font-size:12px">Henüz içerik yok — yukarıdan ekleyebilir ya da dosyayı bu sayfaya sürükleyip bırakabilirsin.</span></p></div>`;
       return;
     }
     list.innerHTML = "";
     for (const f of files) {
+      // Dünya kapakları: Minecraft'ın kendi kaydettiği icon.png varsa gerçek kapak göster
+      const face = contentKind === "saves" && f.icon
+        ? `<img alt="" draggable="false" src="${fileSrc(f.icon)}" width="40" height="40" style="border-radius:var(--radius-sm); object-fit:cover" onerror="this.style.display='none'" />`
+        : `<div style="font-size:22px">${f.is_dir ? "🌍" : "📦"}</div>`;
       const row = el(`
         <div class="card mod-row" style="display:flex; align-items:center; gap:12px; padding:12px 14px">
-          <div style="font-size:22px">${f.is_dir ? "🌍" : "📦"}</div>
+          ${face}
           <div style="flex:1; min-width:0">
             <div style="font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${f.name}</div>
             <div style="color:var(--text-faint); font-size:11.5px">${f.is_dir ? "dünya" : fmtBytes(f.size)}</div>

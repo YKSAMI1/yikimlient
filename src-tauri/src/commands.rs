@@ -798,6 +798,8 @@ pub struct UiContentFile {
     pub is_dir: bool,
     pub size: u64,
     pub modified: i64,
+    /// Dünyalar için kapak: <dünya>/icon.png (Minecraft bu dosyayı kendi kaydeder).
+    pub icon: Option<String>,
 }
 
 /// Kurulumun içerik dosyalarını listele (doku paketi / shader / dünya).
@@ -831,6 +833,11 @@ pub async fn cmd_list_content_files(
                 }
             }
             let meta = e.metadata().ok();
+            let icon = if kind == "saves" && p.join("icon.png").is_file() {
+                Some(p.join("icon.png").to_string_lossy().to_string())
+            } else {
+                None
+            };
             out.push(UiContentFile {
                 name,
                 is_dir,
@@ -841,6 +848,7 @@ pub async fn cmd_list_content_files(
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                     .map(|d| d.as_millis() as i64)
                     .unwrap_or(0),
+                icon,
             });
         }
     }
@@ -890,9 +898,132 @@ pub async fn cmd_add_content_file(
     Ok(())
 }
 
-/// İçerik dosyasını sil (dosya veya klasör).
+/// Hedef klasörde çakışmayan benzersiz bir ad üret ("deneme.zip" → "deneme (2).zip").
+fn unique_target_name(dir: &std::path::Path, file_name: &str) -> String {
+    let stem = std::path::Path::new(file_name)
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| file_name.to_string());
+    let ext = std::path::Path::new(file_name)
+        .extension()
+        .map(|s| format!(".{}", s.to_string_lossy()))
+        .unwrap_or_default();
+    let mut name = file_name.to_string();
+    let mut n = 2u32;
+    while dir.join(&name).exists() {
+        name = format!("{} ({}){}", stem, n, ext);
+        n += 1;
+    }
+    name
+}
+
+/// Sürükle-bırak: dışarıdan atılan dosyayı kural (mod/doku/shader/dünya/zip-dünya).
+/// Sürükleme akışı için cmd_add_content_file'ın (dialoglu) doğrudan bildirim hâli.
 #[tauri::command]
-pub async fn cmd_delete_content_file(
+pub async fn cmd_add_content_path(
+    instance_id: String,
+    kind: String,
+    path: String,
+) -> Result<(), String> {
+    let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
+    let src = std::path::PathBuf::from(&path);
+    if !src.exists() {
+        return Err("dosya bulunamadı".into());
+    }
+    let dir = match kind.as_str() {
+        "mods" => inst.dir().join("mods"),
+        "resourcepacks" | "shaderpacks" => content_dir(&inst, &kind)?,
+        "saves" => inst.dir().join("saves"),
+        "saves_zip" => inst.dir().join("saves"),
+        _ => return Err("geçersiz içerik türü".into()),
+    };
+    let _ = std::fs::create_dir_all(&dir);
+    match kind.as_str() {
+        "saves" => {
+            // klasör dünya → doğrudan kopyala (klasör <name>'i hedef)
+            let file_name = src
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "Dunya".into());
+            let target = dir.join(unique_target_name(&dir, &file_name));
+            crate::launcher::copy_dir_recursive(&src, &target)?;
+        }
+        "saves_zip" => {
+            // zip dünya → aç, kök düzleme indir (repos dünya kurulumuyla aynı davranış)
+            let file_name = src
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "Dunya".into());
+            let target = dir.join(unique_target_name(&dir, &format!("{}.zip", file_name)));
+            let dest = target.with_extension(""); // .zip soneksiz klasör adı
+            unzip_to_dir(&src, &dest)?;
+        }
+        _ => {
+            // mod / doku / shader → tek dosya kopyası (jar & zip)
+            let file_name = src
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "paket.zip".into());
+            let dest = dir.join(unique_target_name(&dir, &file_name));
+            std::fs::copy(&src, &dest).map_err(|e| format!("kopyalanamadı: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+/// Sürüklenen dosyanın ne olduğunu ayırt et (sürükle-bırak yönlendirmesi).
+/// Sonuç: "jar" | "modpack" | "world" | "zip" (belirsiz zip → kullanıcıya sorulur) | "unknown"
+#[tauri::command]
+pub async fn cmd_route_dropped(path: String) -> Result<String, String> {
+    let src = std::path::PathBuf::from(&path);
+    if !src.exists() {
+        return Err("dosya bulunamadı".into());
+    }
+    if src.is_dir() {
+        return Ok(if src.join("level.dat").exists() {
+            "world".into()
+        } else {
+            "unknown".into()
+        });
+    }
+    let ext = src
+        .extension()
+        .map(|x| x.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    match ext.as_str() {
+        "jar" => return Ok("jar".into()),
+        "mrpack" => return Ok("modpack".into()),
+        "zip" => {
+            // içinde ne var? paket indeksleri / dünya verisi
+            if let Ok(f) = std::fs::File::open(&src) {
+                if let Ok(mut archive) = zip::ZipArchive::new(f) {
+                    if archive.by_name("modrinth.index.json").is_ok()
+                        || archive.by_name("manifest.json").is_ok()
+                    {
+                        return Ok("modpack".into());
+                    }
+                    let mut names: Vec<String> = archive
+                        .file_names()
+                        .take(50)
+                        .map(|s| s.to_string())
+                        .collect();
+                    names.sort();
+                    if names.iter().any(|n| n.trim_end_matches('/').ends_with("level.dat")
+                        || n.trim_end_matches('/').ends_with("/level.dat")
+                        || n == "level.dat")
+                    {
+                        return Ok("world".into());
+                    }
+                }
+            }
+            return Ok("zip".into());
+        }
+        _ => return Ok("unknown".into()),
+    }
+}
+
+/// İçerik dosyasını sil (dosya veya klasör).
+#[tauri::command]pub async fn cmd_delete_content_file(
     instance_id: String,
     kind: String,
     name: String,
