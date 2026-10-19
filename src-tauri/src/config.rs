@@ -31,6 +31,10 @@ pub struct YikimConfig {
     /// İlk kurulum sihirbazı (hesap + ilk paket) tamamlandı mı? — yalnız boş
     /// gelen (hesabı ve kurulumu olmayan) kullanıcılara gösterilir.
     pub onboarding_done: bool,
+    /// Ambiens parçacık yoğunluğu: "none" | "low" | "mid" | "high"
+    pub fx_particles: String,
+    /// Özel fare imleci: "standart" | "yikim" | "hedef" | "nokta"
+    pub cursor_style: String,
     pub java_dir: Option<String>,      // özel java bin klasörü (boşsa otomatik)
     pub download_concurrency: usize,   // paralel indirme sayısı
     /// Microsoft Build of OpenJDK 25 (mod paketleri için optimize JVM —
@@ -58,6 +62,8 @@ impl Default for YikimConfig {
             stats_enabled: true,
             guided_tour_done: false,
             onboarding_done: false,
+            fx_particles: "mid".into(),
+            cursor_style: "standart".into(),
             java_dir: None,
             download_concurrency: 8,
             use_java25: true,

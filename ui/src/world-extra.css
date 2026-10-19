@@ -248,3 +248,68 @@
   --accent-deep: color-mix(in srgb, var(--custom-accent, #ff7a18) 84%, #000);
   --accent-dim: color-mix(in srgb, var(--custom-accent, #ff7a18) 12%, transparent);
 }
+
+/* ============================================================
+   DÜNYA DOKULARI — her dünyaya kendi yüzeyi (template'den kopma)
+   Şu katman: body::after sabit overlay (pointer-events yok) +
+   bileşen sevyesinde dokunuşlar. Custom-accent bloğu yukarıda
+   olduğundan bu bloklar yalnız Dekor kuralları taşır.
+   ============================================================ */
+
+/* — Karanlık Oda: kırmızı ışık vinyeti + film taneciği — */
+:root[data-world="oda"] body::after {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    radial-gradient(1100px 820px at 50% 42%, transparent 42%, rgba(120, 10, 6, 0.3) 100%),
+    repeating-linear-gradient(0deg, transparent 0 2px, rgba(255, 255, 255, 0.014) 2px 3px);
+}
+:root[data-world="oda"] .rail-logo img,
+:root[data-world="oda"] .rail-account .face {
+  filter: sepia(0.25) saturate(1.4) hue-rotate(-18deg);
+}
+
+/* — Buzul: buzlardan geçen cam çatı — */
+:root[data-world="buz"] .card {
+  position: relative;
+  overflow: hidden;
+  outline: 1px solid rgba(255, 255, 255, 0.5);
+  outline-offset: -3px;
+}
+:root[data-world="buz"] .card::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 52%;
+  background: linear-gradient(158deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 68%);
+  pointer-events: none;
+}
+:root[data-world="buz"] .rail-item .ri-icon { filter: drop-shadow(0 1px 3px rgba(11, 87, 208, 0.3)); }
+
+/* — Perde: kadife dokusu + altın sahne ışığı — */
+:root[data-world="perde"] body::after {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    radial-gradient(920px 430px at 50% -70px, rgba(212, 175, 55, 0.12), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.045) 0 1px, transparent 1px 4px);
+}
+:root[data-world="perde"] .card {
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.4),
+    0 0 0 4px rgba(212, 175, 55, 0.1),
+    0 14px 34px rgba(0, 0, 0, 0.5);
+}
+
+/* — Kumaş: keten dokusu (çapraz örgü) — */
+:root[data-world="kumas"] body::after {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    repeating-linear-gradient(45deg, rgba(90, 70, 45, 0.045) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 5px);
+}

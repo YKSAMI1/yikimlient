@@ -148,6 +148,35 @@ export function renderSettings(root: HTMLElement): void {
     </div>
 
     <div class="card set-card anim-fade-up">
+      <h3>${icon("sparkles")} Ambiens &amp; İmleç</h3>
+      <p class="set-sub">Dünyanızı hareketlendir: her temanın kendi ambiens parçacık efekti vardır; imleç simgesi de seçilebilir.</p>
+      <div class="row-between">
+        <div>
+          <b style="font-size:13px">Ambiens parçacıklar</b>
+          <div style="font-size:11.5px; color:var(--text-dim)">Zımtırak, kar, fosfor yağmuru... — dünya efektinin yoğunluğu. Performans kaygısı varsa Sessiz'i seç.</div>
+        </div>
+        <select class="input" id="fx-particles" style="width:130px">
+          <option value="none" ${cfg.fx_particles === "none" ? "selected" : ""}>Kapalı</option>
+          <option value="low" ${cfg.fx_particles === "low" ? "selected" : ""}>Sessiz</option>
+          <option value="mid" ${!cfg.fx_particles || cfg.fx_particles === "mid" ? "selected" : ""}>Normal</option>
+          <option value="high" ${cfg.fx_particles === "high" ? "selected" : ""}>Yoğun</option>
+        </select>
+      </div>
+      <div class="row-between" style="margin-top:12px">
+        <div>
+          <b style="font-size:13px">Fare imleci</b>
+          <div style="font-size:11.5px; color:var(--text-dim)">Launcher içindeki fare simgesi — temasının rengiyle boyunca güncellenir.</div>
+        </div>
+        <select class="input" id="cursor-style" style="width:130px">
+          <option value="standart" ${!cfg.cursor_style || cfg.cursor_style === "standart" ? "selected" : ""}>Sistem</option>
+          <option value="yikim" ${cfg.cursor_style === "yikim" ? "selected" : ""}>YIKIM Oku</option>
+          <option value="hedef" ${cfg.cursor_style === "hedef" ? "selected" : ""}>Hedef</option>
+          <option value="nokta" ${cfg.cursor_style === "nokta" ? "selected" : ""}>Nokta</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card set-card anim-fade-up">
       <h3>${icon("mug")} Java</h3>
       <div class="row-between">
         <div>
@@ -244,6 +273,18 @@ export function renderSettings(root: HTMLElement): void {
     applyWorld();
     await save();
     toast("Dünya rengine dönüldü");
+  });
+
+  // ambiens parçacıklar + özel imleç
+  root.querySelector("#fx-particles")?.addEventListener("change", async (e) => {
+    state.config.fx_particles = (e.target as HTMLSelectElement).value;
+    applyWorld();
+    await save();
+  });
+  root.querySelector("#cursor-style")?.addEventListener("change", async (e) => {
+    state.config.cursor_style = (e.target as HTMLSelectElement).value;
+    applyWorld();
+    await save();
   });
 
   // java

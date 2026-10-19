@@ -85,6 +85,12 @@
 /* içerik satırı dünya kapağı */
 .row-face { border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
 
+/* ---------- özel imleç: tüm yüzeye zorlanır ---------- */
+html[data-custom-cursor="1"] body,
+html[data-custom-cursor="1"] body * {
+  cursor: var(--yikim-cursor, auto) !important;
+}
+
 /* ---------- İlk kurulum sihirbazı ---------- */
 .yikim-ob {
   position: fixed; inset: 0; z-index: 3100;

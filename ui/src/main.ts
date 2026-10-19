@@ -9,6 +9,8 @@ import { registerPages } from "./pages";
 import { startDropWatcher } from "./drop";
 import { maybeStartTour } from "./tour";
 import { maybeStartOnboarding } from "./onboarding";
+import { applyFx } from "./fx";
+import { applyCursor } from "./cursor";
 import { WINDOW_CONTROLS, icon, ICONS } from "./icons";
 import { cascadeText, enterRows, enterStage, exitStage, switchPress } from "./motion";
 export { icon };
@@ -108,6 +110,9 @@ export function applyWorld(): void {
     root.removeAttribute("data-world-custom");
     root.style.removeProperty("--custom-accent");
   }
+  // Ambiens parçacıklar + özel imleç — dünyaya ve ayarlara bağlı
+  applyFx();
+  applyCursor();
 }
 
 // Geriye dönük uyumluluk: settings.ts eski adı çağırıyorsa
