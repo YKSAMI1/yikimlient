@@ -31,6 +31,26 @@ const WORLDS = [
     id: "rihtim", name: "Rıhtım", desc: "Yüzen cam dock altta ortada — gece lacivert, deniz feneri teal",
     bg: "#0a0f18", panel: "#111a29", line: "#22304a", text: "#e6effa", dim: "#5e6d85", accent: "#2fd6c3",
   },
+  {
+    id: "oda", name: "Karanlık Oda", desc: "Fotoğraf laboratuvarı — safelight kırmızı, mono tip, ikon-only ray",
+    bg: "#0e0a0b", panel: "#191214", line: "#2c2022", text: "#e8ddd8", dim: "#655a57", accent: "#e0301e",
+  },
+  {
+    id: "kumas", name: "Kumaş", desc: "Terzi rafı — krem keten, kesik dikişli çizgiler, erik moru",
+    bg: "#f7f2e9", panel: "#fffaf1", line: "#ddcfb6", text: "#3f3226", dim: "#97897a", accent: "#a04ac2",
+  },
+  {
+    id: "perde", name: "Perde", desc: "Kızıl kadife sahne — altın vurgular, serif tipografisi",
+    bg: "#17090f", panel: "#24111a", line: "#3f1f2b", text: "#f3e8dd", dim: "#857162", accent: "#d4af37",
+  },
+  {
+    id: "buz", name: "Buzul", desc: "Buzlu cam yüzeyler (frosted) — kar beyazı, kobalt mavi",
+    bg: "#e6edf4", panel: "#f2f6fb", line: "#c7d5e3", text: "#14202c", dim: "#8296a8", accent: "#0b57d0",
+  },
+  {
+    id: "skala", name: "Skala", desc: "Fosforlu CRT tüpü — tarama çizgileri, glow yeşil, mono her şey",
+    bg: "#07130c", panel: "#0d2015", line: "#1a3a26", text: "#d6f5df", dim: "#5e8069", accent: "#45f882",
+  },
 ];
 
 /// Dünyanın mini önizlemesi: kendi paletiyle pano + 3 hat + lambalar

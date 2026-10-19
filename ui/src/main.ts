@@ -4,6 +4,7 @@ import "./pages.css";
 import "./system-ui.css";
 import "./world-afis.css";
 import "./world-layouts.css";
+import "./world-extra.css";
 import { registerPages } from "./pages";
 import { startDropWatcher } from "./drop";
 import { maybeStartTour } from "./tour";

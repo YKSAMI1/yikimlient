@@ -1,0 +1,250 @@
+/* ============================================================
+   DÜNYA 8–12 — SIFIRDAN ÖZGÜN BEŞLİ.
+   Her biri cartoon renkten öte KİMLİK taşır: tipografi, doku, yapı.
+
+   8  oda    — Karanlık Oda: kırmızı safelight, mono tip, ikon-only ray
+   9  kumas  — Kumaş: keçeli krem, kesik (dikişli) çizgiler, çok yumuşak köşe
+   10 perde  — Perde: kızıl kadife + altın, serif tip
+   11 buz    — Buzul: buzlu cam yüzeyler (frosted), kobalt
+   12 skala  — Skala: fosfor yeşili CRT, tarama çizgileri, glow
+   ============================================================ */
+
+/* ---------- 8: KARANLIK ODA ---------- */
+:root[data-world="oda"] {
+  --accent: #e0301e;              /* safelight kırmızı */
+  --accent-soft: #ef5d4d;
+  --accent-deep: #a92417;
+  --accent-ink: #160b0a;
+  --accent-dim: rgba(224, 48, 30, 0.13);
+  --on-accent: #fff;
+
+  --bg0: #0e0a0b;                 /* kızıllığa çalan is */
+  --bg1: #130e0f;
+  --bg2: #191214;
+  --bg3: #201719;
+  --bg4: #2c2022;
+  --hairline: rgba(232, 221, 216, 0.08);
+  --hairline-strong: rgba(232, 221, 216, 0.16);
+
+  --text: #e8ddd8;
+  --text-dim: #9a8c88;
+  --text-faint: #655a57;
+  color-scheme: dark;
+}
+/* negatif film laboratuvarı: her şey monospace etiket */
+:root[data-world="oda"] {
+  --font: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+}
+:root[data-world="oda"] h1,
+:root[data-world="oda"] .page-header h1,
+:root[data-world="oda"] .home-hero h1 {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+/* röntgen sergisi: ray ikon-only daralır */
+:root[data-world="oda"] { --rail-w: 62px; }
+:root[data-world="oda"] .rail-item .ri-label { display: none; }
+:root[data-world="oda"] .rail-item { padding: 12px 4px; align-items: center; }
+:root[data-world="oda"] .ra-name { display: none; }
+:root[data-world="oda"] .rail-account { justify-content: center; }
+:root[data-world="oda"] .btn { text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+:root[data-world="oda"] .card { border-radius: 2px; }
+:root[data-world="oda"] .rail-item.active::before { display: none; }
+:root[data-world="oda"] .rail-item.active {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--accent-dim);
+}
+:root[data-world="oda"] .rail-item.active,
+:root[data-world="oda"] .rail-item.active .ri-icon { color: var(--accent); }
+
+/* ---------- 9: KUMAŞ ---------- */
+:root[data-world="kumas"] {
+  --accent: #a04ac2;              /* erik/mor iplik */
+  --accent-soft: #c184d8;
+  --accent-deep: #7d3599;
+  --accent-ink: #2a0f34;
+  --accent-dim: rgba(160, 74, 194, 0.12);
+  --on-accent: #fff;
+
+  --bg0: #f7f2e9;                 /* keten krem */
+  --bg1: #efe7d8;
+  --bg2: #fffaf1;
+  --bg3: #f3ecdd;
+  --bg4: #ddcfb6;
+  --hairline: rgba(63, 50, 38, 0.28);
+  --hairline-strong: rgba(63, 50, 38, 0.5);
+
+  --text: #3f3226;
+  --text-dim: #6f5f4d;
+  --text-faint: #97897a;
+  --success: #2c8a4b;
+  --danger: #c03530;
+  --warn: #9a6b00;
+  --info: #2f6fb8;
+  color-scheme: light;
+}
+/* terzi dikişleri: her yüzey kesik çizgiyle kenarlanır */
+:root[data-world="kumas"] .card,
+:root[data-world="kumas"] .btn,
+:root[data-world="kumas"] .input,
+:root[data-world="kumas"] .chip,
+:root[data-world="kumas"] .modal,
+:root[data-world="kumas"] .toast,
+:root[data-world="kumas"] .pill,
+:root[data-world="kumas"] .rail-account,
+:root[data-world="kumas"] .rail-logo {
+  border: 2px dashed var(--hairline-strong);
+}
+:root[data-world="kumas"] .titlebar { border-bottom: 2px dashed var(--hairline-strong); }
+:root[data-world="kumas"] .rail { border-right: 2px dashed var(--hairline-strong); }
+:root[data-world="kumas"] .card,
+:root[data-world="kumas"] .btn { border-radius: 18px; }
+:root[data-world="kumas"] .switch { border: 2px dashed var(--hairline-strong); }
+:root[data-world="kumas"] .btn:active { transform: scale(0.97); }
+:root[data-world="kumas"] .page-header h1 { font-weight: 650; letter-spacing: -0.01em; }
+
+/* ---------- 10: PERDE — kızıl kadife, altın, serif ---------- */
+:root[data-world="perde"] {
+  --accent: #d4af37;              /* sahne altını */
+  --accent-soft: #e6c766;
+  --accent-deep: #a8871f;
+  --accent-ink: #24180a;
+  --accent-dim: rgba(212, 175, 55, 0.14);
+  --on-accent: #241804;
+
+  --bg0: #17090f;                 /* kadife koyu */
+  --bg1: #1d0d14;
+  --bg2: #24111a;
+  --bg3: #2e1620;
+  --bg4: #3f1f2b;
+  --hairline: rgba(243, 232, 221, 0.09);
+  --hairline-strong: rgba(212, 175, 55, 0.22);
+
+  --text: #f3e8dd;
+  --text-dim: #bfa898;
+  --text-faint: #857162;
+  color-scheme: dark;
+}
+:root[data-world="perde"] {
+  --font: Georgia, "Palatino Linotype", "Times New Roman", serif;
+}
+:root[data-world="perde"] .brand-word,
+:root[data-world="perde"] .page-header h1,
+:root[data-world="perde"] .home-hero h1 {
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+:root[data-world="perde"] .card {
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 4px;
+}
+:root[data-world="perde"] .titlebar { border-bottom: 1px solid rgba(212, 175, 55, 0.35); }
+:root[data-world="perde"] .btn.primary { color: #241804; }
+:root[data-world="perde"] .chip.gold,
+:root[data-world="perde"] .chip.orange { background: var(--accent); color: #241804; }
+
+/* ---------- 11: BUZUL — buzkırıcı cam ---------- */
+:root[data-world="buz"] {
+  --accent: #0b57d0;              /* buzul kobaltı */
+  --accent-soft: #4a80e8;
+  --accent-deep: #0842a0;
+  --accent-ink: #fff;
+  --accent-dim: rgba(11, 87, 208, 0.08);
+  --on-accent: #fff;
+
+  --bg0: #e6edf4;                 /* kar yaması */
+  --bg1: #dde6ef;
+  --bg2: #f2f6fb;
+  --bg3: #eaf1f8;
+  --bg4: #c7d5e3;
+  --hairline: rgba(20, 32, 44, 0.14);
+  --hairline-strong: rgba(20, 32, 44, 0.3);
+
+  --text: #14202c;
+  --text-dim: #4d5d6e;
+  --text-faint: #8296a8;
+  --success: #0f8a4f;
+  --danger: #d0331c;
+  color-scheme: light;
+}
+:root[data-world="buz"] .card {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(20, 32, 44, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(20, 32, 44, 0.08);
+}
+:root[data-world="buz"] .rail,
+:root[data-world="buz"] .titlebar {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+}
+:root[data-world="buz"] .btn {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(20, 32, 44, 0.16);
+  border-radius: 9px;
+}
+:root[data-world="buz"] .input { background: rgba(255, 255, 255, 0.8); border-radius: 9px; }
+
+/* ---------- 12: SKALA — fosforlu CRT ---------- */
+:root[data-world="skala"] {
+  --accent: #45f882;              /* fosfor yeşili */
+  --accent-soft: #7dffab;
+  --accent-deep: #22b45e;
+  --accent-ink: #04220f;
+  --accent-dim: rgba(69, 248, 130, 0.12);
+  --on-accent: #04220f;
+
+  --bg0: #07130c;
+  --bg1: #0a1910;
+  --bg2: #0d2015;
+  --bg3: #12291b;
+  --bg4: #1a3a26;
+  --hairline: rgba(69, 248, 130, 0.1);
+  --hairline-strong: rgba(69, 248, 130, 0.25);
+
+  --text: #d6f5df;
+  --text-dim: #8db59b;
+  --text-faint: #5e8069;
+  color-scheme: dark;
+}
+:root[data-world="skala"] {
+  --font: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+}
+/* tüp taramaları: content üzerine sabit yatay tarama çizgileri */
+:root[data-world="skala"] body::before {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
+  opacity: 0.55;
+}
+:root[data-world="skala"] .btn.primary,
+:root[data-world="skala"] .rail-item.active .ri-icon {
+  text-shadow: 0 0 12px rgba(69, 248, 130, 0.6);
+}
+:root[data-world="skala"] .btn.primary {
+  box-shadow: 0 0 14px rgba(69, 248, 130, 0.25);
+}
+:root[data-world="skala"] h1,
+:root[data-world="skala"] .page-header h1,
+:root[data-world="skala"] .home-hero h1 {
+  text-transform: none;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+
+/* ============================================================
+   ÖZEL VURGU RENGİ — TÜM DÜNYALARDA (eski theme.css'teki blok aynı
+   spesifiklikte önce yüklediğinden yeni dünyaları EZİYORDU;
+   bu blok çift öznitelikli + en sonda → her zaman kazanır)
+   ============================================================ */
+:root[data-world][data-world-custom="1"] {
+  --accent: var(--custom-accent, #ff7a18);
+  --accent-soft: color-mix(in srgb, var(--custom-accent, #ff7a18) 82%, #fff);
+  --accent-deep: color-mix(in srgb, var(--custom-accent, #ff7a18) 84%, #000);
+  --accent-dim: color-mix(in srgb, var(--custom-accent, #ff7a18) 12%, transparent);
+}

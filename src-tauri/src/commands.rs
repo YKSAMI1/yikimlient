@@ -833,10 +833,25 @@ pub async fn cmd_list_content_files(
                 }
             }
             let meta = e.metadata().ok();
-            let icon = if kind == "saves" && p.join("icon.png").is_file() {
-                Some(p.join("icon.png").to_string_lossy().to_string())
-            } else {
-                None
+            let icon: Option<String> = match kind.as_str() {
+                // dünya kapağı: Minecraft'ın kendi kaydettiği icon.png
+                "saves" => {
+                    if p.join("icon.png").is_file() {
+                        Some(p.join("icon.png").to_string_lossy().to_string())
+                    } else {
+                        None
+                    }
+                }
+                // doku/shader: zip kökündeki pack.png (yoksa kökteki ilk png) →
+                // gizli önbellek dosyasına çıkarılıp gösterilir
+                "resourcepacks" | "shaderpacks" => {
+                    let raw = dir.join(format!(".yikim-icon-{}.png", name));
+                    if !raw.exists() {
+                        try_extract_pack_icon(&p, &raw);
+                    }
+                    raw.exists().then(|| raw.to_string_lossy().to_string())
+                }
+                _ => None,
             };
             out.push(UiContentFile {
                 name,
@@ -853,6 +868,43 @@ pub async fn cmd_list_content_files(
         }
     }
     Ok(out)
+}
+
+/// Doku/shader zip'inin kökü kendi kapak resmini taşıyorsa (pack.png ya da
+/// iç kökteki ilk png) söylenen yola çıkarır. Hata — sessizce yutulur.
+fn try_extract_pack_icon(zip_path: &std::path::Path, out: &std::path::Path) {
+    fn inner(zip_path: &std::path::Path, out: &std::path::Path) -> Result<(), String> {
+        use std::io::Read;
+        let f = std::fs::File::open(zip_path).map_err(|e| e.to_string())?;
+        let mut archive = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
+        let mut found: Option<usize> = None;
+        for i in 0..archive.len() {
+            let fname = archive
+                .by_index(i)
+                .map(|z| z.name().to_string())
+                .unwrap_or_default();
+            if fname.ends_with('/') {
+                continue;
+            }
+            // kökteki pack.png idealdir; yoksa kök seviyedeki ilk png
+            if fname == "pack.png" {
+                found = Some(i);
+                break;
+            }
+            if found.is_none() && !fname[1..].contains('/') && fname.to_lowercase().ends_with(".png") {
+                found = Some(i);
+            }
+        }
+        let Some(i) = found else {
+            return Err("kapak resmi yok".into());
+        };
+        let mut z = archive.by_index(i).map_err(|e| e.to_string())?;
+        let mut buf = Vec::new();
+        z.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+        std::fs::write(out, buf).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    let _ = inner(zip_path, out);
 }
 
 /// İçerik dosyası ekle: zip seç (doku/shader) veya klasör seç (dünya) → kurulum klasörüne kopyala.
