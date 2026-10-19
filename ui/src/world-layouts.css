@@ -1,0 +1,148 @@
+/* ============================================================
+   YAPISAL DÜNYALAR — yerleşim kendisi farklı, sadece renk değil.
+
+   DÜNYA 6: SIRA — navigasyon ÜSTTE yatay şerit. Ray soldan üstüne taşınır;
+   sekmeler hap plaka, aktif sekme mathinger çerçeveli.
+   DÜNYA 7: RIHTIM — yüzen iskele dock. Ray pencerenin alta ortasında cam
+   kapsül; sayfa tam genişlik nefes alır.
+
+   Renk paletleri de文案 tüm dünyalardan farklı hedeflenir.
+   ============================================================ */
+
+/* ---------- DÜNYA 6: SIRA ---------- */
+:root[data-world="sira"] {
+  --accent: #a3e635;              /* makine yeşili — lime */
+  --accent-soft: #c2f273;
+  --accent-deep: #65a30d;
+  --accent-ink: #142108;
+  --accent-dim: rgba(163, 230, 53, 0.11);
+  --on-accent: #142108;
+
+  --bg0: #0e1112;
+  --bg1: #121516;
+  --bg2: #171b1c;
+  --bg3: #1e2325;
+  --bg4: #2a3134;
+  --hairline: rgba(237, 242, 230, 0.09);
+  --hairline-strong: rgba(237, 242, 230, 0.17);
+
+  --text: #edf2e6;
+  --text-dim: #a3ac9d;
+  --text-faint: #6c7568;
+  color-scheme: dark;
+}
+:root[data-world="sira"] .brand-word,
+:root[data-world="sira"] .page-header h1,
+:root[data-world="sira"] .home-hero h1 {
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+:root[data-world="sira"] .btn {
+  border-radius: 8px;
+  font-weight: 650;
+}
+:root[data-world="sira"] .card { border-radius: 10px; }
+
+/* üst şerit yerleşimi */
+:root[data-world="sira"] .body-row { flex-direction: column; }
+:root[data-world="sira"] .rail {
+  width: auto;
+  flex-direction: row;
+  align-items: center;
+  padding: 0 16px;
+  gap: 6px;
+  border-right: none;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--bg1);
+}
+:root[data-world="sira"] .rail-logo {
+  width: 34px; height: 34px;
+  margin: 0 12px 0 0;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+:root[data-world="sira"] .rail-logo img { width: 22px; height: 22px; }
+:root[data-world="sira"] .rail-item {
+  flex-direction: row;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+}
+:root[data-world="sira"] .rail-item .ri-icon svg { width: 17px; height: 17px; }
+:root[data-world="sira"] .rail-item .ri-label { font-size: 11.5px; }
+:root[data-world="sira"] .rail-item.active::before { display: none; }
+:root[data-world="sira"] .rail-item.active {
+  background: var(--accent-dim);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+:root[data-world="sira"] .rail-item.active .ri-icon { color: var(--accent); }
+:root[data-world="sira"] .rail-account { margin-left: auto; }
+
+/* ---------- DÜNYA 7: RIHTIM ---------- */
+:root[data-world="rihtim"] {
+  --accent: #2fd6c3;              /* deniz feneri teal */
+  --accent-soft: #6be8d9;
+  --accent-deep: #149e8e;
+  --accent-ink: #04201c;
+  --accent-dim: rgba(47, 214, 195, 0.11);
+  --on-accent: #04201c;
+
+  --bg0: #0a0f18;                 /* gece denizi lacivert */
+  --bg1: #0d1420;
+  --bg2: #111a29;
+  --bg3: #162234;
+  --bg4: #22304a;
+  --hairline: rgba(230, 239, 250, 0.08);
+  --hairline-strong: rgba(230, 239, 250, 0.16);
+
+  --text: #e6effa;
+  --text-dim: #93a4bd;
+  --text-faint: #5e6d85;
+  color-scheme: dark;
+}
+:root[data-world="rihtim"] .rail-item.active::before { display: none; }
+:root[data-world="rihtim"] .rail-item.active {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+:root[data-world="rihtim"] .rail-item.active .ri-label { font-weight: 700; }
+:root[data-world="rihtim"] .rail-item.active .ri-icon { color: var(--on-accent); }
+:root[data-world="rihtim"] .btn { border-radius: 10px; }
+:root[data-world="rihtim"] .card { border-radius: 14px; }
+
+/* iskele yerleşimi */
+:root[data-world="rihtim"] .body-row { padding-bottom: 88px; }
+:root[data-world="rihtim"] .rail {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--bg2) 86%, transparent);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  box-shadow: var(--shadow-pop);
+  z-index: 40;
+}
+:root[data-world="rihtim"] .rail-logo,
+:root[data-world="rihtim"] .rail-flex { display: none; }
+:root[data-world="rihtim"] .rail-item {
+  padding: 9px 12px;
+  min-width: 62px;
+  border-radius: 999px;
+}
+:root[data-world="rihtim"] .rail-account {
+  margin-left: 6px;
+  padding-left: 14px;
+  border-left: 1px solid var(--hairline);
+  border-radius: 0;
+  background: transparent;
+  border-top: none; border-right: none; border-bottom: none;
+}

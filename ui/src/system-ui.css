@@ -84,3 +84,34 @@
 
 /* içerik satırı dünya kapağı */
 .row-face { border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
+
+/* ---------- İlk kurulum sihirbazı ---------- */
+.yikim-ob {
+  position: fixed; inset: 0; z-index: 3100;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--bg0) 82%, transparent);
+  backdrop-filter: blur(6px);
+  animation: fadeIn 0.25s ease both;
+}
+.yikim-ob .ob-card {
+  width: min(460px, calc(100vw - 60px));
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  padding: 26px 26px 20px;
+  background: var(--bg2);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  animation: fadeUp 0.3s var(--ease) both;
+}
+.yikim-ob .ob-logo { width: 62px; height: 62px; border-radius: 14px; margin: 0 auto 12px; }
+.yikim-ob h2 { font-size: 19px; text-align: center; margin-bottom: 4px; }
+.yikim-ob .ob-sub { text-align: center; color: var(--text-dim); font-size: 12.5px; margin-bottom: 18px; }
+.yikim-ob .ob-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 16px; }
+.yikim-ob .ob-dots i { width: 22px; height: 4px; border-radius: 2px; background: var(--bg4); }
+.yikim-ob .ob-dots i.done { background: var(--accent); }
+.yikim-ob .ob-step-label { font-size: 12px; color: var(--text-faint); margin-bottom: 14px; text-align: center; }
+.yikim-ob .ob-actions { display: flex; gap: 8px; margin-top: 20px; }
+.yikim-ob .ob-actions .spacer { flex: 1; }
+.yikim-ob label.ob-lab { display: block; font-size: 12px; color: var(--text-dim); margin: 12px 0 5px; }
+.yikim-ob .ob-ok { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--success); font-size: 12.5px; }

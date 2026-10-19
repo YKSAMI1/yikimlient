@@ -59,19 +59,29 @@ let active: HTMLElement | null = null;
 function cardPosition(spot: DOMRect | null, card: HTMLElement): void {
   const W = window.innerWidth;
   const H = window.innerHeight;
-  const top = (target: number): string => `${Math.max(70, Math.min(target, H - 290))}px`;
-  if (spot && spot.right + 340 < W) {
-    card.style.left = `${Math.min(spot.right + 18, W - 328)}px`;
-    card.style.top = top(spot.top - 10);
-    card.style.transform = "none";
-  } else if (spot && spot.left > 340) {
-    card.style.left = `${Math.max(14, spot.left - 326)}px`;
-    card.style.top = top(spot.top - 10);
+  const cw = card.offsetWidth;
+  const ch = card.offsetHeight;
+  const clampX = (x: number): number => Math.max(12, Math.min(x, W - cw - 12));
+  const clampY = (y: number): number => Math.max(14, Math.min(y, H - ch - 14));
+  if (spot) {
+    // yatay: önce sağ tarafta dene, sığmazsa sol, o da sığmazsa ortala
+    const rightX = spot.right + 16;
+    const leftX = spot.left - 16 - cw;
+    let x: number;
+    if (rightX + cw <= W - 12) x = rightX;
+    else if (leftX >= 12) x = leftX;
+    else x = (W - cw) / 2;
+    // dikey: hedefe hizala; üstte taşarsa hedefin altına in
+    let y = spot.top + spot.height / 2 - ch / 2;
+    if (y < 14) y = spot.bottom + 16;
+    card.style.left = `${clampX(x)}px`;
+    card.style.top = `${clampY(y)}px`;
     card.style.transform = "none";
   } else {
-    card.style.left = "50%";
-    card.style.top = "44%";
-    card.style.transform = "translate(-50%, -50%)";
+    // hedef yok → tam ortala (piksel bazlı; transform yok, GSAP bozamaz)
+    card.style.left = `${Math.max(12, (W - cw) / 2)}px`;
+    card.style.top = `${clampY((H - ch) / 2)}px`;
+    card.style.transform = "none";
   }
 }
 
@@ -80,7 +90,15 @@ function drawStep(root: HTMLElement, index: number): void {
   const spot = root.querySelector(".spot") as HTMLElement;
   const card = root.querySelector(".tc") as HTMLElement;
 
+  // metni ÖNCE kur (boyut ölçümü doğru çıksın diye)
   navigate(step.page);
+  const dots = card.querySelector(".tc-step") as HTMLElement;
+  dots.innerHTML = STEPS.map((_, i) =>
+    `<i class="${i <= index ? "done" : ""}"></i>`).join("");
+  (card.querySelector("h3") as HTMLElement).textContent = step.title;
+  (card.querySelector("p") as HTMLElement).textContent = step.text;
+  const next = card.querySelector(".tc-next") as HTMLButtonElement;
+  next.textContent = index === STEPS.length - 1 ? "Tamam ✓" : "İleri →";
 
   let rect: DOMRect | null = null;
   if (step.sel) {
@@ -99,19 +117,11 @@ function drawStep(root: HTMLElement, index: number): void {
   }
   cardPosition(rect, card);
 
-  // adım metni + noktalar
-  const dots = card.querySelector(".tc-step") as HTMLElement;
-  dots.innerHTML = STEPS.map((_, i) =>
-    `<i class="${i <= index ? "done" : ""}"></i>`).join("");
-  (card.querySelector("h3") as HTMLElement).textContent = step.title;
-  (card.querySelector("p") as HTMLElement).textContent = step.text;
-  const next = card.querySelector(".tc-next") as HTMLButtonElement;
-  next.textContent = index === STEPS.length - 1 ? "Tamam ✓" : "İleri →";
-
-  // kart içeriği değiştiğinde kısa giriş sahnesi (GSAP)
+  // kart içeriği değiştiğinde kısa giriş sahnesi (GSAP); çıkışta transform'u
+  // temizler — sonraki adımın elle konumlandırması bozulmaz
   gsap.fromTo(card,
     { y: 14, autoAlpha: 0 },
-    { y: 0, autoAlpha: 1, duration: 0.38, ease: "power3.out" });
+    { y: 0, autoAlpha: 1, duration: 0.38, ease: "power3.out", clearProps: "transform" });
 }
 
 /** config.guided_tour_done false ise turu oynat; bitince bayrağı kaydet. */

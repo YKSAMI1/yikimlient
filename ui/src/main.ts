@@ -3,9 +3,11 @@ import "./app.css";
 import "./pages.css";
 import "./system-ui.css";
 import "./world-afis.css";
+import "./world-layouts.css";
 import { registerPages } from "./pages";
 import { startDropWatcher } from "./drop";
 import { maybeStartTour } from "./tour";
+import { maybeStartOnboarding } from "./onboarding";
 import { WINDOW_CONTROLS, icon, ICONS } from "./icons";
 import { cascadeText, enterRows, enterStage, exitStage, switchPress } from "./motion";
 export { icon };
@@ -580,9 +582,9 @@ export async function boot(): Promise<void> {
     registerPages();
     setupShell();
     navigate("home");
-    // Sürükle-bırak motoru + (bir kezlik) ilk açılış rehberi
+    // Sürükle-bırak + ilk kurulum sihirbazı + (o oynanmadıysa) rehber tur
     startDropWatcher();
-    maybeStartTour();
+    if (!maybeStartOnboarding()) maybeStartTour();
     // Otomatik güncelleme kontrolü (imzalı; GitHub releases'ten) — sessiz kontrol,
     // güncelleme varsa kullanıcıya sorar, hata asla açılışı bozmaz.
     void checkForUpdate();

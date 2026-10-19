@@ -20,8 +20,16 @@ const WORLDS = [
     bg: "#0e1016", panel: "#171a24", line: "#2b3044", text: "#eceffa", dim: "#666e8a", accent: "#6e8bff",
   },
   {
-    id: "afis", name: "Afiş Provası", desc: "Sıfırdan yeni tasarım — baskı kâğıdı, sert oferta çizgi, turuncu",
+    id: "afis", name: "Afiş Provası", desc: "Sıfırdan yeni tasarım — baskı kâğıdı, sert mürekkep çizgi, ofset gölge",
     bg: "#f3ecdd", panel: "#faf6ea", line: "#16130c", text: "#16130c", dim: "#8a7f6b", accent: "#ff4d00",
+  },
+  {
+    id: "sira", name: "Sıra Düzeni", desc: "Navigasyon ÜSTTE — yatay hap şerit, makine yeşili",
+    bg: "#0e1112", panel: "#171b1c", line: "#2a3134", text: "#edf2e6", dim: "#6c7568", accent: "#a3e635",
+  },
+  {
+    id: "rihtim", name: "Rıhtım", desc: "Yüzen cam dock altta ortada — gece lacivert, deniz feneri teal",
+    bg: "#0a0f18", panel: "#111a29", line: "#22304a", text: "#e6effa", dim: "#5e6d85", accent: "#2fd6c3",
   },
 ];
 
