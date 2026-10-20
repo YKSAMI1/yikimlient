@@ -47,7 +47,12 @@ fn embedded_mods_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
 }
 
 fn load_manifest(dir: &Path) -> Option<Vec<ManifestEntry>> {
-    let text = fs::read_to_string(dir.join("manifest.json")).ok()?;
+    let mut bytes = fs::read(dir.join("manifest.json")).ok()?;
+    // UTF-8 BOF koruması: bazı paketleyiciler BOM bırakıyor; serde_json BOM'u reddeder.
+    if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
+        bytes.drain(..3);
+    }
+    let text = String::from_utf8(bytes).ok()?;
     let js: serde_json::Value = serde_json::from_str(&text).ok()?;
     let arr = js["mods"].as_array()?;
     let mut out = Vec::new();
@@ -182,6 +187,20 @@ mod tests {
 
     fn dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources").join("mods")
+    }
+
+    /// BOM'lu manifest bile okunmalı — paketleyici BOM bırakırsa kurulum çökmemeli.
+    #[test]
+    fn bomlu_manifest_okunur() {
+        let tmp = std::env::temp_dir().join(format!("yikim-bom-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let ham = "\u{FEFF}{\"mods\":[{\"mcVersion\":\"1.21.11\",\"file\":\"test.jar\"}]}";
+        std::fs::write(tmp.join("manifest.json"), ham).unwrap();
+        let girdi = load_manifest(&tmp).expect("BOM'lu manifest okunamadi");
+        assert_eq!(girdi.len(), 1);
+        assert_eq!(girdi[0].file, "test.jar");
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]
