@@ -17,10 +17,11 @@ let lastResults: SearchResult[] = [];
 // sayfalama: her kaynak (Modrinth/CurseForge) kendi limiti kadar döner; offset kaynak başına
 // artar (search_all iki kaynağı birleştirip indirilme sırasına dizer)
 let pageLimit = 40;
-let pageOffset = 0;
+let pageNum = 1;   // görünür sayfa (1 tabanlı)
+let knownMax = 1;  // butonlar 1..knownMax; dolu geçen sayfalar keşfedildikçe büyür
 let lastVersion = "";
 let lastLoader = "";
-let loadingMore = false;
+let pagerBusy = false;
 
 export function renderExplore(root: HTMLElement): void {
   // nav.param iki kalıp: "kind:X" (paketler/içerik sayfalarından) veya instance id ("Mod Ekle")
@@ -143,64 +144,78 @@ async function doSearch(root: HTMLElement, query: string): Promise<void> {
   // ve Modrinth facet'i sonuçları boşaltır → boş geç
   const isContent = ["resourcepack", "shader", "world", "datapack"].includes(kind);
   lastLoader = isContent ? "" : rawLoader;
-  pageOffset = 0;
+  pageNum = 1;
   try {
     const resp = await invoke("cmd_repos_search", {
       query, kind, versions: lastVersion ? [lastVersion] : [], loader: lastLoader, offset: 0, limit: pageLimit,
     });
     lastResults = resp.results;
+    knownMax = lastResults.length >= pageLimit ? 2 : 1;
     grid.innerHTML = "";
     if (!lastResults.length) {
       grid.innerHTML = `<div class="card empty-state" style="grid-column:1/-1"><p>Sonuç bulunamadı — farklı bir şey dene.</p></div>`;
       return;
     }
     for (const r of lastResults) grid.appendChild(resultCard(r));
-    attachMoreBtn(root);
+    renderPager(root);
   } catch (e) {
     grid.innerHTML = `<div class="card" style="grid-column:1/-1"><p>Arama hatası: ${e}</p></div>`;
   }
 }
 
-/// Sonuç listesinin sonuna "Daha fazla göster" koyar — sayfalama bitince kaldırır.
-function attachMoreBtn(root: HTMLElement): void {
+/// Sayfa göstergesi: 1 2 3 … — sonraki keşfi › butonu açar; boş sayfada daralır.
+function renderPager(root: HTMLElement): void {
   const grid = root.querySelector("#exp-results") as HTMLElement;
-  const old = grid.querySelector("#exp-more");
-  if (old) old.remove();
-  if (lastResults.length < pageLimit) return; // aşırı az gelmediyse devam edilebilir
-  const btn = el(`
-    <div class="card hover exp-more-card" id="exp-more" style="grid-column:1/-1; display:flex; align-items:center; justify-content:center; gap:10px; padding:14px; cursor:pointer">
-      <span id="exp-more-label">Daha fazla göster</span>
-    </div>
-  `);
-  btn.addEventListener("click", () => loadMore(root));
-  grid.appendChild(btn);
+  grid.querySelector("#exp-pager")?.remove();
+  const dolu = lastResults.length >= pageLimit;
+  if (pageNum === 1 && !dolu) return; // tek sayfalık sonuç — gösterge gereksiz
+  const btns = [`<button class="pg-btn" data-pg="prev" title="Önceki sayfa" ${pageNum <= 1 ? "disabled" : ""}>‹</button>`];
+  for (let i = 1; i <= knownMax; i++) {
+    btns.push(`<button class="pg-btn ${i === pageNum ? "cur" : ""}" data-pg="${i}">${i}</button>`);
+  }
+  btns.push(`<button class="pg-btn" data-pg="next" title="Sonraki sayfa" ${dolu ? "" : "disabled"}>›</button>`);
+  const bar = el(`<div class="exp-pager" id="exp-pager" style="grid-column:1/-1">${btns.join("")}</div>`);
+  bar.addEventListener("click", (e) => {
+    const target = (e.target as HTMLElement).closest(".pg-btn") as HTMLButtonElement | null;
+    if (!target || target.disabled) return;
+    const v = target.dataset.pg!;
+    const hedef = v === "prev" ? pageNum - 1 : v === "next" ? pageNum + 1 : parseInt(v, 10);
+    if (!Number.isFinite(hedef) || hedef < 1 || hedef === pageNum) return;
+    loadPage(root, hedef);
+  });
+  grid.appendChild(bar);
 }
 
-async function loadMore(root: HTMLElement): Promise<void> {
-  if (loadingMore) return;
-  loadingMore = true;
+async function loadPage(root: HTMLElement, p: number): Promise<void> {
+  if (pagerBusy) return;
+  pagerBusy = true;
   const grid = root.querySelector("#exp-results") as HTMLElement;
-  const label = grid.querySelector("#exp-more-label");
-  if (label) label.textContent = "Yükleniyor…";
+  grid.innerHTML = `<div class="spinner" style="grid-column:1/-1; margin:40px auto"></div>`;
   try {
     const resp = await invoke("cmd_repos_search", {
       query: lastQuery, kind, versions: lastVersion ? [lastVersion] : [], loader: lastLoader,
-      offset: pageOffset, limit: pageLimit,
+      offset: (p - 1) * pageLimit, limit: pageLimit,
     });
     const fresh: SearchResult[] = resp.results;
-    pageOffset += pageLimit;
-    // aynı projeyi iki kaynaktan tekrar eklemeyi önle (id tekrarları)
-    const seen = new Set(lastResults.map((r) => r.id));
-    const added: SearchResult[] = fresh.filter((r) => !seen.has(r.id));
-    grid.querySelector("#exp-more")?.remove();
-    if (!added.length) return;
-    lastResults = lastResults.concat(added);
-    for (const r of added) grid.appendChild(resultCard(r));
-    attachMoreBtn(root);
+    if (!fresh.length) {
+      // boş sayfa — bilinen aralığı daralt ve göstergeyi yeniden çiz
+      knownMax = Math.min(knownMax, Math.max(1, p - 1));
+      grid.innerHTML = "";
+      for (const r of lastResults) grid.appendChild(resultCard(r));
+      renderPager(root);
+      return;
+    }
+    lastResults = fresh;
+    pageNum = p;
+    knownMax = Math.max(knownMax, fresh.length >= pageLimit ? p + 1 : p);
+    grid.innerHTML = "";
+    for (const r of fresh) grid.appendChild(resultCard(r));
+    renderPager(root);
+    grid.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) {
-    grid.innerHTML += `<div class="card" style="grid-column:1/-1"><p>Sayfa yüklenemedi: ${e}</p></div>`;
+    grid.innerHTML = `<div class="card" style="grid-column:1/-1"><p>Sayfa yüklenemedi: ${e}</p></div>`;
   } finally {
-    loadingMore = false;
+    pagerBusy = false;
   }
 }
 

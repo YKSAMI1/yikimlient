@@ -3,6 +3,7 @@ package com.yikimlient.client;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.minecraft.class_2960;
 import net.minecraft.class_310;
 import net.minecraft.class_3222;
 import net.minecraft.class_8710;
@@ -21,8 +22,11 @@ import net.minecraft.class_9139;
  *   çift kayıt olmaması için istisnalar yutulur.
  */
 public final class YikimNet {
-    public static final class_8710.class_9154<HelloPayload> HELLO = class_8710.method_56483("yikimlient:hello");
-    public static final class_8710.class_9154<RosterPayload> ROSTER = class_8710.method_56483("yikimlient:roster");
+    // NOT: class_8710.method_56483(String) yolu YALNIZ path kabul eder (ofVanilla —
+    // önüne minecraft: ekler); "yikimlient:hello" orada ikinci ':' yüzünden patlar.
+    // Doğrusu of(namespace, path) = class_2960.method_60655 + Type kaydını elle kurmak.
+    public static final class_8710.class_9154<HelloPayload> HELLO = new class_8710.class_9154<HelloPayload>(class_2960.method_60655("yikimlient", "hello"));
+    public static final class_8710.class_9154<RosterPayload> ROSTER = new class_8710.class_9154<RosterPayload>(class_2960.method_60655("yikimlient", "roster"));
 
     static final class_9139<class_9129, HelloPayload> HELLO_CODEC = class_9139.method_56431(new HelloPayload());
     static final class_9139<class_9129, RosterPayload> ROSTER_CODEC = new class_9139<class_9129, RosterPayload>() {
