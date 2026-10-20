@@ -3,7 +3,11 @@ package com.yikimlient.client;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import net.minecraft.class_11719;
 import net.minecraft.class_2561;
+import net.minecraft.class_2583;
+import net.minecraft.class_2960;
 import net.minecraft.class_310;
 
 /**
@@ -20,8 +24,11 @@ import net.minecraft.class_310;
  *    (aynı jarın mods klasöründe olması) yaydığı roster listesi — YikimNet.
  */
 public final class YikimBadge {
-    public static final String GLYPH = "\uE000 ";
+    /** Glif + boşluk ayrı bileşen: glif yalnız badge fontunda, boşluk default fontta. */
+    private static final String GLYPH = "\uE000";
+    private static final String BOSLUK = " ";
     private static final Set<UUID> KNOWN = new HashSet<UUID>();
+    private static final AtomicBoolean LOGLANMADI = new AtomicBoolean(false);
 
     private YikimBadge() {
     }
@@ -70,7 +77,16 @@ public final class YikimBadge {
             if (name == null) {
                 return null;
             }
-            return class_2561.method_43470(GLYPH).method_10852(name);
+            if (LOGLANMADI.compareAndSet(false, true)) {
+                // canlı kanıt: mixin zinciri çalışıyor mu? (sunucu bağımsız teşhis)
+                YikimClient.LOGGER.info("YIKIM rozet: glif metne ekleniyor (font: yikimlient:badge)");
+            }
+            // glif, modun KENDİ fontuyla çözümlenir — minecraft:default'u ezan
+            // başka modlardan (139 mod!) tamamen bağımsız.
+            class_2583 stil = class_2583.field_24360.method_27704(
+                new class_11719.class_11721(class_2960.method_60655("yikimlient", "badge")));
+            return class_2561.method_43470(GLYPH).method_10862(stil)
+                .method_10852(class_2561.method_43470(BOSLUK)).method_10852(name);
         }
         catch (Throwable problem) {
             return name;

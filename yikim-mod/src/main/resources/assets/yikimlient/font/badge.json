@@ -1,0 +1,11 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "yikimlient:font/badge.png",
+      "height": 16,
+      "ascent": 8,
+      "chars": ["\uE000"]
+    }
+  ]
+}
