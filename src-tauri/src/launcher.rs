@@ -874,10 +874,29 @@ fn build_jvm_args(
     // preset + instance özel argümanları (önce; sonra version arg'ları override edebilir)
     let preset = crate::modpacks::java_preset_by_id(&inst.java_preset_id)
         .unwrap_or_else(|| crate::modpacks::java_preset_by_id("balanced").unwrap());
-    for a in preset.args.iter().chain(inst.java_args_extra.iter()) {
-        let a = a.replace("{ram_mb}", &inst.ram_mb.to_string());
-        if !a.trim().is_empty() {
-            out.push(a);
+    if inst.java_preset_id == "ozel" {
+        // "Özel" (v0.3.15): launcher HİÇBİR JVM bayrağı eklemez — oyuncunun
+        // yazdığı geçer ({ram_mb} yer tutucusu RAM sürgüsünden akar).
+        if let Some(ozel) = inst.custom_vm_args.as_deref() {
+            for a in ozel.split_whitespace() {
+                let a = a.replace("{ram_mb}", &inst.ram_mb.to_string());
+                if !a.trim().is_empty() {
+                    out.push(a);
+                }
+            }
+        }
+        for a in inst.java_args_extra.iter() {
+            let a = a.replace("{ram_mb}", &inst.ram_mb.to_string());
+            if !a.trim().is_empty() {
+                out.push(a);
+            }
+        }
+    } else {
+        for a in preset.args.iter().chain(inst.java_args_extra.iter()) {
+            let a = a.replace("{ram_mb}", &inst.ram_mb.to_string());
+            if !a.trim().is_empty() {
+                out.push(a);
+            }
         }
     }
 

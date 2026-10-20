@@ -89,6 +89,7 @@ pub fn run() {
             commands::cmd_install_pack_files,
             commands::cmd_set_instance_java_preset,
             commands::cmd_set_instance_ram,
+            commands::cmd_set_instance_custom,
             commands::cmd_get_app_dir,
             commands::cmd_list_news,
             commands::cmd_list_yikim_news,

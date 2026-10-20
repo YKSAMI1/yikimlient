@@ -277,6 +277,9 @@
 .mod-row .ms { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 
 .java-grid { display: flex; flex-direction: column; gap: 14px; }
+.ozel-grid { display: grid; grid-template-columns: 220px 1fr; gap: 14px; align-items: start; }
+.ozel-grid .ozel-alan:first-child { max-width: 220px; }
+@media (max-width: 760px) { .ozel-grid { grid-template-columns: 1fr; } }
 .ram-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
 input[type="range"] { accent-color: var(--accent); cursor: pointer; }
 .preset-list { display: flex; flex-direction: column; gap: 9px; margin-top: 12px; }

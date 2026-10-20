@@ -22,6 +22,9 @@ pub struct Instance {
     pub playtime_ms: i64,
     pub source_pack: Option<String>, // modrinth/curseforge pack'ten geldiyse
     pub cover: Option<String>,       // kurulum kapak fotoğrafı (dosya yolu, opsiyonel)
+    // "Özel" preset (v0.3.15): her şeyi oyuncu ayarlar, launcher değerlere karışmaz.
+    pub view_distance: Option<u32>,     // doğrudan options.txt renderDistance (None = dokunma)
+    pub custom_vm_args: Option<String>, // boşluk/satır ile ayrılmış JVM argümanları (None = yok)
 }
 
 impl Default for Instance {
@@ -42,6 +45,8 @@ impl Default for Instance {
             playtime_ms: 0,
             source_pack: None,
             cover: None,
+            view_distance: None,
+            custom_vm_args: None,
         }
     }
 }

@@ -203,6 +203,16 @@ let parts: P[] = [];
 let raf = 0;
 let last = 0;
 let intensity = 1;
+// GPU disiplini (v0.3.15): ambiyens süsü oyunun GPU'sunu yemesin.
+//  - frameMinMs: çizim FPS tavanı (low 25 / mid 33 / high 45)
+//  - hardPaused: pencere odak kaybetti → tamamen dur (oyun açıkken sıfır GPU)
+//  - DPR tavan 1.5: retina 2x canvas dolgusunu yarıya indirir
+let frameMinMs = 33;
+let hardPaused = false;
+
+function drawDpr(): number {
+  return Math.min(window.devicePixelRatio || 1, 1.5);
+}
 
 function stopCanvas(): void {
   if (raf) cancelAnimationFrame(raf);
@@ -215,10 +225,17 @@ function stopCanvas(): void {
 function loop(t: number): void {
   raf = 0;
   if (!ctx || !canvas || !def) return;
+  // odak kaybında/gizlenen sekmede: raf sıfır kalır → resume() uyardır
+  if (hardPaused || document.hidden) return;
+  // FPS tavanı: ambiyens süs çizimi yalnızca frameMinMs'te bir (idle GPU disiplini)
+  if (t - last < frameMinMs) {
+    raf = requestAnimationFrame(loop);
+    return;
+  }
   const dt = Math.min((t - last) / 1000, 0.06);
   last = t;
   raf = requestAnimationFrame(loop);
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = drawDpr();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   const area: [number, number] = [window.innerWidth, window.innerHeight];
@@ -238,19 +255,37 @@ function loop(t: number): void {
   ctx.globalAlpha = 1;
 }
 
+function uyan(): void {
+  if (def && ctx && !raf && !document.hidden && !hardPaused) {
+    last = performance.now();
+    raf = requestAnimationFrame(loop);
+  }
+}
+
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
-  } else if (def && !raf) {
-    last = performance.now();
-    raf = requestAnimationFrame(loop);
+  } else {
+    uyan();
   }
+});
+
+// Pencere odak kaybetti → TAM DURAKLAMA. Oyun açıkken (launcher odakta değil)
+// GPU sıfıra düşer — ambiyens süsünün arkada parçacık yakması yok.
+window.addEventListener("blur", () => {
+  hardPaused = true;
+  if (raf) cancelAnimationFrame(raf);
+  raf = 0;
+});
+window.addEventListener("focus", () => {
+  hardPaused = false;
+  uyan();
 });
 
 window.addEventListener("resize", () => {
   if (!canvas || !ctx) return;
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = drawDpr();
   canvas.width = Math.round(innerWidth * dpr);
   canvas.height = Math.round(innerHeight * dpr);
 });
@@ -265,12 +300,15 @@ export function applyFx(): void {
   const next = modeForWorld(world);
   if (!next) { stopCanvas(); return; }
 
-  const map: Record<string, number> = { low: 0.45, mid: 1, high: 1.9 };
+  const map: Record<string, number> = { low: 0.45, mid: 0.9, high: 1.6 };
   intensity = map[level] ?? 1;
+  // FPS tavanı da seviyeye göre: low=25, mid=30, high=40 (idle GPU disiplini)
+  const fpsKapa: Record<string, number> = { low: 25, mid: 30, high: 40 };
+  frameMinMs = 1000 / (fpsKapa[level] ?? 30);
 
   stopCanvas();                    // kısa yeniden tohumlama — tema rengi güvende
   def = next;
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = drawDpr();
   canvas = document.createElement("canvas");
   canvas.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:3";
   canvas.width = Math.round(innerWidth * dpr);

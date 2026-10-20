@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.9.6";
+    public static final String MOD_VERSION = "1.10.0";
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
     private static boolean readyMarked;
     private static boolean firstJoinSeen;
@@ -48,13 +48,15 @@ implements ClientModInitializer {
         YikimTheme.loadFromConfig();
         YikimTheme.sync();
         YikimKeys.register();
+        // Rozet ağı (v1.10.0): payload türleri + roster alıcı
+        YikimNet.clientInit();
         HudRenderCallback.EVENT.register(YikimHud::render);
         ClientTickEvents.END_CLIENT_TICK.register(YikimClient::tick);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             YikimLog.info("YIKIM kapan\u0131\u015f: g\u00fcnl\u00fck kuyru\u011fu bo\u015falt\u0131ld\u0131 (v1.3.1).");
             YikimLog.flushNow();
         });
-        LOGGER.info("YIKIM Client {} haz\u0131r: {} HUD \u00f6\u011fesi, mixin yok, oyun ayarlar\u0131na kendili\u011finden dokunulmaz.", (Object)MOD_VERSION, (Object)YikimWidgets.all().size());
+        LOGGER.info("YIKIM Client {} haz\u0131r: {} HUD \u00f6\u011fesi, rozet motoru etkin, oyun ayarlar\u0131na kendili\u011finden dokunulmaz.", (Object)MOD_VERSION, (Object)YikimWidgets.all().size());
     }
 
     private static void tick(class_310 client) {
@@ -74,6 +76,7 @@ implements ClientModInitializer {
         // HAFİF işlemler her tick'te (yer bellek, disk YOK):
         YikimMetrics.tick(client);   // FPS sayacı + CPS + bildirimler (1 sn'de bir gerçek iş — v1.8.2'de yanlışlıkla çıkarılmıştı, HUD 0 gösteriyordu)
         YikimAbTest.tick(client);    // A/B faz ilerlemesi (çalışmıyorken anında döner)
+        YikimNet.tick(client);       // rozet: dünya giriş/çıkış + selam (v1.10.0)
         YikimKeys.poll(client);       // tuş algılama — her tick şart
         YikimClient.markReadyWhenPossible(client);
         // KATALOG TİCK KALDIRILDI — disk yoklaması Rust tarafında zaten var (spawn_catalog_watcher)

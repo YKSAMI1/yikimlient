@@ -431,6 +431,9 @@ async function tabMods(content: HTMLElement, inst: any): Promise<void> {
 async function tabJava(content: HTMLElement, inst: any): Promise<void> {
   content.innerHTML = `<div class="spinner" style="margin:40px auto"></div>`;
   const presets: any[] = await invoke("cmd_list_java_arg_presets");
+  const ozelAcik = inst.java_preset_id === "ozel";
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const ozelCmds = inst.custom_vm_args ?? (presets.find((p) => p.id === "balanced")?.args ?? []).join("\\n");
   content.innerHTML = `
     <div class="java-grid">
       <div class="card">
@@ -455,6 +458,23 @@ async function tabJava(content: HTMLElement, inst: any): Promise<void> {
               <p>${p.description}</p>
               <details><summary>JVM bayraklarını göster</summary><pre>${p.args.join("\n").replace(/\{ram_mb\}/g, String(inst.ram_mb))}</pre></details>
             </div>`).join("")}
+        </div>
+      </div>
+      <div class="card" id="ozel-card" ${ozelAcik ? "" : 'style="opacity:0.55"'}>
+        <h3>${icon("args")} Özel${ozelAcik ? ' <span class="chip" style="margin-left:8px">aktif — launcher karışmaz</span>' : ' <span class="chip gray" style="margin-left:8px">"Özel" preset seçince aktif</span>'}</h3>
+        <div class="ozel-grid">
+          <label class="ozel-alan">
+            <span style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:6px">Chunk mesafesi (renderDistance)</span>
+            <input class="input" type="number" min="2" max="32" value="${inst.view_distance ?? 12}" id="ozel-vd" ${ozelAcik ? "" : "disabled"} />
+          </label>
+          <div class="ozel-alan">
+            <span style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:6px">JVM argümanları — boşluk veya her satıra bir bayrak; {ram_mb} = RAM sürgüsü</span>
+            <textarea class="input" id="ozel-args" rows="7" spellcheck="false" style="width:100%; resize:vertical; font-family:var(--font-mono); font-size:11.5px" ${ozelAcik ? "" : "disabled"}>${esc(ozelCmds)}</textarea>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px">
+          <button class="btn ghost sm" id="ozel-sifirla" ${ozelAcik ? "" : "disabled"}>Varsayılana dön</button>
+          <button class="btn primary sm" id="ozel-kaydet" ${ozelAcik ? "" : "disabled"}>Özel Ayarları Kaydet</button>
         </div>
       </div>
     </div>
@@ -492,6 +512,24 @@ async function tabJava(content: HTMLElement, inst: any): Promise<void> {
       });
       toast("Preset seçildi");
     });
+  });
+  // "Özel" editörı — kaydet / sıfırla
+  const ozelSave = content.querySelector("#ozel-kaydet");
+  ozelSave?.addEventListener("click", async () => {
+    const vdEl = content.querySelector("#ozel-vd") as HTMLInputElement;
+    const argsEl = content.querySelector("#ozel-args") as HTMLTextAreaElement;
+    const vdText = vdEl.value.trim();
+    const vd = vdText === "" ? null : Math.max(2, Math.min(32, parseInt(vdText) || 12));
+    const args = argsEl.value.trim();
+    await invoke("cmd_set_instance_custom", { id: inst.id, viewDistance: vd, customVmArgs: args || null });
+    inst.view_distance = vd;
+    inst.custom_vm_args = args || null;
+    toast("Özel ayarlar kaydedildi — bir sonraki açılışta geçerli");
+  });
+  const ozelReset = content.querySelector("#ozel-sifirla");
+  ozelReset?.addEventListener("click", () => {
+    const argsEl = content.querySelector("#ozel-args") as HTMLTextAreaElement;
+    argsEl.value = (presets.find((p) => p.id === "balanced")?.args ?? []).join("\n");
   });
 }
 

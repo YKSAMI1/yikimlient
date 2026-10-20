@@ -141,6 +141,13 @@ pub fn java_presets() -> Vec<JavaPreset> {
                 "-XX:+AlwaysPreTouch".into(),
             ],
         },
+        JavaPreset {
+            id: "ozel".into(),
+            name: "Özel".into(),
+            description: "Her şeyi kendin ayarla: RAM, chunk mesafesi ve JVM argümanlarını sen yazarsın — launcher değerlere karışmaz.".into(),
+            recommended_ram_mb: 4096,
+            args: vec![],
+        },
     ]
 }
 

@@ -14,6 +14,13 @@ interface RepoVersion {
 let kind = "mod";            // "mod" | "modpack" | "resourcepack" | "shader" | "world" | "datapack"
 let lastQuery = "";
 let lastResults: SearchResult[] = [];
+// sayfalama: her kaynak (Modrinth/CurseForge) kendi limiti kadar döner; offset kaynak başına
+// artar (search_all iki kaynağı birleştirip indirilme sırasına dizer)
+let pageLimit = 40;
+let pageOffset = 0;
+let lastVersion = "";
+let lastLoader = "";
+let loadingMore = false;
 
 export function renderExplore(root: HTMLElement): void {
   // nav.param iki kalıp: "kind:X" (paketler/içerik sayfalarından) veya instance id ("Mod Ekle")
@@ -130,15 +137,16 @@ async function doSearch(root: HTMLElement, query: string): Promise<void> {
   lastQuery = query;
   const grid = root.querySelector("#exp-results") as HTMLElement;
   grid.innerHTML = `<div class="spinner" style="grid-column:1/-1; margin:40px auto"></div>`;
-  const version = (root.querySelector("#exp-ver") as HTMLSelectElement).value;
+  lastVersion = (root.querySelector("#exp-ver") as HTMLSelectElement).value;
   const rawLoader = (root.querySelector("#exp-loader") as HTMLSelectElement).value;
   // içerik türlerinde (doku/shader/dünya/datapack) loader kategorisi anlamsızdır
   // ve Modrinth facet'i sonuçları boşaltır → boş geç
   const isContent = ["resourcepack", "shader", "world", "datapack"].includes(kind);
-  const loader = isContent ? "" : rawLoader;
+  lastLoader = isContent ? "" : rawLoader;
+  pageOffset = 0;
   try {
     const resp = await invoke("cmd_repos_search", {
-      query, kind, versions: version ? [version] : [], loader, offset: 0, limit: 40,
+      query, kind, versions: lastVersion ? [lastVersion] : [], loader: lastLoader, offset: 0, limit: pageLimit,
     });
     lastResults = resp.results;
     grid.innerHTML = "";
@@ -147,8 +155,52 @@ async function doSearch(root: HTMLElement, query: string): Promise<void> {
       return;
     }
     for (const r of lastResults) grid.appendChild(resultCard(r));
+    attachMoreBtn(root);
   } catch (e) {
     grid.innerHTML = `<div class="card" style="grid-column:1/-1"><p>Arama hatası: ${e}</p></div>`;
+  }
+}
+
+/// Sonuç listesinin sonuna "Daha fazla göster" koyar — sayfalama bitince kaldırır.
+function attachMoreBtn(root: HTMLElement): void {
+  const grid = root.querySelector("#exp-results") as HTMLElement;
+  const old = grid.querySelector("#exp-more");
+  if (old) old.remove();
+  if (lastResults.length < pageLimit) return; // aşırı az gelmediyse devam edilebilir
+  const btn = el(`
+    <div class="card hover exp-more-card" id="exp-more" style="grid-column:1/-1; display:flex; align-items:center; justify-content:center; gap:10px; padding:14px; cursor:pointer">
+      <span id="exp-more-label">Daha fazla göster</span>
+    </div>
+  `);
+  btn.addEventListener("click", () => loadMore(root));
+  grid.appendChild(btn);
+}
+
+async function loadMore(root: HTMLElement): Promise<void> {
+  if (loadingMore) return;
+  loadingMore = true;
+  const grid = root.querySelector("#exp-results") as HTMLElement;
+  const label = grid.querySelector("#exp-more-label");
+  if (label) label.textContent = "Yükleniyor…";
+  try {
+    const resp = await invoke("cmd_repos_search", {
+      query: lastQuery, kind, versions: lastVersion ? [lastVersion] : [], loader: lastLoader,
+      offset: pageOffset, limit: pageLimit,
+    });
+    const fresh: SearchResult[] = resp.results;
+    pageOffset += pageLimit;
+    // aynı projeyi iki kaynaktan tekrar eklemeyi önle (id tekrarları)
+    const seen = new Set(lastResults.map((r) => r.id));
+    const added: SearchResult[] = fresh.filter((r) => !seen.has(r.id));
+    grid.querySelector("#exp-more")?.remove();
+    if (!added.length) return;
+    lastResults = lastResults.concat(added);
+    for (const r of added) grid.appendChild(resultCard(r));
+    attachMoreBtn(root);
+  } catch (e) {
+    grid.innerHTML += `<div class="card" style="grid-column:1/-1"><p>Sayfa yüklenemedi: ${e}</p></div>`;
+  } finally {
+    loadingMore = false;
   }
 }
 
@@ -202,7 +254,7 @@ async function openProject(r: SearchResult): Promise<void> {
       list.innerHTML = `<p style="color:var(--text-dim)">Bu sürüm/loader için dosya bulunamadı.</p>`;
       return;
     }
-    for (const v of versions.slice(0, 12)) {
+    for (const v of versions) {
       const row = el(`
         <div class="ver-row">
           <div class="ver-info">

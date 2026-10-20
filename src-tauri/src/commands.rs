@@ -512,6 +512,22 @@ pub async fn cmd_set_instance_ram(id: String, ram_mb: u32) -> Result<Instance, S
     })
 }
 
+/// "Özel" preset (v0.3.15): oyuncu chunk mesafesi + JVM argümanlarını kendisi
+/// yazar. Launcher clamp yamaz — yazılan geçer (boş değer = alanı kapat).
+#[tauri::command]
+pub async fn cmd_set_instance_custom(
+    id: String,
+    view_distance: Option<u32>,
+    custom_vm_args: Option<String>,
+) -> Result<Instance, String> {
+    instances::update(&id, |i| {
+        i.view_distance = view_distance;
+        i.custom_vm_args = custom_vm_args
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+    })
+}
+
 // ---------- preset & standart modlar ----------
 
 #[tauri::command]
@@ -1555,7 +1571,12 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
 
     // Ayar profili: her açılışta yeniden zorlanır (dil TR, sınırsız FPS, VSync kapalı,
     // ölçek 2, erişilebilirlik sarsıntıları kapalı) — başlangıç ekranı atlanır.
-    crate::game_options::ensure_profile(&inst.dir());
+    // "Özel" preset: oyuncunun seçtiği chunk mesafesi de burada zorlanır (v0.3.15).
+    let mut profil_ekstra: Vec<(&str, String)> = Vec::new();
+    if let Some(vd) = inst.view_distance {
+        profil_ekstra.push(("renderDistance", vd.to_string()));
+    }
+    crate::game_options::ensure_profile_with(&inst.dir(), &profil_ekstra);
     // Sunucu listesi: YIKIMDARA (yikimdara.com.tr) her kurulumda hazır dursun.
     crate::server_list::ensure_default(&inst.dir());
 

@@ -27,6 +27,20 @@ pub const FORCED_OPTIONS: &[(&str, &str)] = &[
 /// Dosya yoksa oluşturulur; varsa yalnızca listedeki anahtarlar güncellenir.
 /// Hata oyunu ASLA engellemez — yalnızca loglanır.
 pub fn ensure_profile(game_dir: &Path) {
+    ensure_profile_with(game_dir, &[]);
+}
+
+/// `extra`: bu açılışa özgü ek zorlamalar — örn. "Özel" preset'in
+/// renderDistance değeri. (FORCED_OPTIONS listesinde yok, instance'ta istenmiş.)
+pub fn ensure_profile_with(game_dir: &Path, extra: &[(&str, String)]) {
+    let plan = FORCED_OPTIONS
+        .iter()
+        .map(|(k, v)| (*k, v.to_string()))
+        .chain(extra.iter().map(|(k, v)| (*k, v.clone())));
+    write_plan(game_dir, plan.collect())
+}
+
+fn write_plan(game_dir: &Path, plan: Vec<(&str, String)>) {
     let path = game_dir.join("options.txt");
     let existing = std::fs::read_to_string(&path).unwrap_or_default();
     let mut lines: Vec<String> = existing
@@ -34,17 +48,17 @@ pub fn ensure_profile(game_dir: &Path) {
         .map(str::to_string)
         .collect();
     let mut changed = 0usize;
-    for (key, value) in FORCED_OPTIONS {
+    for (key, value) in plan {
         // DİL TEK SEFERLİK (v0.3.1): options.txt'de zaten bir lang satırı varsa
         // (oyuncu oyun içinden dil değiştirmiş olabilir) ASLA üstüne yazma —
         // sadece oyunun ilk açılışında (satır hiç yoksa) Türkçe yazılır.
-        if *key == "lang" && existing.lines().any(|l| l.split(':').next().map(str::trim) == Some("lang")) {
+        if key == "lang" && existing.lines().any(|l| l.split(':').next().map(str::trim) == Some("lang")) {
             continue;
         }
         let wanted = format!("{key}:{value}");
         let mut found = false;
         for line in lines.iter_mut() {
-            if line.split(':').next().map(str::trim) == Some(*key) {
+            if line.split(':').next().map(str::trim) == Some(key) {
                 found = true;
                 if *line != wanted {
                     *line = wanted.clone();

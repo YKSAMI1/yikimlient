@@ -1,0 +1,15 @@
+{
+    "required":  false,
+    "minVersion":  "0.8",
+    "package":  "com.yikimlient.client.mixin",
+    "compatibilityLevel":  "JAVA_21",
+    "refmap":  null,
+    "mixins":  [],
+    "client":  [
+                   "PlayerBadgeMixin",
+                   "TabBadgeMixin"
+               ],
+    "injectors":  {
+                      "defaultRequire":  0
+                  }
+}
