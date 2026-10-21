@@ -34,16 +34,58 @@ struct ManifestEntry {
 /// Turuncu zemin üzerinde beyaz Y (marka diline uygun, temadan bağımsız).
 pub const YIKIM_ICON_DATA_URI: &str = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%23ff7a18'/><text x='12' y='16.5' font-family='Segoe UI,system-ui,sans-serif' font-size='13.5' font-weight='700' fill='white' text-anchor='middle'>Y</text></svg>";
 
-/// Gömülü mods dizinini bul. Kurulu pakette tauri `resources` önekini korur
-/// (`<exe>/resources/mods`), geliştirmede cargo manifest dizini geçerlidir.
+/// Gömülü mods dizinini bul. Yerleşim platforma göre değişir:
+///  - NSIS:     <exe>\resources\mods
+///  - AppImage: $APPDIR(/usr)?/resources/mods
+///  - deb:      /usr/lib/<paket>/resources/mods (tauri resource_dir)
+/// Bu yüzden aday köklerde (resource_dir, $APPDIR, exe dizini) "mods/manifest.json"
+/// arayan sınırlı derinlikte bir arama yapılır — hiçbir yerleşime körü körüne
+/// bağlı kalmadan bulunur (Linux'ta "mod güncellenmiyor" şikayetinin panzehiri).
 fn embedded_mods_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
-    let mut candidates: Vec<PathBuf> = Vec::new();
+    let mut kokler: Vec<PathBuf> = Vec::new();
     if let Ok(rd) = app.path().resource_dir() {
-        candidates.push(rd.join("resources").join("mods"));
-        candidates.push(rd.join("mods"));
+        kokler.push(rd);
     }
-    candidates.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources").join("mods"));
-    candidates.into_iter().find(|d| d.join("manifest.json").is_file())
+    if let Ok(ad) = std::env::var("APPDIR") {
+        kokler.push(PathBuf::from(&ad));
+        kokler.push(PathBuf::from(ad).join("usr"));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(ebeveyn) = exe.parent() {
+            kokler.push(ebeveyn.to_path_buf());
+            kokler.push(ebeveyn.join("resources"));
+        }
+    }
+    // geliştirme (cargo dev) yedeği — derleme anı yolu
+    kokler.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources"));
+    for kok in &kokler {
+        if let Some(bulunan) = mods_dir_ara(kok, 0) {
+            return Some(bulunan);
+        }
+    }
+    None
+}
+
+/// `dir` altında (derinlik <= 5) `mods/manifest.json` içeren dizini arar.
+fn mods_dir_ara(dir: &Path, derinlik: u8) -> Option<PathBuf> {
+    if derinlik > 5 {
+        return None;
+    }
+    let mods = dir.join("mods");
+    if mods.join("manifest.json").is_file() {
+        return Some(mods);
+    }
+    if let Ok(rd) = dir.read_dir() {
+        for girdi in rd.filter_map(|e| e.ok()) {
+            let yol = girdi.path();
+            if yol.is_dir() {
+                if let Some(bulunan) = mods_dir_ara(&yol, derinlik + 1) {
+                    return Some(bulunan);
+                }
+            }
+        }
+    }
+    None
 }
 
 fn load_manifest(dir: &Path) -> Option<Vec<ManifestEntry>> {
