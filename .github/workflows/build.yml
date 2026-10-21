@@ -12,41 +12,11 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install deps
-        run: npm ci
-
-      - name: Build Windows
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'YIKIMLient ${{ github.ref_name }}'
-          releaseBody: 'See assets below to download.'
-          releaseDraft: false
-          prerelease: false
-          args: --bundles nsis
-
+  # NOT: Windows paketi YEREL makinede imzalı anahtarla derlenir ve release'e
+  # CI bittikten sonra yüklenir. CI'in Windows derlemesi BURADAN KALDIRILDI:
+  # tauri-action CI'de farklı/private olmayan bir imza anahtarıyla exe üretip
+  # bizim imzalı exe'nin üstüne yazıyordu → updater "signature verification
+  # failed" hatası veriyordu (v0.3.18 olayı).
   build-linux:
     runs-on: ubuntu-22.04
     steps:
