@@ -41,7 +41,7 @@ public final class YikimBadge {
         Set<UUID> fresh = new HashSet<UUID>();
         parsePairs(json, fresh);
         synchronized (KNOWN) {
-            KNOWN.clear();
+            // BİRLEŞTİR: el sıkışmadan öğrenilenler roster gelince kaybolmasın
             KNOWN.addAll(fresh);
         }
     }
@@ -69,6 +69,20 @@ public final class YikimBadge {
         }
         synchronized (KNOWN) {
             return KNOWN.contains(id);
+        }
+    }
+
+    /**
+     * El sıkışmadan öğrenilen oyuncu: listede EKLE (varsa false döner).
+     * Roster'ın temizleyici olmadan BİRLEŞMESİ de buradan: hem sunucu relay'i
+     * hem görünmez selamlaşma aynı seti besler.
+     */
+    public static boolean markKnown(UUID id) {
+        if (id == null) {
+            return false;
+        }
+        synchronized (KNOWN) {
+            return KNOWN.add(id);
         }
     }
 
