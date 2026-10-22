@@ -38,6 +38,8 @@ public final class YikimConfig {
     public boolean paused;
     public boolean showDiagnostics = false;
     public boolean diagnosticsToChat = false;
+    /** Çapraz rozet (presence servisi): aynı sunucudaki YIKIMLient oyuncularını rozetle. */
+    public boolean caprazRozet = true;
     public int accent = -34280;
     public int accent2 = -49920;
     public int backdrop = -16119284;

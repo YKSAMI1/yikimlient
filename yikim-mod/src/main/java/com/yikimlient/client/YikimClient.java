@@ -28,7 +28,6 @@ import com.yikimlient.client.YikimWidgets;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.class_310;
 import net.minecraft.class_442;
@@ -38,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.10.4";
+    public static final String MOD_VERSION = "1.10.5";
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
     private static boolean readyMarked;
     private static boolean firstJoinSeen;
@@ -49,22 +48,15 @@ implements ClientModInitializer {
         YikimTheme.loadFromConfig();
         YikimTheme.sync();
         YikimKeys.register();
-        // Rozet ağı (v1.10.1): payload türleri + roster alıcı.
+        // Çapraz rozet (v1.10.5): Lunar tarzı PRESENCE servisi.
+        // Sohbet kanalı el sıkışması KALDIRILDI (kutu karakterler + spam + kick).
+        // Presence HTTPS ile çalışır; sohbete hiç dokunmaz, kick imkânsız.
         // Çifte emniyet: kurulum başarısız olsa da oyun MUTLAKA açılacak.
         try {
             YikimNet.clientInit();
         }
         catch (Throwable harmless) {
             LOGGER.warn("YIKIM rozet agi kurulamadi (oyun devam eder): {}", harmless.toString());
-        }
-        // Görünmez el sıkışma (v1.10.4): vanilla sunucularda bile çapraz rozet.
-        // ALLOW_CHAT paketi yakalar + kendi ekranından gizler; her koşulda güvenli.
-        try {
-            ClientReceiveMessageEvents.ALLOW_CHAT.register(
-                (mesaj, imzali, gonderen, tip, an) -> YikimHandshake.allowVeYakala(mesaj, gonderen));
-        }
-        catch (Throwable harmless) {
-            LOGGER.warn("YIKIM el sikisma event'i kurulamadi (oyun devam eder): {}", harmless.toString());
         }
         HudRenderCallback.EVENT.register(YikimHud::render);
         ClientTickEvents.END_CLIENT_TICK.register(YikimClient::tick);
@@ -94,7 +86,7 @@ implements ClientModInitializer {
         YikimAbTest.tick(client);    // A/B faz ilerlemesi (çalışmıyorken anında döner)
         try {
             YikimNet.tick(client);   // rozet: dünya giriş/çıkış + selam (v1.10.1)
-            YikimHandshake.tick(client); // görünmez selamlaşma (v1.10.4)
+            YikimPresence.tick(client); // çapraz rozet: presence servisi (v1.10.5)
         }
         catch (Throwable ignored) {
             // tick'te asla patlamayalım
