@@ -97,6 +97,32 @@ pub fn write_theme_json(inst: &crate::instances::Instance, cfg: &crate::config::
     if let Err(e) = std::fs::write(dir.join("theme.json"), json) {
         yikim_log(format!("theme.json yazılamadı: {e}"));
     }
+    write_presence_url(inst, cfg);
+}
+
+/// Presence uç noktasını modun okuduğu `.yikim/presence-url.txt`'e yaz.
+/// Config'te presence_url boşsa dosya SİLİNİR → mod varsayılana döner.
+pub fn write_presence_url(inst: &crate::instances::Instance, cfg: &crate::config::YikimConfig) {
+    let dir = state_dir(inst);
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let yol = dir.join("presence-url.txt");
+    let url = cfg
+        .presence_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|u| u.starts_with("http://") || u.starts_with("https://"));
+    match url {
+        Some(u) => {
+            if let Err(e) = std::fs::write(&yol, format!("{u}\n")) {
+                yikim_log(format!("presence-url.txt yazılamadı: {e}"));
+            }
+        }
+        None => {
+            let _ = std::fs::remove_file(&yol);
+        }
+    }
 }
 
 /// restart-request.json'ı oku (yoksa None). Okunduktan SONRA çağıran silmelidir.

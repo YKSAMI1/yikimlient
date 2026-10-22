@@ -41,6 +41,9 @@ pub struct YikimConfig {
     /// Java 21+ isteyen sürümlerde Mojang runtime'ı yerine bu kullanılır).
     /// İndirme başarısızsa otomatik Mojang java-runtime'a düşer.
     pub use_java25: bool,
+    /// Çapraz rozet presence uç noktası (boşsa mod varsayılanını kullanır).
+    /// VDS sahipleri kendi sunucusunu buraya yazar: http://VDS_IP:8787/presence
+    pub presence_url: Option<String>,
 }
 
 impl Default for YikimConfig {
@@ -67,6 +70,7 @@ impl Default for YikimConfig {
             java_dir: None,
             download_concurrency: 8,
             use_java25: true,
+            presence_url: None,
         }
     }
 }

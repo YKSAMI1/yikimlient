@@ -27,7 +27,7 @@ import net.minecraft.class_642;
  * oyunun hiçbir akışı etkilenmez. YikimConfig.caprazRozet ile kapatılabilir.
  */
 public final class YikimPresence {
-    private static final String UCAK = "https://yikimdara.com.tr/yikim-api/presence.php";
+    private static final String VARSAYILAN_UCAK = "https://yikimdara.com.tr/yikim-api/presence.php";
     private static final long PERIYOT = 30000L;
     private static final long HATA_SESSIZLIGI = 600000L;
 
@@ -115,8 +115,7 @@ public final class YikimPresence {
         try {
             if (System.currentTimeMillis() - sonHata < HATA_SESSIZLIGI) {
                 return; // uç nokta bilinen şekilde ölü — sessiz kal
-            }
-            class_310 mc = class_310.method_1551();
+            }            class_310 mc = class_310.method_1551();
             if (mc == null || mc.field_1724 == null) {
                 return;
             }
@@ -126,7 +125,7 @@ public final class YikimPresence {
             String govde = "{\"v\":1,\"s\":\"" + kac(adres) + "\",\"u\":\"" + uuid
                 + "\",\"n\":\"" + kac(isim) + "\"}";
             byte[] bayt = govde.getBytes(StandardCharsets.UTF_8);
-            HttpURLConnection bag = (HttpURLConnection) new URL(UCAK).openConnection();
+            HttpURLConnection bag = (HttpURLConnection) new URL(ucak()).openConnection();
             bag.setConnectTimeout(5000);
             bag.setReadTimeout(5000);
             bag.setRequestMethod("POST");
@@ -182,5 +181,23 @@ public final class YikimPresence {
 
     private static String kac(String ham) {
         return ham.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", " ");
+    }
+
+    /// Uç nokta: launcher yazarsa `.yikim/presence-url.txt` kazanır; yoksa varsayılan.
+    /// (VDS sahipleri kendi sunucusunu böyle işaret eder — kod değişikliği gerekmez.)
+    private static String ucak() {
+        try {
+            java.nio.file.Path dosya = YikimBridge.stateDir().resolve("presence-url.txt");
+            if (java.nio.file.Files.exists(dosya)) {
+                String url = java.nio.file.Files.readString(dosya, StandardCharsets.UTF_8).trim();
+                if (url.startsWith("http://") || url.startsWith("https://")) {
+                    return url;
+                }
+            }
+        }
+        catch (Throwable ignored) {
+            // okunamazsa varsayılana düş
+        }
+        return VARSAYILAN_UCAK;
     }
 }
