@@ -141,6 +141,44 @@ public final class YikimAtolye {
         return null;
     }
 
+    // ---------------------------------------------------------------- yetki
+
+    /**
+     * Atölye yetki düzeyi (launcher yazar, mod okur — `.yikim/yetki.json`):
+     * 2 = admin (Microsoft hesaplı yönetici) · 1 = izinli oyuncu · 0 = yok.
+     * Dosya yoksa/okunamazsa 0 — atölye açılmaz.
+     */
+    public static int yetkiDuzeyi() {
+        try {
+            Path dosya = YikimBridge.stateDir().resolve("yetki.json");
+            if (!Files.exists(dosya)) {
+                return 0;
+            }
+            String json = Files.readString(dosya, StandardCharsets.UTF_8);
+            int i = json.indexOf("\"duzey\"");
+            if (i < 0) {
+                return 0;
+            }
+            int ikiNokta = json.indexOf(':', i);
+            if (ikiNokta < 0) {
+                return 0;
+            }
+            StringBuilder sayi = new StringBuilder();
+            for (int k = ikiNokta + 1; k < json.length(); k++) {
+                char c = json.charAt(k);
+                if (c >= '0' && c <= '9') {
+                    sayi.append(c);
+                } else if (sayi.length() > 0) {
+                    break;
+                }
+            }
+            return sayi.length() == 0 ? 0 : Integer.parseInt(sayi.toString());
+        }
+        catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
     // ---------------------------------------------------------------- sunucu
 
     /// Arka plan: sunucuya kendi çizimini yükle (png=null → sunucudan sil).

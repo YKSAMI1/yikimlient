@@ -125,6 +125,38 @@ pub fn write_presence_url(inst: &crate::instances::Instance, cfg: &crate::config
     }
 }
 
+/// Piksel Atölyesi yetkisini modun okuduğu `.yikim/yetki.json`'a yaz.
+///
+/// Düzeyler:
+///   2 = admin  (atolye_admin listesinde + MICROSOFT hesap — güvenli kanal)
+///   1 = izinli (atolye_izinli listesinde — her hesap türü olabilir)
+///   0 = yok    (menü açılamaz)
+///
+/// Yalnız launcher yazar; mod sadece okur. Offline hesap asla admin olamaz.
+pub fn write_atolye_yetki(
+    inst: &crate::instances::Instance,
+    cfg: &crate::config::YikimConfig,
+    hesap_isim: &str,
+    hesap_tur: &str,
+) {
+    let dir = state_dir(inst);
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let yol = dir.join("yetki.json");
+    let microsoft = hesap_tur == "microsoft";
+    let admin = microsoft && cfg.atolye_admin.iter().any(|a| a.eq_ignore_ascii_case(hesap_isim));
+    let izinli = cfg.atolye_izinli.iter().any(|a| a.eq_ignore_ascii_case(hesap_isim));
+    let duzey = if admin { 2 } else if izinli { 1 } else { 0 };
+    let json = format!(
+        "{{\"duzey\": {}, \"isim\": {:?}, \"hesap\": {:?}}}\n",
+        duzey, hesap_isim, hesap_tur
+    );
+    if let Err(e) = std::fs::write(&yol, json) {
+        yikim_log(format!("yetki.json yazılamadı: {e}"));
+    }
+}
+
 /// restart-request.json'ı oku (yoksa None). Okunduktan SONRA çağıran silmelidir.
 pub fn read_restart_request(inst: &crate::instances::Instance) -> Option<RestartRequest> {
     let path = restart_request_path(inst);

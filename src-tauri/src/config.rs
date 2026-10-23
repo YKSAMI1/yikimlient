@@ -44,6 +44,11 @@ pub struct YikimConfig {
     /// Çapraz rozet presence uç noktası (boşsa mod varsayılanını kullanır).
     /// VDS sahipleri kendi sunucusunu buraya yazar: http://VDS_IP:8787/presence
     pub presence_url: Option<String>,
+    /// Piksel Atölyesi YÖNETİCİLERİ (yalnızca Microsoft hesap).
+    /// Varsayılan: ["YKSAMI1"] — admin her şeyi yapar.
+    pub atolye_admin: Vec<String>,
+    /// Atölyeyi kullanmasına izin verilen oyuncular (her hesap türü olabilir).
+    pub atolye_izinli: Vec<String>,
 }
 
 impl Default for YikimConfig {
@@ -71,6 +76,8 @@ impl Default for YikimConfig {
             download_concurrency: 8,
             use_java25: true,
             presence_url: None,
+            atolye_admin: vec!["YKSAMI1".into()],
+            atolye_izinli: vec![],
         }
     }
 }

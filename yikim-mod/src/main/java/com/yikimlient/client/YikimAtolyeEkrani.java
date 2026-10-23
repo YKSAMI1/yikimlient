@@ -44,16 +44,15 @@ public final class YikimAtolyeEkrani extends class_437 {
     }
 
     @Override
-    public void method_25419() {
+    public void method_25394(class_332 graphics, int mouseX, int mouseY, float delta) {
+        class_327 font = this.field_22793;
+        // düzen HER karede hesaplanır — init zamanlamasına bağımlı değil
+        // (1.21.2+'da init'te genişlik henüz 0 olabiliyordu → butonlar üst üste
+        // biniyordu; v1.11.1 düzeltmesi)
         this.izgaraX = (this.field_22789 - YikimAtolye.BOY * HUCRE) / 2;
         this.izgaraY = 44;
         this.kaydetX = this.izgaraX;
         this.sifirlaX = this.izgaraX + 92;
-    }
-
-    @Override
-    public void method_25394(class_332 graphics, int mouseX, int mouseY, float delta) {
-        class_327 font = this.field_22793;
         // perde
         graphics.method_25294(0, 0, this.field_22789, this.field_22790, 0xA0101014);
         YikimAdapter.text(graphics, font, "Piksel At\u00f6lyesi — rozetin nametag'te herkeste g\u00f6r\u00fcn\u00fcr",

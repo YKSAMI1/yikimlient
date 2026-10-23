@@ -1568,6 +1568,8 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
 
     // Köprü: tema + kurulum kimliğini modla paylaş (mod .yikim/theme.json'u okur)
     crate::curtain::write_theme_json(&inst, &cfg);
+    // Atölye yetkisi: hesap adı + türü launcher'da bilinir → mod güvenle okur
+    crate::curtain::write_atolye_yetki(&inst, &cfg, &account.name, &account.kind);
 
     // Ayar profili: her açılışta yeniden zorlanır (dil TR, sınırsız FPS, VSync kapalı,
     // ölçek 2, erişilebilirlik sarsıntıları kapalı) — başlangıç ekranı atlanır.

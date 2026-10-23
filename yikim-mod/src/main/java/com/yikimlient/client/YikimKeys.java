@@ -56,7 +56,11 @@ public final class YikimKeys {
             YikimPresets.cycle(client);
         }
         while (atolye.method_1436()) {
-            client.method_1507(new YikimAtolyeEkrani());
+            if (YikimAtolye.yetkiDuzeyi() > 0) {
+                client.method_1507(new YikimAtolyeEkrani());
+            } else {
+                YikimMetrics.notify("Piksel At\u00f6lyesi: yetkin yok (y\u00f6netici izni gerekir)");
+            }
         }
         YikimKeys.tickZoom(client);
     }
