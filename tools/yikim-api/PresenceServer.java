@@ -41,6 +41,9 @@ public class PresenceServer {
     /// sunucu adresi → (uuid → oyuncu bilgisi)
     private static final Map<String, Map<String, Oyuncu>> KAYIT = new ConcurrentHashMap<>();
 
+    /// özel rozetler: uuid → base64 png (8x8); TTL yok — çizim kalıcıdır
+    private static final Map<String, String> ROZETLER = new ConcurrentHashMap<>();
+
     private static final class Oyuncu {
         final String isim;
         volatile long zaman;
@@ -80,8 +83,24 @@ public class PresenceServer {
             String sunucu = alan(govde, "s");
             String uuid = alan(govde, "u");
             String isim = alan(govde, "n");
-            if (sunucu == null || uuid == null || !uuidGuvenli(uuid)) {
+            String png = alan(govde, "png");
+            if (uuid == null || !uuidGuvenli(uuid)) {
                 cevap(degis, 400, "{\"p\":[]}");
+                return;
+            }
+
+            // --- rozet işlemi: png/sil alanı varsa güncelle (sunucu bilgisi şart değil) ---
+            if (png != null) {
+                if (png.length() <= 4096) {
+                    ROZETLER.put(uuid, png);
+                }
+            } else if (govde.contains("\"sil\"")) {
+                ROZETLER.remove(uuid);
+            }
+
+            // --- sadece rozet isteği (presence yoksa) burada biter ---
+            if (sunucu == null) {
+                cevap(degis, 200, "{\"p\":[],\"b\":" + rozetlerYaz(uuid) + "}");
                 return;
             }
             if (isim == null || isim.isEmpty()) isim = "oyuncu";
@@ -115,7 +134,7 @@ public class PresenceServer {
                 ilk = false;
                 json.append('"').append(e.getKey()).append('"');
             }
-            json.append("]}");
+            json.append("],\"b\":").append(rozetlerYaz(uuid)).append('}');
             cevap(degis, 200, json.toString());
         }
         catch (Throwable problem) {
@@ -139,6 +158,19 @@ public class PresenceServer {
         if (t2 < 0) return null;
         String deger = govde.substring(t1 + 1, t2).trim();
         return deger.isEmpty() ? null : deger;
+    }
+
+    /// İstek sahibi hariç, aynı sunucudaki oyuncuların özel rozetleri ({"uuid":"png"}).
+    private static String rozetlerYaz(String istekSahibi) {
+        StringBuilder json = new StringBuilder("{");
+        boolean ilk = true;
+        for (Map.Entry<String, String> e : ROZETLER.entrySet()) {
+            if (e.getKey().equals(istekSahibi)) continue;
+            if (!ilk) json.append(',');
+            ilk = false;
+            json.append('"').append(e.getKey()).append("\":\"").append(e.getValue()).append('"');
+        }
+        return json.append('}').toString();
     }
 
     private static boolean uuidGuvenli(String uuid) {

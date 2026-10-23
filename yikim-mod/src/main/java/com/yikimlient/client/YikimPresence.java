@@ -149,9 +149,11 @@ public final class YikimPresence {
                 }
             }
             bag.disconnect();
+            String metin = yanit.toString();
+            // başkalarının özel rozetleri ("b" alanı) → atölye kataloğuna
+            YikimAtolye.uzaklariIsle(metin);
             int yeni = 0;
             int i = 0;
-            String metin = yanit.toString();
             while ((i = metin.indexOf('"', i)) >= 0) {
                 int son = metin.indexOf('"', i + 1);
                 if (son < 0) {

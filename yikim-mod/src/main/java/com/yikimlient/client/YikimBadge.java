@@ -86,6 +86,17 @@ public final class YikimBadge {
         }
     }
 
+    /** Metin zaten rozetli mi (idempotence — çift ön ek imkânsız). */
+    public static boolean kapsar(class_2561 ad) {
+        try {
+            return ad != null && !ad.getString().isEmpty()
+                && ad.getString().charAt(0) == VARSAYILAN_GLIF;
+        }
+        catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     public static class_2561 tag(class_2561 name) {
         return tag(name, VARSAYILAN_GLIF);
     }

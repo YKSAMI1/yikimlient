@@ -24,6 +24,7 @@ public final class YikimKeys {
     public static class_304 hud;
     public static class_304 profile;
     public static class_304 zoom;
+    public static class_304 atolye;
     private static int fovBeforeZoom;
 
     private YikimKeys() {
@@ -34,6 +35,7 @@ public final class YikimKeys {
         hud = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.hud", 345));
         profile = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.profile", 346));
         zoom = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.zoom", 342));
+        atolye = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.atolye", 79));
     }
 
     public static void poll(class_310 client) {
@@ -52,6 +54,9 @@ public final class YikimKeys {
         }
         while (profile.method_1436()) {
             YikimPresets.cycle(client);
+        }
+        while (atolye.method_1436()) {
+            client.method_1507(new YikimAtolyeEkrani());
         }
         YikimKeys.tickZoom(client);
     }
