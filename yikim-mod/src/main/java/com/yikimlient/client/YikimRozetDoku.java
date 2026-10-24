@@ -8,15 +8,15 @@ import net.minecraft.class_2960;
 import net.minecraft.class_310;
 
 /**
- * ROZET DOKUSU (v1.11.4) — \uE000 glifinin GPU İÇERİĞİNİ günceller.
+ * ROZET DOKUSU (v1.11.5) — \uE000 glifinin GPU içeriğini günceller.
  *
- * 1.21.11 font atlası sayfa id şeması: <font_id>/<sayfa> → `yikimlient:badge/0`.
- * `yikimlient:badge` fontunun atlasında SADECE rozet glifi var.
+ * Ölçüm (v1.11.4 kullanıcı testi): sheet şeffaf kanvas + çizim (0,0)'da.
+ * TAB'da SADECE çizimin sağ 2 sütunu göründü → glif penceresi sheet'i
+ * x ≡ 6 (mod 8) noktasından okuyor (sprite sheet'te (6,0)'a paketlenmiş).
  *
- * Ders (v1.11.3 log'u): sayfa dokusu 1024x1024 olabiliyor; 8x8 tam-yazma
- * reddediliyor. Çözüm: bulunan dokunun GERÇEK boyutunu sorgula, aynı boyutta
- * şeffaf kanvas aç, çizimi (0,0)'a damgala, tam yaz. Boyut log'a yazılır —
- * (0,0) hücresi tek-glift atlasında glifin kendisidir.
+ * Çözüm: sheet'in bütününe P(x,y) = art[(x-6) mod 8][y mod 8] damgalanır.
+ * Glif penceresi (6..13) okuduğunda düz 'art' çıkar; sprite hangi turda
+ * dönerse dönsün periyodik doku doğru okur. Sıfırla VARSAYILAN_Y çizer.
  */
 public final class YikimRozetDoku {
     private static final class_2960[] ADAYLAR = new class_2960[]{
@@ -24,8 +24,14 @@ public final class YikimRozetDoku {
         class_2960.method_60655("yikimlient", "badge/1"),
         class_2960.method_60655("yikimlient", "badge/2")
     };
+    /** glif penceresinin sheet'teki sütun ofseti (ölçüm: 6) */
+    private static final int ROLL_X = 6;
     private static boolean yaziLoglandi;
     private static boolean yokLoglandi;
+    private static int[] kanvasArt;
+    private static class_1011 kanvas;
+    private static int kanvasGenislik;
+    private static int kanvasYukseklik;
 
     /// Standart Y + şimşek — Sıfırla bunu geri getirir.
     public static final int[] VARSAYILAN_Y = {
@@ -43,7 +49,7 @@ public final class YikimRozetDoku {
     }
 
     /// 64 ARGB pikseli glif dokusuna bas (render thread'e taşınır; hata loglanır).
-    public static void uygula(int[] pikseller) {
+    public static synchronized void uygula(int[] pikseller) {
         try {
             if (pikseller == null || pikseller.length < 64) {
                 return;
@@ -60,7 +66,6 @@ public final class YikimRozetDoku {
             if (mc == null) {
                 return;
             }
-            // atlas sayfasını bul (yikimlient:badge/0 .. /2)
             class_1044 doku = null;
             class_2960 bulunanId = null;
             for (class_2960 aday : ADAYLAR) {
@@ -78,26 +83,35 @@ public final class YikimRozetDoku {
                 }
                 return;
             }
-            // GERÇEK boyutu sorgula (atlas sayfası 256 ya da 1024 olabilir)
             int genislik = doku.method_68004().getWidth(0);
             int yukseklik = doku.method_68004().getHeight(0);
-            if (genislik <= 0 || yukseklik <= 0 || genislik > 4096 || yukseklik > 4096) {
-                YikimClient.LOGGER.warn("YIKIM rozet dokusu boyutu sapis: {}x{}", genislik, yukseklik);
-                return;
+            if (genislik <= 0 || yukseklik <= 0 || genislik > 4096 || yukseklik > 4096
+                || genislik != kanvasGenislik || yukseklik != kanvasYukseklik) {
+                kanvas = null; // boyut değişti → canvas yeniden
             }
-            // aynı boyutta şeffaf kanvas + sol üst köşeye damga
-            class_1011 resim = new class_1011(genislik, yukseklik, true);
-            for (int y = 0; y < YikimAtolye.BOY; y++) {
-                for (int x = 0; x < YikimAtolye.BOY; x++) {
-                    resim.method_4305(x, y, abgr(pikseller[y * YikimAtolye.BOY + x]));
+            if (kanvas == null) {
+                kanvasArt = null;
+                kanvas = new class_1011(genislik, yukseklik, true);
+                kanvasGenislik = genislik;
+                kanvasYukseklik = yukseklik;
+            }
+            if (kanvasArt == null || !java.util.Arrays.equals(kanvasArt, pikseller)) {
+                // canvas'ı roll-düzeltilmiş çizimle doldur (period 8 karo)
+                for (int y = 0; y < yukseklik; y++) {
+                    int satir = (y % 8) * 8;
+                    for (int x = 0; x < genislik; x++) {
+                        int sutun = ((x - ROLL_X) % 8 + 8) % 8;
+                        kanvas.method_4305(x, y, abgr(pikseller[satir + sutun]));
+                    }
                 }
+                kanvasArt = pikseller.clone();
             }
             GpuDevice aygit = RenderSystem.getDevice();
-            aygit.createCommandEncoder().writeToTexture(doku.method_68004(), resim);
+            aygit.createCommandEncoder().writeToTexture(doku.method_68004(), kanvas);
             if (!yaziLoglandi) {
                 yaziLoglandi = true;
-                YikimClient.LOGGER.info("YIKIM rozet dokusu yazildi: {} ({}x{}) — cizim glifte aktif",
-                    bulunanId, genislik, yukseklik);
+                YikimClient.LOGGER.info("YIKIM rozet dokusu yazildi: {} ({}x{}, roll {}) — cizim glifte aktif",
+                    bulunanId, genislik, yukseklik, ROLL_X);
             }
         }
         catch (Throwable problem) {

@@ -178,6 +178,16 @@ public final class YikimAtolyeEkrani extends class_437 {
     }
 
     @Override
+    public boolean method_25404(net.minecraft.class_11908 tus) {
+        // Esc: daima oyuna dön (Kaydet'e basmadan çıkış artık ÇALIŞIYOR)
+        if (tus.comp_4795() == 256) {
+            class_310.method_1551().method_1507(null);
+            return true;
+        }
+        return super.method_25404(tus);
+    }
+
+    @Override
     public boolean method_25403(class_11909 tik, double dx, double dy) {
         double mx = tik.comp_4798();
         double my = tik.comp_4799();

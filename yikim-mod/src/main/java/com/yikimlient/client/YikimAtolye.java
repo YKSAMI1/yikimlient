@@ -134,8 +134,10 @@ public final class YikimAtolye {
         catch (Throwable ignored) {
             // yok sayılır
         }
-        for (int i = 0; i < IZGARA.length; i++) {
-            IZGARA[i] = 0;
+        // ızgarayı standart Y logoyla doldur — kullanıcı bölüm üstüne çizebilir
+        int[] varsayilan = YikimRozetDoku.VARSAYILAN_Y;
+        for (int i = 0; i < IZGARA.length && i < varsayilan.length; i++) {
+            IZGARA[i] = varsayilan[i];
         }
         YikimRozetDoku.varsayilanaDon();
         UUID ben = kendim();
