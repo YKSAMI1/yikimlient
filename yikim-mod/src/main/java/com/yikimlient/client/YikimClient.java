@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.11.5";
+    public static final String MOD_VERSION = "1.12.0";
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
     private static boolean readyMarked;
     private static boolean firstJoinSeen;
@@ -51,7 +51,7 @@ implements ClientModInitializer {
         // Kayıtlı özel rozet varsa glif dokusunu oyun açılışında devral
         YikimAtolye.yukle();
         if (YikimAtolye.dosyaVarMi()) {
-            YikimRozetDoku.uygula(YikimAtolye.izgaraKopya());
+            YikimAtolye.yukluysaUygula();
         }
         // Çapraz rozet (v1.10.5): Lunar tarzı PRESENCE servisi.
         // Sohbet kanalı el sıkışması KALDIRILDI (kutu karakterler + spam + kick).

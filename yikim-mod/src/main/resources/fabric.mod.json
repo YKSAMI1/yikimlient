@@ -1,7 +1,7 @@
 ﻿{
     "schemaVersion":  1,
     "id":  "yikimlient",
-    "version":  "1.11.5+1.21.11",
+    "version":  "1.12.0+1.21.11",
     "name":  "YIKIM Client",
     "description":  "YIKIMLient\u0027in oyun içi çekirdeği. Sağ Shift ile YIKIM paneli; çakışmayan HUD düzeni, tam ekran HUD editörü, kare hızı teşhisi, oyun içi katalog ve başlatıcı ile dosya köprüsü.",
     "authors":  [

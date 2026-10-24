@@ -17,7 +17,7 @@ import net.minecraft.class_437;
  * 1.21.2+ fare API'si kayıt tabanlıdır: method_25402(class_11909, boolean) vb.
  */
 public final class YikimAtolyeEkrani extends class_437 {
-    private static final int HUCRE = 18;
+    private static final int HUCRE = 10; // 16x16 ızgara sığmalı (v1.12)
     private static final int[] PALET = {
         0xFFFFFFFF, 0xFF212121, 0xFFFF7A18, 0xFFFFB020, 0xFFFFE066,
         0xFF9BE564, 0xFF34C759, 0xFF35D0C5, 0xFF2E9BFF, 0xFF3A50C8,

@@ -154,7 +154,7 @@ public final class YikimPresence {
             YikimAtolye.uzaklariIsle(metin);
             // kendi çizimimi her heartbeat'te yeniden bas (resource reload'a dayanıklı)
             if (YikimAtolye.dosyaVarMi()) {
-                YikimRozetDoku.uygula(YikimAtolye.izgaraKopya());
+                YikimAtolye.yukluysaUygula();
             }
             int yeni = 0;
             int i = 0;

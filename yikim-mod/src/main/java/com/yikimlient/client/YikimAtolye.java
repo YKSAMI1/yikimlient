@@ -28,7 +28,10 @@ import net.minecraft.class_310;
  * (bkz. YikimRozetCizim + PlayerBadgeMixin).
  */
 public final class YikimAtolye {
-    public static final int BOY = 8;
+    public static final int BOY = 16;
+    /// toplam piksel (BOY*BOY)
+    public static final int UZUNLUK = BOY * BOY;
+    /// toplam piksel (BOY*BOY)
     private static final String VARSAYILAN_UCAK = "http://yikimdara.com.tr:8787/presence";
     private static final int MAX_ART_BAYT = 2048;
 
@@ -58,6 +61,19 @@ public final class YikimAtolye {
         }
         catch (Throwable ignored) {
             // çizim yoksa standart Y glifi kalır
+        }
+    }
+
+    /// Çizim kayıtlıysa (rozet.png) kendi slotuna uygula — başlangıç + heartbeat.
+    public static void yukluysaUygula() {
+        if (dosyaVarMi()) {
+            try {
+                izarayiOku(YikimBridge.stateDir().resolve("rozet.png"));
+                YikimSlotlar.ata(kendim(), izgaraKopya());
+            }
+            catch (Throwable ignored) {
+                // çizim yoksa standart Y kalır
+            }
         }
     }
 
@@ -121,7 +137,7 @@ public final class YikimAtolye {
         catch (Throwable problem) {
             YikimClient.LOGGER.warn("YIKIM atolye: rozet.png yazilamadi: {}", problem.toString());
         }
-        YikimRozetDoku.uygula(izgaraKopya());
+        YikimSlotlar.ata(kendim(), izgaraKopya());
         arkaPlandaYukle(base64Png(), kendim());
         YikimClient.LOGGER.info("YIKIM atolye: ozel rozet kaydedildi ve sunucuya yukleniyor");
     }
@@ -139,10 +155,11 @@ public final class YikimAtolye {
         for (int i = 0; i < IZGARA.length && i < varsayilan.length; i++) {
             IZGARA[i] = varsayilan[i];
         }
-        YikimRozetDoku.varsayilanaDon();
+        // standart Y slot 0'da; cizim arti kullanicin slotundan silinir
         UUID ben = kendim();
         if (ben != null) {
             UZAK.remove(ben);
+            YikimSlotlar.temizAta(ben);
         }
         arkaPlandaYukle(null, ben);
     }
@@ -267,18 +284,17 @@ public final class YikimAtolye {
                 }
                 i = json.indexOf('{', d2 + 1);
             }
-            // v1: kendi çizimim yoksa ve uzak rozet varsa → ilk uzak rozeti glife bas
-            // (kişiye çoklu slot v2'de). Kendi çizimim önceliklidir.
-            if (!dosyaVarMi() && !UZAK.isEmpty()) {
-                String b64 = UZAK.values().iterator().next();
-                int[] piksel = pngdenOku(b64);
+            // HER uzak oyuncunun cizimi KENDI slotuna yazilir (v1.12 — tek
+            // glif paylasimi kalkti: birinin cizimi baskasinin rozetinde cikmaz)
+            for (java.util.Map.Entry<UUID, String> e : UZAK.entrySet()) {
+                int[] piksel = pngdenOku(e.getValue());
                 if (piksel != null) {
-                    YikimRozetDoku.uygula(piksel);
+                    YikimSlotlar.ata(e.getKey(), piksel);
                 }
             }
         }
         catch (Throwable ignored) {
-            // asla patlamayalım
+            // asla patlamayalim
         }
     }
 

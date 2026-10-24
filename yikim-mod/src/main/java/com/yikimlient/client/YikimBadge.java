@@ -98,30 +98,34 @@ public final class YikimBadge {
     }
 
     public static class_2561 tag(class_2561 name) {
-        return tag(name, VARSAYILAN_GLIF);
+        return tag(name, null);
     }
 
     /**
-     * Rozetli isim. <b>glif</b> parametresi gelecekteki "özel rozet" altyapısı
-     * için ayrıldı: kullanıcı kendi sembolünü seçtiğinde ayrı bir glif kodu
-     * (yikimlient:badge fontunun ayrı bir karakteri) buradan verilir.
-     *
-     * STİL MİRASI TUZAĞI: boş stilli kardeş bileşenler kökün stilini miras
-     * alır — kök glif (badge fontu) olduğu için isim de badge fontuyla
-     * çizilip KUTU KUTU görünüyordu (v1.10.2 hatası). Bu yüzden boşluk ve
-     * isim AÇIKÇA minecraft:default fontuna bağlanır; yalnız glif modun
-     * kendi fontuyla çözümlenir (default'u ezen modlardan bağımsız).
+     * ROCKE v1.12 — oyuncu başına AYRI glif: uuid'un slotu (YikimSlotlar)
+     * ≠ 0 ise o slotun OWN fontu (yikimlient:badge_s<k>) kullanılır; artı
+     * rakam 0 ise standart Y (yikimlient:badge) glifi çıkar. Böylece bir
+     * oyuncunun çizimi SADECE kendi rozetinde görünür.
      */
+    public static class_2561 tag(class_2561 name, java.util.UUID kim) {
+        int slot = YikimSlotlar.slotOf(kim);
+        return tag(name, '\uE000', "yikimlient", slot == 0 ? "badge" : "badge_s" + slot);
+    }
+
     public static class_2561 tag(class_2561 name, char glif) {
+        return tag(name, glif, "yikimlient", "badge");
+    }
+
+    private static class_2561 tag(class_2561 name, char glif, String fontNs, String fontYol) {
         try {
             if (name == null) {
                 return null;
             }
             if (LOGLANMADI.compareAndSet(false, true)) {
                 // canlı kanıt: mixin zinciri çalışıyor mu? (sunucu bağımsız teşhis)
-                YikimClient.LOGGER.info("YIKIM rozet: glif metne ekleniyor (font: yikimlient:badge)");
+                YikimClient.LOGGER.info("YIKIM rozet: glif metne ekleniyor (font: {}.{})", fontNs, fontYol);
             }
-            class_2583 glifStil = fontStil("yikimlient", "badge");
+            class_2583 glifStil = fontStil(fontNs, fontYol);
             class_2583 normalStil = fontStil("minecraft", "default");
             // isim, açık default stilli bir sarmalın içine konur: kendi özel
             // stili (sunucu renkli isim vb.) korunur, fontu ise garanti default.

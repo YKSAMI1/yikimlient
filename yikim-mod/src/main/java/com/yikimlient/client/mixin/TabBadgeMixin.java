@@ -25,7 +25,7 @@ public abstract class TabBadgeMixin {
                 return;
             }
             if (YikimBadge.isKnown(profile.id())) {
-                cir.setReturnValue(YikimBadge.tag(cir.getReturnValue()));
+                cir.setReturnValue(YikimBadge.tag(cir.getReturnValue(), profile.id()));
             }
         }
         catch (Throwable ignored) {

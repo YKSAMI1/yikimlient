@@ -52,7 +52,7 @@ public abstract class PlayerBadgeMixin {
             class_310 mc = class_310.method_1551();
             if (mc.field_1724 == e || YikimBadge.isKnown(e.method_5667())) {
                 kanitla();
-                cir.setReturnValue(YikimBadge.tag(cir.getReturnValue()));
+                cir.setReturnValue(YikimBadge.tag(cir.getReturnValue(), e.method_5667()));
             }
         }
         catch (Throwable ignored) {
@@ -74,7 +74,7 @@ public abstract class PlayerBadgeMixin {
                 class_2561 base = st.field_53337 != null ? st.field_53337 : e.method_5797();
                 if (base != null && !YikimBadge.kapsar(base)) {
                     kanitla();
-                    st.field_53337 = YikimBadge.tag(base);
+                    st.field_53337 = YikimBadge.tag(base, e.method_5667());
                     if (st.field_53338 == null) {
                         st.field_53338 = new class_243(0.0, (double) e.method_5751() + 0.5, 0.0);
                     }
@@ -83,7 +83,7 @@ public abstract class PlayerBadgeMixin {
             else if (st.field_53337 != null && YikimBadge.isKnown(e.method_5667())
                     && !YikimBadge.kapsar(st.field_53337)) {
                 kanitla();
-                st.field_53337 = YikimBadge.tag(st.field_53337);
+                st.field_53337 = YikimBadge.tag(st.field_53337, e.method_5667());
             }
         }
         catch (Throwable ignored) {
