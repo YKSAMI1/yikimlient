@@ -19,7 +19,17 @@ import net.minecraft.class_310;
  * Render thread şartı: başka thread'den çağrılırsa client.execute ile taşınır.
  */
 public final class YikimRozetDoku {
-    private static final class_2960 ID = class_2960.method_60655("yikimlient", "font/badge.png");
+    /// 1.21.11 font atlası sayfa id şeması: <font_id>/<sayfa> (recipe: "/§").
+    /// `yikimlient:badge` fontunun atlasında SADECE rozet glifi var → sayfanın
+    /// tamamını güvenle yazabiliriz. Sayfa, glif ilk render'da talep edilince
+    /// oluşur; o ana kadar doku kayıtlı olmayabilir → bulunamazsa sessiz geç,
+    /// presence tick'i 30 sn'de bir yeniden dener.
+    private static final class_2960[] ADAYLAR = new class_2960[]{
+        class_2960.method_60655("yikimlient", "badge/0"),
+        class_2960.method_60655("yikimlient", "badge/1"),
+        class_2960.method_60655("yikimlient", "badge/2")
+    };
+    private static boolean bulunduLoglandi;
 
     /// Standart Y + şimşek (badge.png'nin piksel haritası) — Sıfırla bunu geri getirir.
     public static final int[] VARSAYILAN_Y = {
@@ -54,9 +64,25 @@ public final class YikimRozetDoku {
             if (mc == null) {
                 return;
             }
-            class_1044 doku = mc.method_1531().method_4619(ID);
+            // atlas sayfasını bul (yikimlient:badge/0 .. /2)
+            class_1044 doku = null;
+            for (class_2960 aday : ADAYLAR) {
+                class_1044 adayDoku = mc.method_1531().method_4619(aday);
+                if (adayDoku != null) {
+                    doku = adayDoku;
+                    if (!bulunduLoglandi) {
+                        bulunduLoglandi = true;
+                        YikimClient.LOGGER.info("YIKIM rozet dokusu atlasta bulundu: {}", aday);
+                    }
+                    break;
+                }
+            }
             if (doku == null) {
-                return; // font hâlâ yüklenmemiş — sessiz geç
+                if (!bulunduLoglandi) {
+                    bulunduLoglandi = true;
+                    YikimClient.LOGGER.info("YIKIM rozet atlasi henuz yok — ilk rozet render'indan sonra uygulanacak");
+                }
+                return;
             }
             class_1011 resim = new class_1011(YikimAtolye.BOY, YikimAtolye.BOY, false);
             for (int y = 0; y < YikimAtolye.BOY; y++) {

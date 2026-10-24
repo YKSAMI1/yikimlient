@@ -152,6 +152,10 @@ public final class YikimPresence {
             String metin = yanit.toString();
             // başkalarının özel rozetleri ("b" alanı) → atölye kataloğuna
             YikimAtolye.uzaklariIsle(metin);
+            // kendi çizimimi her heartbeat'te yeniden bas (resource reload'a dayanıklı)
+            if (YikimAtolye.dosyaVarMi()) {
+                YikimRozetDoku.uygula(YikimAtolye.izgaraKopya());
+            }
             int yeni = 0;
             int i = 0;
             while ((i = metin.indexOf('"', i)) >= 0) {
