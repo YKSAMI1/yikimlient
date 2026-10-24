@@ -150,11 +150,10 @@ public final class YikimAtolye {
         catch (Throwable ignored) {
             // yok sayılır
         }
-        // ızgarayı standart Y logoyla doldur — kullanıcı bölüm üstüne çizebilir
-        int[] varsayilan = YikimRozetDoku.VARSAYILAN_Y;
-        for (int i = 0; i < IZGARA.length && i < varsayilan.length; i++) {
-            IZGARA[i] = varsayilan[i];
-        }
+        // ızgarayı 16×16 standart Y logoyla doldur (v1.12.1: 2×2 büyütülmüş
+        // tam kanvas — eski 64-int basımı yarım kalmış "iki Y" hatasıydı)
+        int[] varsayilan = YikimRozetDoku.varsayilanBuyuk();
+        System.arraycopy(varsayilan, 0, IZGARA, 0, Math.min(IZGARA.length, varsayilan.length));
         // standart Y slot 0'da; cizim arti kullanicin slotundan silinir
         UUID ben = kendim();
         if (ben != null) {

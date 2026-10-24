@@ -7,7 +7,9 @@
     "mixins":  [],
     "client":  [
                    "PlayerBadgeMixin",
-                   "TabBadgeMixin"
+                   "TabBadgeMixin",
+                   "YikimFontStokMixin",
+                   "YikimFontCtxSahasi"
                ],
     "injectors":  {
                       "defaultRequire":  0

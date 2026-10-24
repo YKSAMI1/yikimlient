@@ -86,11 +86,23 @@ public final class YikimPresence {
 
     private static synchronized void durdur() {
         calisiyor = false;
+        Thread eski = isParcacigi;
         isParcacigi = null;
+        if (eski != null) {
+            // ZOMBİ DÜZELTMESİ (v1.12.1): bayrak yeterli DEĞİL — baslat() bayrağı
+            // anında geri true yapabildiğinden eski thread uyanınca bayrağı
+            // "canlı" sanıp 30 sn'de bir POST atmaya devam ediyordu; her gir-çık
+            // +1 sızıntı thread demekti (sürekli ağ trafiği / ping düşüşü).
+            // Artık thread KENDİNE özel kimlikle çalışır: eski thread'in
+            // isParcacigi referansı yeni thread'e geçtiği anda döngü koşulu
+            // bozulur; interrupt da uykudaki bloğu anında koparır.
+            eski.interrupt();
+        }
     }
 
     private static void dongu() {
-        while (calisiyor) {
+        Thread ben = Thread.currentThread();
+        while (calisiyor && ben == isParcacigi) {
             try {
                 String adres = aktifAdres;
                 if (!adres.isEmpty()) {
@@ -101,12 +113,12 @@ public final class YikimPresence {
                 // tur başarısız — periyot sonrası tekrar
             }
             try {
-                for (long beklenecek = 0L; calisiyor && beklenecek < PERIYOT; beklenecek += 500L) {
+                for (long beklenecek = 0L; calisiyor && ben == isParcacigi && beklenecek < PERIYOT; beklenecek += 500L) {
                     Thread.sleep(500L);
                 }
             }
             catch (InterruptedException kesildi) {
-                return;
+                return; // durdur() çağrıldı — sessizce çık (zombi yok)
             }
         }
     }
@@ -138,6 +150,7 @@ public final class YikimPresence {
             int kod = bag.getResponseCode();
             if (kod != 200) {
                 sonHata = System.currentTimeMillis();
+                bag.disconnect(); // soket sızıntısı = yarı açık bağlantı birikimi
                 return;
             }
             StringBuilder yanit = new StringBuilder(512);
