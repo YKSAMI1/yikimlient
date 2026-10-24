@@ -164,6 +164,8 @@ public final class YikimAtolyeEkrani extends class_437 {
             if (icinde(mx, my, this.kaydetX, this.kaydetY, 84, 20)) {
                 YikimAtolye.kaydet();
                 YikimMetrics.notify("Rozet kaydedildi — herkeste g\u00f6r\u00fcnecek");
+                // kaydet → ekranı kapat (oyuna dön), rozet anında glifte
+                class_310.method_1551().method_1507(null);
                 return true;
             }
             if (icinde(mx, my, this.sifirlaX, this.sifirlaY, 84, 20)) {

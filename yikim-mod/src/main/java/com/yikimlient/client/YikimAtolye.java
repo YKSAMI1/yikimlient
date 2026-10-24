@@ -89,6 +89,21 @@ public final class YikimAtolye {
         IZGARA[y * BOY + x] = argb;
     }
 
+    /// Izgaranın kopyası (doku güncellemesi için).
+    public static synchronized int[] izgaraKopya() {
+        return IZGARA.clone();
+    }
+
+    /// Kayıtlı çizim var mı (`.yikim/rozet.png`)?
+    public static boolean dosyaVarMi() {
+        try {
+            return Files.exists(YikimBridge.stateDir().resolve("rozet.png"));
+        }
+        catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     /// Kaydet: disk + sunucu. "Bir kez kaydet, hep kalsın."
     public static synchronized void kaydet() {
         try {
@@ -106,6 +121,7 @@ public final class YikimAtolye {
         catch (Throwable problem) {
             YikimClient.LOGGER.warn("YIKIM atolye: rozet.png yazilamadi: {}", problem.toString());
         }
+        YikimRozetDoku.uygula(izgaraKopya());
         arkaPlandaYukle(base64Png(), kendim());
         YikimClient.LOGGER.info("YIKIM atolye: ozel rozet kaydedildi ve sunucuya yukleniyor");
     }
@@ -121,6 +137,7 @@ public final class YikimAtolye {
         for (int i = 0; i < IZGARA.length; i++) {
             IZGARA[i] = 0;
         }
+        YikimRozetDoku.varsayilanaDon();
         UUID ben = kendim();
         if (ben != null) {
             UZAK.remove(ben);
@@ -248,9 +265,43 @@ public final class YikimAtolye {
                 }
                 i = json.indexOf('{', d2 + 1);
             }
+            // v1: kendi çizimim yoksa ve uzak rozet varsa → ilk uzak rozeti glife bas
+            // (kişiye çoklu slot v2'de). Kendi çizimim önceliklidir.
+            if (!dosyaVarMi() && !UZAK.isEmpty()) {
+                String b64 = UZAK.values().iterator().next();
+                int[] piksel = pngdenOku(b64);
+                if (piksel != null) {
+                    YikimRozetDoku.uygula(piksel);
+                }
+            }
         }
         catch (Throwable ignored) {
             // asla patlamayalım
+        }
+    }
+
+    /// base64 PNG → 8x8 ARGB dizisi (uzak rozet dokusu için); bozuksa null.
+    private static int[] pngdenOku(String base64) {
+        try {
+            byte[] bayt = Base64.getDecoder().decode(base64);
+            net.minecraft.class_1011 resim = net.minecraft.class_1011.method_49277(bayt);
+            int genislik = Math.min(resim.method_4307(), BOY);
+            int yukseklik = Math.min(resim.method_4323(), BOY);
+            int[] cikti = new int[BOY * BOY];
+            for (int y = 0; y < yukseklik; y++) {
+                for (int x = 0; x < genislik; x++) {
+                    int abgr = resim.method_61940(x, y);
+                    int a = (abgr >>> 24) & 0xFF;
+                    int m = (abgr >>> 16) & 0xFF;
+                    int ye = (abgr >>> 8) & 0xFF;
+                    int k = abgr & 0xFF;
+                    cikti[y * BOY + x] = (a << 24) | (k << 16) | (ye << 8) | m;
+                }
+            }
+            return cikti;
+        }
+        catch (Throwable problem) {
+            return null;
         }
     }
 
