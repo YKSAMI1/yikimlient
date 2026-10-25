@@ -32,7 +32,7 @@ public final class YikimAtolye {
     /// toplam piksel (BOY*BOY)
     public static final int UZUNLUK = BOY * BOY;
     /// toplam piksel (BOY*BOY)
-    private static final String VARSAYILAN_UCAK = "http://yikimdara.com.tr:8787/presence";
+    private static final String VARSAYILAN_UCAK = "https://yikim-presence.onrender.com/presence";
     private static final int MAX_ART_BAYT = 2048;
 
     /// kendi çizimin — [y * BOY + x], ARGB; alfa 0 = boş

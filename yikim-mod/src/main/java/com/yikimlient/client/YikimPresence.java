@@ -28,9 +28,9 @@ import net.minecraft.class_642;
  * oyunun hiçbir akışı etkilenmez. YikimConfig.caprazRozet ile kapatılabilir.
  */
 public final class YikimPresence {
-    private static final String VARSAYILAN_UCAK = "http://yikimdara.com.tr:8787/presence";
+    private static final String VARSAYILAN_UCAK = "https://yikim-presence.onrender.com/presence";
     private static final long PERIYOT = 30000L;
-    private static final long HATA_SESSIZLIGI = 600000L;
+    private static final long HATA_SESSIZLIGI = 120000L;
 
     private static Thread isParcacigi;
     private static volatile boolean calisiyor;
