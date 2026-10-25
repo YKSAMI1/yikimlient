@@ -190,6 +190,18 @@ public class PresenceServer {
             String uuid = alan(govde, "u");
             String isim = alan(govde, "n");
             String png = alan(govde, "png");
+
+            // --- izin listesi değişimi UUID'DEN ÖNCE işlenir (v1.12.6): admin
+            // paneli izinleri u/n OLMADAN yollar; eski sürüm bunu 400 ile
+            // kovduğu için izin kaydı HİÇ çalışmıyordu.
+            if (govde.contains("\"izinler\"")) {
+                izinleriIsle(govde);
+                if (uuid == null || !uuidGuvenli(uuid)) {
+                    cevap(degis, 200, "{\"p\":[],\"b\":{},\"izinler\":" + izinlerYaz() + "}");
+                    return;
+                }
+            }
+
             if (uuid == null || !uuidGuvenli(uuid)) {
                 cevap(degis, 400, "{\"p\":[]}");
                 return;

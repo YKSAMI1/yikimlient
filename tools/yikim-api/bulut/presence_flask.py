@@ -69,6 +69,17 @@ _yukle()
 app = Flask(__name__)
 
 
+def _izin_uygula(izin_geldi):
+    """İzin listesini uygula + izni geri alınanların çizimlerini sil."""
+    global IZINLER
+    IZINLER = [str(a).strip()[:32] for a in izin_geldi
+               if isinstance(a, str) and 0 < len(str(a).strip()) <= 32]
+    for k in list(ROZETLER.keys()):
+        if ISIMLER.get(k, k).lower() not in [i.lower() for i in IZINLER]:
+            ROZETLER.pop(k, None)
+    _kaydet()
+
+
 @app.route("/presence", methods=["GET"])
 def ping():
     return jsonify(ok=True, service="yikim-presence", p=[])
@@ -80,6 +91,13 @@ def presence():
     if not isinstance(govde, dict):
         return jsonify(p=[], b={}, izinler=IZINLER), 400
     uuid = govde.get("u")
+    # İzin listesi değişimi UUID'DEN ÖNCE (v1.12.6): admin paneli izinleri
+    # u/n OLMADAN yollar — eski sürüm 400 döndürüp kaydı yutuyordu.
+    izin_geldi = govde.get("izinler")
+    if isinstance(izin_geldi, list) and (not isinstance(uuid, str) or len(uuid) != 36 or uuid.count("-") != 4):
+        with KILIT:
+            _izin_uygula(izin_geldi)
+        return jsonify(p=[], b={}, izinler=IZINLER)
     if not isinstance(uuid, str) or len(uuid) != 36 or uuid.count("-") != 4:
         return jsonify(p=[], b={}, izinler=IZINLER), 400
     sunucu = govde.get("s")
@@ -100,14 +118,7 @@ def presence():
         # --- izin listesi değişimi (admin paneli) ---
         izin_geldi = govde.get("izinler")
         if isinstance(izin_geldi, list):
-            IZINLER = [str(a).strip()[:32] for a in izin_geldi
-                       if isinstance(a, str) and 0 < len(str(a).strip()) <= 32]
-            # İZİN GERİ ALMA TEMİZLİĞİ: yeni listede olmayan isimlerin çizimleri
-            # silinir → izni düşen oyuncu herkesin ekranında normal Y'ye döner.
-            for k in list(ROZETLER.keys()):
-                if ISIMLER.get(k, k).lower() not in [i.lower() for i in IZINLER]:
-                    ROZETLER.pop(k, None)
-            _kaydet()
+            _izin_uygula(izin_geldi)
         if isinstance(isim, str) and isim and isim != "oyuncu":
             ISIMLER[uuid] = isim
 

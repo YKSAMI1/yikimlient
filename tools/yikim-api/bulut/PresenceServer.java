@@ -44,6 +44,10 @@ public class PresenceServer {
     /// özel rozetler: uuid → base64 png (8x8); TTL yok — çizim kalıcıdır
     private static final Map<String, String> ROZETLER = new ConcurrentHashMap<>();
 
+    /// uuid → hesap adı (çizimler izinle eşleşsin diye; izin geri alınan
+    /// oyuncunun çizimi ilk kalp atışında sunucudan da silinir)
+    private static final Map<String, String> ISIMLER = new ConcurrentHashMap<>();
+
     /// çizim izinli oyuncu isimleri (admin panelden yönetilir); izinler.json'a yazılır
     private static final Map<String, Boolean> IZINLER = new ConcurrentHashMap<>();
 
@@ -92,6 +96,21 @@ public class PresenceServer {
             }
         }
         izinleriKaydet();
+        // İZİN GERİ ALMA TEMİZLİĞİ: yeni listede olmayan isimlerin çizimleri
+        // silinir → izni düşen oyuncu HERKESİN ekranında normal Y'ye döner.
+        int temizlenen = 0;
+        for (String rozetUuid : ROZETLER.keySet()) {
+            String ad = ISIMLER.get(rozetUuid);
+            if (ad == null) {
+                ad = rozetUuid; // uuid doğrudan isim olarak yazılmış olabilir
+            }
+            if (!IZINLER.containsKey(ad.toLowerCase()) && ROZETLER.remove(rozetUuid) != null) {
+                temizlenen++;
+            }
+        }
+        if (temizlenen > 0) {
+            System.out.println("[YIKIM presence] izin geri alindi: " + temizlenen + " cizim silindi");
+        }
         System.out.println("[YIKIM presence] izin listesi guncellendi: " + IZINLER.keySet());
     }
 
@@ -171,6 +190,18 @@ public class PresenceServer {
             String uuid = alan(govde, "u");
             String isim = alan(govde, "n");
             String png = alan(govde, "png");
+
+            // --- izin listesi değişimi UUID'DEN ÖNCE işlenir (v1.12.6): admin
+            // paneli izinleri u/n OLMADAN yollar; eski sürüm bunu 400 ile
+            // kovduğu için izin kaydı HİÇ çalışmıyordu.
+            if (govde.contains("\"izinler\"")) {
+                izinleriIsle(govde);
+                if (uuid == null || !uuidGuvenli(uuid)) {
+                    cevap(degis, 200, "{\"p\":[],\"b\":{},\"izinler\":" + izinlerYaz() + "}");
+                    return;
+                }
+            }
+
             if (uuid == null || !uuidGuvenli(uuid)) {
                 cevap(degis, 400, "{\"p\":[]}");
                 return;
@@ -183,6 +214,9 @@ public class PresenceServer {
                 }
             } else if (govde.contains("\"sil\"")) {
                 ROZETLER.remove(uuid);
+            }
+            if (isim != null && !isim.isEmpty()) {
+                ISIMLER.put(uuid, isim.length() > 32 ? isim.substring(0, 32) : isim);
             }
 
             // --- izin listesi değişimi (admin paneli) ---
