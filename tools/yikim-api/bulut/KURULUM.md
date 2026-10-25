@@ -1,43 +1,65 @@
 # YIKIM Presence — ÜCRETSİZ BULUT KURULUMU
 
-VDS kesintilerini bitirmek için presence sunucusunu **Hugging Face Spaces**
-(ücretsiz, kredi kartı YOK) üzerinden 7/24 çalıştır. Aynı klasördeki
-`PresenceServer.java` + `Dockerfile` + bu `README.md` yeterli.
+VDS kesintilerini bitirmek için presence sunucusunu ücretsiz bulutta çalıştır.
+**ÖNERİLEN: PythonAnywhere** — ücretsiz, kredi kartı YOK, **uykuya YATMAZ**
+(VDS'teki gibi kesinti olmaz). Alternatif: Render.com.
 
-## Hugging Face Spaces (ÖNERİLEN — kartsız ücretsiz)
+> NOT: Hugging Face Spaces'in Docker SDK'sı artık ÜCRETLİ — bu yüzden HF yolu
+> kapatıldı. Java jar'ı VDS'te çalıştırmaya devam edebilirsin ama kalıcı
+> çözüm için aşağıdaki PythonAnywhere yolunu kur (aynı protokol, aynı izinler).
 
-1. https://huggingface.co/join → ücretsiz hesap aç
-2. https://huggingface.co/new-space → isim: `yikim-presence` → **SDK: Docker** → Blank → Create
-3. Space sayfasında **Files** sekmesi → **Add file → Upload files**:
-   bu klasördeki 3 dosyayı yükle: `PresenceServer.java`, `Dockerfile`, `README.md`
-4. Yükleme bitince Space otomatik derler (~1 dk). Durum **Running** olunca hazır.
-5. Adresin: `https://KULLANICI_ADIN-yikim-presence.hf.space`
-   (Space'in sağ üstündeki ⋮ → Embed this Space → "Direct URL" kısmında yazar)
+## YOL 1: PythonAnywhere (ÖNERİLEN — hep açık, kartsız)
 
-Launcher'a adres yazma (2 yol):
-- **Oyun içi**: Yıkım menüsü → Ayarlar → Presence Adresi → `https://KULLANICI_ADIN-yikim-presence.hf.space`
-- **Elle**: `.minecraft/.yikim/presence-url.txt` dosyasına aynı adresi yaz.
+1. https://www.pythonanywhere.com/registration/register/beginner/ → ücretsiz
+   hesap aç (kart sorulmaz). Kullanıcı adın neyse adresin o olacak:
+   `https://KULLANICI.pythonanywhere.com`
+2. Üstte **Files** sekmesi → Upload → **`presence_flask.py`** dosyasını yükle
+   (bu klasörde).
+3. Üstte **Web** sekmesi → **Add a new web app** → Next →
+   **Manual configuration** → **Python 3.10** → Next.
+4. Web sekmesinde **WSGI configuration file** linkine tık → dosyanın İÇİNİ
+   tamamen sil, şunu yaz (KULLANICI yerine kendi kullanıcı adın):
+   ```python
+   import sys
+   path = '/home/KULLANICI'
+   if path not in sys.path:
+       sys.path.insert(0, path)
+   from presence_flask import application
+   ```
+5. **Save** → Web sekmesine dön → büyük yeşil **Reload** butonuna bas.
+6. Test: tarayıcıda `https://KULLANICI.pythonanywhere.com/presence` aç →
+   `{"ok":true,...}` görüyorsan hazır.
 
-Notlar:
-- HF ücretsiz Space'i ~48 saat trafik gelmezse uyar; sen oyuna girince ilk
-  kalp atışı onu uyandırır (ilk bağlanış ~1 dk gecikebilir, sonra normal).
-- İzin listesi (`izinler.json`) Space dosya alanında saklanır; Space'i
-  yeniden başlatsan da kaybolmaz (Container yeniden kurulursa boşalabilir —
-  admin panelden bir kez yeniden Kaydetmen yeterli).
-- Kesintisiz 7/24 + JSON kaybı sıfır istersen: Space → Settings → **Persistent
-  storage** yok (ücretsizde yok), bu yüzden kritik durumda aşağıdaki Render
-  alternatifine bak.
+### Launcher'a adres yazma
+- Oyun içi: Yıkım menüsü → Ayarlar → Presence Adresi:
+  `https://KULLANICI.pythonanywhere.com/presence`
+  (sonunda `/presence` OLMAK ZORUNDA — client tam bu adrese POST atar)
+- Elle: `.minecraft/.yikim/presence-url.txt` içine aynı adres.
 
-## Alternatif: Render.com (ücretsiz web service)
+### İzin paneli
+- Mod otomatik bu sunucuyu kullanır; admin paneldeki "İzin → Kaydet" listesi
+  hesabındaki `izinler.json`'a yazılır, kalıcıdır.
+- Rozet çizimleri de `rozetler.json`'a yazılır — web yeniden başlasa bile
+  çizimler KAYBOLMAZ (VDS'in tersine).
+
+### Dikkat
+- Ücretsiz hesapta 3 ayda bir siteye giriş yapman gerekir (yoksa uyur).
+- Kesintisiz 7/24 ve tek adres: tek web app yeter, ikinci app açma.
+
+## YOL 2: Render.com (alternatif — Java jar'ı aynen çalıştırır)
 
 1. https://render.com → GitHub ile gir (kart gerekmez)
-2. New → **Web Service** → "Deploy an existing image" yerine **Docker**:
-   bu klasörü bir GitHub repo'suna push et, Render'da repo'yu bağla
-3. Free instance seç (512 MB yeter) → Create
-4. Adres: `https://servis-adin.onrender.com` — launcher'a aynı şekilde yaz.
-   Not: 15 dk trafik gelmezse uyar; oyuncu girince ilk istek onu uyandırır.
+2. `tools/yikim-api/bulut/` klasörünü bir GitHub reposuna push et
+3. New → **Web Service** → repo'yu bağla → Runtime: **Docker** →
+   Instance: **Free** → Create
+4. Adres: `https://servis-adin.onrender.com/presence` → launcher'a yaz.
+- 15 dk trafik gelmezse uyur; oyuncu girince ilk kalp atışı uyandırır
+  (~30-50 sn gecikme, sonra normal).
+- İzinler container yeniden kurulunca boşalabilir (admin panelden tekrar
+  Kaydet).
 
-## Test
+## Test (her iki yolda)
 
-Tarayıcıda aç: `https://ADRES/presence` → `{"ok":true,...}` görürsen çalışıyor.
-Oyunda iki hesapla gir: TAB'da rozetler görünmeli.
+1. Tarayıcı: `ADRES/presence` → `{"ok":true,...}`
+2. Oyunda iki hesapla gir → TAB'da rozetler.
+3. Admin panelden oyuncuya izin ver → o oyuncunun O tuşu atölyeyi açmalı.
