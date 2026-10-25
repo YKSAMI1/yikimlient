@@ -1,0 +1,30 @@
+# YIKIM presence sunucusunu 7/24 UYANIK tutar (Render ücretsiz katmanı
+# 15 dk trafik gelmezse uyuyor — bu iş her 10 dakikada bir dokununca
+# servisin uykuya geçmesi imkânsız hale gelir).
+#
+# Not: "schedule" işleri GitHub'da gecikmeli koşabilir (~5-15 dk sapma
+# normal) — presence için yeterli. Repo 60 gün boyunca hiç push almazsa
+# GitHub planlı işleri durdurur; repomuz aktif olduğu sürece sorun yok.
+name: Keep Presence Awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping presence
+        run: |
+          kod=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 \
+            https://yikim-presence.onrender.com/presence)
+          echo "presence HTTP $kod"
+          if [ "$kod" = "200" ]; then
+            echo "servis uyanik"
+          else
+            echo "olari: beklenmedik yanit — bir sonraki turda tekrar denenecek"
+          fi
