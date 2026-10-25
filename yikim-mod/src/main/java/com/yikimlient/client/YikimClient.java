@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.12.3";
+    public static final String MOD_VERSION = "1.12.4";
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
     private static boolean readyMarked;
     private static boolean firstJoinSeen;
@@ -92,6 +92,14 @@ implements ClientModInitializer {
         try {
             YikimNet.tick(client);   // rozet: dünya giriş/çıkış + selam (v1.10.1)
             YikimPresence.tick(client); // çapraz rozet: presence servisi (v1.10.5)
+            // v1.12.4 KALICILIK: açılışta oyuncu henüz durmuyordu (kendim() null)
+            // → kaydedilen çizim oyuna her girişte KENDİ slotuna yeniden basılır.
+            // "Bir kez kaydet, değiştirene kadar hep görünsün" tam bu.
+            boolean oyunda = client.field_1724 != null;
+            if (oyunda && !oyundaydi) {
+                YikimAtolye.yukluysaUygula();
+            }
+            oyundaydi = oyunda;
         }
         catch (Throwable ignored) {
             // tick'te asla patlamayalım
@@ -106,6 +114,7 @@ implements ClientModInitializer {
         YikimMetrics.recordTickCost(System.nanoTime() - started);
     }
     private static long lastHeavyTick;
+    private static boolean oyundaydi;
 
     private static void installMainMenu(class_310 client) {
         if (!(client.field_1755 instanceof class_442) || !YikimConfig.get().customMainMenu) {

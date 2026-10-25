@@ -36,7 +36,9 @@ public final class YikimAtolyeEkrani extends class_437 {
     private int sifirlaX;
     private int sifirlaY;
     private int izinX;
+    private int izinlilerX;
     private int izinY;
+    private int izinlilerY;
     private boolean admin;
 
     public YikimAtolyeEkrani() {
@@ -144,6 +146,10 @@ public final class YikimAtolyeEkrani extends class_437 {
             this.izinY = butonY;
             butonCiz(graphics, font, this.izinX, butonY, 84, "İzin",
                 icinde(mouseX, mouseY, this.izinX, butonY, 84, 20), 0xFF3AA0FF);
+            this.izinlilerX = this.izinX + 92;
+            this.izinlilerY = butonY;
+            butonCiz(graphics, font, this.izinlilerX, butonY, 84, "İzinliler",
+                icinde(mouseX, mouseY, this.izinlilerX, butonY, 84, 20), 0xFF3AA0FF);
         }
         YikimAdapter.text(graphics, font, "\u00c7iz \u2192 Kaydet — kaydedince herkeste kal\u0131c\u0131 \u2022 Esc: kapat",
             this.izgaraX, butonY + 30, YikimTheme.TEXT_DIM, false);
@@ -245,6 +251,10 @@ public final class YikimAtolyeEkrani extends class_437 {
             }
             if (this.admin && icinde(mx, my, this.izinX, this.izinY, 84, 20)) {
                 class_310.method_1551().method_1507(new YikimIzinEkrani());
+                return true;
+            }
+            if (this.admin && icinde(mx, my, this.izinlilerX, this.izinlilerY, 84, 20)) {
+                class_310.method_1551().method_1507(new YikimIzinlilerEkrani());
                 return true;
             }
             if (icinde(mx, my, this.kaydetX, this.kaydetY, 84, 20)) {
