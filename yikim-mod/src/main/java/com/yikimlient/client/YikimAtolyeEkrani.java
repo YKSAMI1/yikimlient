@@ -17,7 +17,7 @@ import net.minecraft.class_437;
  * 1.21.2+ fare API'si kayıt tabanlıdır: method_25402(class_11909, boolean) vb.
  */
 public final class YikimAtolyeEkrani extends class_437 {
-    private static final int HUCRE = 10; // 16x16 ızgara sığmalı (v1.12)
+    private static final int HUCRE = 18; // 8x8 ızgara (v1.12.2 — 16x16 TAB'da çakışıyordu)
     private static final int[] PALET = {
         0xFFFFFFFF, 0xFF212121, 0xFFFF7A18, 0xFFFFB020, 0xFFFFE066,
         0xFF9BE564, 0xFF34C759, 0xFF35D0C5, 0xFF2E9BFF, 0xFF3A50C8,
@@ -27,12 +27,17 @@ public final class YikimAtolyeEkrani extends class_437 {
     private int seciliRenk = 0xFFFF7A18;
     private boolean silgi;
     private boolean boyaBasili;
+    private boolean ozelAcik;          // özel renk paneli (v1.12.2)
+    private int ozelR = 255, ozelG = 128, ozelB = 40;
     private int izgaraX;
     private int izgaraY;
     private int kaydetX;
     private int kaydetY;
     private int sifirlaX;
     private int sifirlaY;
+    private int izinX;
+    private int izinY;
+    private boolean admin;
 
     public YikimAtolyeEkrani() {
         super(class_2561.method_43470("YIKIM Piksel At\u00f6lyesi"));
@@ -93,6 +98,38 @@ public final class YikimAtolyeEkrani extends class_437 {
         graphics.method_25294(silgiX, paletY, silgiX + 18, paletY + 18, this.silgi ? 0xFF4A2A2A : 0xFF17171C);
         kareCerceve(graphics, silgiX, paletY, 18, this.silgi ? 0xFFFFFFFF : 0xFF3A3A44);
         YikimAdapter.textCentered(graphics, font, "S", silgiX + 9, paletY + 5, -15724524, false);
+        // ÖZEL renk swatch'ı (v1.12.2) — R/G/B şeritli kare, tıkla → panel aç/kapa
+        int ozelX = silgiX + 26;
+        graphics.method_25294(ozelX, paletY, ozelX + 18, paletY + 6, 0xFFFF3B3B);
+        graphics.method_25294(ozelX, paletY + 6, ozelX + 18, paletY + 12, 0xFF34C759);
+        graphics.method_25294(ozelX, paletY + 12, ozelX + 18, paletY + 18, 0xFF2E9BFF);
+        kareCerceve(graphics, ozelX, paletY, 18, this.ozelAcik ? 0xFFFFFFFF : 0xFF3A3A44);
+        this.admin = YikimAtolye.yetkiDuzeyi() >= 2;
+
+        // ÖZEL RENK PANELİ — ızgaranın sağındaki boşlukta (v1.12.2)
+        if (this.ozelAcik) {
+            int panelX = this.izgaraX + YikimAtolye.BOY * HUCRE + 16;
+            int barGenislik = 96;
+            int[] kanallar = {this.ozelR, this.ozelG, this.ozelB};
+            int[] kutu = {0xFFFF3B3B, 0xFF34C759, 0xFF2E9BFF};
+            String[] adlar = {"R", "G", "B"};
+            for (int k = 0; k < 3; k++) {
+                int by = 60 + k * 26;
+                YikimAdapter.text(graphics, font, adlar[k], panelX, by - 2, kutu[k], false);
+                int bx = panelX + 14;
+                graphics.method_25294(bx, by, bx + barGenislik, by + 8, 0xFF17171C);
+                int dolu = (int) (barGenislik * (kanallar[k] / 255.0));
+                graphics.method_25294(bx, by, bx + dolu, by + 8, kutu[k]);
+                graphics.method_25294(bx, by, bx + barGenislik, by + 1, 0xFF3A3A44);
+                graphics.method_25294(bx, by + 7, bx + barGenislik, by + 8, 0xFF3A3A44);
+                YikimAdapter.text(graphics, font, String.valueOf(kanallar[k]), bx + barGenislik + 6, by - 2, YikimTheme.TEXT_DIM, false);
+            }
+            // önizleme + uygulanmış seçim
+            int onizleme = (0xFF << 24) | (this.ozelR << 16) | (this.ozelG << 8) | this.ozelB;
+            graphics.method_25294(panelX, 140, panelX + 18, 158, onizleme);
+            kareCerceve(graphics, panelX, 140, 18, this.seciliRenk == onizleme ? 0xFFFFFFFF : 0xFF3A3A44);
+            YikimAdapter.text(graphics, font, "Seç", panelX + 24, 146, YikimTheme.TEXT, false);
+        }
 
         // butonlar
         int butonY = paletY + 34;
@@ -102,6 +139,12 @@ public final class YikimAtolyeEkrani extends class_437 {
             icinde(mouseX, mouseY, this.kaydetX, butonY, 84, 20), YikimTheme.accent);
         butonCiz(graphics, font, this.sifirlaX, butonY, 84, "S\u0131f\u0131rla",
             icinde(mouseX, mouseY, this.sifirlaX, butonY, 84, 20), YikimTheme.WARN);
+        if (this.admin) {
+            this.izinX = this.sifirlaX + 92;
+            this.izinY = butonY;
+            butonCiz(graphics, font, this.izinX, butonY, 84, "İzin",
+                icinde(mouseX, mouseY, this.izinX, butonY, 84, 20), 0xFF3AA0FF);
+        }
         YikimAdapter.text(graphics, font, "\u00c7iz \u2192 Kaydet — kaydedince herkeste kal\u0131c\u0131 \u2022 Esc: kapat",
             this.izgaraX, butonY + 30, YikimTheme.TEXT_DIM, false);
     }
@@ -159,6 +202,49 @@ public final class YikimAtolyeEkrani extends class_437 {
             int silgiX = this.izgaraX + PALET.length * 20 + 8;
             if (icinde(mx, my, silgiX, paletY, 18, 18)) {
                 this.silgi = true;
+                return true;
+            }
+            // ÖZEL renk swatch'ı (silgiX + 26) — panel aç/kapa
+            if (icinde(mx, my, silgiX + 26, paletY, 18, 18)) {
+                this.ozelAcik = !this.ozelAcik;
+                if (this.ozelAcik) {
+                    this.silgi = false;
+                    this.seciliRenk = (0xFF << 24) | (this.ozelR << 16) | (this.ozelG << 8) | this.ozelB;
+                }
+                return true;
+            }
+            // ÖZEL panel bar tıkları (ızgaranın sağı)
+            if (this.ozelAcik) {
+                int panelX = this.izgaraX + YikimAtolye.BOY * HUCRE + 16;
+                int barGenislik = 96;
+                if (icinde(mx, my, panelX, 140, 18, 18)) {
+                    // önizlemeye tıkla → fırça rengi yap
+                    this.seciliRenk = (0xFF << 24) | (this.ozelR << 16) | (this.ozelG << 8) | this.ozelB;
+                    this.silgi = false;
+                    return true;
+                }
+                if (mx >= panelX + 14 && mx < panelX + 14 + barGenislik) {
+                    int deger = (int) Math.max(0, Math.min(255,
+                        ((mx - (panelX + 14)) / (double) barGenislik) * 255.0));
+                    if (my >= 58 && my < 70) {
+                        this.ozelR = deger;
+                    }
+                    else if (my >= 84 && my < 96) {
+                        this.ozelG = deger;
+                    }
+                    else if (my >= 110 && my < 122) {
+                        this.ozelB = deger;
+                    }
+                    else {
+                        return super.method_25402(tik, cift);
+                    }
+                    this.seciliRenk = (0xFF << 24) | (this.ozelR << 16) | (this.ozelG << 8) | this.ozelB;
+                    this.silgi = false;
+                    return true;
+                }
+            }
+            if (this.admin && icinde(mx, my, this.izinX, this.izinY, 84, 20)) {
+                class_310.method_1551().method_1507(new YikimIzinEkrani());
                 return true;
             }
             if (icinde(mx, my, this.kaydetX, this.kaydetY, 84, 20)) {

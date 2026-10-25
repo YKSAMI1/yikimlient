@@ -56,7 +56,11 @@ public final class YikimKeys {
             YikimPresets.cycle(client);
         }
         while (atolye.method_1436()) {
-            if (YikimAtolye.yetkiDuzeyi() > 0) {
+            boolean izinli = YikimAtolye.yetkiDuzeyi() > 0
+                || (client.field_1724 != null
+                    && YikimPresence.izinlimi(client.field_1724.method_5797() != null
+                        ? client.field_1724.method_5797().getString() : null));
+            if (izinli) {
                 client.method_1507(new YikimAtolyeEkrani());
             } else {
                 YikimMetrics.notify("Piksel At\u00f6lyesi: yetkin yok (y\u00f6netici izni gerekir)");

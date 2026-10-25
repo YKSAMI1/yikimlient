@@ -27,11 +27,14 @@ import net.minecraft.class_8538;
  */
 public final class YikimGlifFabrika {
     public static final int GLIF_KODU = 0xE000;
-    public static final int BOY = 16;
-    private static final float ADVANS = 17.0f;
+    public static final int BOY = 8;
+    /// ESKİ Y BADGE'ININ VANILLA GEOMETRİSİYLE BİREBİR (0.3.32): bitmap provider
+    /// 8×8/ascent-7 png için (0, 8, 0, 8) float'larını üretiyordu — aynı değerler
+    /// aynı yerleşimi verir (TAB'da çakışmasız, nametag'te metin hizasında).
+    private static final float ADVANS = 8.0f;
     private static final float QUAD_SOL = 0.0f;
-    private static final float QUAD_SAG = 16.0f;
-    private static final float QUAD_UST = -8.0f;
+    private static final float QUAD_SAG = 8.0f;
+    private static final float QUAD_UST = 0.0f;
     private static final float QUAD_ALT = 8.0f;
 
     private static final IcSaglayici[] SAGLAYICILAR = new IcSaglayici[YikimSlotlar.SLOT_SONU + 1];

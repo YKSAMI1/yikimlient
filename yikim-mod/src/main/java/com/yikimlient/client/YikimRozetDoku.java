@@ -40,16 +40,8 @@ public final class YikimRozetDoku {
         0,          0,          0xFFFFFFFF, 0,          0,          0,          0,          0
     };
 
-    /// 16×16 standart Y (2×2 piksel-art büyütme) — Sıfırla düzeltmesi (v1.12.1):
-    /// eski kod 64 int'i 256'lık ızgaraya basıyordu → "yarımı olmayan iki Y".
+    /// Standart Y (8×8 — kanvas artık 8×8 olduğu için birebir).
     public static int[] varsayilanBuyuk() {
-        int[] buyuk = new int[YikimAtolye.UZUNLUK];
-        for (int y = 0; y < YikimAtolye.BOY; y++) {
-            for (int x = 0; x < YikimAtolye.BOY; x++) {
-                buyuk[y * YikimAtolye.BOY + x] =
-                    VARSAYILAN_Y[(y / 2) * 8 + (x / 2)];
-            }
-        }
-        return buyuk;
+        return VARSAYILAN_Y.clone();
     }
 }

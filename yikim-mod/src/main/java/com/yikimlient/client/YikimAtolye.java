@@ -28,7 +28,7 @@ import net.minecraft.class_310;
  * (bkz. YikimRozetCizim + PlayerBadgeMixin).
  */
 public final class YikimAtolye {
-    public static final int BOY = 16;
+    public static final int BOY = 8;
     /// toplam piksel (BOY*BOY)
     public static final int UZUNLUK = BOY * BOY;
     /// toplam piksel (BOY*BOY)
@@ -83,10 +83,13 @@ public final class YikimAtolye {
         if (resim == null) {
             return;
         }
+        // boyut farklıysa (ör. eski 16×16 denemesi) OKUMA — bozuk yarım görüntü olmasın
+        if (resim.getWidth() != BOY || resim.getHeight() != BOY) {
+            return;
+        }
         for (int y = 0; y < BOY; y++) {
             for (int x = 0; x < BOY; x++) {
-                int px = x < resim.getWidth() && y < resim.getHeight() ? resim.getRGB(x, y) : 0;
-                IZGARA[y * BOY + x] = px;
+                IZGARA[y * BOY + x] = resim.getRGB(x, y);
             }
         }
     }

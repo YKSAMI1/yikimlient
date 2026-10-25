@@ -44,6 +44,9 @@ public class PresenceServer {
     /// özel rozetler: uuid → base64 png (8x8); TTL yok — çizim kalıcıdır
     private static final Map<String, String> ROZETLER = new ConcurrentHashMap<>();
 
+    /// çizim izinli oyuncu isimleri (admin panelden yönetilir); izinler.json'a yazılır
+    private static final Map<String, Boolean> IZINLER = new ConcurrentHashMap<>();
+
     private static final class Oyuncu {
         final String isim;
         volatile long zaman;
@@ -54,13 +57,97 @@ public class PresenceServer {
         int port = 8787;
         if (args.length > 0) {
             try { port = Integer.parseInt(args[0].trim()); } catch (NumberFormatException yok) { /* varsayılan */ }
+        } else {
+            // bulut (HF Spaces/Render/Docker) PORT ortam değişkenini dayatır
+            String ortam = System.getenv("PORT");
+            if (ortam != null) {
+                try { port = Integer.parseInt(ortam.trim()); } catch (NumberFormatException yok) { /* varsayılan */ }
+            }
         }
+        izinleriYukle();
         HttpServer sunucu = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
         sunucu.createContext("/presence", PresenceServer::isle);
         sunucu.setExecutor(Executors.newFixedThreadPool(2));
         sunucu.start();
         System.out.println("[YIKIM presence] calisiyor: http://0.0.0.0:" + port + "/presence");
         System.out.println("[YIKIM presence] launcher config'ine su adresi yaz: http://VDS_IP:" + port + "/presence");
+    }
+
+    // ---------------------------------------------------------------- izinler
+
+    /// İstek gövdesindeki "izinler":[...] dizisini işle (tam liste değişimi).
+    private static void izinleriIsle(String govde) {
+        if (!govde.contains("\"izinler\"")) {
+            return;
+        }
+        List<String> adlar = dizi(govde, "izinler");
+        if (adlar == null) {
+            return;
+        }
+        IZINLER.clear();
+        for (String ad : adlar) {
+            String temiz = ad.trim();
+            if (temiz.length() > 1 && temiz.length() <= 32) {
+                IZINLER.put(temiz, Boolean.TRUE);
+            }
+        }
+        izinleriKaydet();
+        System.out.println("[YIKIM presence] izin listesi guncellendi: " + IZINLER.keySet());
+    }
+
+    private static String izinlerYaz() {
+        StringBuilder json = new StringBuilder("[");
+        boolean ilk = true;
+        for (String ad : IZINLER.keySet()) {
+            if (!ilk) json.append(',');
+            ilk = false;
+            json.append('"').append(ad.replace("\"", "")).append('"');
+        }
+        return json.append(']').toString();
+    }
+
+    private static void izinleriKaydet() {
+        try {
+            java.nio.file.Files.write(java.nio.file.Path.of("izinler.json"),
+                izinlerYaz().getBytes(StandardCharsets.UTF_8));
+        } catch (Throwable yoksay) { /* salt-okunur dosya sisteminde sessiz kal */ }
+    }
+
+    private static void izinleriYukle() {
+        try {
+            java.nio.file.Path yol = java.nio.file.Path.of("izinler.json");
+            if (java.nio.file.Files.exists(yol)) {
+                String json = new String(java.nio.file.Files.readAllBytes(yol), StandardCharsets.UTF_8);
+                List<String> adlar = dizi(json, "izinler");
+                if (adlar != null) {
+                    for (String ad : adlar) {
+                        if (ad.trim().length() > 1) {
+                            IZINLER.put(ad.trim(), Boolean.TRUE);
+                        }
+                    }
+                }
+            }
+        } catch (Throwable yoksay) { /* yok say */ }
+    }
+
+    /// "ad":["a","b"] dizisini kütüphanesiz çıkar (izinler alanı dizidir).
+    private static List<String> dizi(String govde, String ad) {
+        int i = govde.indexOf("\"" + ad + "\"");
+        if (i < 0) return null;
+        int sol = govde.indexOf('[', i);
+        int sag = govde.indexOf(']', sol);
+        if (sol < 0 || sag < 0 || sag <= sol) return null;
+        List<String> parcalar = new ArrayList<>();
+        int j = sol;
+        while (true) {
+            int t1 = govde.indexOf('"', j + 1);
+            if (t1 < 0 || t1 > sag) break;
+            int t2 = govde.indexOf('"', t1 + 1);
+            if (t2 < 0 || t2 > sag) break;
+            parcalar.add(govde.substring(t1 + 1, t2));
+            j = t2;
+        }
+        return parcalar;
     }
 
     private static void isle(HttpExchange degis) throws IOException {
@@ -98,9 +185,13 @@ public class PresenceServer {
                 ROZETLER.remove(uuid);
             }
 
+            // --- izin listesi değişimi (admin paneli) ---
+            izinleriIsle(govde);
+
             // --- sadece rozet isteği (presence yoksa) burada biter ---
             if (sunucu == null) {
-                cevap(degis, 200, "{\"p\":[],\"b\":" + rozetlerYaz(uuid) + "}");
+                cevap(degis, 200, "{\"p\":[],\"b\":" + rozetlerYaz(uuid)
+                    + ",\"izinler\":" + izinlerYaz() + "}");
                 return;
             }
             if (isim == null || isim.isEmpty()) isim = "oyuncu";
@@ -134,7 +225,8 @@ public class PresenceServer {
                 ilk = false;
                 json.append('"').append(e.getKey()).append('"');
             }
-            json.append("],\"b\":").append(rozetlerYaz(uuid)).append('}');
+            json.append("],\"b\":").append(rozetlerYaz(uuid))
+                .append(",\"izinler\":").append(izinlerYaz()).append('}');
             cevap(degis, 200, json.toString());
         }
         catch (Throwable problem) {

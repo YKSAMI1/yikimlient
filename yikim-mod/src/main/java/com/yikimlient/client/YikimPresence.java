@@ -35,6 +35,8 @@ public final class YikimPresence {
     private static volatile boolean calisiyor;
     private static volatile String aktifAdres = "";
     private static volatile long sonHata;
+    private static volatile java.util.List<String> izinListesi = java.util.List.of();
+    private static volatile long izinGonderimZamani;
 
     private YikimPresence() {
     }
@@ -165,6 +167,8 @@ public final class YikimPresence {
             String metin = yanit.toString();
             // başkalarının özel rozetleri ("b" alanı) → atölye kataloğuna
             YikimAtolye.uzaklariIsle(metin);
+            // çizim izin listesi (admin panel + atölye kapısı için)
+            izinListesi = izinleriOku(metin);
             // kendi çizimimi her heartbeat'te yeniden bas (resource reload'a dayanıklı)
             if (YikimAtolye.dosyaVarMi()) {
                 YikimAtolye.yukluysaUygula();
@@ -200,6 +204,114 @@ public final class YikimPresence {
 
     private static String kac(String ham) {
         return ham.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", " ");
+    }
+
+    // ---------------------------------------------------------------- izinler
+
+    /// Sunucudan gelen izinli isim listesi (atölye kapısı + admin panel başlangıcı).
+    public static java.util.List<String> izinler() {
+        return izinListesi;
+    }
+
+    /// Bu isim çizim izinli mi? (kıyassız karşılaştırma)
+    public static boolean izinlimi(String isim) {
+        if (isim == null) {
+            return false;
+        }
+        for (String ad : izinListesi) {
+            if (isim.equalsIgnoreCase(ad)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Admin paneli: izin listesini sunucuya yaz (arka plan POST, yanıt yeni liste).
+    public static void izinKaydet(java.util.List<String> adlar) {
+        if (adlar == null || System.currentTimeMillis() - izinGonderimZamani < 1000L) {
+            return; // 1 sn throttle — çift tık koruması
+        }
+        izinGonderimZamani = System.currentTimeMillis();
+        StringBuilder govde = new StringBuilder("{\"izinler\":[");
+        for (int i = 0; i < adlar.size(); i++) {
+            if (i > 0) {
+                govde.append(',');
+            }
+            govde.append('"').append(kac(adlar.get(i))).append('"');
+        }
+        govde.append("]}");
+        byte[] bayt = govde.toString().getBytes(StandardCharsets.UTF_8);
+        String ucakAdres = ucak();
+        Thread t = new Thread(() -> {
+            try {
+                HttpURLConnection bag = (HttpURLConnection) new URL(ucakAdres).openConnection();
+                bag.setConnectTimeout(5000);
+                bag.setReadTimeout(5000);
+                bag.setRequestMethod("POST");
+                bag.setDoOutput(true);
+                bag.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                bag.setFixedLengthStreamingMode(bayt.length);
+                try (OutputStream cikis = bag.getOutputStream()) {
+                    cikis.write(bayt);
+                }
+                int kod = bag.getResponseCode();
+                if (kod != 200) {
+                    bag.disconnect();
+                    return;
+                }
+                StringBuilder yanit = new StringBuilder(256);
+                try (InputStream giris = bag.getInputStream()) {
+                    byte[] tampon = new byte[1024];
+                    int okunan;
+                    while ((okunan = giris.read(tampon)) > 0) {
+                        yanit.append(new String(tampon, 0, okunan, StandardCharsets.UTF_8));
+                    }
+                }
+                bag.disconnect();
+                java.util.List<String> yeni = izinleriOku(yanit.toString());
+                if (yeni != null) {
+                    izinListesi = yeni;
+                }
+            }
+            catch (Throwable ignored) {
+                // sunucu yoksa liste yerelde kalır
+            }
+        }, "YIKIM-izin");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /// Yanıttaki "izinler":["ad", ...] dizisini kütüphanesiz çıkar.
+    private static java.util.List<String> izinleriOku(String metin) {
+        try {
+            int i = metin.indexOf("\"izinler\"");
+            if (i < 0) {
+                return null;
+            }
+            int sol = metin.indexOf('[', i);
+            int sag = sol >= 0 ? metin.indexOf(']', sol) : -1;
+            if (sol < 0 || sag < 0) {
+                return null;
+            }
+            java.util.List<String> adlar = new java.util.ArrayList<>();
+            int j = sol;
+            while (true) {
+                int t1 = metin.indexOf('"', j + 1);
+                if (t1 < 0 || t1 > sag) {
+                    break;
+                }
+                int t2 = metin.indexOf('"', t1 + 1);
+                if (t2 < 0 || t2 > sag) {
+                    break;
+                }
+                adlar.add(metin.substring(t1 + 1, t2));
+                j = t2;
+            }
+            return adlar;
+        }
+        catch (Throwable problem) {
+            return null;
+        }
     }
 
     /// Uç nokta: launcher yazarsa `.yikim/presence-url.txt` kazanır; yoksa varsayılan.
