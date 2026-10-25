@@ -34,6 +34,11 @@ public final class YikimGlifFabrika {
     /// 8×8/ascent-7 png için (0, 8, 0, 8) float'larını üretiyordu — aynı değerler
     /// aynı yerleşimi verir (TAB'da çakışmasız, nametag'te metin hizasında).
     private static final float ADVANS = 8.0f;
+    /// v1.12.6 KESKINLIK: UV'yi piksel MERKEZINE yapıştırır (8×8 → 0.0625,
+    /// 0.9375). Eski (0.001, 0.999) aralığı her ekran pikselinin ikiser
+    /// texel karışımı örneklemesine yol açıyordu → "fotoğraf gibi / blurlu".
+    /// Merkez-snap ile hangi filtre modunda olursa olsun birebir keskin.
+    private static final float UV_MERKEZ = 0.5f / BOY;
     private static final float QUAD_SOL = 0.0f;
     private static final float QUAD_SAG = 8.0f;
     private static final float QUAD_UST = 0.0f;
@@ -121,7 +126,7 @@ public final class YikimGlifFabrika {
                 class_379.method_73329(ADVANS),
                 class_8538.method_51643(glifId(slot)),
                 doku.method_71659(),
-                0.001f, 0.999f, 0.001f, 0.999f,
+                UV_MERKEZ, 1.0f - UV_MERKEZ, UV_MERKEZ, 1.0f - UV_MERKEZ,
                 QUAD_SOL, QUAD_SAG, QUAD_UST, QUAD_ALT);
             PISINMIS[slot] = glif;
         }
