@@ -78,8 +78,20 @@ $latest = @{
 [System.IO.File]::WriteAllText("$nsis\latest.json", $latest, (New-Object System.Text.UTF8Encoding($false)))
 gh release upload "v$V" "$nsis\latest.json" --clobber 2>&1 | Select-Object -First 1
 
-Write-Host "[7/7] dogrulama"
-$u = Invoke-RestMethod "https://github.com/YKSAMI1/yikimlient/releases/latest/download/latest.json"
-Write-Host "surum: $($u.version)"
+Write-Host "[7/7] dogrulama (API tabanli - CDN cache tuzaigi atlanir)"
+$dogru = $false
+foreach ($deneme in 1..3) {
+  Start-Sleep -Seconds 5
+  $rel = gh api "repos/YKSAMI1/yikimlient/releases/tags/v$V" | ConvertFrom-Json
+  $a = $rel.assets | Where-Object { $_.name -eq 'latest.json' }
+  $icerik = gh api "repos/YKSAMI1/yikimlient/releases/assets/$($a.id)" --header 'Accept: application/octet-stream'
+  $u = $icerik | ConvertFrom-Json
+  $plat = $u.platforms.PSObject.Properties.Name
+  Write-Host "surum: $($u.version)  platforms: $($plat -join ', ')"
+  if ($plat -contains 'windows-x86_64' -and $plat -contains 'linux-x86_64') { $dogru = $true; break }
+  Write-Host "windows eksik - CI dosyasi ustune yazmis, birlesigi yeniden yukluyorum"
+  gh release upload "v$V" "$nsis\latest.json" --clobber 2>&1 | Select-Object -First 1
+}
 foreach ($p in $u.platforms.PSObject.Properties.Name) { Write-Host "$p imza uzunluk: $($u.platforms.$p.signature.Length)" }
-Write-Host "asset: $((gh api repos/YKSAMI1/yikimlient/releases/tags/v$V --jq '.assets | length'))"
+Write-Host "asset: $($rel.assets.Count)"
+if (-not $dogru) { Write-Host "DUZELTILEMEDIM - elle bak"; exit 1 }
