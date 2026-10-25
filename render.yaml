@@ -1,0 +1,17 @@
+# Render.com Blueprint — GitHub'a bağlı OTOMATIK presence sunucusu.
+# Kullanım: render.com → "Sign in with GitHub" → New + → Blueprint →
+# bu repoyu (YKSAMI1/yikimlient) seç → Apply.
+# Bu andan itibaren repoya HER push'ta sunucu otomatik yeniden kurulur.
+#
+# Uç nokta: https://<servis-adin>.onrender.com/presence  → launcher'a yaz.
+# Ücretsiz katman: 15 dk trafik gelmezse uyur; oyuncu girişte ilk kalp
+# atışı uyandırır (~30-50 sn gecikme, sonra normal).
+services:
+  - type: web
+    name: yikim-presence
+    runtime: docker
+    dockerfilePath: tools/yikim-api/bulut/Dockerfile
+    dockerContext: tools/yikim-api/bulut
+    plan: free
+    healthCheckPath: /presence
+    autoDeploy: true

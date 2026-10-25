@@ -19,15 +19,17 @@ MAX_PNG = 4096
 
 KAYIT = {}      # sunucu -> {uuid: [isim, zaman]}
 ROZETLER = {}   # uuid -> base64 png
+ISIMLER = {}    # uuid -> hesap adı (izin geri alma temizliği için)
 IZINLER = []    # [isim, ...]
 KILIT = threading.Lock()
 
 ROZET_DOSYA = os.path.join(os.path.expanduser("~"), "rozetler.json")
 IZIN_DOSYA = os.path.join(os.path.expanduser("~"), "izinler.json")
+ISIM_DOSYA = os.path.join(os.path.expanduser("~"), "isimler.json")
 
 
 def _yukle():
-    global ROZETLER, IZINLER
+    global ROZETLER, IZINLER, ISIMLER
     try:
         with open(ROZET_DOSYA, "r", encoding="utf-8") as f:
             ROZETLER = json.load(f)
@@ -36,6 +38,11 @@ def _yukle():
     try:
         with open(IZIN_DOSYA, "r", encoding="utf-8") as f:
             IZINLER = json.load(f)
+    except Exception:
+        pass
+    try:
+        with open(ISIM_DOSYA, "r", encoding="utf-8") as f:
+            ISIMLER = json.load(f)
     except Exception:
         pass
 
@@ -49,6 +56,11 @@ def _kaydet():
     try:
         with open(IZIN_DOSYA, "w", encoding="utf-8") as f:
             json.dump(IZINLER, f)
+    except Exception:
+        pass
+    try:
+        with open(ISIM_DOSYA, "w", encoding="utf-8") as f:
+            json.dump(ISIMLER, f)
     except Exception:
         pass
 
@@ -90,7 +102,14 @@ def presence():
         if isinstance(izin_geldi, list):
             IZINLER = [str(a).strip()[:32] for a in izin_geldi
                        if isinstance(a, str) and 0 < len(str(a).strip()) <= 32]
+            # İZİN GERİ ALMA TEMİZLİĞİ: yeni listede olmayan isimlerin çizimleri
+            # silinir → izni düşen oyuncu herkesin ekranında normal Y'ye döner.
+            for k in list(ROZETLER.keys()):
+                if ISIMLER.get(k, k).lower() not in [i.lower() for i in IZINLER]:
+                    ROZETLER.pop(k, None)
             _kaydet()
+        if isinstance(isim, str) and isim and isim != "oyuncu":
+            ISIMLER[uuid] = isim
 
         # --- presence (aynı sunucudaki oyuncular) ---
         if not isinstance(sunucu, str) or not sunucu:

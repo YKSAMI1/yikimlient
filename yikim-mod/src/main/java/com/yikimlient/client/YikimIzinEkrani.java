@@ -24,6 +24,7 @@ import java.util.Set;
 public final class YikimIzinEkrani extends class_437 {
     private final List<String> isimler = new ArrayList<>();
     private final Set<String> secili = new LinkedHashSet<>();
+    private String sonOzet = "";
     private int listeX;
     private int listeY;
     private final int satirH = 18;
@@ -35,7 +36,17 @@ public final class YikimIzinEkrani extends class_437 {
         super(class_2561.method_43470("YIKIM Çizim İzinleri"));
         // sunucudaki mevcut izinliler (baştan seçili)
         secili.addAll(YikimPresence.izinler());
-        // online oyuncular (TAB listesi: isimler GameProfile'dan)
+        listeyiYenile();
+    }
+
+    /// v1.12.3 CANLI YENİLEME: liste her karede sunucudan gelen izinlerle
+    /// tazelenir (kalp atışı 30 sn'de bir yanıt getirir). Böylece "Kaydet'e
+    /// bastım, tekrar açtım, kimse seçili gelmedi" olmaz — seçimler sunucudaki
+    /// gerçeği yansıtır; ayrıca panel açıkken yeni giren oyuncular da listeye
+    /// düşer. Kullanıcının tıklayıp henüz kaydetmediği seçimler korunur.
+    private void listeyiYenile() {
+        List<String> sunucuListesi = YikimPresence.izinler();
+        isimler.clear();
         try {
             class_310 mc = class_310.method_1551();
             if (mc != null && mc.method_1562() != null) {
@@ -53,12 +64,23 @@ public final class YikimIzinEkrani extends class_437 {
             // tek oyunculu / bağlantı yok — sadece sunucu listesi gösterilir
         }
         // offline izinliler de listede kalsın (geri alma için)
-        for (String ad : YikimPresence.izinler()) {
+        for (String ad : sunucuListesi) {
+            if (!isimler.contains(ad)) {
+                isimler.add(ad);
+            }
+        }
+        // kullanıcı seçti ama henüz kaydetmediyse listede kalsın
+        for (String ad : secili) {
             if (!isimler.contains(ad)) {
                 isimler.add(ad);
             }
         }
         isimler.sort(String.CASE_INSENSITIVE_ORDER);
+        StringBuilder ozet = new StringBuilder();
+        for (String ad : sunucuListesi) {
+            ozet.append(ad).append('\u0001');
+        }
+        sonOzet = ozet.toString();
     }
 
     @Override
@@ -68,6 +90,15 @@ public final class YikimIzinEkrani extends class_437 {
 
     @Override
     public void method_25394(class_332 graphics, int mouseX, int mouseY, float delta) {
+        // sunucudan yeni izin listesi geldi mi? (her karede ucuz karşılaştırma)
+        List<String> sunucuListesi = YikimPresence.izinler();
+        StringBuilder ozet = new StringBuilder();
+        for (String ad : sunucuListesi) {
+            ozet.append(ad).append('\u0001');
+        }
+        if (!ozet.toString().equals(sonOzet)) {
+            listeyiYenile();
+        }
         class_327 font = this.field_22793;
         this.listeX = Math.max(30, (this.field_22789 - 220) / 2);
         this.listeY = 44;

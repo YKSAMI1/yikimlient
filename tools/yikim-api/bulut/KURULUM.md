@@ -1,5 +1,14 @@
 # YIKIM Presence — ÜCRETSİZ BULUT KURULUMU
 
+## ÖNEMLİ — VDS senaryosu (şu an buradasın)
+İzin listesi kaydolmamasının sebebi: VDS'teki jar ESKİ. İzin (izinler) desteği
+YENİ `PresenceServer.java` ile geldi. Şunu yap:
+1. `tools/yikim-api/PresenceServer.java`'yı VDS'e tekrar yükle
+2. VDS'te derle: `javac PresenceServer.java` (Java 17+)
+3. Eski jarı kapat, yeni sunucuyu aç: `java PresenceServer 8787`
+Bundan sonra: izin paneli kaydeder, izin geri alınan kişiye çizim silinir ve
+herkeste normal Y görünür.
+
 VDS kesintilerini bitirmek için presence sunucusunu ücretsiz bulutta çalıştır.
 **ÖNERİLEN: PythonAnywhere** — ücretsiz, kredi kartı YOK, **uykuya YATMAZ**
 (VDS'teki gibi kesinti olmaz). Alternatif: Render.com.

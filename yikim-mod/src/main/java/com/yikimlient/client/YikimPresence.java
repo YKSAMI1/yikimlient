@@ -7,6 +7,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import net.minecraft.class_310;
+import net.minecraft.class_640;
 import net.minecraft.class_642;
 
 /**
@@ -134,8 +135,11 @@ public final class YikimPresence {
                 return;
             }
             String uuid = mc.field_1724.method_5667().toString();
-            String isim = mc.field_1724.method_5797() != null
-                ? mc.field_1724.method_5797().getString() : "oyuncu";
+            String isim = profilAdi(mc, uuid);
+            if (isim == null) {
+                isim = mc.field_1724.method_5797() != null
+                    ? mc.field_1724.method_5797().getString() : "oyuncu";
+            }
             String govde = "{\"v\":1,\"s\":\"" + kac(adres) + "\",\"u\":\"" + uuid
                 + "\",\"n\":\"" + kac(isim) + "\"}";
             byte[] bayt = govde.getBytes(StandardCharsets.UTF_8);
@@ -169,6 +173,18 @@ public final class YikimPresence {
             YikimAtolye.uzaklariIsle(metin);
             // çizim izin listesi (admin panel + atölye kapısı için)
             izinListesi = izinleriOku(metin);
+            // İZİN GERİ ALındıysa çizim silinir (v1.12.3): admin seni listeden
+            // çıkaardıysa kendi rozetin sunucudan düşer, normal Y'ye dönersin.
+            try {
+                if (YikimAtolye.dosyaVarMi() && YikimAtolye.yetkiDuzeyi() == 0
+                    && !izinlimi(isim)) {
+                    YikimClient.LOGGER.info("YIKIM izin: cizim izni geri alindi — normal Y'ye donuluyor");
+                    YikimAtolye.sifirla();
+                }
+            }
+            catch (Throwable ignored) {
+                // izin temizliği oyunu asla etkilemez
+            }
             // kendi çizimimi her heartbeat'te yeniden bas (resource reload'a dayanıklı)
             if (YikimAtolye.dosyaVarMi()) {
                 YikimAtolye.yukluysaUygula();
@@ -204,6 +220,28 @@ public final class YikimPresence {
 
     private static String kac(String ham) {
         return ham.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", " ");
+    }
+
+    /// Kendi GERÇEK hesap adımız (takım önekleri/renk kodları OLMADAN).
+    /// v1.12.3: eskiden displayName gönderiliyordu — süslü isimli sunucularda
+    /// izin eşleşmesi kırılıyordu. TAB listesindeki GameProfile adı kazanır.
+    private static String profilAdi(class_310 mc, String uuid) {
+        try {
+            if (mc.method_1562() == null) {
+                return null;
+            }
+            UUID bek = UUID.fromString(uuid);
+            for (class_640 girdi : mc.method_1562().method_2880()) {
+                if (girdi.method_2966() != null
+                    && bek.equals(girdi.method_2966().id())) {
+                    return girdi.method_2966().name();
+                }
+            }
+        }
+        catch (Throwable ignored) {
+            // liste hazır değil — displayName düş
+        }
+        return null;
     }
 
     // ---------------------------------------------------------------- izinler
