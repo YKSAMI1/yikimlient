@@ -4,7 +4,7 @@
    1) Pano mat karanlıkta durur; yüzeyler cetvelle bölünür, kart yığılmaz.
    2) Turuncu elektrik işaretidir: lamba, şalter, aktif cetvel. Süs değil.
    3) Rakamlar tabular; canlı değerler hücrelerinde kaskadla değişir.
-   Dört dünya teması: pano (varsayılan) · söküm · anons · standart.
+   Dunya temalari: pano (varsayilan) | sokum | afis | standart.
    ============================================================ */
 
 :root,
@@ -84,36 +84,6 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-weight: 750;
-}
-
-/* ---------- Dünya 3: Anons Panosu — flap siyahı, sıcak beyaz, parlak amber ---------- */
-:root[data-world="anons"] {
-  --accent: #ffc247;
-  --accent-soft: #ffd97a;
-  --accent-deep: #d69a12;
-  --accent-ink: #1a1100;
-  --accent-dim: rgba(255, 194, 71, 0.13);
-  --on-accent: #1a1100;
-
-  --bg0: #0d0c09;
-  --bg1: #12110d;
-  --bg2: #17150f;
-  --bg3: #1e1b13;
-  --bg4: #2b2718;
-  --hairline: rgba(245, 236, 210, 0.11);
-  --hairline-strong: rgba(245, 236, 210, 0.2);
-
-  --text: #f7f1e3;
-  --text-dim: #b0a893;
-  --text-faint: #77715f;
-  color-scheme: dark;
-}
-:root[data-world="anons"] .brand-word,
-:root[data-world="anons"] .page-header h1,
-:root[data-world="anons"] .home-hero h1 {
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-weight: 700;
 }
 
 /* ---------- Dünya 4: Kategori Standardı — Arc/Linear cilası, çelik mavisi ---------- */

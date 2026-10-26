@@ -181,7 +181,6 @@ function modeForWorld(world: string): ModeDef | null {
     case "pano":     return emberDef(0.5, false);                // turuncu zımtırak
     case "sokum":    return emberDef(0.9, true);                 // ağır kızıl zımtırak
     case "afis":     return dustDef("rgba(63,50,38,0.5)");       // baskı kâğıdı tozu
-    case "anons":    return twinkleDef("rgba(255,194,71,0.9)");  // amber şimşek
     case "standart": return twinkleDef("rgba(147,168,255,0.5)"); // nazik mavi kıvılcım
     case "sira":     return twinkleDef("rgba(163,230,53,0.85)"); // ateşböceği
     case "rihtim":   return bubbleDef();                          // deniz kabarcığı

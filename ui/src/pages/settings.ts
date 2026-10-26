@@ -12,10 +12,6 @@ const WORLDS = [
     bg: "#14100c", panel: "#201a14", line: "#382c1f", text: "#f2e9dd", dim: "#7d7264", accent: "#ff5a24",
   },
   {
-    id: "anons", name: "Anons Panosu", desc: "Flap siyahı, sıcak beyaz, parlak amber",
-    bg: "#0d0c09", panel: "#17150f", line: "#2b2718", text: "#f7f1e3", dim: "#77715f", accent: "#ffc247",
-  },
-  {
     id: "standart", name: "Kategori Standardı", desc: "Arc/Linear cilası — yumuşak köşe, çelik mavisi",
     bg: "#0e1016", panel: "#171a24", line: "#2b3044", text: "#eceffa", dim: "#666e8a", accent: "#6e8bff",
   },
@@ -73,7 +69,7 @@ export function renderSettings(root: HTMLElement): void {
   // ölü nesneye yazmamak için cfg her kayıttan sonra tazelenir (save() içinde).
   let cfg = state.config;
   // eski tema değerlerini dünyalara eşle (orange/dark/neon/light artık dünya adlarıyla yaşar)
-  const legacy: Record<string, string> = { dark: "standart", neon: "anons", light: "pano", orange: "pano" };
+  const legacy: Record<string, string> = { dark: "standart", neon: "pano", light: "pano", orange: "pano", anons: "pano" };
   const activeTheme = legacy[cfg.theme] ?? cfg.theme;
   const customOn = !!(cfg.custom_accent || "").trim();
   // dinamik sürüm — Tauri'nin kendi getVersion()'undan

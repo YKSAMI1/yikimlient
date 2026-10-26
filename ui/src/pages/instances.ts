@@ -853,8 +853,8 @@ async function openCreateWizard(): Promise<void> {
       <button class="loader-card" data-l="vanilla">
         <div class="lc-icon">${loaderIcon("vanilla")}</div><b>Vanilla</b><span>Modsuz sade oyun</span>
       </button>
-      <button class="loader-card disabled" data-l="forge" disabled>
-        <div class="lc-icon">${loaderIcon("forge")}</div><b>Forge</b><span>Yakında</span>
+      <button class="loader-card" data-l="forge">
+        <div class="lc-icon">${loaderIcon("forge")}</div><b>Forge</b><span>Mod paketleri &amp; klasik modlar — ilk oyun açılışında kurulur</span>
       </button>
     </div>
 

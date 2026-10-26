@@ -37,6 +37,9 @@ if (-not (Test-Path (Join-Path $ui "index.html"))) { Write-Host "UI DIST YOK - d
 $kokSurum = [IO.File]::ReadAllText((Join-Path $ui "surum.txt")).Trim()
 Write-Host "      kaynak surum.txt: $kokSurum (bilgi amacli; kanal surumu parametreden gelir)"
 
+# paket icindeki surum.txt = kanal surumu (gomulu surumle karisik olmasin)
+[System.IO.File]::WriteAllText((Join-Path $ui "surum.txt"), $Surum, (New-Object System.Text.UTF8Encoding($false)))
+
 Write-Host "[2/6] zip + sha256"
 $zip = Join-Path $env:TEMP "ui-$Surum.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }

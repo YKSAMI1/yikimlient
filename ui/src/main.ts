@@ -96,7 +96,7 @@ export function applyWorld(): void {
   if (!state.config) return;
   const t = state.config.theme as string;
   const root = document.documentElement;
-  const legacy: Record<string, string> = { dark: "standart", neon: "anons", light: "pano", orange: "pano" };
+  const legacy: Record<string, string> = { dark: "standart", neon: "pano", light: "pano", orange: "pano", anons: "pano" };
   // "custom" eski bir değer: pano dünyasında yaşar
   const world = t === "custom" ? "pano" : (legacy[t] ?? t) || "pano";
 
