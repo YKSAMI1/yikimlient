@@ -39,6 +39,12 @@ public final class YikimAtolye {
     private static final int[] IZGARA = new int[BOY * BOY];
     private static boolean yuklendi;
 
+    /// v1.12.7 SİMGE KAPATMA: çizim/izin sistemi geçici kaldırıldı — farklı bir
+    /// sistemle geri gelecek, o yüzden bulut presence sunucusu çalışmaya devam
+    /// eder. Bu bayrak açıkken herkes standart Y simgesini görür; eski çizim
+    /// dosyaları açılışta silinir.
+    private static final boolean CIZIM_KAPALI = true;
+
     /// başkalarının rozetleri: uuid → base64 png
     private static final Map<UUID, String> UZAK = new ConcurrentHashMap<UUID, String>();
 
@@ -53,6 +59,16 @@ public final class YikimAtolye {
             return;
         }
         yuklendi = true;
+        if (CIZIM_KAPALI) {
+            // eski çizim temizliği: artık herkeste aynı (standart Y) simge
+            try {
+                Files.deleteIfExists(YikimBridge.stateDir().resolve("rozet.png"));
+            }
+            catch (Throwable ignored) {
+                // silinemezse bile uygulanmayacak (yukluysaUygula no-op)
+            }
+            return;
+        }
         try {
             Path dosya = YikimBridge.stateDir().resolve("rozet.png");
             if (Files.exists(dosya)) {
@@ -66,6 +82,9 @@ public final class YikimAtolye {
 
     /// Çizim kayıtlıysa (rozet.png) kendi slotuna uygula — başlangıç + heartbeat.
     public static void yukluysaUygula() {
+        if (CIZIM_KAPALI) {
+            return; // v1.12.7: çizim kapalı — herkeste standart Y
+        }
         if (dosyaVarMi()) {
             try {
                 izarayiOku(YikimBridge.stateDir().resolve("rozet.png"));
@@ -125,6 +144,9 @@ public final class YikimAtolye {
 
     /// Kaydet: disk + sunucu. "Bir kez kaydet, hep kalsın."
     public static synchronized void kaydet() {
+        if (CIZIM_KAPALI) {
+            return; // v1.12.7: çizim kapalı — hiçbir şey kaydetme veya yükleme
+        }
         try {
             Path dosya = YikimBridge.stateDir().resolve("rozet.png");
             java.awt.image.BufferedImage resim = new java.awt.image.BufferedImage(
@@ -253,6 +275,9 @@ public final class YikimAtolye {
 
     /// Presence yanıtından başkalarının rozetlerini al ({"b":{uuid:"<b64>"}}).
     public static void uzaklariIsle(String json) {
+        if (CIZIM_KAPALI) {
+            return; // v1.12.7: uzak çizimler yok — standart Y herkeste
+        }
         try {
             if (json == null) {
                 return;

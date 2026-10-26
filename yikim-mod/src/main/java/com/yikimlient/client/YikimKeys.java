@@ -56,15 +56,9 @@ public final class YikimKeys {
             YikimPresets.cycle(client);
         }
         while (atolye.method_1436()) {
-            boolean izinli = YikimAtolye.yetkiDuzeyi() > 0
-                || (client.field_1724 != null
-                    && YikimPresence.izinlimi(client.field_1724.method_5797() != null
-                        ? client.field_1724.method_5797().getString() : null));
-            if (izinli) {
-                client.method_1507(new YikimAtolyeEkrani());
-            } else {
-                YikimMetrics.notify("Piksel At\u00f6lyesi: yetkin yok (y\u00f6netici izni gerekir)");
-            }
+            // v1.12.7: Piksel Atölyesi geçici kapalı — çizim/izin sistemi
+            // farklı bir sistemle dönecek; bulut sunucusu çalışmaya devam eder.
+            YikimMetrics.notify("Piksel At\u00f6lyesi bu s\u00fcr\u00fcmde kapal\u0131 — farkl\u0131 bir sistemle d\u00f6necek");
         }
         YikimKeys.tickZoom(client);
     }
