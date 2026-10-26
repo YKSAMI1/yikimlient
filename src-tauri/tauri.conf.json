@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "YIKIMLient",
-  "version": "0.3.38",
+  "version": "0.3.39",
   "identifier": "com.yikimlient.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run ui-dist",
     "frontendDist": "../ui/dist"
   },
   "app": {
@@ -22,14 +22,19 @@
         "decorations": false,
         "transparent": false,
         "center": true,
-        "dragDropEnabled": true
+        "dragDropEnabled": true,
+        "url": "http://yikim.localhost/index.html"
       }
     ],
     "security": {
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPDATA/.yikimlient/**/*", "$APPDATA/**/*", "**/.yikimlient/**/*"]
+        "scope": [
+          "$APPDATA/.yikimlient/**/*",
+          "$APPDATA/**/*",
+          "**/.yikimlient/**/*"
+        ]
       }
     },
     "withGlobalTauri": true
@@ -37,16 +42,31 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "targets": ["nsis", "appimage", "deb"],
-    "resources": ["resources/mods/*"],
-    "icon": ["icons/icon.ico", "icons/32x32.png", "icons/128x128.png", "icons/icon.png"],
-    "copyright": "\u00A9 2026 YIKIMLient",
+    "targets": [
+      "nsis",
+      "appimage",
+      "deb"
+    ],
+    "resources": [
+      "resources/mods/*",
+      "resources/ui/**/*"
+    ],
+    "icon": [
+      "icons/icon.ico",
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.png"
+    ],
+    "copyright": "© 2026 YIKIMLient",
     "shortDescription": "YIKIMLient â€” HÄ±zlÄ± Minecraft Launcher",
     "longDescription": "Ultra-hafif, ultra-hÄ±zlÄ± Minecraft launcher ve oyun iÃ§i mod. Electron'suz, Tauri 2 + Rust ile oluÅŸturuldu.",
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["Turkish", "English"],
+        "languages": [
+          "Turkish",
+          "English"
+        ],
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico"
       },
@@ -75,5 +95,3 @@
     }
   }
 }
-
-

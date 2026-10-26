@@ -280,6 +280,21 @@ pub async fn yazi_senkonize(handle: tauri::AppHandle) -> Result<(), String> {
     }
     let _ = fs::write(durum_yolu(), serde_json::to_string(&d).unwrap_or_default());
 
+    // KAYNAKLAR — yenir sistemler buraya bağlanır (şu an 'ui' bilinir).
+    // Yeni paket türü eklemek: bu match'e bir kol + özel uygula fonksiyonu.
+    for k in &m.kaynaklar {
+        let tur = k.get("tur").and_then(|t| t.as_str()).unwrap_or("");
+        match tur {
+            "ui" => {
+                if let Err(h) = ui_paketi_uygula(k).await {
+                    core::yikim_log(format!("sicak ui: {h}"));
+                }
+            }
+            "" => {}
+            t => core::yikim_log(format!("sicak: bilinmeyen kaynak turu '{t}' atlandı (eski launcher)")),
+        }
+    }
+
     // Yeni kurulan jar'ların zaten kurulmuş instance'lara uygulanması:
     // oyun açıkken jar kilitli olur — install_from sessizce atlar, bir
     // sonraki açılışta güncellenir (yikim_mod bunu güvenli yapıyor).
@@ -309,6 +324,122 @@ pub fn kanali_dagit(handle: tauri::AppHandle) {
         }
     });
 }
+
+// ---------------------------------------------------------------------------
+// 'ui' kaynak işleyicisi — launcher ara yüzü paketi (tema/sayfalar)
+// ---------------------------------------------------------------------------
+
+/// UI paketi uygula: indir → sha doğrula → zip aç → aktif.json yaz →
+/// eski sürümü temizle. Uygulama SONRAKİ AÇILIŞta etkinleşir (yikim_ui).
+async fn ui_paketi_uygula(e: &serde_json::Value) -> Result<(), String> {
+    let ver = e
+        .get("surum")
+        .and_then(|v| v.as_str())
+        .ok_or("ui paketinde 'surum' yok")?
+        .to_string();
+    let gecerli_ad = !ver.is_empty()
+        && ver
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-');
+    if !gecerli_ad {
+        return Err(format!("ui sürüm adı uygunsuz: {ver}"));
+    }
+
+    // Aktif sürüm aynı/büyüksa atla (karşılaştırma: sayısal 0.3.x)
+    if let Ok(bayt) = fs::read(core::app_dir().join("ui").join("aktif.json")) {
+        if let Ok(js) = serde_json::from_slice::<serde_json::Value>(&bayt) {
+            if let Some(eski) = js["surum"].as_str() {
+                match (crate::yikim_mod::parse_version(eski), crate::yikim_mod::parse_version(&ver)) {
+                    (Some(a), Some(b)) if a >= b => return Ok(()), // zaten güncel
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    let url = e.get("url").and_then(|v| v.as_str()).unwrap_or("");
+    if url.is_empty() {
+        return Err("ui paketinde 'url' yok".into());
+    }
+    let sha = e.get("sha256").and_then(|v| v.as_str()).unwrap_or("");
+
+    let hedef_zip = sicak_dir().join(format!("ui-{ver}"));
+    indir(url, &hedef_zip, sha).await?;
+
+    // zip aç: <app_dir>/ui/<ver>/
+    let kok = core::app_dir().join("ui").join(&ver);
+    let mut arşiv = zip::ZipArchive::new(
+        fs::File::open(&hedef_zip).map_err(|z| format!("ui zip acılamadı: {z}"))?,
+    )
+    .map_err(|z| format!("ui zip arşivi bozuk: {z}"))?;
+    for i in 0..arşiv.len() {
+        let mut girdi = arşiv
+            .by_index(i)
+            .map_err(|z| format!("ui zip girdi {i} hatası: {z}"))?;
+        let ad = girdi.name().replace('\\', "/");
+        if ad.is_empty() || ad.contains("..") {
+            return Err(format!("ui zip girdisi güvensiz: {ad}"));
+        }
+        if girdi.is_dir() || ad.ends_with('/') {
+            continue;
+        }
+        let yol = kok.join(&ad);
+        if let Some(ebeyne) = yol.parent() {
+            fs::create_dir_all(ebeyne).map_err(|z| format!("ui klasör hatası: {z}"))?;
+        }
+        let mut cikis = fs::File::create(&yol).map_err(|z| format!("ui yazma hatası: {z}"))?;
+        std::io::copy(&mut girdi, &mut cikis)
+            .map_err(|z| format!("ui kopyalama hatası: {z}"))?;
+    }
+
+    // sürüm damgası dosyası (yazayım her ihtimale karşı zip'te yoksa)
+    if !kok.join("surum.txt").is_file() {
+        let _ = fs::write(kok.join("surum.txt"), &ver);
+    }
+
+    // aktif.json atomik olarak yaz: ana pencere bundan sonra bu klasörü sunar
+    let ui_kok = core::app_dir().join("ui");
+    let aktifi = serde_json::json!({
+        "surum": ver.clone(),
+        "klasor": ver.clone(),
+        "zaman": SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|s| s.as_secs())
+            .unwrap_or(0),
+    });
+    let yari = ui_kok.join("aktif.json.yari");
+    fs::write(&yari, aktifi.to_string()).map_err(|z| format!("aktif.json hatası: {z}"))?;
+    fs::rename(&yari, ui_kok.join("aktif.json")).map_err(|z| format!("aktif.json rename: {z}"))?;
+
+    // eski sürüm klasörlerini temizle (surum.txt okunup daha eski olanlar)
+    if let Ok(rd) = fs::read_dir(&ui_kok) {
+        for girdi in rd.filter_map(|s| s.ok()) {
+            let yol = girdi.path();
+            if !yol.is_dir() {
+                continue;
+            }
+            let eski_ver = fs::read(yol.join("surum.txt"))
+                .ok()
+                .and_then(|b| String::from_utf8(b).ok())
+                .map(|s| s.trim().to_string())
+                .and_then(|s| crate::yikim_mod::parse_version(&s));
+            if let Some(eski) = eski_ver {
+                if let Some(yeni) = crate::yikim_mod::parse_version(&ver) {
+                    if eski < yeni {
+                        let _ = fs::remove_dir_all(&yol);
+                    }
+                }
+            }
+        }
+    }
+    let _ = fs::remove_file(&hedef_zip); // zip artık gerekmiyor
+
+    core::yikim_log(format!(
+        "sicak ui: {ver} indirildi ve aktif olarak işaretlendi — sonraki açılışta uygulanır"
+    ));
+    Ok(())
+}
+
 
 #[cfg(test)]
 mod tests {

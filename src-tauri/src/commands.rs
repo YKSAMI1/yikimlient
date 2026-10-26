@@ -178,6 +178,10 @@ pub async fn cmd_create_instance(
     if instance.mod_loader == "fabric" && instance.loader_version.trim().is_empty() {
         instance.loader_version = launcher::fabric_latest_loader().await.unwrap_or_default();
     }
+    // forge build'i boşsa en günceli al (launch'ta da garanti edilir)
+    if instance.mod_loader == "forge" && instance.loader_version.trim().is_empty() {
+        instance.loader_version = launcher::forge_latest_build(&instance.mc_version).await.unwrap_or_default();
+    }
     let created = instances::create(instance)?;
 
     // YIKIM çekirdeği — her kurulumda otomatik (yalnız Fabric + 1.21.x)
@@ -1193,10 +1197,14 @@ pub async fn cmd_install_pack_files(
     }
     match repos::install_modpack(&app, &source, &project_id, &version_id, &mut inst).await {
         Ok(()) => {
-            // fabric loader sürümü paketten geldiyse profil json'u önden indir
+            // fabric/forge loader sürümü paketten geldiyse profil json'u önden kur
             if inst.mod_loader == "fabric" && !inst.loader_version.is_empty() {
                 if let Err(e) = launcher::install_fabric_profile(&inst.mc_version, &inst.loader_version).await {
                     core::yikim_log(format!("fabric profile önden indirilemedi (launch'ta tekrar denenir): {e}"));
+                }
+            } else if inst.mod_loader == "forge" && !inst.loader_version.is_empty() {
+                if let Err(e) = launcher::install_forge_profile(&inst.mc_version, &inst.loader_version).await {
+                    core::yikim_log(format!("forge önden kurulamadı (launch'ta tekrar denenir): {e}"));
                 }
             }
             inst.save()?;
@@ -1288,6 +1296,10 @@ pub async fn cmd_import_pack_file(
                     launcher::install_fabric_profile(&inst.mc_version, &inst.loader_version).await
                 {
                     core::yikim_log(format!("fabric profile önden indirilemedi: {e}"));
+                }
+            } else if inst.mod_loader == "forge" && !inst.loader_version.is_empty() {
+                if let Err(e) = launcher::install_forge_profile(&inst.mc_version, &inst.loader_version).await {
+                    core::yikim_log(format!("forge önden kurulamadı (launch'ta tekrar denenir): {e}"));
                 }
             }
             inst.save()?;
@@ -1524,7 +1536,21 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
             vid
         }
         "forge" => {
-            return Err("Forge desteği yakında — şimdilik Fabric/Vanilla kullanın".into());
+            if inst.loader_version.is_empty() {
+                inst.loader_version = launcher::forge_latest_build(&inst.mc_version).await?;
+                inst.save()?;
+            }
+            // mrpack/import bazen tam id ("1.21.1-forge-52.0.24") yazar — ayıkla
+            let forge_ver = inst
+                .loader_version
+                .rsplit_once("-forge-")
+                .map(|(_, v)| v.to_string())
+                .unwrap_or_else(|| inst.loader_version.clone());
+            let vid = format!("{}-forge-{}", inst.mc_version, forge_ver);
+            if !crate::core::versions_dir().join(&vid).join(format!("{vid}.json")).exists() {
+                launcher::install_forge_profile(&inst.mc_version, &forge_ver).await?;
+            }
+            vid
         }
         other => return Err(format!("bilinmeyen loader: {other}")),
     };

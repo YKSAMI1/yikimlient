@@ -14,6 +14,7 @@ pub mod stats;
 pub mod util;
 pub mod yikim_mod;
 pub mod yikim_sicak;
+pub mod yikim_ui;
 
 /// Launcher sürümü (Cargo.toml) — Discord presence ve loglar için.
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -55,6 +56,9 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // YIKIM ARA YÜZ SUNUCUSU: ana pencere sıcak-kanal UI'ı yükler
+        // (http://yikim.localhost — tauri.conf windows.url ile eşleşir).
+        .register_uri_scheme_protocol("yikim", |_ctx, istek| yikim_ui::sunuc(istek))
         .manage(AppState::new(cfg))
         .invoke_handler(tauri::generate_handler![
             commands::cmd_get_state,

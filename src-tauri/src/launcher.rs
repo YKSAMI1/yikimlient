@@ -1,5 +1,6 @@
 use crate::core::{
-    assets_dir, http_client, libraries_dir, os_name, runtimes_dir, versions_dir, yikim_log,
+    app_dir, assets_dir, http_client, libraries_dir, os_name, runtimes_dir, versions_dir,
+    yikim_log,
 };
 use crate::util::{download_many, verify_sha1, DlOpts};
 use serde::{Deserialize, Serialize};
@@ -190,6 +191,108 @@ pub async fn install_fabric_profile(mc: &str, loader: &str) -> Result<String, St
         }
     }
     Ok(id)
+}
+
+// ---------- Forge ----------
+
+/// Forge build sorgusu: promotions_slim.json ("{mc}-latest" / "-recommended").
+/// Dönüş: tam sürüm kimliği ("1.21.11-forge-54.x.x" biçimi; promos değerinin
+/// mc önekli olup olmamasına göre normalize edilir).
+pub async fn forge_latest_build(mc: &str) -> Result<String, String> {
+    let resp = http_client()
+        .get("https://files.minecraftforge.net/maven/net/minecraftforge/forge/promotions_slim.json")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("forge promos hatası: {}", resp.status()));
+    }
+    let js: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let promos = js["promos"].as_object().ok_or("forge promos bozuk")?;
+    let ham = promos
+        .get(&format!("{mc}-latest"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            promos
+                .get(&format!("{mc}-recommended"))
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+        })
+        .ok_or_else(|| format!("forge promos'ta {mc} bulunamadı"))?;
+    // doğru/yarım önekleri birleştirilir
+    if ham.starts_with(&format!("{mc}-")) {
+        Ok(ham)
+    } else {
+        Ok(format!("{mc}-{ham}"))
+    }
+}
+
+/// Forge kurulumu: resmî installer jar + `--installClient <oyun_dizini>`.
+/// Installer kendi libraries'lerini ve versions/<id>.json'u yazar; burada
+/// saver ayarlar. Dönüş: sürüm kimliği (forge-<ver> id'si).
+pub async fn install_forge_profile(mc: &str, forge_ver: &str) -> Result<String, String> {
+    let vid = format!("{mc}-forge-{forge_ver}");
+    let vers = versions_dir();
+    let profil = vers.join(&vid).join(format!("{vid}.json"));
+    if profil.exists() {
+        yikim_log(format!("forge profili hazır: {vid}"));
+        return Ok(vid);
+    }
+
+    // kurulum için java: vanilla sürümün javaVersion'ından çözülür
+    let vj = load_version_json_merged(mc).await?;
+    let component = vj["javaVersion"]["component"]
+        .as_str()
+        .unwrap_or("java-runtime-gamma")
+        .to_string();
+    let major = vj["javaVersion"]["majorVersion"].as_u64().unwrap_or(21) as u32;
+    let java_dir = resolve_java_dirs(&component, major, None).await?;
+    let java = java_exe(&java_dir);
+
+    // installer jar: maven.minecraftforge.net (kayıt: app_dir/cache)
+    let cache = app_dir().join("cache");
+    std::fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
+    let installer = cache.join(format!("forge-{forge_ver}-installer.jar"));
+    if !installer.exists() {
+        let url = format!(
+            "https://maven.minecraftforge.net/net/minecraftforge/forge/{forge_ver}/forge-{forge_ver}-installer.jar"
+        );
+        yikim_log(format!("forge installer indiriliyor: {url}"));
+        let resp = http_client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("forge installer indirilemedi: {e}"))?;
+        if !resp.status().is_success() {
+            return Err(format!("forge installer hatası: {}", resp.status()));
+        }
+        let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+        std::fs::write(&installer, &bytes).map_err(|e| e.to_string())?;
+    }
+
+    // kurulum: java -jar installer --installClient <app_dir>
+    // (installer kendi libraries + versions altına yazar; 1-3 dk sürebilir)
+    yikim_log(format!("forge kurulumu başlıyor: {vid}"));
+    let cikti = std::process::Command::new(&java)
+        .arg("-jar")
+        .arg(&installer)
+        .arg("--installClient")
+        .arg(app_dir())
+        .output()
+        .map_err(|e| format!("forge installer başlatılamadı: {e}"))?;
+    if !cikti.status.success() {
+        let log = String::from_utf8_lossy(&cikti.stderr);
+        yikim_log(format!("forge installer çıktı: {}", log.chars().take(400).collect::<String>()));
+        return Err(format!(
+            "forge installer hata kodu {:?} — ayrıntı kayıtlarda",
+            cikti.status.code()
+        ));
+    }
+    if !profil.exists() {
+        return Err(format!("forge installer sürüm json'u yazmaydı: {vid}"));
+    }
+    yikim_log(format!("forge profili kuruldu: {vid}"));
+    Ok(vid)
 }
 
 // ---------- Version json (inheritsFrom birleştirmeli) ----------
