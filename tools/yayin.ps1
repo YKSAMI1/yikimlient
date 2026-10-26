@@ -1,11 +1,12 @@
-# YIKIMLient — TAM YAYIN HATTI (mod derleme DAHİL, kalıcı)
-# Öğrenilen dersler zinciri:
-#  - exe yeniden derlemesin diye unutulan mod derleme asla silinmez (v0.3.36 vakası)
-#  - tag HER ZAMAN commit sonrası alınır (v0.3.34 vakası)
-#  - release create + upload + CI(D)den sonra linux asset imzaları + latest.json EN SON
+# YIKIMLient - TAM YAYIN HATTI (mod derleme DAHIL, kalici)
+# Ogrenilen dersler zinciri:
+#  - exe yeniden derlemesin diye unutulan mod derleme asla silinmez (v0.3.36 vakasi)
+#  - tag HER ZAMAN commit sonrasi alinir (v0.3.34 vakasi)
+#  - release create + upload + CI(D)den sonra linux asset imzalari + latest.json EN SON
 param(
-    [string]$V = "0.3.37",
-    [string]$MV = "1.12.6"
+    [string]$V = "0.3.38",
+    [string]$MV = "1.12.6",
+    [string]$Notlar = ""
 )
 $ErrorActionPreference = 'Continue'
 $kok = Split-Path -Parent $PSScriptRoot
@@ -19,7 +20,7 @@ powershell -ExecutionPolicy Bypass -File (Join-Path $kok "yikim-mod\araclar\derl
 $jarKaynak = "$kok\yikim-mod\derleme\yikimlient-$MV+1.21.11.jar"
 if (-not (Test-Path $jarKaynak)) { Write-Host "MOD DERLEME BASARISIZ"; exit 1 }
 Copy-Item $jarKaynak "$kok\src-tauri\resources\mods\yikimlient-$MV+1.21.11.jar" -Force
-# eski mod jarlarini resources'tan temizle (1.12.* olanlar haric degil — HEPSI)
+# eski mod jarlarini resources'tan temizle (1.12.* olanlar haric degil - HEPSI)
 Get-ChildItem "$kok\src-tauri\resources\mods" -Filter "yikimlient-*.jar" | Where-Object { $_.Name -ne "yikimlient-$MV+1.21.11.jar" -and $_.Name -match "1\.12\." } | Remove-Item -Force
 $manifest = Get-Content "$kok\src-tauri\resources\mods\manifest.json" -Raw
 $manifest = $manifest -replace '"modVersion":\s*"[^"]+"', ('"modVersion": "' + $MV + '"')
@@ -38,7 +39,8 @@ npm run dist 2>&1 | ForEach-Object { $_.ToString() } | Select-Object -Last 2
 if (-not (Test-Path "$nsis\YIKIMLient_${V}_x64-setup.exe")) { Write-Host "WINDOWS DERLEME HATASI"; exit 1 }
 
 Write-Host "[4/7] release + tag (guncel HEAD)"
-gh release create "v$V" --title "YIKIMLient v$V" --notes "Mod ${MV}: rozet cizimleri birebir keskin. Izin paneli + izinliler menusu sunucu tarafindan calisiyor." 2>&1 | ForEach-Object { $_.ToString() } | Select-Object -First 2
+if ($Notlar -eq "") { $Notlar = "Mod ${MV}: sicak guncelleme kanali gomulu - bundan sonra mod guncellemeleri exe derlemesi olmadan dakikalar icinde dagitilir." }
+gh release create "v$V" --title "YIKIMLient v$V" --notes $Notlar 2>&1 | ForEach-Object { $_.ToString() } | Select-Object -First 2
 gh release upload "v$V" "$nsis\YIKIMLient_${V}_x64-setup.exe" "$nsis\YIKIMLient_${V}_x64-setup.exe.sig" --clobber 2>&1 | Select-Object -First 1
 
 Write-Host "[5/7] tag CI bekle (linux)"
@@ -68,7 +70,7 @@ $wsig = [System.IO.File]::ReadAllText("$nsis\YIKIMLient_${V}_x64-setup.exe.sig")
 $lsig = [System.IO.File]::ReadAllText((Join-Path $tmp "YIKIMLient_${V}_amd64.AppImage.sig")).Trim()
 $latest = @{
   version  = $V
-  notes    = "Mod $MV keskin cizim. Izin sistemi sunucuda canli."
+  notes    = $Notlar
   pub_date = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ')
   platforms = @{
     "windows-x86_64" = @{ signature = $wsig; url = "https://github.com/YKSAMI1/yikimlient/releases/download/v$V/YIKIMLient_${V}_x64-setup.exe" }

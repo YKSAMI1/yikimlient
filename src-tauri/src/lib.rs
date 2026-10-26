@@ -13,6 +13,7 @@ pub mod server_list;
 pub mod stats;
 pub mod util;
 pub mod yikim_mod;
+pub mod yikim_sicak;
 
 /// Launcher sürümü (Cargo.toml) — Discord presence ve loglar için.
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -147,6 +148,8 @@ pub fn run() {
             if let Err(e) = app.asset_protocol_scope().allow_directory(core::app_dir(), true) {
                 core::yikim_log(format!("asset scope eklenemedi: {e}"));
             }
+            // SICAK kanal: derlemesiz güncellemeler (mod vb.) — hemen + 15 dk'da bir.
+            yikim_sicak::kanali_dagit(handle.clone());
             tauri::async_runtime::spawn(async move {
                 // Arka plan ısıtma: sürüm manifesti + haberler (best-effort, UI'yi engellemez).
                 if let Err(e) = repos::warm_caches(&handle).await {

@@ -107,7 +107,8 @@ fn load_manifest(dir: &Path) -> Option<Vec<ManifestEntry>> {
 }
 
 /// "1.21.11" → (1, 21, 11); "1.21" → (1, 21, 0); beklenmedik biçimde None.
-fn parse_version(v: &str) -> Option<(u32, u32, u32)> {
+/// sıcak kanal (yikim_sicak) da sürüm karşılaştırmalarında bunu kullanır.
+pub(crate) fn parse_version(v: &str) -> Option<(u32, u32, u32)> {
     let p: Vec<u32> = v
         .split('.')
         .map(|s| s.trim().parse::<u32>().ok())
@@ -187,8 +188,19 @@ pub fn install_from(embedded_dir: &Path, inst: &Instance) -> Result<bool, String
     }
     let mods_dir = inst.mods_dir();
     fs::create_dir_all(&mods_dir).map_err(|e| format!("mods klasörü açılamadı: {e}"))?;
-    let jar = pick_jar_for(&inst.mc_version, embedded_dir)
+    let mut jar = pick_jar_for(&inst.mc_version, embedded_dir)
         .ok_or_else(|| format!("{} için YIKIM modu jar'ı yok", inst.mc_version))?;
+    // SICAK kanal önceliği: derlemesiz gelen daha yeni bir jar indirilmişse
+    // gömülü olandan onu kur (kurulum sırası aynı: eski yikimlient jar'ları
+    // silinir, yenisi kopyalanır). Kanaldan bir şey gelmemişse gömülü devam.
+    let gomulu_adi = jar
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_default();
+    if let Some(hot) = crate::yikim_sicak::daha_yeni_jar(&inst.mc_version, &gomulu_adi) {
+        core::yikim_log(format!("sicak: gömülü olandan daha yeni mod jar'ı bulundu — sıcak kaynak kullanıldı"));
+        jar = hot;
+    }
     let file_name = jar
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
