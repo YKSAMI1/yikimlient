@@ -63,6 +63,8 @@ export class Sahne {
     private boyutla: (() => void) | null = null;
     private zaman = 0;
     private durum: "idle" | "emote" | "soft" = "idle";
+    /** vitrin kartında göstermek için son oynanan emote adı */
+    public sonOynananAd = "";
     private durumBitis = 0;
     private emoteListe: Emote[] = [];
     private aktif: Emote | null = null;
@@ -215,6 +217,7 @@ export class Sahne {
             hedef = this.idlePozu(this.zaman);
             if (this.emoteListe.length && this.zaman >= this.durumBitis) {
                 this.aktif = this.emoteListe[Math.floor(Math.random() * this.emoteListe.length)];
+                this.sonOynananAd = this.aktif.adi;
                 this.durum = "emote";
                 this.tEmote = this.aktif.baslangicTick;
                 if (this.aktif.dongu) {

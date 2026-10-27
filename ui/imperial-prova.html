@@ -1,0 +1,52 @@
+<!doctype html>
+<!-- DEV-ONLY: Imperial home görsel prova — sahte Tauri shim ile. Derleme paketine girmez. -->
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<title>imperial prova</title>
+<script>
+  const bekle = (s) => new Promise(s => setTimeout(s, s));
+  // ---- sahte Tauri ----
+  let idc = 0;
+  const T = (window.__TAURI__T = {
+    kont: { tema: "sahne", show_news: true },
+    hesap: [{ kind: "msa", uuid: "test-uuid-1", name: "TestOyuncu" }],
+    kurulumlar: [
+      { id: "k1", name: "Ana Hayat", icon: "🔥", mod_loader: "fabric", mc_version: "1.21.11", ram_mb: 4096, cover: "", last_played: Date.now() - 6 * 60000 },
+      { id: "k2", name: "Kreativ Slot", icon: "⛏️", mod_loader: "forge", mc_version: "1.20.1", ram_mb: 3072, cover: "", last_played: Date.now() - 400 * 60000 },
+      { id: "k3", name: "Piksel Para", icon: "🏰", mod_loader: "fabric", mc_version: "1.21.11", ram_mb: 8192, cover: "", last_played: Date.now() - 980 * 60000 },
+    ],
+  });
+  window.__TAURI_INTERNALS__ = { convertFileSrc: (p) => p };
+  window.__TAURI__ = {
+    window: {
+      getCurrentWindow: () => ({
+        minimize: () => {}, toggleMaximize: () => {}, close: () => {},
+        onCloseRequested: () => {}, isMaximized: async () => false,
+        onResized: async () => () => {}, startDragging: () => {},
+      }),
+    },
+    core: {
+      invoke: async (cmd, args) => {
+        console.log("invoke:", cmd, JSON.stringify(args || {}));
+        if (cmd === "cmd_get_state") return { config: T.kont, accounts: T.hesap, instances: T.kurulumlar, featured_versions: [], curseforge: false, sys: { total_ram_mb: 16384 } };
+        if (cmd === "cmd_get_account_skin") return { dosya: "https://minotar.net/skin/Steve.png", slim: false };
+        if (cmd === "cmd_list_yikim_news") return [
+          { id: "n1", title: "0.3.44 geldi — Imperial uslübü", date: "2026-10-27", pinned: true, image: "" },
+          { id: "n2", title: "Emote Deneme Alanı nasil kullanilir", date: "2026-10-26", pinned: false, image: "" },
+        ];
+        if (cmd.startsWith("cmd_list_emote")) return [];
+        if (cmd.startsWith("cmd_")) return null;
+        return null;
+      },
+    },
+    event: { listen: async () => () => {} },
+  };
+</script>
+<style>body { margin: 0; background: #0d0e12; } #kok { width: 1100px; height: 720px; }</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" src="/src/prova-boots.ts"></script>
+</body>
+</html>

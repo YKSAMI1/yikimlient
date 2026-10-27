@@ -5,8 +5,194 @@ import { emoteParca } from "../sahne/emote";
 
 let selectedInstanceId: string | null = null;
 
+const sahneDunyasi = (): boolean => document.documentElement.getAttribute("data-world") === "sahne";
+const timeAgo = (t: number | null | undefined): string => {
+  if (!t) return "hiç";
+  const dk = Math.round((Date.now() - t) / 60000);
+  if (dk < 1) return "şimdi";
+  if (dk < 60) return `${dk} dk önce`;
+  const sa = Math.round(dk / 60);
+  if (sa < 24) return `${sa} saat önce`;
+  return `${Math.round(sa / 24)} gün önce`;
+};
+
+/** IMPERIAL USLÜBÜ home (Sahne dünyası): banner + ortada karakter + sağda haberler/hızlı giriş */
+function impHome(root: HTMLElement): void {
+  const lastInstance = state.instances[0];
+  if (!selectedInstanceId || !state.instances.find((i) => i.id === selectedInstanceId)) {
+    selectedInstanceId = lastInstance?.id || null;
+  }
+  const sel = state.instances.find((i) => i.id === selectedInstanceId);
+  const acc = currentAccount();
+  const iconIsFile = (v: string) => !!v && (v.includes("/") || v.includes("\\"));
+  const sonOynananlar = [...state.instances].sort((a, b) => (b.last_played || 0) - (a.last_played || 0));
+  const hizli = sonOynananlar[0] || null;
+  const profiller = sonOynananlar.slice(0, 5);
+
+  root.innerHTML = `
+    <div class="imp-root">
+      <div class="imp-main">
+        <div class="imp-brand">
+          <div class="imp-brand-orta">
+            <span class="imp-chip imp-sari">YIKIM</span>
+            <span class="imp-chip imp-gri">LIENT</span>
+          </div>
+          <span class="imp-counter">${state.instances.length} kurulum</span>
+        </div>
+
+        <div class="imp-banner${sel?.cover ? " kapakli" : ""}"${sel?.cover ? ` style="background-image:url('${fileSrc(sel.cover)}')"` : ""}>
+          <div class="vitrin"><canvas id="sahne-katman"></canvas></div>
+          <button class="imp-ad-chip" id="i-ad" title="Hesap yönetimi">
+            ${acc?.name ? `${headAttrs(acc)}<b>${acc.name}</b><small>hesabı yönet</small>` : `<b>hesap yok</b><small>giriş yap</small>`}
+          </button>
+          <div class="imp-vitrin-kart">
+            <b class="imp-emote-adi" id="i-emote-adi">EMOTE BEKLER</b>
+            <button class="btn imp-sari-kucuk" id="i-wardrobe">DENEME ALANI</button>
+          </div>
+          ${sel ? `<button class="imp-buyut" id="i-menu" title="${sel.name}">${icon("gear")}</button>` : ""}
+        </div>
+
+        <div class="imp-profil-baslik">
+          <span>${icon("grid")} SON OYNANAN PROFİLLER</span>
+          <span class="imp-pill">
+            <span class="pill sel">${sel?.mod_loader ? loaderName(sel.mod_loader) : "Java"}</span>
+            <span class="pill">${sel?.mc_version || "—"}</span>
+          </span>
+        </div>
+        <div class="imp-profiller" id="i-profil-satirlar"></div>
+
+        <div class="imp-alt">
+          <button class="imp-tam imp-sari-tam" id="i-yonet">${icon("grid")} TÜM PROFİLLERİ YÖNET</button>
+          <button class="imp-tam imp-gri-tam" id="i-mod">${icon("plus")} MOD EKLE</button>
+        </div>
+      </div>
+
+      <div class="imp-yan">
+        <div class="imp-news-head">
+          <b>● SON HABERLER</b>
+          <button class="imp-link" id="i-haber-tumu">Tümü →</button>
+        </div>
+        <div class="imp-news" id="i-news"><div class="imp-news-kart yukleniyor"></div></div>
+
+        <div class="imp-hizli">
+          <div class="imp-hizli-bas">${icon("play")} HIZLI GİRİŞ</div>
+          ${hizli ? `
+          <button class="imp-hizli-satir" id="i-hizli-oyla">
+            <b>${hizli.name}</b>
+            <small>${loaderName(hizli.mod_loader)} · ${hizli.mc_version}</small>
+          </button>
+          <button class="imp-hizli-satir pas" id="i-hizli-liste">Tümünü gör →</button>` : `
+          <button class="imp-hizli-satir pas" id="i-hizli-liste">İlk kurulumu oluştur</button>`}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // profil satırları (Imperial: ikon + piksel isim + yeşil OYNA + dişli)
+  const satirHost = root.querySelector("#i-profil-satirlar") as HTMLElement;
+  for (const inst of profiller) {
+    const row = el(`
+      <div class="imp-satir" role="button" tabindex="0" data-id="${inst.id}">
+        <span class="imp-satir-ikon">${iconIsFile(inst.icon)
+          ? `<img src="${fileSrc(inst.icon)}" draggable="false" />`
+          : `<span class="emoji">${inst.icon || "🔥"}</span>`}</span>
+        <span class="imp-satir-yazi">
+          <b class="imp-satir-ad">${inst.name}</b>
+          <small>${loaderName(inst.mod_loader)} · ${inst.mc_version} — ${timeAgo(inst.last_played)}</small>
+        </span>
+        <button class="imp-oyla" title="${inst.name} — OYNA">${icon("play")} OYNA</button>
+        <button class="imp-diyis" title="Düzenle">${icon("gear")}</button>
+      </div>
+    `);
+    row.addEventListener("click", (e) => {
+      const id = inst.id;
+      if ((e.target as HTMLElement).closest(".imp-diyis")) {
+        navigate("instances", id);
+        return;
+      }
+      if ((e.target as HTMLElement).closest(".imp-oyla")) {
+        // buton bağlanmış (aşağıda) — satır tıkı durum yönetir
+        selectedInstanceId = id;
+        return;
+      }
+      selectedInstanceId = id;
+      navigate("instances", id);
+    });
+    row.querySelector(".imp-oyla")?.addEventListener("click", (e) => e.stopPropagation());
+    satirHost.appendChild(row);
+  }
+  // OYNA butonlarını ayrıca bağla (satır click'i yürümesin)
+  satirHost.querySelectorAll(".imp-satir").forEach((row) => {
+    const id = (row as HTMLElement).dataset.id || "";
+    row.querySelector(".imp-oyla")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!state.accounts.length) return openLoginModal();
+      const { launchInstance } = await import("../main");
+      void launchInstance(id);
+    });
+  });
+
+  // üst şerit ve alt butonlar
+  root.querySelector("#i-yonet")?.addEventListener("click", () => navigate("instances"));
+  root.querySelector("#i-mod")?.addEventListener("click", () => navigate("explore"));
+  root.querySelector("#i-menu")?.addEventListener("click", () => { if (selectedInstanceId) navigate("instances", selectedInstanceId); });
+  root.querySelector("#i-ad")?.addEventListener("click", () => openLoginModal());
+  root.querySelector("#i-wardrobe")?.addEventListener("click", () => navigate("deneme"));
+  root.querySelector("#i-haber-tumu")?.addEventListener("click", () => navigate("news"));
+  root.querySelector("#i-hizli-liste")?.addEventListener("click", () => navigate("instances"));
+  root.querySelector("#i-hizli-oyla")?.addEventListener("click", async () => {
+    if (!state.accounts.length) return openLoginModal();
+    if (hizli) { const { launchInstance } = await import("../main"); void launchInstance(hizli.id); }
+  });
+
+  // vitrin motoru + skin + emote (eski akışla aynı)
+  void baslatVitrin(root, acc);
+  // vitrin karttındaki emote adını canlı tut
+  const kartaYaz = setInterval(() => {
+    const host = root.querySelector("#i-emote-adi");
+    const canvas = root.querySelector("#sahne-katman");
+    if (!host || (canvas && !canvas.isConnected)) { clearInterval(kartaYaz); return; }
+    const ad = sahnekartad();
+    if (ad && host.textContent !== ad) host.textContent = ad.toUpperCase();
+  }, 800);
+}
+
+function sahnekartad(): string {
+  const ws = (window as any).__sahne as { sonOynananAd?: string } | null;
+  return ws?.sonOynananAd || "EMOTE BEKLER";
+}
+
+async function impNewsYukle(root: HTMLElement): Promise<void> {
+  const host = root.querySelector("#i-news") as HTMLElement | null;
+  if (!host) return;
+  try {
+    const items: any[] = await invoke("cmd_list_yikim_news");
+    items.sort((a: any, b: any) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.date.localeCompare(a.date));
+    host.innerHTML = "";
+    for (const a of items.slice(0, 2)) {
+      const kart = el(`
+        <div class="imp-news-kart" role="button" tabindex="0">
+          <div class="imp-news-img"${a.image ? ` style="background-image:url('${a.image}')"` : ""}></div>
+          <div class="imp-news-govde">
+            <span class="imp-news-chip${a.pinned ? " sar" : ""}">${a.pinned ? "DUYURU" : "YIKIM"}</span>
+            <b>${a.title}</b>
+            <small>${a.date}</small>
+          </div>
+        </div>
+      `);
+      kart.addEventListener("click", () => navigate("news"));
+      host.appendChild(kart);
+    }
+  } catch { /* çevrimdışı: sessiz geç */ }
+}
+
 export function renderHome(root: HTMLElement): void {
   sahneKapat(); // eski canvas/renderer'ı temizle (sayfa yenileniyor)
+  if (sahneDunyasi()) {
+    impHome(root);
+    void impNewsYukle(root);
+    return;
+  }
   const lastInstance = state.instances[0];
   if (!selectedInstanceId || !state.instances.find((i) => i.id === selectedInstanceId)) {
     selectedInstanceId = lastInstance?.id || null;
