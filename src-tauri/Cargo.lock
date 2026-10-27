@@ -6499,7 +6499,7 @@ dependencies = [
 
 [[package]]
 name = "yikimlient"
-version = "0.3.39"
+version = "0.3.40"
 dependencies = [
  "base64 0.23.1",
  "chrono",

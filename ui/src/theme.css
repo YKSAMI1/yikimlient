@@ -347,10 +347,25 @@ select.input option { background: var(--bg2); }
 
 :root[data-world="sahne"] .home-hero {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 316px minmax(0, 1fr);
   align-items: stretch;
-  gap: 22px;
-  min-height: 320px;
+  gap: 20px;
+  min-height: 340px;
+}
+:root[data-world="sahne"] .home-hero .vitrin {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: stretch;
+}
+:root[data-world="sahne"] .home-hero .hero-content {
+  grid-column: 1;
+  grid-row: 1;
+}
+:root[data-world="sahne"] .home-hero .play-ring-wrap {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  align-self: center;
 }
 :root[data-world="sahne"] .home-hero .vitrin {
   display: block;
@@ -358,7 +373,7 @@ select.input option { background: var(--bg2); }
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius);
   overflow: hidden;
-  min-height: 260px;
+  min-height: 280px;
   background:
     linear-gradient(#0000 0, #0000 100%),
     repeating-conic-gradient(from 90deg, var(--bg2) 0% 25%, var(--bg3) 25% 50%);
