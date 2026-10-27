@@ -254,6 +254,7 @@ const RAIL = [
   { page: "instances", icon: "grid", label: "Paketler" },
   { page: "explore", icon: "compass", label: "Keşfet" },
   { page: "news", icon: "news", label: "Haberler" },
+  { page: "deneme", icon: "play", label: "Deneme Alanı" },
   { page: "settings", icon: "gear", label: "Ayarlar" },
 ];
 
