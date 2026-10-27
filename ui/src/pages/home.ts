@@ -43,7 +43,7 @@ function impHome(root: HTMLElement): void {
         <div class="imp-banner${sel?.cover ? " kapakli" : ""}"${sel?.cover ? ` style="background-image:url('${fileSrc(sel.cover)}')"` : ""}>
           <div class="vitrin"><canvas id="sahne-katman"></canvas></div>
           <button class="imp-ad-chip" id="i-ad" title="Hesap yönetimi">
-            ${acc?.name ? `${headAttrs(acc)}<b>${acc.name}</b><small>hesabı yönet</small>` : `<b>hesap yok</b><small>giriş yap</small>`}
+            ${acc?.name ? `<img src="${headUrl(acc)}" alt="" draggable="false" ${headAttrs(acc)}><b>${acc.name}</b><small>hesabı yönet</small>` : `<b>hesap yok</b><small>giriş yap</small>`}
           </button>
           <div class="imp-vitrin-kart">
             <b class="imp-emote-adi" id="i-emote-adi">EMOTE BEKLER</b>

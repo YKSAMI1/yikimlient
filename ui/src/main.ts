@@ -7,6 +7,8 @@ import "./world-layouts.css";
 import "./world-extra.css";
 import "@fontsource/silkscreen/400.css";
 import "@fontsource/silkscreen/700.css";
+import "@fontsource/silkscreen/latin-ext-400.css";
+import "@fontsource/silkscreen/latin-ext-700.css";
 import { registerPages } from "./pages";
 import { startDropWatcher } from "./drop";
 import { maybeStartTour } from "./tour";
