@@ -121,34 +121,135 @@
   font-weight: 680;
 }
 
-/* ---------- Dünya 5: Sahne — karakter vitrini, satrancı zemin, amber ---------- */
+/* ---------- Dünya 5: Sahne — Imperial uslübü: piksel yazı, sarı blok butonlar, satrancı zemin ---------- */
 :root[data-world="sahne"] {
-  --accent: #ffab4d;
-  --accent-soft: #ffc47e;
-  --accent-deep: #e08b1e;
-  --accent-ink: #221100;
-  --accent-dim: rgba(255, 171, 77, 0.12);
-  --on-accent: #1a1000;
+  --accent: #ffd83d;
+  --accent-soft: #ffe97f;
+  --accent-deep: #e8bf1f;
+  --accent-ink: #201a02;
+  --accent-dim: rgba(255, 216, 61, 0.14);
+  --on-accent: #201800;
 
-  --bg0: #0c0d13;
-  --bg1: #10111a;
-  --bg2: #14151f;
-  --bg3: #1a1c29;
-  --bg4: #262939;
-  --hairline: rgba(240, 230, 210, 0.08);
-  --hairline-strong: rgba(240, 230, 210, 0.15);
+  --oyun-yesil: #3fae4c;          /* OYNA: Minecraft envanter yeşili */
+  --oyun-yesil-ink: #0c2a0e;
 
-  --text: #efeade;
-  --text-dim: #a89f92;
-  --text-faint: #6f6a5f;
+  --bg0: #0d0e12;
+  --bg1: #121319;
+  --bg2: #17181f;
+  --bg3: #1d1e28;
+  --bg4: #2a2c3a;
+  --hairline: rgba(235, 225, 200, 0.09);
+  --hairline-strong: rgba(235, 225, 200, 0.18);
+
+  --text: #f2edde;
+  --text-dim: #aaa291;
+  --text-faint: #71695c;
+  --piksel: "Silkscreen", "Courier New", monospace;
   color-scheme: dark;
 }
+/* satrancı zemin: tüm uygulamada Imperial gibi hafif görünen damalı doku */
+:root[data-world="sahne"] body {
+  background-image:
+    repeating-conic-gradient(from 90deg, rgba(255, 255, 255, 0.012) 0% 25%, transparent 25% 50%);
+  background-size: 32px 32px;
+}
+/* piksel yazı: başlıklar, butonlar, etiketler — gövde metni okunaklı kalır */
 :root[data-world="sahne"] .brand-word,
 :root[data-world="sahne"] .page-header h1,
+:root[data-world="sahne"] .home-hero h1,
+:root[data-world="sahne"] h2,
+:root[data-world="sahne"] h3,
+:root[data-world="sahne"] .btn,
+:root[data-world="sahne"] .dim-cap,
+:root[data-world="sahne"] .hero-badge,
+:root[data-world="sahne"] .meter-cap,
+:root[data-world="sahne"] .vitrin-isim,
+:root[data-world="sahne"] .nav-item span,
+:root[data-world="sahne"] .ledger-title,
+:root[data-world="sahne"] .pr-label,
+:root[data-world="sahne"] .sr-label {
+  font-family: var(--piksel);
+  letter-spacing: 0.04em;
+}
+:root[data-world="sahne"] .page-header h1,
 :root[data-world="sahne"] .home-hero h1 {
-  letter-spacing: 0.05em;
   text-transform: uppercase;
-  font-weight: 750;
+  font-weight: 700;
+}
+
+/* sarı blok butonlar: Imperial'in dokulu sarı bloğu */
+:root[data-world="sahne"] .btn.primary {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 3px, transparent 3px 6px),
+    var(--accent);
+  color: var(--on-accent);
+  border: 1px solid var(--accent-deep);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 2px 0 0 var(--accent-deep);
+  text-transform: uppercase;
+}
+:root[data-world="sahne"] .btn.primary:hover {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0 3px, transparent 3px 6px),
+    var(--accent-soft);
+}
+/* OYNA ring: Minecraft yeşili + piksel etiket */
+:root[data-world="sahne"] .play-ring {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0 3px, transparent 3px 6px),
+    var(--oyun-yesil);
+  color: #eaffea;
+}
+:root[data-world="sahne"] .play-ring .pr-label,
+:root[data-world="sahne"] .play-ring .pr-sub {
+  color: #eaffea;
+}
+/* kenar rayı: Imperial'in yuvarlak kare ikon düğmeleri */
+:root[data-world="sahne"] .nav-item {
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+:root[data-world="sahne"] .nav-item.sel {
+  background: var(--accent-dim);
+  border-color: var(--accent-deep);
+  color: var(--accent);
+}
+:root[data-world="sahne"] .rail {
+  background: var(--bg1);
+}
+/* kartlar: Imperial'in yumuşak köşeli blokları */
+:root[data-world="sahne"] .card {
+  border-radius: 10px;
+}
+/* vitrin: karakterin zemin perdesi hafif dikişli çerçeve + sarı üst şerit */
+:root[data-world="sahne"] .home-hero .vitrin {
+  border-radius: 12px;
+  border: 2px solid var(--bg4);
+}
+/* "DİĞER HATLAR" satırları: piksel isim + yeşil mini OYNA bloğu */
+:root[data-world="sahne"] .lr-name {
+  font-family: var(--piksel);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 13px;
+}
+:root[data-world="sahne"] .lr-meta {
+  font-size: 11.5px;
+}
+:root[data-world="sahne"] .lr-play {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 3px, transparent 3px 6px),
+    var(--oyun-yesil);
+  color: #eaffea;
+  border: 1px solid #2c7a35;
+  border-radius: 7px;
+}
+:root[data-world="sahne"] .vitrin::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 8px, var(--accent-deep) 8px 16px);
+  z-index: 3;
 }
 
 /* ---------- custom accent (Ayarlar'dan) ---------- */

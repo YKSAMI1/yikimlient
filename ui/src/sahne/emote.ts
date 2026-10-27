@@ -251,17 +251,22 @@ export function poz(emote: Emote, tHam: number): Poz {
             }
         }
     }
-    // delta'ya çevir: eski format mutlak pivot px; PAL zaten delta
+    // Eski format: x/y/z = kemiğin EBEVEYNİNE GÖRE mutlak konumu (palm: head y=-0.0 gövde çocuğu;
+    // waving: bacak y=12 köke bağlı gibi). PAL: pivottan delta zaten.
+    // Dünya koordinatına çevir → açısal pivotumuzdan delta çıkar.
     const PIVOT: number[][] = [
         [0, 24, 0], [0, 24, 0], [5, 22, 0], [-5, 22, 0], [1.9, 12, 0], [-1.9, 12, 0],
     ];
+    // ebeveyn düzeltmesi: [head, body, armL, armR, legL, legR] — head/kollar gövdenin çocuğu (y'e +24)
+    const GOVDE_COCUK = [1, 0, 1, 1, 0, 0];
     for (let i = 0; i < 6; i++) {
         const ham = konumHam[i];
         const yaz = p.konum[i];
-        const fark = emote.palDelta !== true && ham.some((v) => v !== undefined);
         for (let a = 0; a < 3; a++) {
             if (ham[a] === undefined) { yaz[a] = 0; continue; }
-            yaz[a] = fark ? (ham[a] as number) - PIVOT[i][a] : (ham[a] as number);
+            let dunya = ham[a] as number;
+            if (a === 1 && GOVDE_COCUK[i]) dunya += 24;
+            yaz[a] = dunya - PIVOT[i][a];
         }
     }
     return p;

@@ -5,6 +5,8 @@ import "./system-ui.css";
 import "./world-afis.css";
 import "./world-layouts.css";
 import "./world-extra.css";
+import "@fontsource/silkscreen/400.css";
+import "@fontsource/silkscreen/700.css";
 import { registerPages } from "./pages";
 import { startDropWatcher } from "./drop";
 import { maybeStartTour } from "./tour";

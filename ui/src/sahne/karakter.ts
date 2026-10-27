@@ -160,12 +160,12 @@ export class Sahne {
         armL.position.set(5 * KS, 22 * KS, 0);
         armL.userData.pivotPx = [5, 22, 0];
         const armLMesh = kutuYap({ u: 32, v: 48, w: armW, h: 12, d: 4 }, doku);
-        armLMesh.position.set(KS, -6 * KS, 0);
+        armLMesh.position.set(KS, -4 * KS, 0);
         armL.add(armLMesh);
         armR.position.set(-5 * KS, 22 * KS, 0);
         armR.userData.pivotPx = [-5, 22, 0];
         const armRMesh = kutuYap({ u: 40, v: 16, w: armW, h: 12, d: 4 }, doku);
-        armRMesh.position.set(-KS, -6 * KS, 0);
+        armRMesh.position.set(-KS, -4 * KS, 0);
         armR.add(armRMesh);
 
         legL.position.set(1.9 * KS, 12 * KS, 0);

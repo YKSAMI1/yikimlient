@@ -4,8 +4,8 @@ import { currentAccount, headAttrs, headUrl, icon, invoke, openModal, openLoginM
    preview html'i inline style'la çizilir; tema motoruna bağımlı değil. */
 const WORLDS = [
   {
-    id: "sahne", name: "Sahne", desc: "Karakter vitrini — satrancı zemin, amber vurgu, emote'lu karakter",
-    bg: "#0c0d13", panel: "#14151f", line: "#262939", text: "#efeade", dim: "#6f6a5f", accent: "#ffab4d",
+    id: "sahne", name: "Sahne", desc: "Imperial uslübü — ortada karakter, piksel yazı, sarı blok butonlar",
+    bg: "#0d0e12", panel: "#17181f", line: "#2a2c3a", text: "#f2edde", dim: "#71695c", accent: "#ffd83d",
   },
   {
     id: "pano", name: "Devre Panosu", desc: "Hatlar, lambalar, şalter",
