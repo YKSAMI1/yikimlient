@@ -179,6 +179,7 @@ function twinkleDef(hue: string): ModeDef {
 function modeForWorld(world: string): ModeDef | null {
   switch (world) {
     case "pano":     return emberDef(0.5, false);                // turuncu zımtırak
+    case "sahne":    return twinkleDef("rgba(255,171,77,0.75)"); // sahne ışık tozu
     case "sokum":    return emberDef(0.9, true);                 // ağır kızıl zımtırak
     case "afis":     return dustDef("rgba(63,50,38,0.5)");       // baskı kâğıdı tozu
     case "standart": return twinkleDef("rgba(147,168,255,0.5)"); // nazik mavi kıvılcım

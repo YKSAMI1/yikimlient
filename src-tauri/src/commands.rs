@@ -2,6 +2,7 @@ use crate::{
     auth, config::YikimConfig, core, instances, instances::Instance, launcher, modpacks, repos,
     stats, util::write_json, yikim_mod,
 };
+use base64::Engine as _;
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -95,6 +96,136 @@ pub async fn cmd_save_settings(
 #[tauri::command]
 pub async fn cmd_list_accounts() -> Result<Vec<SanitizedAccount>, String> {
     Ok(load_accounts().iter().map(sanitize).collect())
+}
+
+// ---------- sahne emote paketleri ----------
+
+/// Launcher karakter vitrinine eklenmiş emote'ları listeler: [{adi, icerik}]
+#[tauri::command]
+pub fn cmd_list_emotes() -> Result<Vec<serde_json::Value>, String> {
+    let dir = crate::core::app_dir().join("emotes");
+    let mut out: Vec<serde_json::Value> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        let mut dosyalar: Vec<std::path::PathBuf> =
+            rd.filter_map(|s| s.ok()).map(|s| s.path()).collect();
+        dosyalar.sort();
+        for yol in dosyalar {
+            if yol.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            if let Ok(icerik) = std::fs::read_to_string(&yol) {
+                let adi = yol.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+                out.push(serde_json::json!({ "adi": adi, "icerik": icerik }));
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Deneme alanından emote kaydet (launcher vitrinine kalıcı ekle)
+#[tauri::command]
+pub fn cmd_add_emote(icerik: String) -> Result<serde_json::Value, String> {
+    let js: serde_json::Value = serde_json::from_str(&icerik).map_err(|z| format!("geçersiz json: {z}"))?;
+    let adi = js["name"].as_str().unwrap_or("emote").trim().to_string();
+    let guvenli: String = adi
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == ' ' { c } else { '_' })
+        .collect();
+    let guvenli = if guvenli.is_empty() { "emote".into() } else { guvenli };
+    let dir = crate::core::app_dir().join("emotes");
+    std::fs::create_dir_all(&dir).map_err(|z| z.to_string())?;
+    let mut ad = format!("{guvenli}.json");
+    let mut i = 1;
+    while dir.join(&ad).exists() {
+        ad = format!("{guvenli}-{i}.json");
+        i += 1;
+    }
+    std::fs::write(dir.join(&ad), &icerik).map_err(|z| z.to_string())?;
+    Ok(serde_json::json!({ "adi": ad }))
+}
+
+/// Emote sil (yalnız dosya adı; yol geçişi kapalı)
+#[tauri::command]
+pub fn cmd_delete_emote(adi: String) -> Result<bool, String> {
+    if adi.is_empty() || adi.contains("..") || adi.contains('/') || adi.contains('\\') {
+        return Err("uygunsuz emote adı".into());
+    }
+    let yol = crate::core::app_dir().join("emotes").join(&adi);
+    match std::fs::remove_file(&yol) {
+        Ok(()) => Ok(true),
+        Err(_) => Ok(false),
+    }
+}
+
+/// Seçili hesabın skin'ini Mojang'dan çeker, cache'ler; {dosya, slim} döner.
+/// Hesap yok/offline ise {varsayilan: true} → UI Steve yedeğine düşer.
+#[tauri::command]
+pub async fn cmd_get_account_skin(id: String) -> Result<serde_json::Value, String> {
+    let list = load_accounts();
+    let acc = match list.iter().find(|a| a.id == id) {
+        Some(a) => a.clone(),
+        None => return Ok(serde_json::json!({ "varsayilan": true })),
+    };
+    if acc.kind != "microsoft" || acc.uuid.trim().is_empty() {
+        return Ok(serde_json::json!({ "varsayilan": true }));
+    }
+    let cache = crate::core::app_dir().join("cache");
+    std::fs::create_dir_all(&cache).map_err(|z| z.to_string())?;
+    let png = cache.join(format!("skin-{}.png", acc.uuid));
+    let meta = cache.join(format!("skin-{}.json", acc.uuid));
+
+    let oku_slim = || -> bool {
+        std::fs::read_to_string(&meta)
+            .ok()
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            .and_then(|j| j["slim"].as_bool())
+            .unwrap_or(false)
+    };
+
+    if png.exists() {
+        return Ok(serde_json::json!({ "dosya": png.to_string_lossy(), "slim": oku_slim() }));
+    }
+
+    let uuid = acc.uuid.replace('-', "");
+    let url = format!("https://sessionserver.mojang.com/session/minecraft/profile/{uuid}");
+    let resp = crate::core::http_client()
+        .get(&url)
+        .send()
+        .await
+        .map_err(|z| format!("oyun profili hatası: {z}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("oyun profili alınamadı: {}", resp.status()));
+    }
+    let p: serde_json::Value = resp.json().await.map_err(|z| z.to_string())?;
+    let tex_prop = p["properties"]
+        .as_array()
+        .and_then(|a| a.iter().find(|k| k["name"] == "textures"))
+        .and_then(|k| k["value"].as_str())
+        .ok_or("skin texture özelliği yok")?;
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(tex_prop)
+        .map_err(|z| format!("texture base64 hatası: {z}"))?;
+    let tex: serde_json::Value =
+        serde_json::from_slice(&decoded).map_err(|z| z.to_string())?;
+    let skin_url = tex["textures"]["SKIN"]["url"]
+        .as_str()
+        .ok_or("skin url yok")?;
+    let slim = tex["textures"]["SKIN"]["metadata"]["model"].as_str() == Some("slim");
+    let bayt = crate::core::http_client()
+        .get(skin_url)
+        .send()
+        .await
+        .map_err(|z| z.to_string())?
+        .bytes()
+        .await
+        .map_err(|z| z.to_string())?;
+    std::fs::write(&png, &bayt).map_err(|z| z.to_string())?;
+    let yari = cache.join(format!("skin-{}.json.yari", acc.uuid));
+    std::fs::write(&yari, serde_json::json!({ "slim": slim }).to_string())
+        .map_err(|z| z.to_string())?;
+    let _ = std::fs::rename(&yari, &meta);
+
+    Ok(serde_json::json!({ "dosya": png.to_string_lossy(), "slim": slim }))
 }
 
 #[tauri::command]

@@ -121,6 +121,36 @@
   font-weight: 680;
 }
 
+/* ---------- Dünya 5: Sahne — karakter vitrini, satrancı zemin, amber ---------- */
+:root[data-world="sahne"] {
+  --accent: #ffab4d;
+  --accent-soft: #ffc47e;
+  --accent-deep: #e08b1e;
+  --accent-ink: #221100;
+  --accent-dim: rgba(255, 171, 77, 0.12);
+  --on-accent: #1a1000;
+
+  --bg0: #0c0d13;
+  --bg1: #10111a;
+  --bg2: #14151f;
+  --bg3: #1a1c29;
+  --bg4: #262939;
+  --hairline: rgba(240, 230, 210, 0.08);
+  --hairline-strong: rgba(240, 230, 210, 0.15);
+
+  --text: #efeade;
+  --text-dim: #a89f92;
+  --text-faint: #6f6a5f;
+  color-scheme: dark;
+}
+:root[data-world="sahne"] .brand-word,
+:root[data-world="sahne"] .page-header h1,
+:root[data-world="sahne"] .home-hero h1 {
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 750;
+}
+
 /* ---------- custom accent (Ayarlar'dan) ---------- */
 :root[data-world-custom="1"] {
   --accent: var(--custom-accent, #ff7a18);
@@ -307,6 +337,53 @@ select.input option { background: var(--bg2); }
   width: 16px; height: 16px; border-radius: 50%;
   border: 2px solid var(--bg4); border-top-color: var(--accent);
   animation: spin 0.7s linear infinite; display: inline-block;
+}
+
+/* ---------- Vitrin (Sahne): karakter sahne kartı + hero dizilişi ----------
+   Vitrin DOM'u tüm dünyalarda aynı; yalnız sahne dünyasında görünür.
+   Sahne zemininde hafif satrancı (checker) — karakterin flokları burada
+   durur; kamera sabit, karakter rastgele emote oynar. */
+.vitrin { display: none; }
+
+:root[data-world="sahne"] .home-hero {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 22px;
+  min-height: 320px;
+}
+:root[data-world="sahne"] .home-hero .vitrin {
+  display: block;
+  position: relative;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+  min-height: 260px;
+  background:
+    linear-gradient(#0000 0, #0000 100%),
+    repeating-conic-gradient(from 90deg, var(--bg2) 0% 25%, var(--bg3) 25% 50%);
+  background-size: auto, 44px 44px;
+  box-shadow: inset 0 -60px 90px -55px rgba(0, 0, 0, 0.8);
+}
+:root[data-world="sahne"] .home-hero .vitrin canvas,
+:root[data-world="sahne"] .vitrin canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+}
+.vitrin canvas { opacity: 0; transition: opacity 0.4s ease; }
+.vitrin canvas.on { opacity: 1; }
+:root[data-world="sahne"] .vitrin-isim {
+  position: absolute; left: 12px; bottom: 10px; z-index: 2;
+  font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+  font-weight: 650; color: var(--text-dim);
+  background: color-mix(in srgb, var(--bg1) 80%, transparent);
+  border: 1px solid var(--hairline); padding: 4px 9px; border-radius: var(--radius-sm);
+  backdrop-filter: blur(3px);
+}
+:root[data-world="sahne"] .vitrin::after {
+  /* sahne ışığı hissi: amfi şeridi değil, ince üst hairline + spotu */
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-dim), transparent);
+  z-index: 3; pointer-events: none;
 }
 
 /* ---------- Tooltip ---------- */

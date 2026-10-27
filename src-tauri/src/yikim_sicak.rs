@@ -290,6 +290,11 @@ pub async fn yazi_senkonize(handle: tauri::AppHandle) -> Result<(), String> {
                     core::yikim_log(format!("sicak ui: {h}"));
                 }
             }
+            "emotepaketi" => {
+                if let Err(h) = emote_paketi_uygula(k).await {
+                    core::yikim_log(format!("sicak emote: {h}"));
+                }
+            }
             "" => {}
             t => core::yikim_log(format!("sicak: bilinmeyen kaynak turu '{t}' atlandı (eski launcher)")),
         }
@@ -440,6 +445,68 @@ async fn ui_paketi_uygula(e: &serde_json::Value) -> Result<(), String> {
     Ok(())
 }
 
+
+// ---------------------------------------------------------------------------
+// 'emotepaketi' kaynak işleyicisi — karakter vitrininin emote paketleri
+// ---------------------------------------------------------------------------
+
+/// Emote paketini uygula: indir → sha doğrula → .json dosyalarını
+/// <app_dir>/emotes/ klasörüne dök. Sürüm damgası (.surum) aynıysa atla.
+async fn emote_paketi_uygula(e: &serde_json::Value) -> Result<(), String> {
+    let ver = e
+        .get("surum")
+        .and_then(|v| v.as_str())
+        .ok_or("emotepaketi 'surum' yok")?
+        .replace(['\\', '/', ':', '*'], "_");
+    if ver.is_empty() {
+        return Err("emotepaketi 'surum' boş".into());
+    }
+
+    let klasor = core::app_dir().join("emotes");
+    let damga = klasor.join(".surum");
+    if let Ok(eski) = fs::read_to_string(&damga) {
+        if eski.trim() == ver {
+            return Ok(()); // aynı paket zaten uygulanmış
+        }
+    }
+
+    let url = e.get("url").and_then(|v| v.as_str()).unwrap_or("");
+    if url.is_empty() {
+        return Err("emotepaketi 'url' yok".into());
+    }
+    let sha = e.get("sha256").and_then(|v| v.as_str()).unwrap_or("");
+    let hedef_zip = sicak_dir().join(format!("emote-{ver}"));
+    indir(url, &hedef_zip, sha).await?;
+
+    fs::create_dir_all(&klasor).map_err(|z| format!("emotes klasör hatası: {z}"))?;
+    let mut arşiv = zip::ZipArchive::new(
+        fs::File::open(&hedef_zip).map_err(|z| format!("emote zip açılamadı: {z}"))?,
+    )
+    .map_err(|z| format!("emote zip arşivi bozuk: {z}"))?;
+    let n = arşiv.len();
+    for i in 0..n {
+        let mut girdi = arşiv
+            .by_index(i)
+            .map_err(|z| format!("emote zip girdi {i} hatası: {z}"))?;
+        let ad = girdi.name().replace('\\', "/");
+        if ad.is_empty() || ad.contains("..") || ad.ends_with('/') {
+            continue;
+        }
+        // yalnız .json emote dosyaları; klasör yapısı düz
+        let Some(dosya_adi) = ad.rsplit('/').next() else { continue };
+        if !dosya_adi.to_ascii_lowercase().ends_with(".json") || dosya_adi.starts_with('.') {
+            continue;
+        }
+        let mut cikis = fs::File::create(klasor.join(dosya_adi))
+            .map_err(|z| format!("emote yazma hatası: {z}"))?;
+        std::io::copy(&mut girdi, &mut cikis)
+            .map_err(|z| format!("emote kopyalama hatası: {z}"))?;
+    }
+    let _ = fs::remove_file(&hedef_zip);
+    let _ = fs::write(&damga, &ver);
+    core::yikim_log(format!("sicak emote: {ver} paketi uygulandı ({n} girdi)"));
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {

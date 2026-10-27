@@ -96,9 +96,9 @@ export function applyWorld(): void {
   if (!state.config) return;
   const t = state.config.theme as string;
   const root = document.documentElement;
-  const legacy: Record<string, string> = { dark: "standart", neon: "pano", light: "pano", orange: "pano", anons: "pano" };
-  // "custom" eski bir değer: pano dünyasında yaşar
-  const world = t === "custom" ? "pano" : (legacy[t] ?? t) || "pano";
+  const legacy: Record<string, string> = { dark: "standart", neon: "pano", light: "pano", orange: "sahne", anons: "pano" };
+  // "custom" eski bir değer: pano dünyasında yaşar; bilinmeyen/ayboş → sahne (varsayılan)
+  const world = t === "custom" ? "pano" : (legacy[t] ?? t) || "sahne";
 
   // Özel vurgu rengi: boş değilse HANGİ dünyada olursa olsun vurguları boyar
   const accent = (state.config.custom_accent || "").trim();

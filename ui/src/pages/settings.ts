@@ -1,10 +1,14 @@
-import { currentAccount, headAttrs, headUrl, icon, invoke, openModal, openLoginModal, state, toast, applyWorld, refreshState, openPath, openExternal } from "../main";
+import { currentAccount, headAttrs, headUrl, icon, invoke, openModal, openLoginModal, state, toast, applyWorld, refreshState, openPath, openExternal, navigate } from "../main";
 
 /* Dört dünya — her kart o dünyanın kendi zemininde mini önizleme taşır.
    preview html'i inline style'la çizilir; tema motoruna bağımlı değil. */
 const WORLDS = [
   {
-    id: "pano", name: "Devre Panosu", desc: "Varsayılan — hatlar, lambalar, şalter",
+    id: "sahne", name: "Sahne", desc: "Karakter vitrini — satrancı zemin, amber vurgu, emote'lu karakter",
+    bg: "#0c0d13", panel: "#14151f", line: "#262939", text: "#efeade", dim: "#6f6a5f", accent: "#ffab4d",
+  },
+  {
+    id: "pano", name: "Devre Panosu", desc: "Hatlar, lambalar, şalter",
     bg: "#0b0b0d", panel: "#141419", line: "#26262e", text: "#e9e7e2", dim: "#6d6b66", accent: "#ff7a18",
   },
   {
@@ -69,7 +73,7 @@ export function renderSettings(root: HTMLElement): void {
   // ölü nesneye yazmamak için cfg her kayıttan sonra tazelenir (save() içinde).
   let cfg = state.config;
   // eski tema değerlerini dünyalara eşle (orange/dark/neon/light artık dünya adlarıyla yaşar)
-  const legacy: Record<string, string> = { dark: "standart", neon: "pano", light: "pano", orange: "pano", anons: "pano" };
+  const legacy: Record<string, string> = { dark: "standart", neon: "pano", light: "pano", orange: "sahne", anons: "pano" };
   const activeTheme = legacy[cfg.theme] ?? cfg.theme;
   const customOn = !!(cfg.custom_accent || "").trim();
   // dinamik sürüm — Tauri'nin kendi getVersion()'undan
@@ -130,6 +134,13 @@ export function renderSettings(root: HTMLElement): void {
             </span>
             ${activeTheme === w.id ? `<span class="sel-tag">SEÇİLİ</span>` : ""}
           </button>`).join("")}
+      </div>
+      <div class="row-between" style="margin-top:14px">
+        <div>
+          <div style="font-size:12.5px; font-weight:600">Emote Deneme Alanı</div>
+          <div style="font-size:11.5px; color:var(--text-dim)">Blockbench emote'larını anlık dene — vitrin paketine gönder.</div>
+        </div>
+        <button class="btn ghost sm" id="deneme-alani">${icon("gear")} Aç</button>
       </div>
       <div class="row-between" style="margin-top:14px" id="custom-row">
         <div>
@@ -256,6 +267,7 @@ export function renderSettings(root: HTMLElement): void {
   // özel vurgu rengi — tüm dünyalarda geçerli, dünya seçimini BOZMAZ
   const accentPick = root.querySelector("#accent-pick") as HTMLInputElement;
   const accentDefault = root.querySelector("#accent-default");
+  root.querySelector("#deneme-alani")?.addEventListener("click", () => navigate("deneme"));
   accentPick?.addEventListener("input", (e) => {
     state.config.custom_accent = (e.target as HTMLInputElement).value;
     applyWorld();

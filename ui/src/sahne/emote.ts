@@ -1,0 +1,268 @@
+// YIKIM SAHNE - EMOTE PARÇALAMA (Emotecraft/PAL format uyumlu)
+//
+// Emotecraft .json emote'larını launcher karakter vitrininde oynatır.
+// Desteklenen formatlar:
+//   1. Eski format: {name, author, description, emote:{isLoop,beginTick,
+//      endTick,stopTick,returnTick,degrees,moves:[{tick,easing,turn?,head/body/
+//      torso/leftArm/rightArm/leftLeg/rightLeg:{pitch,yaw,roll,bend,x,y,z}}]}}
+//   2. PAL/geckolib biçemi: {format_version, animations:{ad:{bones:{body:
+//      {rotation/position: {vector:[..]} | [{time,vector:[..]}...]}}}}}
+// MoLang ifadeleri (sayı yerine metin) ileri sürüm işi: 0 alınır, ihmal edilir.
+
+export interface Kf { t: number; v: number; easing: string; }
+
+export interface Kanal {
+    pitch?: Kf[];
+    yaw?: Kf[];
+    roll?: Kf[];
+    bend?: Kf[];
+    x?: Kf[];
+    y?: Kf[];
+    z?: Kf[];
+    turn?: Kf[];
+}
+
+export interface Emote {
+    adi: string;
+    yazar: string;
+    aciklama: string;
+    baslangicTick: number;
+    bitisTick: number;
+    stopTick: number;
+    donusTick: number;
+    dongu: boolean;
+    kemikler: Map<string, Kanal>;
+    /** true: x/y/z kanalı pivottan delta (PAL); false/oidsız: mutlak pivot px (eski) */
+    palDelta?: boolean;
+}
+
+const KEMIKLER = ["head", "body", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"];
+const KANALLAR = ["pitch", "yaw", "roll", "bend", "x", "y", "z"] as const;
+
+function say(v: unknown): number | null {
+    return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/** name alanı bazen {"translate": "..."} objesi gelir — düz metne çevir. */
+function isim(v: unknown): string {
+    if (typeof v === "string") return v.trim();
+    if (v && typeof v === "object") {
+        const t = (v as Record<string, unknown>).translate;
+        if (typeof t === "string") return t.trim();
+    }
+    return "";
+}
+
+function BosEmote(adi: string): Emote {
+    return {
+        adi, yazar: "", aciklama: "",
+        baslangicTick: 0, bitisTick: 60, stopTick: 61, donusTick: 60, dongu: false,
+        kemikler: new Map(),
+    };
+}
+
+/** Eski Emotecraft formatını parçalar. */
+function eskiFormat(js: any): Emote {
+    const e = js.emote || {};
+    const donusTick = Number(e.returnTick) > 0 ? Number(e.returnTick) : 60;
+    const bitis = Number(e.endTick) > 0 ? Number(e.endTick) : donusTick;
+    const emote: Emote = {
+        adi: isim(js.name) || "İsimsiz",
+        yazar: String(js.author || ""),
+        aciklama: String(js.description || ""),
+        baslangicTick: Number(e.beginTick) > 0 ? Number(e.beginTick) : 0,
+        bitisTick: bitis,
+        stopTick: Number(e.stopTick) > 0 ? Number(e.stopTick) : bitis,
+        donusTick,
+        dongu: e.isLoop === true || e.isLoop === "true",
+        kemikler: new Map(),
+    };
+    const moves: any[] = Array.isArray(e.moves) ? e.moves : [];
+    let turnToplam: Record<string, number> = {};
+    for (const m of moves) {
+        if (typeof m?.tick !== "number") continue;
+        const t = m.tick;
+        for (const k of KEMIKLER) {
+            const ham = m[k];
+            if (!ham || typeof ham !== "object") continue;
+            let kanal = emote.kemikler.get(k);
+            if (!kanal) { kanal = {}; emote.kemikler.set(k, kanal); }
+            for (const cn of KANALLAR) {
+                const v = say(ham[cn]);
+                if (v !== null) {
+                    if (!kanal[cn]) kanal[cn] = [];
+                    kanal[cn]!.push({ t, v, easing: String(m.easing || "LINEAR").toUpperCase() });
+                }
+            }
+            // tam tur: yaw üstüne kümülatif 360'lık ek
+            const turn = say(ham.turn);
+            if (turn !== null && turn !== 0) {
+                turnToplam[k] = (turnToplam[k] || 0) + turn * 360;
+                if (!kanal.turn) kanal.turn = [];
+                kanal.turn.push({ t, v: turnToplam[k], easing: "LINEAR" });
+            }
+        }
+    }
+    return emote;
+}
+
+/** PAL/geckolib biçemini parçalar (baz: x=pitch, y=yaw, z=roll; derece). */
+function palFormat(js: any): Emote {
+    const anims = js.animations || {};
+    const ilk = Object.values(anims)[0] as any;
+    if (!ilk || typeof ilk !== "object") throw new Error("PAL animasyonu boş");
+    const uzunluk = Number(ilk.animation_length) > 0 ? Number(ilk.animation_length) * 20 : 60;
+    const emote: Emote = {
+        adi: isim(ilk.player_animation_library?.name ?? js.name) || "İsimsiz",
+        yazar: String(ilk.player_animation_library?.author || js.author || ""),
+        aciklama: String(ilk.player_animation_library?.description || js.description || ""),
+        baslangicTick: 0,
+        bitisTick: uzunluk,
+        stopTick: uzunluk,
+        donusTick: uzunluk,
+        dongu: true,
+        kemikler: new Map(),
+        palDelta: true,
+    };
+    const bones = ilk.bones || {};
+    for (const k of Object.keys(bones)) {
+        const b = bones[k];
+        if (!b || typeof b !== "object") continue;
+        const kanal: Kanal = {};
+        // tek ekseni örnekle: zamana göre {time, vector:[x,y,z]} anahtar kareleri
+        const okun = (veri: any, baz: 0 | 1 | 2, hedef: keyof Kanal) => {
+            if (!veri) return;
+            const kfs: Kf[] = [];
+            const ekle = (t: number, v: unknown) => {
+                const n = say(v);
+                if (n !== null) kfs.push({ t, v: n, easing: "LINEAR" });
+            };
+            if (Array.isArray(veri)) {
+                for (const g of veri) {
+                    const t = typeof g?.time === "number" ? g.time * 20 : 0;
+                    ekle(t, Array.isArray(g?.vector) ? g.vector[baz] : undefined);
+                }
+            } else if (Array.isArray(veri.vector)) {
+                ekle(0, veri.vector[baz]);
+            } else if (typeof veri === "number") {
+                ekle(0, veri);
+            }
+            if (kfs.length) kanal[hedef] = kfs;
+        };
+        okun(b.rotation, 0, "pitch");
+        okun(b.rotation, 1, "yaw");
+        okun(b.rotation, 2, "roll");
+        // pozisyon Blockbench pikselinde: /16 katsayısı oynatıcıda KS ile uygulanır
+        okun(b.position, 0, "x");
+        okun(b.position, 1, "y");
+        okun(b.position, 2, "z");
+        if (Object.keys(kanal).length) emote.kemikler.set(k, kanal);
+    }
+    return emote;
+}
+
+/** İki biçemi de dener; hiçbiri değilse fırlatır. */
+export function emoteParca(icerik: string): Emote {
+    const js = JSON.parse(icerik);
+    if (js?.emote && typeof js.emote === "object") return eskiFormat(js);
+    if (js?.animations) return palFormat(js);
+    throw new Error("bilinmeyen emote formatı");
+}
+
+// ---------------------------------------------------------------------------
+// zaman örnekleme
+// ---------------------------------------------------------------------------
+
+function easingFn(ad: string): (x: number) => number {
+    switch (ad) {
+        case "EASEINSINE": case "INSINE": case "EASEIN": return (x) => 1 - Math.cos((x * Math.PI) / 2);
+        case "EASEOUTSINE": case "OUTSINE": return (x) => Math.sin((x * Math.PI) / 2);
+        case "EASEINOUTSINE": case "INOUTSINE": case "SINE": return (x) => -(Math.cos(Math.PI * x) - 1) / 2;
+        case "EASEINOUTQUAD": case "INOUTQUAD": return (x) => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
+        case "EASEINOUTCUBIC": return (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+        case "STEP": return (x) => (x >= 1 ? 1 : 0);
+        default: return (x) => x;
+    }
+}
+
+/** Tek kanalı tick T anında örnekler. */
+function orneklem(kf: Kf[] | undefined, t: number): number | null {
+    if (!kf || !kf.length) return null;
+    if (kf.length === 1) return kf[0].v;
+    let i = 0;
+    while (i < kf.length && kf[i].t <= t) i++;
+    if (i <= 0) return kf[0].v;
+    if (i >= kf.length) return kf[kf.length - 1].v;
+    const a = kf[i - 1];
+    const b = kf[i];
+    const span = b.t - a.t;
+    const x = span <= 0 ? 1 : (t - a.t) / span;
+    return a.v + (b.v - a.v) * easingFn(b.easing)(x);
+}
+
+export interface Poz {
+    head: number[]; body: number[]; armL: number[]; armR: number[]; legL: number[]; legR: number[];
+    bend: number[]; // [armL, armR, legL, legR]
+    /** kemiğin pivotundan delta px: [head, body, armL, armR, legL, legR] [x,y,z] */
+    konum: number[][];
+}
+
+export const SIFIR_POZ: Poz = {
+    head: [0, 0, 0], body: [0, 0, 0], armL: [0, 0, 0], armR: [0, 0, 0], legL: [0, 0, 0], legR: [0, 0, 0],
+    bend: [0, 0, 0, 0], konum: [[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]],
+};
+
+const KEMIK_HEDEF: Record<string, number> = { head: 0, body: 1, torso: 1, leftArm: 2, rightArm: 3, leftLeg: 4, rightLeg: 5 };
+const KONUM_INDEKS: Record<string, number> = KEMIK_HEDEF;
+const BEND_INDEKS: Record<string, number> = { leftArm: 0, rightArm: 1, leftLeg: 2, rightLeg: 3 };
+
+/** Emote'un tick T anındaki pozu. */
+export function poz(emote: Emote, tHam: number): Poz {
+    const donus = emote.dongu && emote.donusTick > 0
+        ? ((tHam - emote.baslangicTick) % emote.donusTick) + emote.baslangicTick
+        : tHam;
+    const t = Math.max(donus, emote.baslangicTick);
+    const p: Poz = {
+        head: [0,0,0], body: [0,0,0], armL: [0,0,0], armR: [0,0,0], legL: [0,0,0], legR: [0,0,0],
+        bend: [0,0,0,0],
+        konum: [[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]],
+    };
+    const bosKonum = () => [undefined, undefined, undefined] as (number | undefined)[];
+    const konumHam: (number | undefined)[][] = Array.from({ length: 6 }, bosKonum);
+    for (const [ad, kanal] of emote.kemikler) {
+        const dizi = KEMIK_HEDEF[ad];
+        const hedef = dizi !== undefined ? ((p as any)[["head","body","armL","armR","legL","legR"][dizi]] as number[]) : null;
+        for (const cn of KANALLAR) {
+            const v = orneklem(kanal[cn], t);
+            if (v === null) continue;
+            if (hedef) {
+                if (cn === "pitch") hedef[0] = v;
+                else if (cn === "yaw") hedef[1] = v;
+                else if (cn === "roll") hedef[2] = v;
+                else if (cn === "x" || cn === "y" || cn === "z") {
+                    // kemiğin kendi pivot konumu (eski: mutlak px; PAL: delta px)
+                    const ki = KONUM_INDEKS[ad];
+                    if (ki !== undefined) konumHam[ki][cn === "x" ? 0 : cn === "y" ? 1 : 2] = v;
+                }
+            }
+            if (cn === "bend") {
+                const idx = BEND_INDEKS[ad];
+                if (idx !== undefined) p.bend[idx] += v;
+            }
+        }
+    }
+    // delta'ya çevir: eski format mutlak pivot px; PAL zaten delta
+    const PIVOT: number[][] = [
+        [0, 24, 0], [0, 24, 0], [5, 22, 0], [-5, 22, 0], [1.9, 12, 0], [-1.9, 12, 0],
+    ];
+    for (let i = 0; i < 6; i++) {
+        const ham = konumHam[i];
+        const yaz = p.konum[i];
+        const fark = emote.palDelta !== true && ham.some((v) => v !== undefined);
+        for (let a = 0; a < 3; a++) {
+            if (ham[a] === undefined) { yaz[a] = 0; continue; }
+            yaz[a] = fark ? (ham[a] as number) - PIVOT[i][a] : (ham[a] as number);
+        }
+    }
+    return p;
+}

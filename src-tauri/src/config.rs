@@ -54,7 +54,7 @@ pub struct YikimConfig {
 impl Default for YikimConfig {
     fn default() -> Self {
         Self {
-            theme: "orange".into(),
+            theme: "sahne".into(),
             custom_accent: "#ff7a1a".into(),
             language: "tr".into(),
             default_ram_mb: 4096,

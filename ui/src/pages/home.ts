@@ -1,9 +1,12 @@
 import { $, currentAccount, el, fileSrc, fmtDuration, headAttrs, headUrl, icon, invoke, lamp, launch, navigate, openLoginModal, state } from "../main";
 import { enterRows, switchPress } from "../motion";
+import { sahneGetir, sahneKapat } from "../sahne/karakter";
+import { emoteParca } from "../sahne/emote";
 
 let selectedInstanceId: string | null = null;
 
 export function renderHome(root: HTMLElement): void {
+  sahneKapat(); // eski canvas/renderer'ı temizle (sayfa yenileniyor)
   const lastInstance = state.instances[0];
   if (!selectedInstanceId || !state.instances.find((i) => i.id === selectedInstanceId)) {
     selectedInstanceId = lastInstance?.id || null;
@@ -26,6 +29,10 @@ export function renderHome(root: HTMLElement): void {
     <div class="page-wrap">
     <!-- HERO HAT: seçili kurulum tek satırda — lamba, ad, ölçümler, OYNA şalteri -->
     <section class="home-hero${sel?.cover ? " has-cover" : ""}"${heroCover}>
+      <div class="vitrin" aria-label="Karakter vitrini">
+        <canvas id="sahne-katman"></canvas>
+        <div class="vitrin-isim">${acc ? `${acc.name} — SAHNE` : "SAHNE"}</div>
+      </div>
       <div class="hero-content">
         ${sel ? `
           <div class="hero-badge">${lamp(heroLamp)} ${heroIcon} ${sel.mc_version} · ${loaderName(sel.mod_loader)}</div>
@@ -172,6 +179,36 @@ export function renderHome(root: HTMLElement): void {
   wireHome(root);
   loadHomeNews();
   loadCommunityStats(root);
+  void baslatVitrin(root, acc);
+}
+
+/** Karakter vitrinini başlat: skin + emote paketleri sahneye bağlanır. */
+async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string } | null | undefined): Promise<void> {
+  const canvas = root.querySelector("#sahne-katman") as HTMLCanvasElement | null;
+  if (!canvas) return;
+  const sah = sahneGetir();
+  sah.kur(canvas);
+  canvas.classList.add("on");
+  try {
+    const skin = await invoke("cmd_get_account_skin", { id: acc?.id || "" });
+    if (skin?.dosya) {
+      await sah.skin({ url: fileSrc(String(skin.dosya)), slim: !!skin.slim });
+    } else {
+      await sah.skin(null);
+    }
+  } catch {
+    await sah.skin(null);
+  }
+  try {
+    const emotes: { adi: string; icerik: string }[] = await invoke("cmd_list_emotes");
+    const liste = [];
+    for (const e of emotes) {
+      try { liste.push(emoteParca(e.icerik)); } catch { /* bozuk emote atlanır */ }
+    }
+    sah.emoteleriKur(liste);
+  } catch {
+    sah.emoteleriKur([]);
+  }
 }
 
 async function loadCommunityStats(root: HTMLElement): Promise<void> {

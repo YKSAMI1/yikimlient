@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YIKIM SAHNE PROVASI (dev)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; background: #0c0d13; color: #efeade;
+           display: grid; grid-template-columns: 480px 340px; gap: 18px; padding: 24px; height: 100vh; }
+    .stage { position: relative; border: 1px solid #262939; border-radius: 6px; overflow: hidden;
+             background: repeating-conic-gradient(from 90deg, #14151f 0% 25%, #1a1c29 25% 50%);
+             background-size: 44px 44px; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    h1 { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 2px; }
+    .sub { font-size: 11px; color: #a89f92; margin-bottom: 14px; }
+    .panel { overflow-y: auto; }
+    label { font-size: 11px; color: #a89f92; display: block; margin: 10px 0 4px; letter-spacing: .04em; }
+    input[type=text] { width: 100%; background: #14151f; border: 1px solid #262939; color: #efeade;
+                       padding: 8px 10px; border-radius: 5px; font-size: 12px; }
+    button { background: #1a1c29; border: 1px solid #262939; color: #efeade; padding: 7px 12px;
+             border-radius: 5px; cursor: pointer; font-size: 12px; margin: 4px 4px 0 0; }
+    button:hover { border-color: #ffab4d; color: #ffab4d; }
+    .drop { border: 1.5px dashed #262939; border-radius: 6px; text-align: center; padding: 18px;
+            margin-top: 14px; font-size: 12px; color: #a89f92; }
+    .drop.surunuyor { border-color: #ffab4d; color: #ffab4d; }
+    .liste { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
+    .satir { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+             background: #10111a; border: 1px solid #262939; border-radius: 5px; padding: 7px 10px;
+             font-size: 12px; cursor: pointer; }
+    .satir:hover { border-color: #ffab4d; }
+    .durum { font-size: 11px; color: #6f6a5f; margin-top: 10px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="stage"><canvas id="sahne"></canvas></div>
+  <div class="panel">
+    <h1>Sahne Provası (dev)</h1>
+    <div class="sub">Bu sayfa launcher dışında çalışır — Blockbench iş akışında hızlı prova için.</div>
+
+    <label>SKIN URL (png; boşsa manken)</label>
+    <input type="text" id="skin-url" value="https://crafatar.com/skins/069a79f4-44e9-4726-a5be-fca90e2a90d5" />
+    <button id="skin-yukle">Skin Yükle</button>
+    <button id="slim-toggle">Slim: hayır</button>
+    <button id="kamera-toggle">Önden/Arkadan</button>
+
+    <label>EMOTE URL (eski Emotecraft veya PAL/geckolib json)</label>
+    <input type="text" id="emote-url" value="https://raw.githubusercontent.com/KosmX/emotes/dev/main/resources/assets/emotecraft/emotes/waving.json" />
+    <button id="emote-yukle">Emote Getir</button>
+    <button id="rastgele-toggle">Rastgele: açık</button>
+    <button id="idle">Idle'a dön</button>
+
+    <div class="drop" id="drop">emote.json sürükle-tıkla</div>
+    <input type="file" id="file" accept=".json" multiple hidden />
+
+    <div class="liste" id="liste"></div>
+    <div class="durum" id="durum"></div>
+  </div>
+  <script type="module" src="/src/prova.ts"></script>
+</body>
+</html>
