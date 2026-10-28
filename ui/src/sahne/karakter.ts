@@ -53,6 +53,8 @@ export class Sahne {
     private scene = new THREE.Scene();
     private camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
     private kok: THREE.Group | null = null;
+    /** kalça (kök) düğümü: PAL `body` kemiği buradan döndürür/taşır (pivot 0,12,0) */
+    private kalca: THREE.Group | null = null;
     private kemikler: {
         head: THREE.Group; body: THREE.Group; armL: THREE.Group; armR: THREE.Group;
         legL: THREE.Group; legR: THREE.Group;
@@ -131,6 +133,12 @@ export class Sahne {
         }
         this.kok = new THREE.Group();
         this.kok.position.y = -0.66;
+        // Kalça düğümü: parçalar buna göre konumlanır; PAL `body` kemiği bu düğümü
+        // döndürür/taşır (mod: body pivotu 0,12,0 — tüm karakter).
+        this.kalca = new THREE.Group();
+        this.kalca.position.set(0, 12 * KS, 0);
+        this.kalca.rotation.order = "ZYX"; // mod: rotateZYX = Rz·Ry·Rx
+        this.kok.add(this.kalca);
         this.kemikler = {
             head: new THREE.Group(), body: new THREE.Group(),
             armL: new THREE.Group(), armR: new THREE.Group(),
@@ -140,9 +148,10 @@ export class Sahne {
             this.kemikler.head, this.kemikler.body, this.kemikler.armL,
             this.kemikler.armR, this.kemikler.legL, this.kemikler.legR,
         ];
+        for (const g of [head, body, armL, armR, legL, legR]) g.rotation.order = "ZYX";
 
-        head.position.set(0, 24 * KS, 0);
-        head.userData.pivotPx = [0, 24, 0];
+        head.position.set(0, 12 * KS, 0);
+        head.userData.pivotPx = [0, 12, 0];
         const headMesh = kutuYap({ u: 0, v: 0, w: 8, h: 8, d: 8 }, doku);
         headMesh.position.set(0, 4 * KS, 0);
         head.add(headMesh);
@@ -151,37 +160,37 @@ export class Sahne {
         hat.position.set(0, 4 * KS, 0);
         head.add(hat);
 
-        body.position.set(0, 24 * KS, 0);
-        body.userData.pivotPx = [0, 24, 0];
+        body.position.set(0, 12 * KS, 0);
+        body.userData.pivotPx = [0, 12, 0];
         const bodyMesh = kutuYap({ u: 16, v: 16, w: 8, h: 12, d: 4 }, doku);
         bodyMesh.position.set(0, -6 * KS, 0);
         body.add(bodyMesh);
 
         const armW = slim ? 3 : 4;
         // klasik kol: kutu merkezi x=±6 (pivot ±5) → local ±1; slim: merkez ±4 → local ±1 (içe gömülü 0.5)
-        armL.position.set(5 * KS, 22 * KS, 0);
-        armL.userData.pivotPx = [5, 22, 0];
+        armL.position.set(5 * KS, 10 * KS, 0);
+        armL.userData.pivotPx = [5, 10, 0];
         const armLMesh = kutuYap({ u: 32, v: 48, w: armW, h: 12, d: 4 }, doku);
         armLMesh.position.set(KS, -4 * KS, 0);
         armL.add(armLMesh);
-        armR.position.set(-5 * KS, 22 * KS, 0);
-        armR.userData.pivotPx = [-5, 22, 0];
+        armR.position.set(-5 * KS, 10 * KS, 0);
+        armR.userData.pivotPx = [-5, 10, 0];
         const armRMesh = kutuYap({ u: 40, v: 16, w: armW, h: 12, d: 4 }, doku);
         armRMesh.position.set(-KS, -4 * KS, 0);
         armR.add(armRMesh);
 
-        legL.position.set(1.9 * KS, 12 * KS, 0);
-        legL.userData.pivotPx = [1.9, 12, 0];
+        legL.position.set(1.9 * KS, 0, 0);
+        legL.userData.pivotPx = [1.9, 0, 0];
         const legLMesh = kutuYap({ u: 16, v: 48, w: 4, h: 12, d: 4 }, doku);
         legLMesh.position.set(0, -6 * KS, 0);
         legL.add(legLMesh);
-        legR.position.set(-1.9 * KS, 12 * KS, 0);
-        legR.userData.pivotPx = [-1.9, 12, 0];
+        legR.position.set(-1.9 * KS, 0, 0);
+        legR.userData.pivotPx = [-1.9, 0, 0];
         const legRMesh = kutuYap({ u: 0, v: 16, w: 4, h: 12, d: 4 }, doku);
         legRMesh.position.set(0, -6 * KS, 0);
         legR.add(legRMesh);
 
-        this.kok.add(head, body, armL, armR, legL, legR);
+        this.kalca.add(head, body, armL, armR, legL, legR);
         this.scene.add(this.kok);
     }
 
@@ -265,6 +274,7 @@ export class Sahne {
             legR: [s * 1.2, 0, 0],
             bend: [0, 0, 0, 0],
             konum: [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            kokDon: [0, 0, 0], kokKonum: [0, 0, 0],
         };
     }
 
@@ -284,9 +294,10 @@ export class Sahne {
             const kn = hedef.konum[ki];
             const hx = (piv[0] + kn[0]) * KS;
             const hy = (piv[1] + kn[1]) * KS;
+            const hz = (piv[2] + kn[2]) * KS;
             g.position.x += (hx - g.position.x) * kar;
             g.position.y += (hy - g.position.y) * kar;
-            if (kn[2]) g.position.z += (piv[2] * KS + kn[2] * KS - g.position.z) * kar;
+            g.position.z += (hz - g.position.z) * kar;
         };
         em(k.head, hedef.head, 0, 0);
         em(k.body, hedef.body, 0, 1);
@@ -294,6 +305,20 @@ export class Sahne {
         em(k.armR, hedef.armR, hedef.bend[1], 3);
         em(k.legL, hedef.legL, hedef.bend[2], 4);
         em(k.legR, hedef.legR, hedef.bend[3], 5);
+        // KÖK: PAL `body` → tüm karakter kalça pivotu (0,12,0) etrafında döner/kayar
+        if (this.kalca) {
+            const d = hedef.kokDon;
+            this.kalca.rotation.x += (R(d[0]) - this.kalca.rotation.x) * kar;
+            this.kalca.rotation.y += (-R(d[1]) - this.kalca.rotation.y) * kar;
+            this.kalca.rotation.z += (R(d[2]) - this.kalca.rotation.z) * kar;
+            const kk = hedef.kokKonum;
+            const hx = kk[0] * KS;
+            const hy = (12 + kk[1]) * KS;
+            const hz = kk[2] * KS;
+            this.kalca.position.x += (hx - this.kalca.position.x) * kar;
+            this.kalca.position.y += (hy - this.kalca.position.y) * kar;
+            this.kalca.position.z += (hz - this.kalca.position.z) * kar;
+        }
         if (this.kok) {
             const hedefY = -0.66;
             this.kok.position.y += (hedefY - this.kok.position.y) * kar;
@@ -309,6 +334,7 @@ export class Sahne {
         this.renderer = null;
         this.kemikler = null;
         this.kok = null;
+        this.kalca = null;
         this.aktif = null;
         this.canvas = null;
         this.durum = "idle";

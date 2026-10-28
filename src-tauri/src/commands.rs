@@ -129,9 +129,15 @@ pub fn cmd_add_emote(icerik: String) -> Result<serde_json::Value, String> {
 }
 
 /// Kaydetme ortak yolu: isim güvenliği + emotes/ klasörüne yaz.
+///
+/// Aynı emote'u tekrar yüklemek dosya çoğaltmaz: önce `uuid` eşleşmesine,
+/// sonra ada bakılır ve bulunan dosyanın ÜZERİNE yazılır (Blockbench'te
+/// güncelleyip yeniden sürükleme akışı). Eşleşme yoksa `ad.json`,
+/// `ad-1.json`, … boş olan ilk ad kullanılır.
 fn emote_kaydet(icerik: &str) -> Result<serde_json::Value, String> {
     let js: serde_json::Value = serde_json::from_str(icerik).map_err(|z| format!("geçersiz json: {z}"))?;
     let adi = js["name"].as_str().unwrap_or("emote").trim().to_string();
+    let uuid = js["uuid"].as_str().unwrap_or("").trim().to_string();
     let guvenli: String = adi
         .chars()
         .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' { c } else { '_' })
@@ -139,6 +145,28 @@ fn emote_kaydet(icerik: &str) -> Result<serde_json::Value, String> {
     let guvenli = if guvenli.is_empty() { "emote".into() } else { guvenli };
     let dir = crate::core::app_dir().join("emotes");
     std::fs::create_dir_all(&dir).map_err(|z| z.to_string())?;
+
+    // 1) mevcut dosyalarda aynı emote var mı? (uuid, yoksa ad)
+    let mut mevcut: Vec<std::path::PathBuf> = std::fs::read_dir(&dir)
+        .map(|rd| rd.filter_map(|s| s.ok()).map(|s| s.path()).collect())
+        .unwrap_or_default();
+    mevcut.sort();
+    for yol in mevcut {
+        if yol.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let Ok(eski) = std::fs::read_to_string(&yol) else { continue };
+        let Ok(ej) = serde_json::from_str::<serde_json::Value>(&eski) else { continue };
+        let ayni_uuid = !uuid.is_empty() && ej["uuid"].as_str().unwrap_or("").trim() == uuid;
+        let ayni_ad = uuid.is_empty() && ej["name"].as_str().unwrap_or("").trim() == adi;
+        if ayni_uuid || ayni_ad {
+            std::fs::write(&yol, icerik).map_err(|z| z.to_string())?;
+            let ad = yol.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+            return Ok(serde_json::json!({ "adi": ad, "guncellendi": true }));
+        }
+    }
+
+    // 2) yeni dosya: boş ad bul
     let mut ad = format!("{guvenli}.json");
     let mut i = 1;
     while dir.join(&ad).exists() {
@@ -146,7 +174,7 @@ fn emote_kaydet(icerik: &str) -> Result<serde_json::Value, String> {
         i += 1;
     }
     std::fs::write(dir.join(&ad), icerik).map_err(|z| z.to_string())?;
-    Ok(serde_json::json!({ "adi": ad }))
+    Ok(serde_json::json!({ "adi": ad, "guncellendi": false }))
 }
 
 /// Emote dosya baytlarını JSON metnine çevirir.

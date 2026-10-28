@@ -32,8 +32,14 @@ export interface Emote {
     donusTick: number;
     dongu: boolean;
     kemikler: Map<string, Kanal>;
-    /** true: x/y/z kanalı pivottan delta (PAL); false/oidsız: mutlak pivot px (eski) */
+    /** true: x/y/z kanalı pivottan delta (PAL/geckolib); false/oidsız: mutlak pivot px (eski) */
     palDelta?: boolean;
+    /**
+     * true: değerler PAL ANİMASYON uzayında (biner .emotecraft çözümü):
+     * konumlar pivot deltası (px, y aşağı), `body` kemiği tüm karakteri taşır.
+     * false/oidsız: eski Emotecraft JSON'u (mutlak px, body = gövde kutusu).
+     */
+    palUzay?: boolean;
     /** isLoop true ise döngünün başladığı tick (Emotecraft returnToTickLoop) */
     loopBas?: number;
 }
@@ -79,6 +85,7 @@ function eskiFormat(js: any): Emote {
         dongu: e.isLoop === true || e.isLoop === "true",
         kemikler: new Map(),
     };
+    if (e.palUzay === true) emote.palUzay = true;
     // Emotecraft "returnToTickLoop": bitişte endTick'ten loopBas'a sarar
     const lb = say(e.loopBas);
     if (lb !== null && lb >= 0) emote.loopBas = lb;
@@ -210,11 +217,20 @@ export interface Poz {
     bend: number[]; // [armL, armR, legL, legR]
     /** kemiğin pivotundan delta px: [head, body, armL, armR, legL, legR] [x,y,z] */
     konum: number[][];
+    /** PAL: tüm karakteri taşıyan kalça (kök) dönüşü [pitch, yaw, roll] (launcher işaretli) */
+    kokDon: number[];
+    /** PAL: kalça pivotundan kök kayması px (launcher: +x sağ, +y yukarı, +z öne) */
+    kokKonum: number[];
+}
+
+function bosKonumlar(): number[][] {
+    return [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]];
 }
 
 export const SIFIR_POZ: Poz = {
     head: [0, 0, 0], body: [0, 0, 0], armL: [0, 0, 0], armR: [0, 0, 0], legL: [0, 0, 0], legR: [0, 0, 0],
-    bend: [0, 0, 0, 0], konum: [[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]],
+    bend: [0, 0, 0, 0], konum: bosKonumlar(),
+    kokDon: [0, 0, 0], kokKonum: [0, 0, 0],
 };
 
 const KEMIK_HEDEF: Record<string, number> = { head: 0, body: 1, torso: 1, leftArm: 2, rightArm: 3, leftLeg: 4, rightLeg: 5 };
@@ -234,27 +250,48 @@ export function poz(emote: Emote, tHam: number): Poz {
         donus = ((tHam - emote.baslangicTick) % emote.donusTick) + emote.baslangicTick;
     }
     const t = Math.max(donus, emote.baslangicTick);
+    const pal = emote.palUzay === true;
     const p: Poz = {
         head: [0,0,0], body: [0,0,0], armL: [0,0,0], armR: [0,0,0], legL: [0,0,0], legR: [0,0,0],
         bend: [0,0,0,0],
-        konum: [[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]],
+        konum: bosKonumlar(),
+        kokDon: [0,0,0], kokKonum: [0,0,0],
     };
-    const bosKonum = () => [undefined, undefined, undefined] as (number | undefined)[];
-    const konumHam: (number | undefined)[][] = Array.from({ length: 6 }, bosKonum);
+    const ADLAR = ["head", "body", "armL", "armR", "legL", "legR"];
+    const bos = () => [undefined, undefined, undefined] as (number | undefined)[];
+    const konumHam: (number | undefined)[][] = Array.from({ length: 6 }, bos);
+    const kokHam = bos();
+    const yazEksen = (hedef: (number | undefined)[], cn: string, v: number) => {
+        hedef[cn === "x" ? 0 : cn === "y" ? 1 : 2] = v;
+    };
     for (const [ad, kanal] of emote.kemikler) {
+        // PAL Animasyon uzayında `body` gövde kutusu DEĞİL, tüm karakterin köküdür
+        // (mod: LivingEntityRendererMixin → poseStack translate/rotate). Pivotu kalçadır.
+        if (pal && ad === "body") {
+            for (const cn of KANALLAR) {
+                const v = orneklem(kanal[cn], t);
+                if (v === null) continue;
+                if (cn === "pitch") p.kokDon[0] = v;
+                else if (cn === "yaw") p.kokDon[1] = v;
+                // launcher dönüşü: (pitch, -yaw, -roll); uygula() roll'u ters çevirmez
+                else if (cn === "roll") p.kokDon[2] = -v;
+                else if (cn === "x" || cn === "y" || cn === "z") yazEksen(kokHam, cn, v);
+            }
+            continue;
+        }
         const dizi = KEMIK_HEDEF[ad];
-        const hedef = dizi !== undefined ? ((p as any)[["head","body","armL","armR","legL","legR"][dizi]] as number[]) : null;
+        const hedef = dizi !== undefined ? ((p as any)[ADLAR[dizi]] as number[]) : null;
         for (const cn of KANALLAR) {
             const v = orneklem(kanal[cn], t);
             if (v === null) continue;
             if (hedef) {
                 if (cn === "pitch") hedef[0] = v;
                 else if (cn === "yaw") hedef[1] = v;
-                else if (cn === "roll") hedef[2] = v;
+                else if (cn === "roll") hedef[2] = pal ? -v : v;
                 else if (cn === "x" || cn === "y" || cn === "z") {
                     // kemiğin kendi pivot konumu (eski: mutlak px; PAL: delta px)
                     const ki = KONUM_INDEKS[ad];
-                    if (ki !== undefined) konumHam[ki][cn === "x" ? 0 : cn === "y" ? 1 : 2] = v;
+                    if (ki !== undefined) yazEksen(konumHam[ki], cn, v);
                 }
             }
             if (cn === "bend") {
@@ -262,6 +299,15 @@ export function poz(emote: Emote, tHam: number): Poz {
                 if (idx !== undefined) p.bend[idx] += v;
             }
         }
+    }
+    if (pal) {
+        // Animasyon uzayı → launcher: konum deltası (px, +py, -pz) (y ikili biçimde aşağı-pozitif)
+        for (let i = 0; i < 6; i++) {
+            const h = konumHam[i];
+            p.konum[i] = [h[0] ?? 0, h[1] ?? 0, -(h[2] ?? 0)];
+        }
+        p.kokKonum = [kokHam[0] ?? 0, kokHam[1] ?? 0, -(kokHam[2] ?? 0)];
+        return p;
     }
     // Eski format: x/y/z = kemiğin EBEVEYNİNE GÖRE mutlak konumu (palm: head y=-0.0 gövde çocuğu;
     // waving: bacak y=12 köke bağlı gibi). PAL: pivottan delta zaten.

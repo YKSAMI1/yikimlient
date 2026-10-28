@@ -138,6 +138,7 @@ function wireDrop(root: HTMLElement): void {
   if (!drop || !file) return;
   const oku = async (dosyalar: FileList | File[]) => {
     let eklenen = 0;
+    let kaydedilen = 0;
     for (const f of Array.from(dosyalar)) {
       try {
         // .emotecraft / zip / binary: gerçek dosya baytlarını Rust çözer
@@ -150,14 +151,27 @@ function wireDrop(root: HTMLElement): void {
         const emote = emoteParca(icerik);
         aktifEmoteler.push({ adi: f.name, emote, icerik });
         eklenen++;
+        // SÜRÜKLEYİNCE KAYDET: ayrıca "Vitrine ekle"ye basmak gerekmesin.
+        // Aynı emote (uuid/ad) tekrar yüklenirse dosya çoğalmaz, üzerine yazılır.
+        try {
+          await invoke("cmd_add_emote", { icerik });
+          kaydedilen++;
+        } catch (h) {
+          toast(`${f.name} kaydedilemedi: ${h instanceof Error ? h.message : String(h)}`);
+        }
       } catch (h) {
         toast(`${f.name}: ${h instanceof Error ? h.message : String(h)} — atlandı`);
       }
     }
     if (eklenen) {
-      toast(`${eklenen} emote yüklendi — satıra tıkla, oynar`);
+      toast(
+        kaydedilen
+          ? `${eklenen} emote yüklendi ve vitrin paketine kaydedildi`
+          : `${eklenen} emote yüklendi — satıra tıkla, oynar`,
+      );
       oturumListesi(root);
       sayac(root);
+      if (kaydedilen) void paketListesi(root);
       const sah = sahneGetir();
       const liste = aktifEmoteler.filter((x) => x.emote).map((x) => x.emote as Emote);
       // son yüklenenler öne: son 3'ü oynat
@@ -203,11 +217,17 @@ async function paketListesi(root: HTMLElement): Promise<void> {
       return;
     }
     for (const k of kayitli) {
+      // dosya adı yerine emote'un kendi adını göster (dosya adı küçük yazıyla)
+      let gorunen = k.adi;
+      try {
+        const j = JSON.parse(k.icerik) as { name?: string };
+        gorunen = String(j?.name || "").trim() || k.adi;
+      } catch { /* bozuk json: dosya adı kalsın */ }
       const satir = el(`
         <div class="deneme-satir">
-          <span class="ds-nome">${k.adi}</span>
+          <span class="ds-nome">${gorunen}<small>${k.adi}</small></span>
           <span class="ds-butonlar">
-            <button class="btn ghost sm" data-sil title="Vitrin paketinden çıkar">Kaldır</button>
+            <button class="btn ghost sm" data-sil title="Bu emote'u vitrin paketinden sil">${icon("trash")} Sil</button>
           </span>
         </div>
       `);
@@ -215,7 +235,11 @@ async function paketListesi(root: HTMLElement): Promise<void> {
         e.stopPropagation();
         try {
           await invoke("cmd_delete_emote", { adi: k.adi });
-          toast(`${k.adi} kaldırıldı`);
+          toast(`${gorunen} silindi`);
+          // oturum listesinden de düş
+          aktifEmoteler = aktifEmoteler.filter((x) => x.adi !== k.adi && x.icerik !== k.icerik);
+          oturumListesi(root);
+          sayac(root);
           void paketListesi(root);
         } catch { /* geç */ }
       });

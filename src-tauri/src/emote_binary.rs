@@ -13,15 +13,17 @@
 //!     0x11 = başlık (name, description, author [, folderpath, bages])
 //!     0x12 = simge (png)
 //!
-//! Çıktı: launcher'ın zaten anladığı ESKİ Emotecraft JSON biçimi
-//! ({name, author, description, emote:{beginTick,endTick,...,moves:[...]}}).
-//! Böylece arayüz tarafında ikinci bir motor gerekmez.
+//! Çıktı: Emotecraft JSON biçimi
+//! ({name, author, description, emote:{...,palUzay:true,moves:[...]}}).
 //!
-//! Eksen uzayı dönüşümü (LegacyAnimationBinary.read ↔ PlayerAnimatorLoader):
-//!   - dönüş değerleri radyan gelir; JSON derece bekler → ×180/π
-//!   - konum değerleri varsayılana göre DELTA'dır (px); launcher mutlak
-//!     pivot konumu bekler → kemik başına pivot/delta düzeltmesi uygulanır
-//!   - y ekseni ikili biçimde aşağı-pozitif; launcher yukarı-pozitif → işaret
+//! Eksen uzayı: değerler PAL'ın (PlayerAnimationLibrary) ANİMASYON uzayında
+//! bırakılır — `emote.palUzay = true` bunu bildirir:
+//!   - dönüş değerleri radyandır; JSON derece bekler → ×180/π
+//!   - konum değerleri kemiğin VARSAYILAN pivotuna göre DELTA'dır (px);
+//!     y aşağı-pozitiftir (mod: `translatePartToBone` → `part.y = -y`)
+//!   - `body` kemiği tek bir kutuyu değil TÜM karakteri taşır/kaydırır;
+//!     pivotu kalçadır: (0,12,0)
+//! Arayüz (`sahne/emote.ts`) bu uzayı three.js sahnesine eşler.
 
 use serde_json::{json, Map, Value};
 
@@ -358,47 +360,6 @@ fn animasyon_oku(o: &mut Oku, surum: u8) -> Result<Animasyon, String> {
 // launcher uzayına dönüşüm
 // ---------------------------------------------------------------------------
 
-/// Konum deltasını launcher'ın beklediği mutlak pivot koordinatına çevirir.
-fn konum_duzelt(ad: &str, eksen: usize, v: f32) -> f32 {
-    match ad {
-        "body" | "torso" => {
-            if eksen == 1 {
-                24.0 + v
-            } else {
-                v
-            }
-        }
-        "head" => {
-            if eksen == 1 {
-                -v
-            } else {
-                v
-            }
-        }
-        "leftArm" => match eksen {
-            0 => 5.0 + v,
-            1 => -2.0 - v,
-            _ => v,
-        },
-        "rightArm" => match eksen {
-            0 => -5.0 + v,
-            1 => -2.0 - v,
-            _ => v,
-        },
-        "leftLeg" => match eksen {
-            0 => 1.9 + v,
-            1 => 12.0 - v,
-            _ => v,
-        },
-        "rightLeg" => match eksen {
-            0 => -1.9 + v,
-            1 => 12.0 - v,
-            _ => v,
-        },
-        _ => v,
-    }
-}
-
 /// EasingType kimliği → launcher'ın tanıdığı ad (bilinmeyenler en yakın sine).
 fn easing_adi(id: u8) -> &'static str {
     match id {
@@ -494,18 +455,12 @@ pub fn coz_json(bayt: &[u8]) -> Result<String, String> {
         yazar = metin_coz(&bo.metin().unwrap_or_default());
     }
 
-    // (tick, kemik, kanal, değer, easing) kayıtları
+    // (tick, kemik, kanal, değer, easing) kayıtları — Animation uzayı (delta px / rad→derece)
     let mut kayitlar: Vec<(f32, &'static str, &'static str, f32, u8)> = Vec::new();
     for k in &animasyon.kemikler {
         for (eksen, kanal) in ["x", "y", "z"].iter().enumerate() {
             for kf in &k.pos[eksen] {
-                kayitlar.push((
-                    kf.t,
-                    k.ad,
-                    kanal,
-                    konum_duzelt(k.ad, eksen, kf.v),
-                    kf.e,
-                ));
+                kayitlar.push((kf.t, k.ad, kanal, kf.v, kf.e));
             }
         }
         for (eksen, kanal) in ["pitch", "yaw", "roll"].iter().enumerate() {
@@ -537,6 +492,7 @@ pub fn coz_json(bayt: &[u8]) -> Result<String, String> {
     emote.insert("isLoop".to_string(), json!(animasyon.dongu));
     emote.insert("returnTick".to_string(), json!(animasyon.geri_ham));
     emote.insert("degrees".to_string(), json!(true));
+    emote.insert("palUzay".to_string(), json!(true));
     if animasyon.dongu {
         // launcher döngüyü returnTick'ten endTick'e sarar
         emote.insert("loopBas".to_string(), json!(animasyon.geri));
