@@ -97,3 +97,34 @@ foreach ($deneme in 1..3) {
 foreach ($p in $u.platforms.PSObject.Properties.Name) { Write-Host "$p imza uzunluk: $($u.platforms.$p.signature.Length)" }
 Write-Host "asset: $($rel.assets.Count)"
 if (-not $dogru) { Write-Host "DUZELTILEMEDIM - elle bak"; exit 1 }
+
+# [8/8] SICAK UI KANALI TAZELEME (kritik degil, hata release'i bozmaz)
+# Neden: launcher, sicak UI'yi YALNIZCA gomulu surumden yeni/esitse tercih eder
+# (yikim_ui::etkin_dir). Onceki dongulerden kalan sicak UI numarasi (or. 0.3.49)
+# yeni release'in gomulu yuzunden buyuk kalirsa kullanici ESKI arayuzu gorur -
+# yeni ozellikler ekranda gorunmez (v0.3.43 vakasi). Cozum: her release sonunda
+# AYNI yuzu daha yuksek numarayla sicak kanala yaz; numara hem release'ten hem
+# onceki sicak surumden buyuk olur.
+Write-Host "[8/8] sicak UI kanali tazeleniyor (gomulu yuzun aynisi, daha yuksek numara)"
+try {
+    $sicakRel = gh api "repos/YKSAMI1/yikimlient/releases/tags/sicak" | ConvertFrom-Json
+    $sj = $sicakRel.assets | Where-Object { $_.name -eq 'sicak.json' } | Select-Object -First 1
+    $canli = gh api "repos/YKSAMI1/yikimlient/releases/assets/$($sj.id)" --header 'Accept: application/octet-stream' | ConvertFrom-Json
+    $uiE = @($canli.kaynaklar) | Where-Object { $_.tur -eq 'ui' } | Select-Object -First 1
+    $p = $V.Split('.')
+    $maj = [int]$p[0]; $min = [int]$p[1]; $pat = [int]$p[2]
+    if ($uiE -and $uiE.surum) {
+        $hp = $uiE.surum.Split('.')
+        $hotPat = [int]$hp[$hp.Count - 1]
+        if ($hotPat -gt $pat) { $pat = $hotPat }
+    }
+    $yeniUi = "$maj.$min.$($pat + 1)"
+    Write-Host "      sicak UI: $yeniUi (onceki: $($uiE.surum))"
+    powershell -ExecutionPolicy Bypass -File (Join-Path $kok "tools\sicak-ui.ps1") -Surum $yeniUi -Notlar $Notlar 2>&1 | ForEach-Object { $_.ToString() } | Select-Object -Last 2
+    # resources/ui/surum.txt paket icin kanal numarasina cevrilir - gomulu deger geri yazilir
+    [System.IO.File]::WriteAllText((Join-Path $kok "src-tauri\resources\ui\surum.txt"), $V, (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "      sicak UI hazir: $yeniUi (gomulu surum.txt: $V)"
+} catch {
+    Write-Host "      sicak UI tazeleme atlandi (kritik degil): $_"
+    [System.IO.File]::WriteAllText((Join-Path $kok "src-tauri\resources\ui\surum.txt"), $V, (New-Object System.Text.UTF8Encoding($false)))
+}
