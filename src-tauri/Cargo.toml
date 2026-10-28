@@ -1,6 +1,6 @@
 [package]
 name = "yikimlient"
-version = "0.3.45"
+version = "0.3.46"
 description = "YIKIMLient Ã¢â‚¬â€ ultra-hafif, hÃ„Â±zlÃ„Â± ve gÃƒÂ¼zel Minecraft launcher"
 edition = "2021"
 rust-version = "1.77"
