@@ -692,6 +692,21 @@ select.input option { background: var(--bg2); }
   flex-shrink: 0;
 }
 :root[data-world="sahne"] .imp-oyla:hover { filter: brightness(1.12); }
+/* oyun açıkken: kendi satırı → DURDUR (turuncu/uyarı), diğer satırlar kilitli */
+:root[data-world="sahne"] .imp-oyla.durdur {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 3px, transparent 3px 6px),
+    #d97a1a;
+  color: #fff3e0;
+  border-color: #8a4d0e;
+}
+:root[data-world="sahne"] .imp-oyla[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+}
+:root[data-world="sahne"] .imp-oyla[disabled]:hover { filter: grayscale(0.6); }
+:root[data-world="sahne"] .imp-satir.oyunda { outline: 1px solid rgba(217, 122, 26, 0.55); }
 :root[data-world="sahne"] .imp-diyis {
   background: var(--bg3);
   border: 1px solid var(--hairline);
@@ -827,7 +842,10 @@ select.input option { background: var(--bg2); }
 :root[data-world="sahne"] .imp-hizli-satir b { font-family: var(--piksel); font-size: 11.5px; color: var(--text); text-transform: uppercase; }
 :root[data-world="sahne"] .imp-hizli-satir small { color: var(--text-faint); font-size: 10.5px; }
 :root[data-world="sahne"] .imp-hizli-satir:hover { background: var(--bg3); }
-:root[data-world="sahne"] .imp-hizli-satir.pas { color: var(--text-dim); }
+  :root[data-world="sahne"] .imp-hizli-satir.pas { color: var(--text-dim); }
+  :root[data-world="sahne"] .imp-hizli-satir.durdur b { color: #d97a1a; }
+  :root[data-world="sahne"] .imp-hizli-satir[disabled] { opacity: 0.45; cursor: not-allowed; }
+  :root[data-world="sahne"] .imp-hizli-satir[disabled]:hover { background: transparent; }
 
 /* ---------- Vitrin (Sahne): karakter sahne kartı + hero dizilişi ----------
    Vitrin DOM'u tüm dünyalarda aynı; yalnız sahne dünyasında görünür.

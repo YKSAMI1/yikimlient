@@ -255,7 +255,7 @@ export function navigate(page: string, param?: string): void {
 // ---------- Kabuk: ikon rayı + üst bar ----------
 const RAIL = [
   { page: "home", icon: "home", label: "Ana Sayfa" },
-  { page: "instances", icon: "grid", label: "Paketler" },
+  { page: "instances", icon: "grid", label: "Mod Paketleri" },
   { page: "explore", icon: "compass", label: "Keşfet" },
   { page: "news", icon: "news", label: "Haberler" },
   { page: "deneme", icon: "play", label: "Deneme Alanı" },

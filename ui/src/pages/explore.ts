@@ -44,7 +44,7 @@ export function renderExplore(root: HTMLElement): void {
       <div class="kind-toggle">
         <button class="kt ${kind === "mod" ? "sel" : ""}" data-k="mod">${icon("puzzle")} Modlar</button>
         <button class="kt ${kind === "modpack" ? "sel" : ""}" data-k="modpack">${icon("box")} Paketler</button>
-        <button class="kt ${kind === "resourcepack" ? "sel" : ""}" data-k="resourcepack">Doku Paketleri</button>
+        <button class="kt ${kind === "resourcepack" ? "sel" : ""}" data-k="resourcepack">Texturepackler</button>
         <button class="kt ${kind === "shader" ? "sel" : ""}" data-k="shader">Shaderlar</button>
         <button class="kt ${kind === "world" ? "sel" : ""}" data-k="world">Dünyalar</button>
         <button class="kt ${kind === "datapack" ? "sel" : ""}" data-k="datapack">Datapack</button>

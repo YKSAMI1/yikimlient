@@ -270,7 +270,7 @@ type ContentKind = "resourcepacks" | "shaderpacks" | "saves";
 let contentKind: ContentKind = "resourcepacks";
 
 const CONTENT_KINDS: Array<{ id: ContentKind; label: string; hint: string }> = [
-  { id: "resourcepacks", label: "Doku Paketleri", hint: "Kaynak paketleri (.zip)" },
+  { id: "resourcepacks", label: "Texturepackler", hint: "Kaynak paketleri (.zip)" },
   { id: "shaderpacks", label: "Shaderlar", hint: "Iris/OptiFine shader'ları (.zip)" },
   { id: "saves", label: "Dünyalar", hint: "Tek oyunculu dünyalar (klasör)" },
 ];

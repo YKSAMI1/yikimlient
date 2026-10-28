@@ -77,8 +77,8 @@ function impHome(root: HTMLElement): void {
         <div class="imp-hizli">
           <div class="imp-hizli-bas">${icon("play")} HIZLI GİRİŞ</div>
           ${hizli ? `
-          <button class="imp-hizli-satir" id="i-hizli-oyla">
-            <b>${hizli.name}</b>
+          <button class="imp-hizli-satir${launch.activeId === hizli.id ? " durdur" : ""}" id="i-hizli-oyla" ${launch.activeId && launch.activeId !== hizli.id ? "disabled data-kilitli=\"1\"" : ""}>
+            <b>${hizli.name}${launch.activeId === hizli.id ? " — AÇIK" : ""}</b>
             <small>${loaderName(hizli.mod_loader)} · ${hizli.mc_version}</small>
           </button>
           <button class="imp-hizli-satir pas" id="i-hizli-liste">Tümünü gör →</button>` : `
@@ -92,7 +92,7 @@ function impHome(root: HTMLElement): void {
   const satirHost = root.querySelector("#i-profil-satirlar") as HTMLElement;
   for (const inst of profiller) {
     const row = el(`
-      <div class="imp-satir" role="button" tabindex="0" data-id="${inst.id}">
+      <div class="imp-satir${launch.activeId === inst.id ? " oyunda" : ""}" role="button" tabindex="0" data-id="${inst.id}">
         <span class="imp-satir-ikon">${iconIsFile(inst.icon)
           ? `<img src="${fileSrc(inst.icon)}" draggable="false" />`
           : `<span class="emoji">${inst.icon || "🔥"}</span>`}</span>
@@ -100,7 +100,8 @@ function impHome(root: HTMLElement): void {
           <b class="imp-satir-ad">${inst.name}</b>
           <small>${loaderName(inst.mod_loader)} · ${inst.mc_version} — ${timeAgo(inst.last_played)}</small>
         </span>
-        <button class="imp-oyla" title="${inst.name} — OYNA">${icon("play")} OYNA</button>
+        <button class="imp-oyla${launch.activeId === inst.id ? " durdur" : ""}" ${launch.activeId && launch.activeId !== inst.id ? "disabled data-kilitli=\"1\"" : ""}
+          title="${launch.activeId === inst.id ? "Oyunu kapat" : `${inst.name} — OYNA`}">${icon(launch.activeId === inst.id ? "stop" : "play")} ${launch.activeId === inst.id ? "DURDUR" : "OYNA"}</button>
         <button class="imp-diyis" title="Düzenle">${icon("gear")}</button>
       </div>
     `);
@@ -111,8 +112,7 @@ function impHome(root: HTMLElement): void {
         return;
       }
       if ((e.target as HTMLElement).closest(".imp-oyla")) {
-        // buton bağlanmış (aşağıda) — satır tıkı durum yönetir
-        selectedInstanceId = id;
+        if (launch.activeId === inst.id) void stopOyun();
         return;
       }
       selectedInstanceId = id;
@@ -126,6 +126,7 @@ function impHome(root: HTMLElement): void {
     const id = (row as HTMLElement).dataset.id || "";
     row.querySelector(".imp-oyla")?.addEventListener("click", async (e) => {
       e.stopPropagation();
+      if (launch.activeId === id) return stopOyun();
       if (!state.accounts.length) return openLoginModal();
       const { launchInstance } = await import("../main");
       void launchInstance(id);
@@ -141,8 +142,11 @@ function impHome(root: HTMLElement): void {
   root.querySelector("#i-haber-tumu")?.addEventListener("click", () => navigate("news"));
   root.querySelector("#i-hizli-liste")?.addEventListener("click", () => navigate("instances"));
   root.querySelector("#i-hizli-oyla")?.addEventListener("click", async () => {
+    if (!hizli) return;
+    if (launch.activeId === hizli.id) return stopOyun();
     if (!state.accounts.length) return openLoginModal();
-    if (hizli) { const { launchInstance } = await import("../main"); void launchInstance(hizli.id); }
+    const { launchInstance } = await import("../main");
+    void launchInstance(hizli.id);
   });
 
   // vitrin motoru + skin + emote (eski akışla aynı)
@@ -160,6 +164,13 @@ function impHome(root: HTMLElement): void {
 function sahnekartad(): string {
   const ws = (window as any).__sahne as { sonOynananAd?: string } | null;
   return ws?.sonOynananAd || "EMOTE BEKLER";
+}
+
+/** Çalışan oyunu kapatır ve arayüzü tazeler (satır OYNA/DURDUR + hızlı giriş ortak). */
+async function stopOyun(): Promise<void> {
+  try { await invoke("cmd_kill_game"); } catch { /* zaten kapalıysa sorun değil */ }
+  const { refreshState } = await import("../main");
+  await refreshState(true);
 }
 
 async function impNewsYukle(root: HTMLElement): Promise<void> {
