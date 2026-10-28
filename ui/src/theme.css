@@ -602,33 +602,6 @@ select.input option { background: var(--bg2); }
 :root[data-world="sahne"] .imp-ad-chip small { font-size: 10px; color: var(--text-dim); }
 :root[data-world="sahne"] .imp-ad-chip img { width: 20px; height: 20px; border-radius: 4px; }
 
-/* sol vitrin kartı: Deneme Alanı butonu */
-:root[data-world="sahne"] .imp-vitrin-kart {
-  position: absolute;
-  left: 16px;
-  bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: color-mix(in srgb, var(--bg1) 92%, transparent);
-  border: 1px solid var(--hairline-strong);
-  border-radius: 10px;
-  padding: 12px 14px;
-  backdrop-filter: blur(4px);
-  z-index: 4;
-}
-:root[data-world="sahne"] .btn.imp-sari-kucuk {
-  font-family: var(--piksel);
-  font-size: 10px;
-  background:
-    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.09) 0 3px, transparent 3px 6px),
-    var(--accent);
-  color: var(--on-accent);
-  border: 1px solid var(--accent-deep);
-  border-radius: 7px;
-  padding: 6px 10px;
-  text-transform: uppercase;
-}
 /* banner sağ üstü: dişli aç/kapat */
 :root[data-world="sahne"] .imp-buyut {
   position: absolute;
@@ -1054,13 +1027,6 @@ select.input option { background: var(--bg2); }
     rgba(255, 216, 61, 0.07);
 }
 :root[data-world="sahne"] .imp-hizli-satir:hover { background: rgba(255, 255, 255, 0.035); }
-
-/* ---- emote isim kartı: cam + sarı kenar ---- */
-:root[data-world="sahne"] .imp-vitrin-kart {
-  background: color-mix(in srgb, var(--bg1) 78%, transparent);
-  border-color: rgba(255, 216, 61, 0.28);
-  box-shadow: 0 10px 26px -18px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
 
 /* ---- butonlar: piksel basma hissi ---- */
 :root[data-world="sahne"] .btn { border-radius: 9px; }

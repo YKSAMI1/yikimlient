@@ -45,9 +45,6 @@ function impHome(root: HTMLElement): void {
           <button class="imp-ad-chip" id="i-ad" title="Hesap yönetimi">
             ${acc?.name ? `<img src="${headUrl(acc)}" alt="" draggable="false" ${headAttrs(acc)}><b>${acc.name}</b><small>hesabı yönet</small>` : `<b>hesap yok</b><small>giriş yap</small>`}
           </button>
-          <div class="imp-vitrin-kart">
-            <button class="btn imp-sari-kucuk" id="i-wardrobe">DENEME ALANI</button>
-          </div>
           ${sel ? `<button class="imp-buyut" id="i-menu" title="${sel.name}">${icon("gear")}</button>` : ""}
         </div>
 
@@ -137,7 +134,6 @@ function impHome(root: HTMLElement): void {
   root.querySelector("#i-mod")?.addEventListener("click", () => navigate("explore"));
   root.querySelector("#i-menu")?.addEventListener("click", () => { if (selectedInstanceId) navigate("instances", selectedInstanceId); });
   root.querySelector("#i-ad")?.addEventListener("click", () => openLoginModal());
-  root.querySelector("#i-wardrobe")?.addEventListener("click", () => navigate("deneme"));
   root.querySelector("#i-haber-tumu")?.addEventListener("click", () => navigate("news"));
   root.querySelector("#i-hizli-liste")?.addEventListener("click", () => navigate("instances"));
   root.querySelector("#i-hizli-oyla")?.addEventListener("click", async () => {

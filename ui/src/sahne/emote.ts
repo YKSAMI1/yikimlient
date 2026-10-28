@@ -312,16 +312,14 @@ export function poz(emote: Emote, tHam: number): Poz {
         [0, 24, 0], [0, 24, 0], [5, 22, 0], [-5, 22, 0], [1.9, 12, 0], [-1.9, 12, 0],
     ];
     if (pal) {
-        // PAL konum kanalları da MUTLAK pivot konumudur ama kalça merkezlidir
-        // (kalça y=24 → model uzayında 0). Örn. bacak y≈-12, kol y≈-2, kafa 0.
-        // Launcher'ın beklediği değer kendi pivotundan DELTA olduğu için çevir.
+        // PAL/ikili (.emotecraft) konum kanalları ZATEN kemiğin dinlenme pivotundan
+        // DELTA'dır (px, +y yukarı) — çözücü `raw - def` yapar (LegacyAnimationBinary
+        // `readKeyframes`). Bu yüzden burada yeniden tabanlamak YOK: 0 = dinlenme.
+        // (Mutlak sanıp pivot çıkarmak kolları/bacakları gövdenin içine sokuyordu.)
+        // +z modelde arkaya gider → sahnede öne gelmesi için -z.
         for (let i = 0; i < 6; i++) {
             const h = konumHam[i];
-            const yaz = p.konum[i];
-            yaz[0] = h[0] === undefined ? 0 : h[0] - PIVOT[i][0];
-            yaz[1] = h[1] === undefined ? 0 : h[1] + 24 - PIVOT[i][1];
-            // PAL +z arkaya gider; launcher'da +z öne
-            yaz[2] = h[2] === undefined ? 0 : -(h[2] - PIVOT[i][2]);
+            p.konum[i] = [h[0] ?? 0, h[1] ?? 0, -(h[2] ?? 0)];
         }
         p.kokKonum = [kokHam[0] ?? 0, kokHam[1] ?? 0, -(kokHam[2] ?? 0)];
         return p;
