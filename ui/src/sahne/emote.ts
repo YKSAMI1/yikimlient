@@ -216,6 +216,8 @@ export interface Poz {
     head: number[]; body: number[]; armL: number[]; armR: number[]; legL: number[]; legR: number[];
     /** dirsek/diz/bel bükülmesi (derece): [armL, armR, legL, legR, gövde] */
     bend: number[];
+    /** gövde bükülmesi baş/kolları da taşır (PAL `applyBendToOtherBones`) */
+    bendTasi?: boolean;
     /** kemiğin pivotundan delta px: [head, body, armL, armR, legL, legR] [x,y,z] */
     konum: number[][];
     /** PAL: tüm karakteri taşıyan kalça (kök) dönüşü [pitch, yaw, roll] (launcher işaretli) */
@@ -255,6 +257,9 @@ export function poz(emote: Emote, tHam: number): Poz {
     const p: Poz = {
         head: [0,0,0], body: [0,0,0], armL: [0,0,0], armR: [0,0,0], legL: [0,0,0], legR: [0,0,0],
         bend: [0,0,0,0,0],
+        // İkili/`.emotecraft` emote'ları PAL'da tüm gövde bükülmesini baş+kollara da
+        // uygular (LegacyAnimationBinary `body.bend` → `torso` + applyBendToOtherBones).
+        bendTasi: pal,
         konum: bosKonumlar(),
         kokDon: [0,0,0], kokKonum: [0,0,0],
     };

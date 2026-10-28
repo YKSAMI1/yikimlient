@@ -99,7 +99,11 @@ export class Sahne {
     } | null = null;
     /** dirsek/diz/bel eklemleri: alt yarıların büküldüğü gruplar */
     private bukulenler: {
-        body: THREE.Group; armL: THREE.Group; armR: THREE.Group;
+        /** gövde üst yarısı (dünyada y=18) — her zaman bükülür */
+        body: THREE.Group;
+        /** baş + kollar (dünyada y=18) — yalnız PAL `applyBendToOtherBones` açıkken bükülür */
+        belUst: THREE.Group;
+        armL: THREE.Group; armR: THREE.Group;
         legL: THREE.Group; legR: THREE.Group;
     } | null = null;
     private saat = new THREE.Clock();
@@ -299,23 +303,32 @@ export class Sahne {
             return eklem;
         };
 
-        // BEL (torso bend): PAL gövde bükülmesini `APPLY_BEND_TO_OTHER_BONES` ile
-        // baş/kollara da uygular (ikili emote okunurken bu bayrak kendiliğinden açılır).
-        // Bu yüzden gövdenin ÜST yarısı + kafa + kollar bel düğümünde toplanır; bacaklar
-        // ve gövdenin alt yarısı kalçada kalır. Bel dünyada y=18 (gövde kutusu 12..24).
+        // GÖVDE: alt yarı `body` kemiğinde (dünya 12..18), üst yarı da `body` İÇİNDEKİ
+        // bel ekleminde (dünya 18..24). Böylece `body` dönüşü (klasik `body`/`torso`
+        // kanalı, PAL `torso` kemiği) gövdenin tamamını döndürür — oyun içi modelde
+        // gövde tek kutu; iki yarı ayrı dönerse belden yırtılır.
         const bel = new THREE.Group();
-        bel.position.set(0, 6 * KS, 0);
+        bel.position.set(0, -6 * KS, 0); // body-local → dünya 18 (bel hizası)
         bel.rotation.order = "ZYX";
         const govdeUst = yarimKutuYap({ u: 16, v: 16, w: 8, h: 12, d: 4 }, false, doku);
         govdeUst.position.set(0, 3 * KS, 0);
         bel.add(govdeUst);
+        body.add(bel);
         const govdeAlt = yarimKutuYap({ u: 16, v: 16, w: 8, h: 12, d: 4 }, true, doku);
         govdeAlt.position.set(0, -9 * KS, 0);
         body.add(govdeAlt);
 
+        // BEL ÜSTÜ: kafa + kollar. Aynı bel hizasında (dünya 18) durur. PAL gövde
+        // bükülmesi (`APPLY_BEND_TO_OTHER_BONES`, ikili emote okunurken otomatik açılır)
+        // baş/kolları da taşır; klasik emote'larda gövde dönüşü onları taşımaz
+        // (oyun içi modelde ayrı parçalar).
+        const belUst = new THREE.Group();
+        belUst.position.set(0, 6 * KS, 0); // kalça-local → dünya 18
+        belUst.rotation.order = "ZYX";
+
         const armW = slim ? 3 : 4;
         // klasik kol: kutu merkezi x=±6 (pivot ±5) → local ±1; slim: merkez ±4 → local ±1 (içe gömülü 0.5)
-        // pivotPx artık BEL'e göre: kafa 12-6, kol 10-6
+        // pivotPx bel düğümüne göre: kafa 12-6, kol 10-6
         head.position.set(0, 6 * KS, 0);
         head.userData.pivotPx = [0, 6, 0];
         armL.position.set(5 * KS, 4 * KS, 0);
@@ -333,12 +346,12 @@ export class Sahne {
         const legREklem = uzuv(legR, { u: 0, v: 16, w: 4, h: 12, d: 4 }, -6 * KS, 0);
 
         this.bukulenler = {
-            body: bel, armL: armLEklem, armR: armREklem,
+            body: bel, belUst, armL: armLEklem, armR: armREklem,
             legL: legLEklem, legR: legREklem,
         };
 
-        bel.add(head, armL, armR);
-        this.kalca.add(body, bel, legL, legR);
+        belUst.add(head, armL, armR);
+        this.kalca.add(body, belUst, legL, legR);
         this.scene.add(this.kok);
     }
 
@@ -465,7 +478,10 @@ export class Sahne {
             eklem(b.armR, hedef.bend[1]);
             eklem(b.legL, hedef.bend[2]);
             eklem(b.legR, hedef.bend[3]);
+            // gövde üst yarısı her zaman belden bükülür; baş/kollar yalnız PAL
+            // `applyBendToOtherBones` açıkken onu izler (klasik emote'larda ayrı kalır)
             eklem(b.body, hedef.bend[4]);
+            eklem(b.belUst, hedef.bendTasi === true ? hedef.bend[4] : 0);
         }
         // KÖK: PAL `body` → tüm karakter kalça pivotu (0,12,0) etrafında döner/kayar
         if (this.kalca) {
