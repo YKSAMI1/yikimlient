@@ -34,6 +34,8 @@ export interface Emote {
     kemikler: Map<string, Kanal>;
     /** true: x/y/z kanalı pivottan delta (PAL); false/oidsız: mutlak pivot px (eski) */
     palDelta?: boolean;
+    /** isLoop true ise döngünün başladığı tick (Emotecraft returnToTickLoop) */
+    loopBas?: number;
 }
 
 const KEMIKLER = ["head", "body", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"];
@@ -77,6 +79,9 @@ function eskiFormat(js: any): Emote {
         dongu: e.isLoop === true || e.isLoop === "true",
         kemikler: new Map(),
     };
+    // Emotecraft "returnToTickLoop": bitişte endTick'ten loopBas'a sarar
+    const lb = say(e.loopBas);
+    if (lb !== null && lb >= 0) emote.loopBas = lb;
     const moves: any[] = Array.isArray(e.moves) ? e.moves : [];
     let turnToplam: Record<string, number> = {};
     for (const m of moves) {
@@ -218,9 +223,16 @@ const BEND_INDEKS: Record<string, number> = { leftArm: 0, rightArm: 1, leftLeg: 
 
 /** Emote'un tick T anındaki pozu. */
 export function poz(emote: Emote, tHam: number): Poz {
-    const donus = emote.dongu && emote.donusTick > 0
-        ? ((tHam - emote.baslangicTick) % emote.donusTick) + emote.baslangicTick
-        : tHam;
+    let donus = tHam;
+    if (emote.dongu && emote.loopBas !== undefined && emote.bitisTick > emote.loopBas) {
+        // returnToTickLoop: 0..endTick bir kez oynar, sonra loopBas..endTick döner
+        if (tHam > emote.bitisTick) {
+            const periyot = emote.bitisTick - emote.loopBas;
+            donus = emote.loopBas + ((tHam - emote.loopBas) % periyot);
+        }
+    } else if (emote.dongu && emote.donusTick > 0) {
+        donus = ((tHam - emote.baslangicTick) % emote.donusTick) + emote.baslangicTick;
+    }
     const t = Math.max(donus, emote.baslangicTick);
     const p: Poz = {
         head: [0,0,0], body: [0,0,0], armL: [0,0,0], armR: [0,0,0], legL: [0,0,0], legR: [0,0,0],

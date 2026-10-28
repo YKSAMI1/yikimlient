@@ -21,7 +21,7 @@ export function renderDeneme(root: HTMLElement): void {
       <div class="page-header">
         <div>
           <h1>Emote Deneme Alanı</h1>
-          <p class="sub">Blockbench'ten çıkardığın emote.json'u buraya sürükle — karakter anında oynatır.</p>
+          <p class="sub">emote.json veya indirdiğin .emotecraft dosyasını buraya sürükle — karakter anında oynatır.</p>
         </div>
         <button class="btn ghost" id="d-vitrin">${icon("home")} Ana Vitrin</button>
       </div>
@@ -35,9 +35,9 @@ export function renderDeneme(root: HTMLElement): void {
         <div class="deneme-panel">
           <div class="card dropzone" id="d-drop" role="button" tabindex="0">
             <div style="font-size:26px; margin-bottom:6px">⤵</div>
-            <strong>emote.json sürükle</strong>
+            <strong>emote.json / .emotecraft sürükle</strong>
             <p class="sub" style="margin-top:4px">veya tıkla — dosya seç. Çoklu seçim olur.</p>
-            <input type="file" id="d-file" accept=".json,application/json" multiple hidden />
+            <input type="file" id="d-file" accept=".json,.emotecraft,application/json" multiple hidden />
           </div>
 
           <div class="card">
@@ -140,7 +140,13 @@ function wireDrop(root: HTMLElement): void {
     let eklenen = 0;
     for (const f of Array.from(dosyalar)) {
       try {
-        const icerik = await f.text();
+        // .emotecraft / zip / binary: gerçek dosya baytlarını Rust çözer
+        const buf = new Uint8Array(await f.arrayBuffer());
+        const zipMi = buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04;
+        const ikiliMi = !zipMi && buf.length > 8 && buf[0] !== 0x7b && buf[4] === 0x10;
+        const icerik = zipMi || ikiliMi
+          ? String(await invoke("cmd_emote_bayt_coz", { veri: Array.from(buf) }))
+          : new TextDecoder().decode(buf);
         const emote = emoteParca(icerik);
         aktifEmoteler.push({ adi: f.name, emote, icerik });
         eklenen++;

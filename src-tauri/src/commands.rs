@@ -134,7 +134,7 @@ fn emote_kaydet(icerik: &str) -> Result<serde_json::Value, String> {
     let adi = js["name"].as_str().unwrap_or("emote").trim().to_string();
     let guvenli: String = adi
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == ' ' { c } else { '_' })
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' { c } else { '_' })
         .collect();
     let guvenli = if guvenli.is_empty() { "emote".into() } else { guvenli };
     let dir = crate::core::app_dir().join("emotes");
@@ -149,15 +149,17 @@ fn emote_kaydet(icerik: &str) -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({ "adi": ad }))
 }
 
-/// .emotecraft dosyasını (zip arşiv) içe aktar: içindeki emote.json çıkar
-/// ve vitrin paketine kaydet. Düz JSON dosyasıysa doğrudan kaydet.
-#[tauri::command]
-pub fn cmd_import_emote_dosyasi(path: String) -> Result<serde_json::Value, String> {
-    let yol = std::path::PathBuf::from(&path);
-    let bayt = std::fs::read(&yol).map_err(|z| format!("dosya okunamadı: {z}"))?;
-    // ZIP imzası (PK\x03\x04) → içinde emote.json ara
-    let icerik = if bayt.len() > 4 && bayt[0..4] == [0x50, 0x4B, 0x03, 0x04] {
-        let imleç = std::io::Cursor::new(&bayt[..]);
+/// Emote dosya baytlarını JSON metnine çevirir.
+/// Üç biçim desteklenir:
+///   1) ZIP arşiv (PK\x03\x04) — içindeki emote.json çıkarılır
+///   2) İkili Emotecraft paketi (0x10 FILE) — emote_binary çözer
+///   3) Düz JSON (emote.json) — olduğu gibi döner
+fn emote_icerik_coz(bayt: &[u8]) -> Result<String, String> {
+    if bayt.len() > 16 * 1024 * 1024 {
+        return Err("dosya çok büyük (16 MB üstü)".into());
+    }
+    if bayt.len() > 4 && bayt[0..4] == [0x50, 0x4B, 0x03, 0x04] {
+        let imleç = std::io::Cursor::new(bayt);
         let mut arşiv = zip::ZipArchive::new(imleç)
             .map_err(|z| format!("emotecraft arşivi açılamadı: {z}"))?;
         let mut bulundu: Option<String> = None;
@@ -176,14 +178,33 @@ pub fn cmd_import_emote_dosyasi(path: String) -> Result<serde_json::Value, Strin
                 }
             }
         }
-        bulundu.ok_or_else(|| "arşivde emote.json bulunamadı".to_string())?
+        bulundu.ok_or_else(|| "arşivde emote.json bulunamadı".to_string())
+    } else if crate::emote_binary::ikili_mi(bayt) {
+        // İkili Emotecraft paketi → eski Emotecraft JSON biçimine çevir
+        crate::emote_binary::coz_json(bayt)
     } else {
-        String::from_utf8(bayt).map_err(|_| "dosya ne zip ne metin".to_string())?
-    };
+        String::from_utf8(bayt.to_vec())
+            .map_err(|_| "dosya ne zip ne emote paketi ne metin".to_string())
+    }
+}
+
+/// .emotecraft dosyasını içe aktar ve vitrin paketine kaydet.
+#[tauri::command]
+pub fn cmd_import_emote_dosyasi(path: String) -> Result<serde_json::Value, String> {
+    let yol = std::path::PathBuf::from(&path);
+    let bayt = std::fs::read(&yol).map_err(|z| format!("dosya okunamadı: {z}"))?;
+    let icerik = emote_icerik_coz(&bayt)?;
     let ad = yol.file_name().and_then(|n| n.to_str()).unwrap_or("emote");
     let mut r = emote_kaydet(&icerik)?;
     r["kaynak"] = serde_json::json!(ad);
     Ok(r)
+}
+
+/// Deneme alanı (tarayıcı dosya seçici / HTML5 sürükle-bırak) için:
+/// baytları çöz ama KAYDETME — oturum listesine eklenip önizlensin.
+#[tauri::command]
+pub fn cmd_emote_bayt_coz(veri: Vec<u8>) -> Result<String, String> {
+    emote_icerik_coz(&veri)
 }
 
 /// Emote sil (yalnız dosya adı; yol geçişi kapalı)

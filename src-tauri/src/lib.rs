@@ -4,6 +4,7 @@ pub mod config;
 pub mod core;
 pub mod curtain;
 pub mod discord_rpc;
+pub mod emote_binary;
 pub mod game_options;
 pub mod instances;
 pub mod launcher;
@@ -67,6 +68,7 @@ pub fn run() {
             commands::cmd_get_account_skin,
             commands::cmd_list_emotes,
             commands::cmd_add_emote,
+            commands::cmd_emote_bayt_coz,
             commands::cmd_import_emote_dosyasi,
             commands::cmd_delete_emote,
             commands::cmd_add_offline_account,

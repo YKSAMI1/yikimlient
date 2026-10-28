@@ -21,7 +21,7 @@ function showVeil(): void {
     <div class="drop-box">
       <div class="drop-glyph">⇣</div>
       <b>Bırak ve yükle</b>
-      <span>Mod (.jar) · Mod paketi (.mrpack / CurseForge .zip) · Dünya · Doku &amp; Shader (.zip)</span>
+      <span>Mod (.jar) · Mod paketi (.mrpack / CurseForge .zip) · Dünya · Doku &amp; Shader (.zip) · Emote (.emotecraft)</span>
     </div>`;
   document.body.appendChild(veil);
 }
@@ -78,7 +78,7 @@ async function handleDropped(path: string): Promise<void> {
       await invoke("cmd_add_content_path", { instanceId: inst.id, kind: "saves", path });
       toast(`Dünya yüklendi: ${fileName}`);
     } else if (route === "emote") {
-      // .emotecraft (zip) veya düz emote.json — vitrin paketine ekle
+      // .emotecraft (ikili veya zip) ya da düz emote.json — çöz ve vitrin paketine ekle
       const sonuc = await invoke("cmd_import_emote_dosyasi", { path });
       toast(`Emote vitrine eklendi: ${(sonuc as any).adi}`);
       navigate("deneme");
