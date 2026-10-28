@@ -214,7 +214,8 @@ function orneklem(kf: Kf[] | undefined, t: number): number | null {
 
 export interface Poz {
     head: number[]; body: number[]; armL: number[]; armR: number[]; legL: number[]; legR: number[];
-    bend: number[]; // [armL, armR, legL, legR]
+    /** dirsek/diz/bel bükülmesi (derece): [armL, armR, legL, legR, gövde] */
+    bend: number[];
     /** kemiğin pivotundan delta px: [head, body, armL, armR, legL, legR] [x,y,z] */
     konum: number[][];
     /** PAL: tüm karakteri taşıyan kalça (kök) dönüşü [pitch, yaw, roll] (launcher işaretli) */
@@ -229,13 +230,13 @@ function bosKonumlar(): number[][] {
 
 export const SIFIR_POZ: Poz = {
     head: [0, 0, 0], body: [0, 0, 0], armL: [0, 0, 0], armR: [0, 0, 0], legL: [0, 0, 0], legR: [0, 0, 0],
-    bend: [0, 0, 0, 0], konum: bosKonumlar(),
+    bend: [0, 0, 0, 0, 0], konum: bosKonumlar(),
     kokDon: [0, 0, 0], kokKonum: [0, 0, 0],
 };
 
 const KEMIK_HEDEF: Record<string, number> = { head: 0, body: 1, torso: 1, leftArm: 2, rightArm: 3, leftLeg: 4, rightLeg: 5 };
 const KONUM_INDEKS: Record<string, number> = KEMIK_HEDEF;
-const BEND_INDEKS: Record<string, number> = { leftArm: 0, rightArm: 1, leftLeg: 2, rightLeg: 3 };
+const BEND_INDEKS: Record<string, number> = { leftArm: 0, rightArm: 1, leftLeg: 2, rightLeg: 3, torso: 4, body: 4 };
 
 /** Emote'un tick T anındaki pozu. */
 export function poz(emote: Emote, tHam: number): Poz {
@@ -253,7 +254,7 @@ export function poz(emote: Emote, tHam: number): Poz {
     const pal = emote.palUzay === true;
     const p: Poz = {
         head: [0,0,0], body: [0,0,0], armL: [0,0,0], armR: [0,0,0], legL: [0,0,0], legR: [0,0,0],
-        bend: [0,0,0,0],
+        bend: [0,0,0,0,0],
         konum: bosKonumlar(),
         kokDon: [0,0,0], kokKonum: [0,0,0],
     };
@@ -275,6 +276,7 @@ export function poz(emote: Emote, tHam: number): Poz {
                 else if (cn === "yaw") p.kokDon[1] = v;
                 // launcher dönüşü: (pitch, -yaw, -roll); uygula() roll'u ters çevirmez
                 else if (cn === "roll") p.kokDon[2] = -v;
+                else if (cn === "bend") p.bend[4] = v; // gövde beli
                 else if (cn === "x" || cn === "y" || cn === "z") yazEksen(kokHam, cn, v);
             }
             continue;
@@ -300,23 +302,28 @@ export function poz(emote: Emote, tHam: number): Poz {
             }
         }
     }
+    // Kemiklerin model uzayındaki (ayak=0, +y yukarı) dinlenme pivotları
+    const PIVOT: number[][] = [
+        [0, 24, 0], [0, 24, 0], [5, 22, 0], [-5, 22, 0], [1.9, 12, 0], [-1.9, 12, 0],
+    ];
     if (pal) {
-        // Animasyon uzayı → launcher: konum deltası (px, +py, -pz).
-        // PAL'da +y yukarıdır (model uzayında aşağı olduğu için mod -y uygular),
-        // +z ise modelde arkaya gider → launcher'da öne gelmesi için -z.
+        // PAL konum kanalları da MUTLAK pivot konumudur ama kalça merkezlidir
+        // (kalça y=24 → model uzayında 0). Örn. bacak y≈-12, kol y≈-2, kafa 0.
+        // Launcher'ın beklediği değer kendi pivotundan DELTA olduğu için çevir.
         for (let i = 0; i < 6; i++) {
             const h = konumHam[i];
-            p.konum[i] = [h[0] ?? 0, h[1] ?? 0, -(h[2] ?? 0)];
+            const yaz = p.konum[i];
+            yaz[0] = h[0] === undefined ? 0 : h[0] - PIVOT[i][0];
+            yaz[1] = h[1] === undefined ? 0 : h[1] + 24 - PIVOT[i][1];
+            // PAL +z arkaya gider; launcher'da +z öne
+            yaz[2] = h[2] === undefined ? 0 : -(h[2] - PIVOT[i][2]);
         }
         p.kokKonum = [kokHam[0] ?? 0, kokHam[1] ?? 0, -(kokHam[2] ?? 0)];
         return p;
     }
     // Eski format: x/y/z = kemiğin EBEVEYNİNE GÖRE mutlak konumu (palm: head y=-0.0 gövde çocuğu;
-    // waving: bacak y=12 köke bağlı gibi). PAL: pivottan delta zaten.
+    // waving: bacak y=12 köke bağlı gibi).
     // Dünya koordinatına çevir → açısal pivotumuzdan delta çıkar.
-    const PIVOT: number[][] = [
-        [0, 24, 0], [0, 24, 0], [5, 22, 0], [-5, 22, 0], [1.9, 12, 0], [-1.9, 12, 0],
-    ];
     // ebeveyn düzeltmesi: [head, body, armL, armR, legL, legR] — head/kollar gövdenin çocuğu (y'e +24)
     const GOVDE_COCUK = [1, 0, 1, 1, 0, 0];
     for (let i = 0; i < 6; i++) {

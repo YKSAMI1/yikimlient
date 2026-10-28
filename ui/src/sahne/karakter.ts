@@ -28,6 +28,19 @@ function yuzUV(geo: THREE.BufferGeometry, yuz: number, x1: number, y1: number, x
     uv.setXY(i + 3, x2 / 64, 1 - ay2 / 64);
 }
 
+/** Piksel dokusunu keskin (nearest) ve doğru renk uzayında kullan. */
+function dokuAyarla(doku: THREE.Texture): void {
+    doku.magFilter = THREE.NearestFilter;
+    doku.minFilter = THREE.NearestFilter;
+    doku.colorSpace = THREE.SRGBColorSpace;
+}
+
+function kutuMalzeme(doku: THREE.Texture | null, saydam = false): THREE.Material {
+    return doku
+        ? new THREE.MeshLambertMaterial({ map: doku, transparent: saydam, alphaTest: saydam ? 0.01 : 0 })
+        : new THREE.MeshLambertMaterial({ color: 0x5a6672 });
+}
+
 /** Bölge tablosundan kutu mesh'i kurar (uv: 64x64 pafta formülü). */
 function kutuYap(b: Bölge, doku: THREE.Texture | null, saydam = false): THREE.Mesh {
     const geo = new THREE.BoxGeometry(b.w * KS, b.h * KS, b.d * KS);
@@ -39,14 +52,38 @@ function kutuYap(b: Bölge, doku: THREE.Texture | null, saydam = false): THREE.M
         yuzUV(geo, 3, u + d + w, v, u + d + w + w, v + d, true);            // ny: alt (dikey ayna)
         yuzUV(geo, 4, u + d, v + d, u + d + w, v + d + h);                  // pz: ön
         yuzUV(geo, 5, u + d + w + d, v + d, u + d + w + d + w, v + d + h);  // nz: arka
-        doku.magFilter = THREE.NearestFilter;
-        doku.minFilter = THREE.NearestFilter;
-        doku.colorSpace = THREE.SRGBColorSpace;
+        dokuAyarla(doku);
     }
-    const mat = doku
-        ? new THREE.MeshLambertMaterial({ map: doku, transparent: saydam, alphaTest: saydam ? 0.01 : 0 })
-        : new THREE.MeshLambertMaterial({ color: 0x5a6672 });
-    return new THREE.Mesh(geo, mat);
+    return new THREE.Mesh(geo, kutuMalzeme(doku, saydam));
+}
+
+/** Bükülebilir uzvun YARISINI üretir (dirsek / diz / bel bükülmesi).
+ *
+ *  Emotecraft (BendingGeometry) modeli: kemik kutusu yatay ortadan ikiye bölünür,
+ *  alt yarı orijinal pivotun yarım boy aşağısındaki eklemden döner.
+ *  - `alt === false` → üst yarı; alt yüzü KESİK yüzüdür (orijinal üst dokudan)
+ *  - `alt === true`  → alt yarı; üst yüzü kesik yüzü, alt yüzü gerçek alt doku
+ *
+ *  İki kesik yüz bükülme yokken çakışıktır; tek yüzlü malzeme (front-face culling)
+ *  sayesinde z-fighting olmaz, bükülünce de içi boş görünmez. */
+function yarimKutuYap(b: Bölge, alt: boolean, doku: THREE.Texture | null, saydam = false): THREE.Mesh {
+    const yh = b.h / 2;
+    const { u, v, w, d } = b;
+    const geo = new THREE.BoxGeometry(b.w * KS, yh * KS, b.d * KS);
+    if (doku) {
+        // Yan yüzlerde doku bandı: üst yarı kutunun üstünde, alt yarı altında kalır
+        const vy = v + d + (alt ? yh : 0);
+        const vy2 = vy + yh;
+        yuzUV(geo, 0, u + d + w, vy, u + d + w + d, vy2);                    // px
+        yuzUV(geo, 1, u, vy, u + d, vy2);                                    // nx
+        yuzUV(geo, 2, u + d, v, u + d + w, v + d);                           // py: üst kesik yüzü
+        if (alt) yuzUV(geo, 3, u + d + w, v, u + d + w + w, v + d, true);    // ny: gerçek alt doku
+        else yuzUV(geo, 3, u + d, v, u + d + w, v + d);                      // ny: kesik yüzü
+        yuzUV(geo, 4, u + d, vy, u + d + w, vy2);                            // pz
+        yuzUV(geo, 5, u + d + w + d, vy, u + d + w + d + w, vy2);            // nz
+        dokuAyarla(doku);
+    }
+    return new THREE.Mesh(geo, kutuMalzeme(doku, saydam));
 }
 
 export class Sahne {
@@ -58,6 +95,11 @@ export class Sahne {
     private kalca: THREE.Group | null = null;
     private kemikler: {
         head: THREE.Group; body: THREE.Group; armL: THREE.Group; armR: THREE.Group;
+        legL: THREE.Group; legR: THREE.Group;
+    } | null = null;
+    /** dirsek/diz/bel eklemleri: alt yarıların büküldüğü gruplar */
+    private bukulenler: {
+        body: THREE.Group; armL: THREE.Group; armR: THREE.Group;
         legL: THREE.Group; legR: THREE.Group;
     } | null = null;
     private saat = new THREE.Clock();
@@ -232,8 +274,6 @@ export class Sahne {
         ];
         for (const g of [head, body, armL, armR, legL, legR]) g.rotation.order = "ZYX";
 
-        head.position.set(0, 12 * KS, 0);
-        head.userData.pivotPx = [0, 12, 0];
         const headMesh = kutuYap({ u: 0, v: 0, w: 8, h: 8, d: 8 }, doku);
         headMesh.position.set(0, 4 * KS, 0);
         head.add(headMesh);
@@ -244,35 +284,61 @@ export class Sahne {
 
         body.position.set(0, 12 * KS, 0);
         body.userData.pivotPx = [0, 12, 0];
-        const bodyMesh = kutuYap({ u: 16, v: 16, w: 8, h: 12, d: 4 }, doku);
-        bodyMesh.position.set(0, -6 * KS, 0);
-        body.add(bodyMesh);
+        // Bükülebilir uzuv kurucusu: üst yarı kemiğe, alt yarı eklem grubuna bağlanır.
+        // `ortaY` = orijinal kutu merkezinin kemik pivotuna göre yüksekliği.
+        const uzuv = (parca: THREE.Group, bolge: Bölge, ortaY: number, x: number): THREE.Group => {
+            const ust = yarimKutuYap(bolge, false, doku);
+            ust.position.set(x, ortaY + (bolge.h / 4) * KS, 0);
+            parca.add(ust);
+            const eklem = new THREE.Group();
+            eklem.position.set(0, ortaY, 0);
+            const alt = yarimKutuYap(bolge, true, doku);
+            alt.position.set(x, -(bolge.h / 4) * KS, 0);
+            eklem.add(alt);
+            parca.add(eklem);
+            return eklem;
+        };
+
+        // BEL (torso bend): PAL gövde bükülmesini `APPLY_BEND_TO_OTHER_BONES` ile
+        // baş/kollara da uygular (ikili emote okunurken bu bayrak kendiliğinden açılır).
+        // Bu yüzden gövdenin ÜST yarısı + kafa + kollar bel düğümünde toplanır; bacaklar
+        // ve gövdenin alt yarısı kalçada kalır. Bel dünyada y=18 (gövde kutusu 12..24).
+        const bel = new THREE.Group();
+        bel.position.set(0, 6 * KS, 0);
+        bel.rotation.order = "ZYX";
+        const govdeUst = yarimKutuYap({ u: 16, v: 16, w: 8, h: 12, d: 4 }, false, doku);
+        govdeUst.position.set(0, 3 * KS, 0);
+        bel.add(govdeUst);
+        const govdeAlt = yarimKutuYap({ u: 16, v: 16, w: 8, h: 12, d: 4 }, true, doku);
+        govdeAlt.position.set(0, -9 * KS, 0);
+        body.add(govdeAlt);
 
         const armW = slim ? 3 : 4;
         // klasik kol: kutu merkezi x=±6 (pivot ±5) → local ±1; slim: merkez ±4 → local ±1 (içe gömülü 0.5)
-        armL.position.set(5 * KS, 10 * KS, 0);
-        armL.userData.pivotPx = [5, 10, 0];
-        const armLMesh = kutuYap({ u: 32, v: 48, w: armW, h: 12, d: 4 }, doku);
-        armLMesh.position.set(KS, -4 * KS, 0);
-        armL.add(armLMesh);
-        armR.position.set(-5 * KS, 10 * KS, 0);
-        armR.userData.pivotPx = [-5, 10, 0];
-        const armRMesh = kutuYap({ u: 40, v: 16, w: armW, h: 12, d: 4 }, doku);
-        armRMesh.position.set(-KS, -4 * KS, 0);
-        armR.add(armRMesh);
+        // pivotPx artık BEL'e göre: kafa 12-6, kol 10-6
+        head.position.set(0, 6 * KS, 0);
+        head.userData.pivotPx = [0, 6, 0];
+        armL.position.set(5 * KS, 4 * KS, 0);
+        armL.userData.pivotPx = [5, 4, 0];
+        const armLEklem = uzuv(armL, { u: 32, v: 48, w: armW, h: 12, d: 4 }, -4 * KS, KS);
+        armR.position.set(-5 * KS, 4 * KS, 0);
+        armR.userData.pivotPx = [-5, 4, 0];
+        const armREklem = uzuv(armR, { u: 40, v: 16, w: armW, h: 12, d: 4 }, -4 * KS, -KS);
 
         legL.position.set(1.9 * KS, 0, 0);
         legL.userData.pivotPx = [1.9, 0, 0];
-        const legLMesh = kutuYap({ u: 16, v: 48, w: 4, h: 12, d: 4 }, doku);
-        legLMesh.position.set(0, -6 * KS, 0);
-        legL.add(legLMesh);
+        const legLEklem = uzuv(legL, { u: 16, v: 48, w: 4, h: 12, d: 4 }, -6 * KS, 0);
         legR.position.set(-1.9 * KS, 0, 0);
         legR.userData.pivotPx = [-1.9, 0, 0];
-        const legRMesh = kutuYap({ u: 0, v: 16, w: 4, h: 12, d: 4 }, doku);
-        legRMesh.position.set(0, -6 * KS, 0);
-        legR.add(legRMesh);
+        const legREklem = uzuv(legR, { u: 0, v: 16, w: 4, h: 12, d: 4 }, -6 * KS, 0);
 
-        this.kalca.add(head, body, armL, armR, legL, legR);
+        this.bukulenler = {
+            body: bel, armL: armLEklem, armR: armREklem,
+            legL: legLEklem, legR: legREklem,
+        };
+
+        bel.add(head, armL, armR);
+        this.kalca.add(body, bel, legL, legR);
         this.scene.add(this.kok);
     }
 
@@ -355,7 +421,7 @@ export class Sahne {
             armR: [-s * 3.6, 0, -2.6 - s2 * 1.4],
             legL: [-s * 1.2, 0, 0],
             legR: [s * 1.2, 0, 0],
-            bend: [0, 0, 0, 0],
+            bend: [0, 0, 0, 0, 0],
             konum: [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]],
             kokDon: [0, 0, 0], kokKonum: [0, 0, 0],
         };
@@ -365,8 +431,8 @@ export class Sahne {
         const k = this.kemikler;
         if (!k) return;
         const R = THREE.MathUtils.degToRad;
-        const em = (g: THREE.Group, a: number[], bendX: number, ki: number) => {
-            const tx = R(a[0] + bendX);
+        const em = (g: THREE.Group, a: number[], ki: number) => {
+            const tx = R(a[0]);
             const ty = -R(a[1]); // yaw işareti: pozitif = karakterin sağına dönme
             const tz = R(a[2]);
             g.rotation.x += (tx - g.rotation.x) * kar;
@@ -382,12 +448,25 @@ export class Sahne {
             g.position.y += (hy - g.position.y) * kar;
             g.position.z += (hz - g.position.z) * kar;
         };
-        em(k.head, hedef.head, 0, 0);
-        em(k.body, hedef.body, 0, 1);
-        em(k.armL, hedef.armL, hedef.bend[0], 2);
-        em(k.armR, hedef.armR, hedef.bend[1], 3);
-        em(k.legL, hedef.legL, hedef.bend[2], 4);
-        em(k.legR, hedef.legR, hedef.bend[3], 5);
+        em(k.head, hedef.head, 0);
+        em(k.body, hedef.body, 1);
+        em(k.armL, hedef.armL, 2);
+        em(k.armR, hedef.armR, 3);
+        em(k.legL, hedef.legL, 4);
+        em(k.legR, hedef.legR, 5);
+        // BÜKÜLME: alt yarı eklemden (dirsek/diz/bel) döner — Emotecraft bend kanalı
+        const b = this.bukulenler;
+        if (b) {
+            const eklem = (g: THREE.Group, derece: number) => {
+                const t = R(derece);
+                g.rotation.x += (t - g.rotation.x) * kar;
+            };
+            eklem(b.armL, hedef.bend[0]);
+            eklem(b.armR, hedef.bend[1]);
+            eklem(b.legL, hedef.bend[2]);
+            eklem(b.legR, hedef.bend[3]);
+            eklem(b.body, hedef.bend[4]);
+        }
         // KÖK: PAL `body` → tüm karakter kalça pivotu (0,12,0) etrafında döner/kayar
         if (this.kalca) {
             const d = hedef.kokDon;
@@ -417,6 +496,7 @@ export class Sahne {
         this.renderer?.dispose();
         this.renderer = null;
         this.kemikler = null;
+        this.bukulenler = null;
         this.kok = null;
         this.kalca = null;
         this.aktif = null;

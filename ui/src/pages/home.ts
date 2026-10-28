@@ -46,7 +46,6 @@ function impHome(root: HTMLElement): void {
             ${acc?.name ? `<img src="${headUrl(acc)}" alt="" draggable="false" ${headAttrs(acc)}><b>${acc.name}</b><small>hesabı yönet</small>` : `<b>hesap yok</b><small>giriş yap</small>`}
           </button>
           <div class="imp-vitrin-kart">
-            <b class="imp-emote-adi" id="i-emote-adi">EMOTE BEKLER</b>
             <button class="btn imp-sari-kucuk" id="i-wardrobe">DENEME ALANI</button>
           </div>
           ${sel ? `<button class="imp-buyut" id="i-menu" title="${sel.name}">${icon("gear")}</button>` : ""}
@@ -151,19 +150,6 @@ function impHome(root: HTMLElement): void {
 
   // vitrin motoru + skin + emote (eski akışla aynı)
   void baslatVitrin(root, acc);
-  // vitrin karttındaki emote adını canlı tut
-  const kartaYaz = setInterval(() => {
-    const host = root.querySelector("#i-emote-adi");
-    const canvas = root.querySelector("#sahne-katman");
-    if (!host || (canvas && !canvas.isConnected)) { clearInterval(kartaYaz); return; }
-    const ad = sahnekartad();
-    if (ad && host.textContent !== ad) host.textContent = ad.toUpperCase();
-  }, 800);
-}
-
-function sahnekartad(): string {
-  const ws = (window as any).__sahne as { sonOynananAd?: string } | null;
-  return ws?.sonOynananAd || "EMOTE BEKLER";
 }
 
 /** Çalışan oyunu kapatır ve arayüzü tazeler (satır OYNA/DURDUR + hızlı giriş ortak). */
