@@ -36,7 +36,7 @@ export interface Emote {
     palDelta?: boolean;
     /**
      * true: değerler PAL ANİMASYON uzayında (biner .emotecraft çözümü):
-     * konumlar pivot deltası (px, y aşağı), `body` kemiği tüm karakteri taşır.
+     * konumlar pivot deltası (px, +y yukarı), `body` kemiği tüm karakteri taşır.
      * false/oidsız: eski Emotecraft JSON'u (mutlak px, body = gövde kutusu).
      */
     palUzay?: boolean;
@@ -301,7 +301,9 @@ export function poz(emote: Emote, tHam: number): Poz {
         }
     }
     if (pal) {
-        // Animasyon uzayı → launcher: konum deltası (px, +py, -pz) (y ikili biçimde aşağı-pozitif)
+        // Animasyon uzayı → launcher: konum deltası (px, +py, -pz).
+        // PAL'da +y yukarıdır (model uzayında aşağı olduğu için mod -y uygular),
+        // +z ise modelde arkaya gider → launcher'da öne gelmesi için -z.
         for (let i = 0; i < 6; i++) {
             const h = konumHam[i];
             p.konum[i] = [h[0] ?? 0, h[1] ?? 0, -(h[2] ?? 0)];

@@ -20,7 +20,7 @@
 //! bırakılır — `emote.palUzay = true` bunu bildirir:
 //!   - dönüş değerleri radyandır; JSON derece bekler → ×180/π
 //!   - konum değerleri kemiğin VARSAYILAN pivotuna göre DELTA'dır (px);
-//!     y aşağı-pozitiftir (mod: `translatePartToBone` → `part.y = -y`)
+//!     +y YUKARIDIR (model uzayında y aşağı olduğu için mod `part.y = -y` uygular)
 //!   - `body` kemiği tek bir kutuyu değil TÜM karakteri taşır/kaydırır;
 //!     pivotu kalçadır: (0,12,0)
 //! Arayüz (`sahne/emote.ts`) bu uzayı three.js sahnesine eşler.
