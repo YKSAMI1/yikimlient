@@ -125,7 +125,12 @@ pub fn cmd_list_emotes() -> Result<Vec<serde_json::Value>, String> {
 /// Deneme alanından emote kaydet (launcher vitrinine kalıcı ekle)
 #[tauri::command]
 pub fn cmd_add_emote(icerik: String) -> Result<serde_json::Value, String> {
-    let js: serde_json::Value = serde_json::from_str(&icerik).map_err(|z| format!("geçersiz json: {z}"))?;
+    emote_kaydet(&icerik)
+}
+
+/// Kaydetme ortak yolu: isim güvenliği + emotes/ klasörüne yaz.
+fn emote_kaydet(icerik: &str) -> Result<serde_json::Value, String> {
+    let js: serde_json::Value = serde_json::from_str(icerik).map_err(|z| format!("geçersiz json: {z}"))?;
     let adi = js["name"].as_str().unwrap_or("emote").trim().to_string();
     let guvenli: String = adi
         .chars()
@@ -140,8 +145,45 @@ pub fn cmd_add_emote(icerik: String) -> Result<serde_json::Value, String> {
         ad = format!("{guvenli}-{i}.json");
         i += 1;
     }
-    std::fs::write(dir.join(&ad), &icerik).map_err(|z| z.to_string())?;
+    std::fs::write(dir.join(&ad), icerik).map_err(|z| z.to_string())?;
     Ok(serde_json::json!({ "adi": ad }))
+}
+
+/// .emotecraft dosyasını (zip arşiv) içe aktar: içindeki emote.json çıkar
+/// ve vitrin paketine kaydet. Düz JSON dosyasıysa doğrudan kaydet.
+#[tauri::command]
+pub fn cmd_import_emote_dosyasi(path: String) -> Result<serde_json::Value, String> {
+    let yol = std::path::PathBuf::from(&path);
+    let bayt = std::fs::read(&yol).map_err(|z| format!("dosya okunamadı: {z}"))?;
+    // ZIP imzası (PK\x03\x04) → içinde emote.json ara
+    let icerik = if bayt.len() > 4 && bayt[0..4] == [0x50, 0x4B, 0x03, 0x04] {
+        let imleç = std::io::Cursor::new(&bayt[..]);
+        let mut arşiv = zip::ZipArchive::new(imleç)
+            .map_err(|z| format!("emotecraft arşivi açılamadı: {z}"))?;
+        let mut bulundu: Option<String> = None;
+        for i in 0..arşiv.len() {
+            let mut e = arşiv.by_index(i).map_err(|z| z.to_string())?;
+            if !e.is_file() || !e.name().ends_with(".json") {
+                continue;
+            }
+            let mut s = String::new();
+            use std::io::Read;
+            e.read_to_string(&mut s).map_err(|z| z.to_string())?;
+            if let Ok(js) = serde_json::from_str::<serde_json::Value>(&s) {
+                if js.get("emote").is_some() {
+                    bulundu = Some(s);
+                    break;
+                }
+            }
+        }
+        bulundu.ok_or_else(|| "arşivde emote.json bulunamadı".to_string())?
+    } else {
+        String::from_utf8(bayt).map_err(|_| "dosya ne zip ne metin".to_string())?
+    };
+    let ad = yol.file_name().and_then(|n| n.to_str()).unwrap_or("emote");
+    let mut r = emote_kaydet(&icerik)?;
+    r["kaynak"] = serde_json::json!(ad);
+    Ok(r)
 }
 
 /// Emote sil (yalnız dosya adı; yol geçişi kapalı)
@@ -1196,6 +1238,7 @@ pub async fn cmd_route_dropped(path: String) -> Result<String, String> {
     match ext.as_str() {
         "jar" => return Ok("jar".into()),
         "mrpack" => return Ok("modpack".into()),
+        "emotecraft" => return Ok("emote".into()),
         "zip" => {
             // içinde ne var? paket indeksleri / dünya verisi
             if let Ok(f) = std::fs::File::open(&src) {

@@ -22,6 +22,12 @@ use tauri::http::{Request as HttpIstem, Response as HttpYanit};
 
 /// Ana pencerenin URL'si (tauri.conf'taki ile eşleşmeli; Windows WebView2
 /// kuralı: http://<scheme>.localhost).
+// Windows'ta WebView2 custom scheme'i http://<scheme>.localhost'a map'ler;
+// Linux'ta (WebKitGTK) sadece scheme'i kendisi çalışır — URL pencereden
+// platforma göre farklı gelir (tauri.linux.conf.json Linux'ta override eder).
+#[cfg(target_os = "linux")]
+pub const ORIGIN_URL: &str = "yikim://localhost/index.html";
+#[cfg(not(target_os = "linux"))]
 pub const ORIGIN_URL: &str = "http://yikim.localhost/index.html";
 
 // ---------------------------------------------------------------------------

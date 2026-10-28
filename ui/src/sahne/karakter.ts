@@ -201,6 +201,9 @@ export class Sahne {
                 return;
             }
             this.rafId = requestAnimationFrame(adim);
+            // ARKA PLANDA: launcher gizli/minimize iken render + animasyonu durdur
+            // (GPU/CPU tasarrufu — görünür olunca kaldığı yerden devam eder)
+            if (document.hidden) return;
             const dt = Math.min(0.05, this.saat.getDelta());
             this.zaman += dt;
             this.adimla(dt);

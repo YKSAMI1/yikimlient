@@ -77,6 +77,11 @@ async function handleDropped(path: string): Promise<void> {
       if (!inst) return;
       await invoke("cmd_add_content_path", { instanceId: inst.id, kind: "saves", path });
       toast(`Dünya yüklendi: ${fileName}`);
+    } else if (route === "emote") {
+      // .emotecraft (zip) veya düz emote.json — vitrin paketine ekle
+      const sonuc = await invoke("cmd_import_emote_dosyasi", { path });
+      toast(`Emote vitrine eklendi: ${(sonuc as any).adi}`);
+      navigate("deneme");
     } else if (route === "zip") {
       await askZipKind(path, fileName);
     } else {

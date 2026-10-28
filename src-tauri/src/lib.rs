@@ -56,8 +56,8 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        // YIKIM ARA YÜZ SUNUCUSU: ana pencere sıcak-kanal UI'ı yükler
-        // (http://yikim.localhost — tauri.conf windows.url ile eşleşir).
+        // YIKIM ARA YÜZ SUNUCUSU: ana pencere sıcak-kanal UI'ı yükler.
+        // Windows: http://yikim.localhost, Linux: yikim://localhost (tauri.linux.conf.json).
         .register_uri_scheme_protocol("yikim", |_ctx, istek| yikim_ui::sunuc(istek))
         .manage(AppState::new(cfg))
         .invoke_handler(tauri::generate_handler![
@@ -67,6 +67,7 @@ pub fn run() {
             commands::cmd_get_account_skin,
             commands::cmd_list_emotes,
             commands::cmd_add_emote,
+            commands::cmd_import_emote_dosyasi,
             commands::cmd_delete_emote,
             commands::cmd_add_offline_account,
             commands::cmd_ms_login_begin,
