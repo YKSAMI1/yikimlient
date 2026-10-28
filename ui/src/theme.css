@@ -150,8 +150,11 @@
 /* satrancı zemin: tüm uygulamada Imperial gibi hafif görünen damalı doku */
 :root[data-world="sahne"] body {
   background-image:
-    repeating-conic-gradient(from 90deg, rgba(255, 255, 255, 0.012) 0% 25%, transparent 25% 50%);
-  background-size: 32px 32px;
+    radial-gradient(ellipse 70% 45% at 50% -8%, rgba(255, 216, 61, 0.055), transparent 70%),
+    radial-gradient(ellipse 120% 90% at 50% 115%, rgba(10, 12, 20, 0.55), transparent 65%),
+    repeating-conic-gradient(from 90deg, rgba(255, 255, 255, 0.014) 0% 25%, transparent 25% 50%);
+  background-size: 100% 100%, 100% 100%, 30px 30px;
+  background-attachment: fixed;
 }
 /* piksel yazı: başlıklar, butonlar, etiketler — gövde metni okunaklı kalır */
 :root[data-world="sahne"] .brand-word,
