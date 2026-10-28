@@ -15,16 +15,17 @@ const KS = 1 / 24; // piksel → dünya (oyuncu boyu 32px = 1.33 birim)
 
 interface Bölge { u: number; v: number; w: number; h: number; d: number; }
 
-/** BoxGeometry'nin bir yüzüne paftadan bölge eşler. */
-function yuzUV(geo: THREE.BufferGeometry, yuz: number, x1: number, y1: number, x2: number, y2: number, ters = false): void {
+/** BoxGeometry'nin bir yüzüne paftadan bölge eşler.
+ *  `dikey` yalnızca alt (ny) yüzde gerekir: vanilla paftada alt yüz dikey aynalıdır. */
+function yuzUV(geo: THREE.BufferGeometry, yuz: number, x1: number, y1: number, x2: number, y2: number, dikey = false): void {
     const uv = geo.attributes.uv as THREE.BufferAttribute;
     const i = yuz * 4;
-    const ax1 = ters ? x2 : x1;
-    const ax2 = ters ? x1 : x2;
-    uv.setXY(i + 0, ax1 / 64, 1 - y1 / 64);
-    uv.setXY(i + 1, ax2 / 64, 1 - y1 / 64);
-    uv.setXY(i + 2, ax1 / 64, 1 - y2 / 64);
-    uv.setXY(i + 3, ax2 / 64, 1 - y2 / 64);
+    const ay1 = dikey ? y2 : y1;
+    const ay2 = dikey ? y1 : y2;
+    uv.setXY(i + 0, x1 / 64, 1 - ay1 / 64);
+    uv.setXY(i + 1, x2 / 64, 1 - ay1 / 64);
+    uv.setXY(i + 2, x1 / 64, 1 - ay2 / 64);
+    uv.setXY(i + 3, x2 / 64, 1 - ay2 / 64);
 }
 
 /** Bölge tablosundan kutu mesh'i kurar (uv: 64x64 pafta formülü). */
@@ -32,12 +33,12 @@ function kutuYap(b: Bölge, doku: THREE.Texture | null, saydam = false): THREE.M
     const geo = new THREE.BoxGeometry(b.w * KS, b.h * KS, b.d * KS);
     const { u, v, w, h, d } = b;
     if (doku) {
-        yuzUV(geo, 0, u + d + w, v + d, u + d + w + d, v + d + h);          // px: sağ şerit
-        yuzUV(geo, 1, u, v + d, u + d, v + d + h, true);                    // nx: sol şerit (ayna)
+        yuzUV(geo, 0, u + d + w, v + d, u + d + w + d, v + d + h);          // px: +x yüzü
+        yuzUV(geo, 1, u, v + d, u + d, v + d + h);                          // nx: -x yüzü
         yuzUV(geo, 2, u + d, v, u + d + w, v + d);                          // py: üst
-        yuzUV(geo, 3, u + d + w, v, u + d + w + w, v + d);                  // ny: alt
+        yuzUV(geo, 3, u + d + w, v, u + d + w + w, v + d, true);            // ny: alt (dikey ayna)
         yuzUV(geo, 4, u + d, v + d, u + d + w, v + d + h);                  // pz: ön
-        yuzUV(geo, 5, u + d + w + d, v + d, u + d + w + d + w, v + d + h, true); // nz: arka (ayna)
+        yuzUV(geo, 5, u + d + w + d, v + d, u + d + w + d + w, v + d + h);  // nz: arka
         doku.magFilter = THREE.NearestFilter;
         doku.minFilter = THREE.NearestFilter;
         doku.colorSpace = THREE.SRGBColorSpace;
@@ -64,6 +65,15 @@ export class Sahne {
     private canvas: HTMLCanvasElement | null = null;
     private boyutla: (() => void) | null = null;
     private zaman = 0;
+    /** yatay yörünge: vitrinde sürükleyerek karakterin etrafında dönülür */
+    private kameraAci = 0;
+    private kameraAciHedef = 0;
+    private kameraYariCap = 2.75;
+    private kameraY = 0.34;
+    private surukleX: number | null = null;
+    private isaretciBas: ((e: PointerEvent) => void) | null = null;
+    private isaretciTasi: ((e: PointerEvent) => void) | null = null;
+    private isaretciBirak: ((e: PointerEvent) => void) | null = null;
     private durum: "idle" | "emote" | "soft" = "idle";
     /** vitrin kartında göstermek için son oynanan emote adı */
     public sonOynananAd = "";
@@ -91,6 +101,7 @@ export class Sahne {
         this.scene.add(dolgu);
         this.camera.position.set(0, 0.34, 2.75);
         this.camera.lookAt(0, 0.02, 0);
+        this.yorungeKur(canvas);
         this.boyutla = () => {
             if (!this.renderer) return;
             const w = canvas.clientWidth || canvas.parentElement?.clientWidth || 320;
@@ -110,14 +121,85 @@ export class Sahne {
         }
     }
 
+    /** Vitrin tuvalinde yatay sürükleme ile karakterin etrafında dönme. */
+    private yorungeKur(canvas: HTMLCanvasElement): void {
+        this.yorungeKapat();
+        canvas.style.cursor = "grab";
+        canvas.style.touchAction = "pan-y";
+        this.isaretciBas = (e: PointerEvent) => {
+            if (e.pointerType === "mouse" && e.button !== 0) return;
+            this.surukleX = e.clientX;
+            canvas.style.cursor = "grabbing";
+            try { canvas.setPointerCapture(e.pointerId); } catch { /* pencere kapanmış olabilir */ }
+        };
+        this.isaretciTasi = (e: PointerEvent) => {
+            if (this.surukleX === null) return;
+            const dx = e.clientX - this.surukleX;
+            this.surukleX = e.clientX;
+            // sağa sürükle → karakter sağa döner (kamera sola kayar)
+            this.kameraAciHedef -= dx * 0.008;
+        };
+        this.isaretciBirak = (e: PointerEvent) => {
+            if (this.surukleX === null) return;
+            this.surukleX = null;
+            canvas.style.cursor = "grab";
+            try { canvas.releasePointerCapture(e.pointerId); } catch { /* zaten bırakılmış */ }
+        };
+        canvas.addEventListener("pointerdown", this.isaretciBas);
+        canvas.addEventListener("pointermove", this.isaretciTasi);
+        canvas.addEventListener("pointerup", this.isaretciBirak);
+        canvas.addEventListener("pointercancel", this.isaretciBirak);
+    }
+
+    /** Yörünge dinleyicilerini bırakır (yeniden kurma / kapatma). */
+    private yorungeKapat(): void {
+        const c = this.canvas;
+        if (c) {
+            if (this.isaretciBas) c.removeEventListener("pointerdown", this.isaretciBas);
+            if (this.isaretciTasi) c.removeEventListener("pointermove", this.isaretciTasi);
+            if (this.isaretciBirak) {
+                c.removeEventListener("pointerup", this.isaretciBirak);
+                c.removeEventListener("pointercancel", this.isaretciBirak);
+            }
+        }
+        this.isaretciBas = null;
+        this.isaretciTasi = null;
+        this.isaretciBirak = null;
+        this.surukleX = null;
+    }
+
+    /** Yörünge açısını yumuşatıp kamerayı yerleştirir. */
+    private kameraGuncelle(dt: number): void {
+        const f = Math.min(1, dt * 14);
+        this.kameraAci += (this.kameraAciHedef - this.kameraAci) * f;
+        const r = this.kameraYariCap;
+        this.camera.position.set(Math.sin(this.kameraAci) * r, this.kameraY, Math.cos(this.kameraAci) * r);
+        this.camera.lookAt(0, 0.02, 0);
+    }
+
     private _bekleyenSkin: { url: string; slim: boolean } | null = null;
 
     /** Skin yükler (asset-protocol/file URL); null ise düz manken. */
     async skin(skin: { url: string; slim: boolean } | null): Promise<void> {
         let doku: THREE.Texture | null = null;
         if (skin?.url) {
-            try { doku = await new THREE.TextureLoader().loadAsync(skin.url); }
-            catch { doku = null; }
+            try {
+                const resim = await new THREE.ImageLoader().loadAsync(skin.url);
+                // eski 64x32 paftalar: UV eşlemi 64 yüksekliğine göre → 64x64 tuvale genişlet
+                if (resim.height === 32) {
+                    const tuval = document.createElement("canvas");
+                    tuval.width = 64;
+                    tuval.height = 64;
+                    const ctx = tuval.getContext("2d");
+                    if (ctx) {
+                        ctx.imageSmoothingEnabled = false;
+                        ctx.drawImage(resim, 0, 0);
+                        doku = new THREE.Texture(tuval);
+                    }
+                }
+                if (!doku) doku = new THREE.Texture(resim);
+                doku.needsUpdate = true;
+            } catch { doku = null; }
         }
         this._bekleyenSkin = skin; // edge: kur() çağrısından önce geldiyse kur After re-apply
         this.modelKur(doku, skin?.slim || false);
@@ -216,6 +298,7 @@ export class Sahne {
             const dt = Math.min(0.05, this.saat.getDelta());
             this.zaman += dt;
             this.adimla(dt);
+            this.kameraGuncelle(dt);
             if (this.renderer) this.renderer.render(this.scene, this.camera);
         };
         adim();
@@ -330,6 +413,7 @@ export class Sahne {
         this.rafId = 0;
         if (this.boyutla) window.removeEventListener("resize", this.boyutla);
         this.boyutla = null;
+        this.yorungeKapat();
         this.renderer?.dispose();
         this.renderer = null;
         this.kemikler = null;

@@ -248,22 +248,113 @@ pub fn cmd_delete_emote(adi: String) -> Result<bool, String> {
     }
 }
 
-/// Seçili hesabın skin'ini Mojang'dan çeker, cache'ler; {dosya, slim} döner.
-/// Hesap yok/offline ise {varsayilan: true} → UI Steve yedeğine düşer.
+/// Gömülü varsayılan skinler (Mojang'ın resmi Steve/Alex paftaları).
+/// Paketlenmiş kaynak yoluna bağımlı kalmamak için doğrudan binary'ye gömülür.
+const VARSAYILAN_STEVE: &[u8] = include_bytes!("../resources/skins/steve.png");
+const VARSAYILAN_ALEX: &[u8] = include_bytes!("../resources/skins/alex.png");
+
+/// Varsayılan skini cache'e yazıp {dosya, slim, varsayilan} döner.
+/// Asset protokolü yalnız `$APPDATA` kapsamını açtığı için gömülü yol doğrudan verilemez.
+fn varsayilan_skin(slim: bool) -> serde_json::Value {
+    let (ad, bayt) = if slim {
+        ("alex.png", VARSAYILAN_ALEX)
+    } else {
+        ("steve.png", VARSAYILAN_STEVE)
+    };
+    let cache = core::app_dir().join("cache");
+    let yol = cache.join(format!("varsayilan-{ad}"));
+    let gecerli = std::fs::metadata(&yol).map(|m| m.len() > 0).unwrap_or(false);
+    if !gecerli {
+        if std::fs::create_dir_all(&cache).is_err() || std::fs::write(&yol, bayt).is_err() {
+            return serde_json::json!({ "varsayilan": true });
+        }
+    }
+    serde_json::json!({
+        "dosya": yol.to_string_lossy(),
+        "slim": slim,
+        "varsayilan": true
+    })
+}
+
+/// İsimden Mojang UUID'si çözer (offline hesap gerçek bir premium hesaba aitse).
+async fn mojang_uuid(ad: &str) -> Option<String> {
+    let url = format!(
+        "https://api.mojang.com/users/profiles/minecraft/{}",
+        urlencoding::encode(ad)
+    );
+    let r = core::http_client().get(url).send().await.ok()?;
+    if !r.status().is_success() {
+        return None;
+    }
+    let j: serde_json::Value = r.json().await.ok()?;
+    let id = j["id"].as_str()?.trim();
+    if id.is_empty() { None } else { Some(id.to_string()) }
+}
+
+/// Mojang profilinden skin baytları + slim bilgisini çeker.
+async fn mojang_skin(uuid: &str) -> Option<(Vec<u8>, bool)> {
+    let url = format!("https://sessionserver.mojang.com/session/minecraft/profile/{uuid}");
+    let resp = core::http_client().get(&url).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let p: serde_json::Value = resp.json().await.ok()?;
+    let tex_prop = p["properties"]
+        .as_array()?
+        .iter()
+        .find(|k| k["name"] == "textures")?
+        .get("value")?
+        .as_str()?;
+    let decoded = base64::engine::general_purpose::STANDARD.decode(tex_prop).ok()?;
+    let tex: serde_json::Value = serde_json::from_slice(&decoded).ok()?;
+    let skin_url = tex["textures"]["SKIN"]["url"].as_str()?;
+    let slim = tex["textures"]["SKIN"]["metadata"]["model"].as_str() == Some("slim");
+    let bayt = core::http_client()
+        .get(skin_url)
+        .send()
+        .await
+        .ok()?
+        .bytes()
+        .await
+        .ok()?;
+    if bayt.len() < 64 {
+        return None; // boş/bozuk yanıt — varsayılana düş
+    }
+    Some((bayt.to_vec(), slim))
+}
+
+/// Seçili hesabın skin'ini çözer, cache'ler; {dosya, slim} döner.
+/// - Microsoft: uuid ile profil.
+/// - Offline: isim gerçek bir Mojang hesabına aitse o hesabın skini (isimle çözülür).
+/// - Bulunamazsa: gömülü Steve (klasik) varsayılanı — gri manken yok.
+/// - Cache varsa ağa hiç çıkılmaz (internetsiz açılışta da skin görünür).
 #[tauri::command]
 pub async fn cmd_get_account_skin(id: String) -> Result<serde_json::Value, String> {
     let list = load_accounts();
     let acc = match list.iter().find(|a| a.id == id) {
         Some(a) => a.clone(),
-        None => return Ok(serde_json::json!({ "varsayilan": true })),
+        None => return Ok(varsayilan_skin(false)),
     };
-    if acc.kind != "microsoft" || acc.uuid.trim().is_empty() {
-        return Ok(serde_json::json!({ "varsayilan": true }));
-    }
-    let cache = crate::core::app_dir().join("cache");
+
+    // Cache anahtarı: microsoft → hesap uuid'si; offline → offline uuid'si
+    // (isimden türetilmiş, dosya adı güvenli). AĞA ÇIKMADAN önce cache denenir:
+    // internet yokken de son bilinen skin görünmeli.
+    let mikro = acc.kind == "microsoft";
+    let anahtar = if mikro {
+        if acc.uuid.trim().is_empty() {
+            return Ok(varsayilan_skin(false));
+        }
+        acc.uuid.replace('-', "")
+    } else if acc.kind == "offline" && !acc.name.trim().is_empty() {
+        acc.uuid.replace('-', "")
+    } else {
+        return Ok(varsayilan_skin(false));
+    };
+
+    let cache = core::app_dir().join("cache");
     std::fs::create_dir_all(&cache).map_err(|z| z.to_string())?;
-    let png = cache.join(format!("skin-{}.png", acc.uuid));
-    let meta = cache.join(format!("skin-{}.json", acc.uuid));
+    let png = cache.join(format!("skin-{anahtar}.png"));
+    let meta = cache.join(format!("skin-{anahtar}.json"));
 
     let oku_slim = || -> bool {
         std::fs::read_to_string(&meta)
@@ -273,45 +364,24 @@ pub async fn cmd_get_account_skin(id: String) -> Result<serde_json::Value, Strin
             .unwrap_or(false)
     };
 
-    if png.exists() {
+    if std::fs::metadata(&png).map(|m| m.len() > 0).unwrap_or(false) {
         return Ok(serde_json::json!({ "dosya": png.to_string_lossy(), "slim": oku_slim() }));
     }
 
-    let uuid = acc.uuid.replace('-', "");
-    let url = format!("https://sessionserver.mojang.com/session/minecraft/profile/{uuid}");
-    let resp = crate::core::http_client()
-        .get(&url)
-        .send()
-        .await
-        .map_err(|z| format!("oyun profili hatası: {z}"))?;
-    if !resp.status().is_success() {
-        return Err(format!("oyun profili alınamadı: {}", resp.status()));
-    }
-    let p: serde_json::Value = resp.json().await.map_err(|z| z.to_string())?;
-    let tex_prop = p["properties"]
-        .as_array()
-        .and_then(|a| a.iter().find(|k| k["name"] == "textures"))
-        .and_then(|k| k["value"].as_str())
-        .ok_or("skin texture özelliği yok")?;
-    let decoded = base64::engine::general_purpose::STANDARD
-        .decode(tex_prop)
-        .map_err(|z| format!("texture base64 hatası: {z}"))?;
-    let tex: serde_json::Value =
-        serde_json::from_slice(&decoded).map_err(|z| z.to_string())?;
-    let skin_url = tex["textures"]["SKIN"]["url"]
-        .as_str()
-        .ok_or("skin url yok")?;
-    let slim = tex["textures"]["SKIN"]["metadata"]["model"].as_str() == Some("slim");
-    let bayt = crate::core::http_client()
-        .get(skin_url)
-        .send()
-        .await
-        .map_err(|z| z.to_string())?
-        .bytes()
-        .await
-        .map_err(|z| z.to_string())?;
+    // Cache yok: Mojang kimliğini çöz (offline hesap gerçek bir premium hesaba aitse isimle)
+    let mojang_kimlik = if mikro {
+        anahtar.clone()
+    } else {
+        match mojang_uuid(acc.name.trim()).await {
+            Some(u) => u,
+            None => return Ok(varsayilan_skin(false)),
+        }
+    };
+    let Some((bayt, slim)) = mojang_skin(&mojang_kimlik).await else {
+        return Ok(varsayilan_skin(false));
+    };
     std::fs::write(&png, &bayt).map_err(|z| z.to_string())?;
-    let yari = cache.join(format!("skin-{}.json.yari", acc.uuid));
+    let yari = cache.join(format!("skin-{anahtar}.json.yari"));
     std::fs::write(&yari, serde_json::json!({ "slim": slim }).to_string())
         .map_err(|z| z.to_string())?;
     let _ = std::fs::rename(&yari, &meta);
