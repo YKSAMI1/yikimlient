@@ -17,3 +17,4 @@ yikim-mod/derleme/
 # binary ve temp — GitHub Release'lerinde durur, git'te değil
 *.exe
 .tmp-*
+yayin/
