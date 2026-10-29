@@ -18,7 +18,7 @@ fn load_accounts() -> Vec<auth::Account> {
     crate::util::read_json(&accounts_path()).unwrap_or_default()
 }
 
-fn save_accounts(list: &[auth::Account]) -> Result<(), String> {
+pub(crate) fn save_accounts(list: &[auth::Account]) -> Result<(), String> {
     write_json(&accounts_path(), &list)
 }
 
@@ -250,8 +250,8 @@ pub fn cmd_delete_emote(adi: String) -> Result<bool, String> {
 
 /// Gömülü varsayılan skinler (Mojang'ın resmi Steve/Alex paftaları).
 /// Paketlenmiş kaynak yoluna bağımlı kalmamak için doğrudan binary'ye gömülür.
-const VARSAYILAN_STEVE: &[u8] = include_bytes!("../resources/skins/steve.png");
-const VARSAYILAN_ALEX: &[u8] = include_bytes!("../resources/skins/alex.png");
+pub(crate) const VARSAYILAN_STEVE: &[u8] = include_bytes!("../resources/skins/steve.png");
+pub(crate) const VARSAYILAN_ALEX: &[u8] = include_bytes!("../resources/skins/alex.png");
 
 /// Varsayılan skini cache'e yazıp {dosya, slim, varsayilan} döner.
 /// Asset protokolü yalnız `$APPDATA` kapsamını açtığı için gömülü yol doğrudan verilemez.
