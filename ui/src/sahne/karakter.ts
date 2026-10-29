@@ -127,6 +127,13 @@ export class Sahne {
     private emoteListe: Emote[] = [];
     private aktif: Emote | null = null;
     private tEmote = 0;
+    /** Pelerin: gövde üst yarısına (belUst) bağlı sarkan düzlem. */
+    private pelerinGrup: THREE.Group | null = null;
+    private pelerinSarkac: THREE.Group | null = null;
+    private pelerinDoku: THREE.Texture | null = null;
+    private _bekleyenPelerin: { url: string } | null = null;
+    /** Editör tuvallerinden gelen canlı doku. */
+    private canliDoku: THREE.CanvasTexture | null = null;
 
     /** Sahneyi başlatır; yeniden çağrılırsa öncekini temizler. */
     kur(canvas: HTMLCanvasElement): void {
@@ -251,6 +258,80 @@ export class Sahne {
         this.modelKur(doku, skin?.slim || false);
     }
 
+    /** Pelerin yükler (64×32 pafta, görünen yüz 1,1–11,17); null → pelerini kaldırır. */
+    async pelerin(p: { url: string } | null): Promise<void> {
+        this._bekleyenPelerin = p;
+        this.pelerinTemizle();
+        if (!p?.url) return;
+        try {
+            const resim = await new THREE.ImageLoader().loadAsync(p.url);
+            const doku = new THREE.Texture(resim);
+            dokuAyarla(doku);
+            doku.needsUpdate = true;
+            this.pelerinDoku = doku;
+            this.pelerinMeshKur();
+        } catch { /* pelerin yüklenemedi — pelerinsiz devam */ }
+    }
+
+    private pelerinTemizle(): void {
+        if (this.pelerinGrup?.parent) this.pelerinGrup.parent.remove(this.pelerinGrup);
+        this.pelerinGrup?.traverse((o) => {
+            const m = o as THREE.Mesh;
+            m.geometry?.dispose();
+            const mat = m.material as THREE.Material | undefined;
+            mat?.dispose();
+        });
+        this.pelerinGrup = null;
+        this.pelerinSarkac = null;
+        this.pelerinDoku?.dispose();
+        this.pelerinDoku = null;
+    }
+
+    private pelerinMeshKur(): void {
+        const belUst = this.bukulenler?.belUst;
+        if (!belUst || !this.pelerinDoku) return;
+        const geo = new THREE.PlaneGeometry(10 * KS, 16 * KS);
+        // 64×32 paftada görünen yüz: (1,1)–(11,17)
+        const uv = geo.attributes.uv as THREE.BufferAttribute;
+        const u1 = 1 / 64, u2 = 11 / 64;
+        const v1 = 1 - 17 / 32, v2 = 1 - 1 / 32;
+        uv.setXY(0, u1, v1);
+        uv.setXY(1, u2, v1);
+        uv.setXY(2, u1, v2);
+        uv.setXY(3, u2, v2);
+        uv.needsUpdate = true;
+        const mat = new THREE.MeshLambertMaterial({
+            map: this.pelerinDoku,
+            transparent: true,
+            alphaTest: 0.01,
+            side: THREE.DoubleSide,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(0, -8 * KS, 0);
+
+        const sarkan = new THREE.Group();
+        sarkan.position.set(0, 6 * KS, -2.5 * KS);
+        sarkan.rotation.x = -0.08;
+        sarkan.add(mesh);
+        belUst.add(sarkan);
+        this.pelerinGrup = sarkan;
+        this.pelerinSarkac = sarkan;
+    }
+
+    /** Editör tuvalleri için canlı doku kurar (slim değişince model yeniden kurulur). */
+    tuvalDoku(kaynak: HTMLCanvasElement, slim: boolean): void {
+        const doku = new THREE.CanvasTexture(kaynak);
+        dokuAyarla(doku);
+        doku.needsUpdate = true;
+        this.canliDoku = doku;
+        this.modelKur(doku, slim);
+    }
+
+    /** Tuvalde çizim yapıldıktan sonra dokuyu tazeler (yeniden kurmadan). */
+    dokuTazele(): void {
+        if (this.canliDoku) this.canliDoku.needsUpdate = true;
+    }
+
     private modelKur(doku: THREE.Texture | null, slim: boolean): void {
         if (this.kok) {
             this.scene.remove(this.kok);
@@ -259,6 +340,9 @@ export class Sahne {
                 if (m.geometry) m.geometry.dispose();
             });
         }
+        // Eski modelle birlikte giden pelerin grubu: dokusu korunur, mesh yeniden kurulur.
+        this.pelerinGrup = null;
+        this.pelerinSarkac = null;
         this.kok = new THREE.Group();
         this.kok.position.y = -0.66;
         // Kalça düğümü: parçalar buna göre konumlanır; PAL `body` kemiği bu düğümü
@@ -353,6 +437,11 @@ export class Sahne {
         belUst.add(head, armL, armR);
         this.kalca.add(body, belUst, legL, legR);
         this.scene.add(this.kok);
+        // Bekleyen pelerini yeni modele bağla (kur()/skin() sonrası).
+        if (this._bekleyenPelerin) {
+            if (this.pelerinDoku) this.pelerinMeshKur();
+            else void this.pelerin(this._bekleyenPelerin);
+        }
     }
 
     /** Emote listesini bağlar; rastgele çalar hemen başlar. */
@@ -422,6 +511,17 @@ export class Sahne {
 
         const kar = this.durum === "soft" ? Math.min(1, dt * 7) : 1;
         this.uygula(hedef, kar);
+        this.pelerinSalin();
+    }
+
+    /** Pelerin salınımı: idle'da hafif, emote sırasında geniş. */
+    private pelerinSalin(): void {
+        const s = this.pelerinSarkac;
+        if (!s) return;
+        const guc = this.durum === "emote" ? 0.075 : 0.035;
+        const hedef = -0.08 + Math.sin(this.zaman * 1.3) * guc;
+        s.rotation.x += (hedef - s.rotation.x) * 0.12;
+        s.rotation.z = Math.sin(this.zaman * 0.9) * 0.02;
     }
 
     private idlePozu(t: number): Poz {
@@ -509,6 +609,10 @@ export class Sahne {
         if (this.boyutla) window.removeEventListener("resize", this.boyutla);
         this.boyutla = null;
         this.yorungeKapat();
+        this.pelerinTemizle();
+        this._bekleyenPelerin = null;
+        this.canliDoku?.dispose();
+        this.canliDoku = null;
         this.renderer?.dispose();
         this.renderer = null;
         this.kemikler = null;
