@@ -51,21 +51,40 @@ pub fn aktif_dir() -> Option<PathBuf> {
     }
 }
 
-/// Build anındaki gömülü kopya: `resources/ui` (yerleşim mods klasörü gibi
-/// platformdan platforma değişir — sınırlı derinlikte arama).
+/// Build anındaki gömülü kopya: `resources/ui`.
+///
+/// KRİTİK (v0.4.4): tauri.conf'taki `resources/ui/**/*` girdisi kurulumda
+/// `<kurulum>/resources/ui` altına düşer — `<kurulum>/ui` DEĞİL. Eski kod
+/// yalnız exe'nin yanındaki `ui` klasörüne bakıyordu; kurulu launcher'da
+/// gömülü arayüz hiç bulunamıyor, bu yüzden herkes sıcak kanaldan gelen ESKİ
+/// paketi görüyordu (skin kataloğu yok, "Emote Deneme Alanı" var) ve eksik
+/// dosyalarda "UI kaynakları yüklenemedi" hatası çıkıyordu.
 pub fn gomulu_ui_dir() -> Option<PathBuf> {
     let mut kokler: Vec<PathBuf> = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(ebeveyn) = exe.parent() {
+            // Windows NSIS / Linux deb-appimage: <kurulum>/resources/ui
+            kokler.push(ebeveyn.join("resources"));
+            // Bazı paketleyiciler kaynakları doğrudan yanına koyar
             kokler.push(ebeveyn.to_path_buf());
+            // macOS .app: <App>.app/Contents/Resources
+            kokler.push(ebeveyn.join("../Resources"));
         }
     }
     // geliştirme (cargo dev) yedeği — derleme anı yolu
     kokler.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources"));
+    if let Ok(gecici) = std::env::current_dir() {
+        kokler.push(gecici.join("resources"));
+    }
     for kok in &kokler {
         let aday = kok.join("ui");
         if aday.join("index.html").is_file() {
             return Some(aday);
+        }
+        // `resources/resources/ui` (bazı kurulum düzenleri iki kez sarar)
+        let cift = aday.join("resources").join("ui");
+        if cift.join("index.html").is_file() {
+            return Some(cift);
         }
     }
     None
@@ -175,8 +194,12 @@ pub fn sunuc(istek: HttpIstem<Vec<u8>>) -> HttpYanit<Vec<u8>> {
             .body(b"gecersiz yol".to_vec())
             .unwrap();
     }
-    let hedef = match etkin_dir() {
-        Some(taban) => taban.join(&yol),
+    // Etkin taban + diğer taban (yarım kalmış sıcak paket için yedek).
+    // Eski davranış: seçilen klasörde dosya yoksa 404 dönüyordu; sıcak paket
+    // yarım indiğinde sayfa hiç açılmıyor ("UI kaynakları yüklenemedi").
+    let secili = etkin_dir();
+    let ana = match &secili {
+        Some(t) => t.clone(),
         None => {
             return HttpYanit::builder()
                 .status(500)
@@ -185,19 +208,26 @@ pub fn sunuc(istek: HttpIstem<Vec<u8>>) -> HttpYanit<Vec<u8>> {
                 .unwrap()
         }
     };
-    match std::fs::read(&hedef) {
-        Ok(bayt) => HttpYanit::builder()
-            .status(200)
-            .header("Content-Type", mime(&yol))
-            .header("Cache-Control", "no-store")
-            .body(bayt)
-            .unwrap(),
-        Err(_) => HttpYanit::builder()
-            .status(404)
-            .header("Content-Type", "text/plain; charset=utf-8")
-            .body(format!("yok: {yol}").into_bytes())
-            .unwrap(),
+    let yedek = [gomulu_ui_dir(), aktif_dir()]
+        .into_iter()
+        .flatten()
+        .find(|p| *p != ana);
+
+    for taban in std::iter::once(&ana).chain(yedek.as_ref()) {
+        if let Ok(bayt) = std::fs::read(taban.join(&yol)) {
+            return HttpYanit::builder()
+                .status(200)
+                .header("Content-Type", mime(&yol))
+                .header("Cache-Control", "no-store")
+                .body(bayt)
+                .unwrap();
+        }
     }
+    HttpYanit::builder()
+        .status(404)
+        .header("Content-Type", "text/plain; charset=utf-8")
+        .body(format!("yok: {yol}").into_bytes())
+        .unwrap()
 }
 
 /// Basit yüzde çözümü (%XX) — dist dosya adları ASCII; güvenli, atla-yoksa

@@ -1,4 +1,5 @@
 import { currentAccount, headAttrs, headUrl, icon, invoke, openModal, openLoginModal, state, toast, applyWorld, refreshState, openPath, openExternal, navigate } from "../main";
+import { SAHNE_ARTLARI, sahneArkaCiz } from "../sahne/arkaplan";
 
 /* Beş dünya — her kart o dünyanın kendi zemininde mini önizleme taşır.
    Diğer denemeler (Devre Panosu, Kategori Standardı, Karanlık Oda, Kumaş,
@@ -153,6 +154,14 @@ export function renderSettings(root: HTMLElement): void {
           </div>
           <span class="to-ornek" id="tema-ornek">Örnek buton</span>
         </div>
+      </div>
+
+      <div class="sahne-art-secim" id="sahne-art-secim">
+        <div class="sas-bas">
+          <b>Sahne arka planı</b>
+          <span>Karakterin arkasındaki piksel manzara — yalnız Sahne dünyasında görünür.</span>
+        </div>
+        <div class="sas-izgara" id="sas-izgara"></div>
       </div>
     </div>
 
@@ -329,6 +338,29 @@ export function renderSettings(root: HTMLElement): void {
     renderSettings(root);
     toast("Bu dünyanın özelleştirmesi sıfırlandı");
   });
+
+  // ---- sahne arka planı: piksel manzara seçimi (canlı minik önizleme) ----
+  const artIzgara = root.querySelector("#sas-izgara") as HTMLElement | null;
+  if (artIzgara) {
+    const seciliArt = String(cfg.sahne_arka || "kiraz");
+    artIzgara.innerHTML = SAHNE_ARTLARI.map((a) => `
+      <button class="sas-kart${a.id === seciliArt ? " sel" : ""}" data-art="${a.id}">
+        <span class="sas-tuval"><canvas data-ciz="${a.id}"></canvas></span>
+        <b>${a.ad}</b>
+        <small>${a.etiket}</small>
+      </button>`).join("");
+    artIzgara.querySelectorAll<HTMLCanvasElement>("canvas[data-ciz]").forEach((c) => {
+      sahneArkaCiz(c, c.dataset.ciz || "kiraz");
+    });
+    artIzgara.querySelectorAll(".sas-kart").forEach((k) =>
+      k.addEventListener("click", async () => {
+        state.config.sahne_arka = (k as HTMLElement).dataset.art!;
+        artIzgara.querySelectorAll(".sas-kart").forEach((x) => x.classList.toggle("sel", x === k));
+        await save();
+        toast("Sahne arka planı değişti");
+      })
+    );
+  }
 
   // ambiens parçacıklar + özel imleç
   root.querySelector("#fx-particles")?.addEventListener("change", async (e) => {

@@ -515,6 +515,34 @@ input.search-in.input, .search-in.input {
   padding: 5px 12px; border-radius: var(--radius-sm);
 }
 
+/* ---------- Sahne arka planı seçici ---------- */
+.sahne-art-secim {
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--hairline);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.sas-bas { display: flex; flex-direction: column; gap: 2px; }
+.sas-bas b { font-size: 13px; }
+.sas-bas span { font-size: 11px; color: var(--text-dim); }
+.sas-izgara {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px;
+}
+.sas-kart {
+  border: 1px solid var(--hairline-strong); background: var(--bg1);
+  border-radius: var(--radius-sm); padding: 0 0 8px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 1px; text-align: left;
+  color: var(--text); font-family: var(--font); overflow: hidden;
+  transition: border-color 0.15s, transform 0.15s var(--ease);
+}
+.sas-kart:hover { border-color: var(--text-faint); transform: translateY(-1px); }
+.sas-kart.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.sas-tuval { display: block; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; }
+.sas-tuval canvas {
+  display: block; width: 100%; height: 100%;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+}
+.sas-kart b { font-size: 11.5px; padding: 0 8px; }
+.sas-kart small { font-size: 10px; color: var(--text-dim); padding: 0 8px; }
+
 /* ---------- Rozet editörü (Ayarlar > yalnız sahip) ---------- */
 .rozet-duzen {
   margin-top: 12px; display: grid; grid-template-columns: auto minmax(0, 1fr);

@@ -2,6 +2,7 @@ import { $, currentAccount, el, fileSrc, fmtDuration, headAttrs, headUrl, icon, 
 import { enterRows, switchPress } from "../motion";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import { emoteParca } from "../sahne/emote";
+import { sahneArkaCiz } from "../sahne/arkaplan";
 
 let selectedInstanceId: string | null = null;
 
@@ -41,7 +42,7 @@ function impHome(root: HTMLElement): void {
         </div>
 
         <div class="imp-banner${sel?.cover ? " kapakli" : ""}"${sel?.cover ? ` style="background-image:url('${fileSrc(sel.cover)}')"` : ""}>
-          <div class="vitrin"><canvas id="sahne-katman"></canvas></div>
+          <div class="vitrin"><canvas id="sahne-arka" class="sahne-arka"></canvas><canvas id="sahne-katman"></canvas></div>
           <button class="imp-ad-chip" id="i-ad" title="Hesap yönetimi">
             ${acc?.name ? `<img src="${headUrl(acc)}" alt="" draggable="false" ${headAttrs(acc)}><b>${acc.name}</b><small>hesabı yönet</small>` : `<b>hesap yok</b><small>giriş yap</small>`}
           </button>
@@ -209,6 +210,7 @@ export function renderHome(root: HTMLElement): void {
     <!-- HERO HAT: seçili kurulum tek satırda — lamba, ad, ölçümler, OYNA şalteri -->
     <section class="home-hero${sel?.cover ? " has-cover" : ""}"${heroCover}>
       <div class="vitrin" aria-label="Karakter vitrini">
+        <canvas id="sahne-arka" class="sahne-arka"></canvas>
         <canvas id="sahne-katman"></canvas>
         <div class="vitrin-isim">${acc ? `${acc.name} — SAHNE` : "SAHNE"}</div>
       </div>
@@ -365,6 +367,12 @@ export function renderHome(root: HTMLElement): void {
 async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string } | null | undefined): Promise<void> {
   const canvas = root.querySelector("#sahne-katman") as HTMLCanvasElement | null;
   if (!canvas) return;
+  // Arka plan yalnız Sahne dünyasında: karakterin arkasındaki piksel manzara.
+  const arka = root.querySelector("#sahne-arka") as HTMLCanvasElement | null;
+  if (arka && document.documentElement.getAttribute("data-world") === "sahne") {
+    sahneArkaCiz(arka, String(state.config?.sahne_arka || "kiraz"));
+    arka.classList.add("on");
+  }
   const sah = sahneGetir();
   sah.kur(canvas);
   canvas.classList.add("on");

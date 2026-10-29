@@ -52,6 +52,9 @@ pub struct YikimConfig {
     /// Dünya başına görsel özelleştirme: {"sahne": {"accent":"#ffd83d","radius":"yumusak"}}
     /// Boş alan = dünyanın kendi rengi/köşesi kullanılır.
     pub tema_ozel: std::collections::HashMap<String, TemaOzel>,
+    /// Sahne dünyasında karakterin arkasındaki piksel manzara
+    /// (kiraz | nether | end | bastion | mantar | buz | col | okyanus)
+    pub sahne_arka: String,
     /// Ana menü karakter animasyonları (emote) oynasın mı?
     pub menu_animasyon: bool,
     /// Animasyon oynatma sıklığı: "sakin" | "normal" | "canli"
@@ -97,6 +100,7 @@ impl Default for YikimConfig {
             atolye_admin: vec!["YKSAMI1".into()],
             atolye_izinli: vec![],
             tema_ozel: std::collections::HashMap::new(),
+            sahne_arka: "kiraz".into(),
             menu_animasyon: true,
             menu_animasyon_hiz: "normal".into(),
         }

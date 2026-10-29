@@ -890,6 +890,28 @@ select.input option { background: var(--bg2); }
 }
 .vitrin canvas { opacity: 0; transition: opacity 0.4s ease; }
 .vitrin canvas.on { opacity: 1; }
+
+/* Sahne arka planı: karakterin arkasındaki piksel manzara.
+   Ayrı tuval — karakter tuvalleriyle çakışmaz, DOM sırasıyla altta kalır. */
+.vitrin canvas.sahne-arka {
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.vitrin canvas.sahne-arka.on { opacity: 1; }
+/* Manzaranın üstüne hafif alt gölge: isim etiketi ve zemin okunur kalsın.
+   z-index:1 → karakter tuvalinin (z-index:auto, DOM'da sonra) ALTINDA kalır;
+   karakter yıkanmaz. */
+:root[data-world="sahne"] .vitrin:has(canvas.sahne-arka.on)::before {
+  inset: 0;
+  height: auto;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0%, transparent 26%, transparent 70%, rgba(0, 0, 0, 0.38) 100%);
+  pointer-events: none;
+}
+:root[data-world="sahne"] .vitrin canvas.sahne-arka ~ canvas { z-index: 2; }
 :root[data-world="sahne"] .vitrin-isim {
   position: absolute; left: 12px; bottom: 10px; z-index: 2;
   font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;

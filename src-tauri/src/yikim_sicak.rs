@@ -397,10 +397,17 @@ async fn ui_paketi_uygula(e: &serde_json::Value) -> Result<(), String> {
             .map_err(|z| format!("ui kopyalama hatası: {z}"))?;
     }
 
-    // sürüm damgası dosyası (yazayım her ihtimale karşı zip'te yoksa)
-    if !kok.join("surum.txt").is_file() {
-        let _ = fs::write(kok.join("surum.txt"), &ver);
+    // Paket gerçekten kullanılabilir mi? index.html yoksa yarım paket demektir:
+    // aktif işaretlemeyiz (yoksa launcher bir sonraki açılışta boş sayfa açar).
+    if !kok.join("index.html").is_file() {
+        let _ = fs::remove_dir_all(&kok);
+        return Err("ui paketinde index.html yok — yarım paket uygulanmadı".into());
     }
+
+    // Sürüm damgası: HER ZAMAN manifest sürümüyle yazılır.
+    // (Paket içindeki surum.txt boş/eksik gelebiliyor; o zaman sürüm
+    // karşılaştırması yapılamıyor ve eski paket diskte kalıcı oluyordu.)
+    let _ = fs::write(kok.join("surum.txt"), format!("{ver}\n"));
 
     // aktif.json atomik olarak yaz: ana pencere bundan sonra bu klasörü sunar
     let ui_kok = core::app_dir().join("ui");
