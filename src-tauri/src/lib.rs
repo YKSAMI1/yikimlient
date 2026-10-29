@@ -11,6 +11,7 @@ pub mod launcher;
 pub mod modpacks;
 pub mod repos;
 pub mod server_list;
+pub mod skins;
 pub mod stats;
 pub mod util;
 pub mod yikim_mod;
