@@ -291,14 +291,15 @@ export class Sahne {
         const belUst = this.bukulenler?.belUst;
         if (!belUst || !this.pelerinDoku) return;
         const geo = new THREE.PlaneGeometry(10 * KS, 16 * KS);
-        // 64×32 paftada görünen yüz: (1,1)–(11,17)
+        // 64×32 pelerin paftası: DIŞARIDAN görünen sırt paneli (12,1)–(22,17).
+        // İç panel (1,1) gövdeye bakan yüzdür; dışarıda kullanılırsa tasarım ters görünür.
         const uv = geo.attributes.uv as THREE.BufferAttribute;
-        const u1 = 1 / 64, u2 = 11 / 64;
-        const v1 = 1 - 17 / 32, v2 = 1 - 1 / 32;
-        uv.setXY(0, u1, v1);
-        uv.setXY(1, u2, v1);
-        uv.setXY(2, u1, v2);
-        uv.setXY(3, u2, v2);
+        const u1 = 12 / 64, u2 = 22 / 64;
+        const vUst = 1 - 1 / 32, vAlt = 1 - 17 / 32;
+        uv.setXY(0, u1, vUst);
+        uv.setXY(1, u2, vUst);
+        uv.setXY(2, u1, vAlt);
+        uv.setXY(3, u2, vAlt);
         uv.needsUpdate = true;
         const mat = new THREE.MeshLambertMaterial({
             map: this.pelerinDoku,
@@ -307,11 +308,13 @@ export class Sahne {
             side: THREE.DoubleSide,
         });
         const mesh = new THREE.Mesh(geo, mat);
+        // Düzlem -Z'ye baksın: arkadan bakan kamera dokuyu düz (aynasız) okur.
+        mesh.rotation.y = Math.PI;
         mesh.position.set(0, -8 * KS, 0);
 
         const sarkan = new THREE.Group();
         sarkan.position.set(0, 6 * KS, -2.5 * KS);
-        sarkan.rotation.x = -0.08;
+        sarkan.rotation.x = 0.06; // hafif dışa salınım (gövdeye doğru değil)
         sarkan.add(mesh);
         belUst.add(sarkan);
         this.pelerinGrup = sarkan;
@@ -514,12 +517,13 @@ export class Sahne {
         this.pelerinSalin();
     }
 
-    /** Pelerin salınımı: idle'da hafif, emote sırasında geniş. */
+    /** Pelerin salınımı: idle'da hafif, emote sırasında geniş. Pozitif açı = gövdeden dışa. */
     private pelerinSalin(): void {
         const s = this.pelerinSarkac;
         if (!s) return;
-        const guc = this.durum === "emote" ? 0.075 : 0.035;
-        const hedef = -0.08 + Math.sin(this.zaman * 1.3) * guc;
+        const taban = 0.06;
+        const guc = this.durum === "emote" ? 0.075 : 0.03;
+        const hedef = taban + Math.sin(this.zaman * 1.3) * guc;
         s.rotation.x += (hedef - s.rotation.x) * 0.12;
         s.rotation.z = Math.sin(this.zaman * 0.9) * 0.02;
     }
