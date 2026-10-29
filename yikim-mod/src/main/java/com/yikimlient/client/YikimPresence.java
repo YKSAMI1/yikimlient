@@ -31,12 +31,12 @@ public final class YikimPresence {
     private static final String VARSAYILAN_UCAK = "https://yikim-presence.onrender.com/presence";
     /// v1.13.2 GECİKME DÜZELTMESİ: 30 sn'lik kalp atışı, karşı tarafın rozeti
     /// en geç 30 sn sonra görmesi demekti ("gir çık yapınca bir süre sonra
-    /// geliyor"). Artık 5 sn — TAB + nametag neredeyse anında güncellenir.
-    private static final long PERIYOT = 5000L;
-    /// HIZLI MOD: TAB'da rozeti bilinmeyen bir oyuncu varsa 1.2 sn'de bir sor.
+    /// geliyor"). v1.13.3: 3 sn — TAB + nametag neredeyse anında güncellenir.
+    private static final long PERIYOT = 3000L;
+    /// HIZLI MOD: TAB'da rozeti bilinmeyen bir oyuncu varsa ~1 sn'de bir sor.
     /// (Sunucuya yeni giren oyuncular ilk saniyede yakalanır; kalıcı yük değil,
-    /// eksik kalmadığında normal 5 sn periyoda döner.)
-    private static final long HIZLI_PERIYOT = 1200L;
+    /// eksik kalmadığında normal periyoda döner.)
+    private static final long HIZLI_PERIYOT = 900L;
     private static final long HIZLI_PENCERE = 20000L;
     private static final long HATA_SESSIZLIGI = 30000L;
 
@@ -47,8 +47,20 @@ public final class YikimPresence {
 
     private static Thread isParcacigi;
     private static volatile boolean calisiyor;
-    private static volatile String aktifAdres = "";
+    /// v1.13.3: SORGU ANAHTARLARI. Servis, oyuncuları "hangi sunucu" havuzunda
+    /// tutar ve havuz anahtarı istemcinin gönderdiği metindir. Eskiden bu metin
+    /// YALNIZ oyuncunun yazdığı adresti: iki kişi aynı sunucuya farklı adla
+    /// (domain ↔ IP, farklı port, büyük/küçük harf) girdiğinde ASLA
+    /// eşleşmiyorlardı — "arkadaşımın rozeti hiç gözükmüyor" şikâyetinin
+    /// kaynağı buydu. Artık hem girilen adres (eski istemcilerle uyum) hem de
+    /// GERÇEK soket adresi (çözülmüş ip:port) sorulur; biri tutarsa yeter.
+    private static volatile java.util.List<String> anahtarlar = java.util.List.of();
+    /// Hangi anahtar akran döndürdüyse o önce denenir (tek istekle sonuç).
+    private static volatile String iyiAnahtar = "";
+    /// Aynı teşhis satırını her turda basmamak için son durum imzası.
+    private static volatile String sonDurum = "";
     private static volatile long sonHata;
+    private static volatile String aktifImza = "";
     private static volatile java.util.List<String> izinListesi = java.util.List.of();
     private static volatile long izinGonderimZamani;
 
@@ -62,14 +74,17 @@ public final class YikimPresence {
                 durdur();
                 return;
             }
-            String adres = suAnkiAdres(mc);
-            if (adres == null) {
+            java.util.List<String> simdiki = suAnkiAnahtarlar(mc);
+            if (simdiki.isEmpty()) {
                 durdur();
                 return;
             }
-            if (!adres.equals(aktifAdres) || !calisiyor) {
+            String imza = String.join("|", simdiki);
+            if (!imza.equals(aktifImza) || !calisiyor) {
                 durdur();
-                aktifAdres = adres;
+                aktifImza = imza;
+                anahtarlar = simdiki;
+                iyiAnahtar = "";
                 // sunucu değişti: kimse bilinmiyor → ilk istek ANINDA + hızlı mod
                 hizliBitis = System.currentTimeMillis() + HIZLI_PENCERE;
                 simdiIste = true;
@@ -82,15 +97,70 @@ public final class YikimPresence {
         }
     }
 
-    private static String suAnkiAdres(class_310 mc) {
+    /// Sorgu anahtarları: [girilen adres, çözülmüş ip:port]. Boş liste =
+    /// tek oyunculu / LAN ana makinesi (servise gerek yok).
+    private static java.util.List<String> suAnkiAnahtarlar(class_310 mc) {
         if (mc.field_1724 == null || mc.field_1687 == null || mc.method_1562() == null) {
+            return java.util.List.of();
+        }
+        java.util.List<String> liste = new java.util.ArrayList<String>(2);
+        String girilen = null;
+        try {
+            class_642 sd = mc.method_1562().method_45734();
+            if (sd != null && sd.field_3761 != null && !sd.field_3761.isEmpty()) {
+                girilen = sd.field_3761.trim();
+            }
+        }
+        catch (Throwable ignored) {
+            // sunucu bilgisi yok — aşağıdaki soket anahtarı yeter
+        }
+        if (girilen != null && !girilen.isEmpty()) {
+            ekle(liste, girilen);            // eski istemcilerle BİREBİR uyum
+            ekle(liste, girilen.toLowerCase(java.util.Locale.ROOT));
+            ekle(liste, girilensizPort(girilen));
+        }
+        String ip = ipAnahtari(mc);
+        if (ip != null) {
+            ekle(liste, ip);
+            if (ip.endsWith(":25565")) {
+                ekle(liste, ip.substring(0, ip.length() - 6)); // port yazmayan eski istemci
+            }
+        }
+        return liste;
+    }
+
+    private static void ekle(java.util.List<String> liste, String deger) {
+        if (deger != null && !deger.isEmpty() && !liste.contains(deger) && liste.size() < 5) {
+            liste.add(deger);
+        }
+    }
+
+    /// "sunucu.com:25565" → "sunucu.com" (varsayılan port yazılmışsa).
+    private static String girilensizPort(String adres) {
+        if (adres != null && adres.endsWith(":25565")) {
+            return adres.substring(0, adres.length() - 6);
+        }
+        return adres;
+    }
+
+    /// GERÇEK bağlantı adresi "ip:port" (küçük harf). Domain mi IP mi yazıldığı,
+    /// port yazılıp yazılmadığı fark etmez — aynı sunucudaki iki oyuncuda AYNI.
+    private static String ipAnahtari(class_310 mc) {
+        try {
+            java.net.SocketAddress adres = mc.method_1562().method_48296().method_10755();
+            if (!(adres instanceof java.net.InetSocketAddress)) {
+                return null;
+            }
+            java.net.InetSocketAddress inet = (java.net.InetSocketAddress) adres;
+            java.net.InetAddress ip = inet.getAddress();
+            if (ip == null) {
+                return null;
+            }
+            return (ip.getHostAddress() + ":" + inet.getPort()).toLowerCase(java.util.Locale.ROOT);
+        }
+        catch (Throwable ignored) {
             return null;
         }
-        class_642 sd = mc.method_1562().method_45734();
-        if (sd == null || sd.field_3761 == null || sd.field_3761.isEmpty()) {
-            return null; // tek oyunculu / LAN ana makinesi — servis gerekmez
-        }
-        return sd.field_3761;
     }
 
     private static synchronized void baslat() {
@@ -124,9 +194,8 @@ public final class YikimPresence {
         Thread ben = Thread.currentThread();
         while (calisiyor && ben == isParcacigi) {
             try {
-                String adres = aktifAdres;
-                if (!adres.isEmpty()) {
-                    gonder(adres);
+                if (!anahtarlar.isEmpty()) {
+                    gonder();
                 }
             }
             catch (Throwable ignored) {
@@ -148,13 +217,52 @@ public final class YikimPresence {
         }
     }
 
-    private static void gonder(String adres) {
+    /// Bir tur: anahtarları sırayla dener. Tercih edilen anahtar (geçen tur
+    /// akran döndüren) önce sorulur; akran yoksa diğer anahtar da denenir.
+    private static void gonder() {
+        if (System.currentTimeMillis() - sonHata < HATA_SESSIZLIGI) {
+            return; // uç nokta bilinen şekilde ölü — sessiz kal
+        }
+        java.util.List<String> denenecek = new java.util.ArrayList<String>(anahtarlar);
+        String tercih = iyiAnahtar;
+        if (!tercih.isEmpty() && denenecek.remove(tercih)) {
+            denenecek.add(0, tercih);
+        }
+        int akran = -1;
+        String tutan = "";
+        int deneme = 0;
+        for (String anahtar : denenecek) {
+            if (++deneme > 3) {
+                break; // tur başına en fazla 3 istek — ücretsiz uç noktayı yormayalım
+            }
+            int sayi = tekGonder(anahtar);
+            if (sayi > 0) {
+                akran = sayi;
+                tutan = anahtar;
+                break; // bu anahtar iş gördü — ikinci isteğe gerek yok
+            }
+            if (sayi == 0 && akran < 0) {
+                akran = 0;
+                tutan = anahtar;
+            }
+        }
+        if (akran < 0) {
+            return; // hiçbir istek tutmadı
+        }
+        iyiAnahtar = tutan;
+        String durum = tutan + "|" + akran;
+        if (!durum.equals(sonDurum)) {
+            sonDurum = durum;
+            YikimClient.LOGGER.info("YIKIM presence: anahtar '{}' → {} akran", tutan, akran);
+        }
+    }
+
+    /// Tek anahtar için istek. Dönen: akran sayısı (>=0) veya -1 (istek düştü).
+    private static int tekGonder(String anahtar) {
         try {
-            if (System.currentTimeMillis() - sonHata < HATA_SESSIZLIGI) {
-                return; // uç nokta bilinen şekilde ölü — sessiz kal
-            }            class_310 mc = class_310.method_1551();
+            class_310 mc = class_310.method_1551();
             if (mc == null || mc.field_1724 == null) {
-                return;
+                return -1;
             }
             String uuid = mc.field_1724.method_5667().toString();
             String isim = profilAdi(mc, uuid);
@@ -162,7 +270,7 @@ public final class YikimPresence {
                 isim = mc.field_1724.method_5797() != null
                     ? mc.field_1724.method_5797().getString() : "oyuncu";
             }
-            String govde = "{\"v\":1,\"s\":\"" + kac(adres) + "\",\"u\":\"" + uuid
+            String govde = "{\"v\":1,\"s\":\"" + kac(anahtar) + "\",\"u\":\"" + uuid
                 + "\",\"n\":\"" + kac(isim) + "\"}";
             byte[] bayt = govde.getBytes(StandardCharsets.UTF_8);
             HttpURLConnection bag = (HttpURLConnection) new URL(ucak()).openConnection();
@@ -179,7 +287,7 @@ public final class YikimPresence {
             if (kod != 200) {
                 sonHata = System.currentTimeMillis();
                 bag.disconnect(); // soket sızıntısı = yarı açık bağlantı birikimi
-                return;
+                return -1;
             }
             StringBuilder yanit = new StringBuilder(512);
             try (InputStream giris = bag.getInputStream()) {
@@ -235,10 +343,32 @@ public final class YikimPresence {
             if (bilinmeyenVar(mc)) {
                 hizliBitis = System.currentTimeMillis() + HIZLI_PENCERE;
             }
+            return akranSayisi(metin);
         }
         catch (Throwable problem) {
             sonHata = System.currentTimeMillis();
+            return -1;
         }
+    }
+
+    /// Yanıttaki "p" dizisinde kaç akran var (kendisi hariç).
+    private static int akranSayisi(String metin) {
+        int b = metin.indexOf("\"p\"");
+        if (b < 0) {
+            return 0;
+        }
+        int sol = metin.indexOf('[', b);
+        int sag = sol < 0 ? -1 : metin.indexOf(']', sol);
+        if (sol < 0 || sag < 0) {
+            return 0;
+        }
+        int tirnak = 0;
+        for (int i = sol; i < sag; i++) {
+            if (metin.charAt(i) == '"') {
+                tirnak++;
+            }
+        }
+        return tirnak / 2;
     }
 
     /// Rozeti bilinmeyen oyuncuların İLK görülme zamanı (uuid → ms).
