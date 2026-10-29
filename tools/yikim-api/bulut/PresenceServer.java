@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -50,13 +51,20 @@ public class PresenceServer {
     private static final int MAX_PLAYERS = 200;
     private static final int MAX_ROZET_B64 = 4096;
     /** protokol sürümü — GET yanıtında görünür, dağıtım doğrulaması için */
-    private static final int SURUM = 2;
+    private static final int SURUM = 3;
 
     /// sunucu adresi → (uuid → oyuncu bilgisi)
     private static final Map<String, Map<String, Oyuncu>> KAYIT = new ConcurrentHashMap<>();
 
     /// özel rozetler: uuid → base64 png (8x8); TTL yok — çizim kalıcıdır
     private static final Map<String, String> ROZETLER = new ConcurrentHashMap<>();
+
+    /// v3: aynı çizimin HAM hali — 64 piksel × 4 bayt (RGBA) base64.
+    /// PNG her istemcide farklı kanal sırasıyla (ABGR/ARGB) çözülebiliyordu ve
+    /// kırmızı↔mavi takası oluyordu (turuncu kalp karşı tarafta MAVİ). Ham
+    /// baytta yorum yok: bayt sırası protokolün parçası.
+    private static final Map<String, String> PIXEL = new ConcurrentHashMap<>();
+    private static final int PX_BAYT = 8 * 8 * 4;
 
     /// uuid → hesap adı (izin eşleşmesi ve "kimin logosu" bilgisi için)
     private static final Map<String, String> ISIMLER = new ConcurrentHashMap<>();
@@ -193,7 +201,12 @@ public class PresenceServer {
             String ad = ISIMLER.getOrDefault(e.getKey(), "");
             json.append('"').append(e.getKey()).append("\":{\"n\":\"")
                 .append(ad.replace("\"", "")).append("\",\"p\":\"")
-                .append(e.getValue()).append("\"}");
+                .append(e.getValue()).append('"');
+            String ham = PIXEL.get(e.getKey());
+            if (ham != null) {
+                json.append(",\"x\":\"").append(ham).append('"');
+            }
+            json.append('}');
         }
         json.append('}');
         try {
@@ -223,6 +236,11 @@ public class PresenceServer {
                     ROZETLER.put(uuid, png);
                     if (ad != null) ISIMLER.put(uuid, ad);
                 }
+                String ham = alan(json, son, "x");
+                if (ham != null && pxGecerli(ham)) {
+                    PIXEL.put(uuid, pxTemizle(ham));
+                    if (ad != null) ISIMLER.put(uuid, ad);
+                }
                 int kapanis = json.indexOf('}', son);
                 i = kapanis < 0 ? son + 1 : kapanis + 1;
             }
@@ -249,6 +267,36 @@ public class PresenceServer {
             json.append('"').append(akran).append("\":\"").append(art).append('"');
         }
         return json.append('}').toString();
+    }
+
+    // ---------------------------------------------------------------- piksel (v3)
+
+    /// Aynı sunucudaki oyuncuların HAM çizimleri {"uuid":"<b64>"}.
+    private static String pixelYaz(String istekSahibi, Map<String, Oyuncu> ayniSunucu) {
+        StringBuilder json = new StringBuilder("{");
+        boolean ilk = true;
+        for (String akran : ayniSunucu.keySet()) {
+            if (akran.equals(istekSahibi)) continue;
+            String ham = PIXEL.get(akran);
+            if (ham == null) continue;
+            if (!ilk) json.append(',');
+            ilk = false;
+            json.append('"').append(akran).append("\":\"").append(ham).append('"');
+        }
+        return json.append('}').toString();
+    }
+
+    /// base64 çözülünce tam 256 bayt (64 piksel × RGBA) mı?
+    private static boolean pxGecerli(String ham) {
+        try {
+            return Base64.getDecoder().decode(ham.trim()).length == PX_BAYT;
+        } catch (Throwable yok) {
+            return false;
+        }
+    }
+
+    private static String pxTemizle(String ham) {
+        return Base64.getEncoder().encodeToString(Base64.getDecoder().decode(ham.trim()));
     }
 
     // ---------------------------------------------------------------- istek
@@ -296,13 +344,27 @@ public class PresenceServer {
                 ISIMLER.put(uuid, isim.length() > 32 ? isim.substring(0, 32) : isim);
             }
 
-            // --- rozet işlemi: png/sil alanı varsa güncelle (sunucu bilgisi şart değil) ---
-            if (png != null && png.length() <= MAX_ROZET_B64) {
+            // --- rozet işlemi (sunucu bilgisi şart değil) ---
+            // v3: istemci HAM RGBA ("x") da gönderir. Sunucu çizimi YORUMLAMAZ
+            // (görüntü kodlayıcı/çözücü yok, kanal sırası tahmini yok): gelen
+            // baytı saklar, aynen dağıtır. Yeni istemci "x"i, eski istemci
+            // "b"yi okur. Kırmızı↔mavi takasının tek kaynağı buydu.
+            String ham = alan(govde, "x");
+            if (ham != null && pxGecerli(ham)) {
+                if (izinliMi(uuid, isim)) {
+                    PIXEL.put(uuid, pxTemizle(ham));
+                    if (png != null && png.length() <= MAX_ROZET_B64) {
+                        ROZETLER.put(uuid, png);
+                    }
+                    rozetleriKaydet();
+                }
+            } else if (png != null && png.length() <= MAX_ROZET_B64) {
                 if (izinliMi(uuid, isim)) {
                     ROZETLER.put(uuid, png);
                     rozetleriKaydet();
                 }
             } else if (govde.contains("\"sil\"")) {
+                PIXEL.remove(uuid);
                 if (ROZETLER.remove(uuid) != null) {
                     rozetleriKaydet();
                 }
@@ -345,6 +407,7 @@ public class PresenceServer {
                 json.append('"').append(e.getKey()).append('"');
             }
             json.append("],\"b\":").append(rozetlerYaz(uuid, liste))
+                .append(",\"x\":").append(pixelYaz(uuid, liste))
                 .append(",\"izinler\":").append(izinlerYaz()).append('}');
             cevap(degis, 200, json.toString());
         }
