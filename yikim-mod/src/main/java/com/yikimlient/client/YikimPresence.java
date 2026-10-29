@@ -29,8 +29,21 @@ import net.minecraft.class_642;
  */
 public final class YikimPresence {
     private static final String VARSAYILAN_UCAK = "https://yikim-presence.onrender.com/presence";
-    private static final long PERIYOT = 30000L;
-    private static final long HATA_SESSIZLIGI = 120000L;
+    /// v1.13.2 GECİKME DÜZELTMESİ: 30 sn'lik kalp atışı, karşı tarafın rozeti
+    /// en geç 30 sn sonra görmesi demekti ("gir çık yapınca bir süre sonra
+    /// geliyor"). Artık 5 sn — TAB + nametag neredeyse anında güncellenir.
+    private static final long PERIYOT = 5000L;
+    /// HIZLI MOD: TAB'da rozeti bilinmeyen bir oyuncu varsa 1.2 sn'de bir sor.
+    /// (Sunucuya yeni giren oyuncular ilk saniyede yakalanır; kalıcı yük değil,
+    /// eksik kalmadığında normal 5 sn periyoda döner.)
+    private static final long HIZLI_PERIYOT = 1200L;
+    private static final long HIZLI_PENCERE = 20000L;
+    private static final long HATA_SESSIZLIGI = 30000L;
+
+    /// Hızlı modun bitiş zamanı + "şimdi gönder" bayrağı (rozet değişince
+    /// / oyuncu listesi değişince uyku bölünür — gecikme beklemeden sorulur).
+    private static volatile long hizliBitis;
+    private static volatile boolean simdiIste;
 
     private static Thread isParcacigi;
     private static volatile boolean calisiyor;
@@ -57,6 +70,10 @@ public final class YikimPresence {
             if (!adres.equals(aktifAdres) || !calisiyor) {
                 durdur();
                 aktifAdres = adres;
+                // sunucu değişti: kimse bilinmiyor → ilk istek ANINDA + hızlı mod
+                hizliBitis = System.currentTimeMillis() + HIZLI_PENCERE;
+                simdiIste = true;
+                ILK_GORULME.clear(); // yeni sunucu: "yeni oyuncu" sayacı sıfır
                 baslat();
             }
         }
@@ -115,9 +132,14 @@ public final class YikimPresence {
             catch (Throwable ignored) {
                 // tur başarısız — periyot sonrası tekrar
             }
+            long bekle = System.currentTimeMillis() < hizliBitis ? HIZLI_PERIYOT : PERIYOT;
             try {
-                for (long beklenecek = 0L; calisiyor && ben == isParcacigi && beklenecek < PERIYOT; beklenecek += 500L) {
-                    Thread.sleep(500L);
+                for (long gecen = 0L; calisiyor && ben == isParcacigi && gecen < bekle; gecen += 250L) {
+                    if (simdiIste) {
+                        simdiIste = false; // rozet/oyuncu değişti — uykuyu böl
+                        break;
+                    }
+                    Thread.sleep(250L);
                 }
             }
             catch (InterruptedException kesildi) {
@@ -207,10 +229,74 @@ public final class YikimPresence {
             if (yeni > 0) {
                 YikimClient.LOGGER.info("YIKIM presence: {} YIKIM oyuncusu bu sunucuda rozetlendi", yeni);
             }
+            // TAB'da hâlâ rozetsiz oyuncu varsa hızlı moda geç (v1.13.2).
+            // Sunucudaki herkes YIKIM değildir; bu yüzden aday sayısı sınırlı:
+            // yalnız gerçekten oyunda olan, kendisi olmayan isimler sayılır.
+            if (bilinmeyenVar(mc)) {
+                hizliBitis = System.currentTimeMillis() + HIZLI_PENCERE;
+            }
         }
         catch (Throwable problem) {
             sonHata = System.currentTimeMillis();
         }
+    }
+
+    /// Rozeti bilinmeyen oyuncuların İLK görülme zamanı (uuid → ms).
+    ///
+    /// Neden gerekli: sunucudaki oyuncuların çoğu YIKIM kullanmaz; "bilinmeyen
+    /// var" demek sonsuz hızlı yoklama demek olurdu (1.2 sn'de bir istek =
+    /// boşa trafik, ücretsiz sunucuda rate limit). Bu yüzden hızlı mod YALNIZ
+    /// yeni görülen oyuncu için 15 sn açık kalır; sonra normal 5 sn periyot.
+    private static final java.util.Map<UUID, Long> ILK_GORULME =
+        new java.util.concurrent.ConcurrentHashMap<UUID, Long>();
+    private static final long HIZLI_ADAY_SURESI = 15000L;
+
+    /// TAB listesinde YENİ görülen ve rozeti hâlâ bilinmeyen (kendisi hariç)
+    /// oyuncu var mı?
+    private static boolean bilinmeyenVar(class_310 mc) {
+        try {
+            if (mc == null || mc.field_1724 == null || mc.method_1562() == null) {
+                return false;
+            }
+            long simdi = System.currentTimeMillis();
+            UUID ben = mc.field_1724.method_5667();
+            boolean gerek = false;
+            for (class_640 girdi : mc.method_1562().method_2880()) {
+                if (girdi.method_2966() == null) {
+                    continue;
+                }
+                UUID id = girdi.method_2966().id();
+                if (id == null || id.equals(ben)) {
+                    continue;
+                }
+                if (YikimBadge.isKnown(id)) {
+                    ILK_GORULME.remove(id); // rozetlendi — adaylığı bitti
+                    continue;
+                }
+                Long ilk = ILK_GORULME.get(id);
+                if (ilk == null) {
+                    if (ILK_GORULME.size() > 256) {
+                        ILK_GORULME.clear(); // sınırsız büyümesin
+                    }
+                    ILK_GORULME.put(id, simdi);
+                    gerek = true;
+                }
+                else if (simdi - ilk < HIZLI_ADAY_SURESI) {
+                    gerek = true;
+                }
+            }
+            return gerek;
+        }
+        catch (Throwable ignored) {
+            // liste hazır değil — hızlı moda gerek yok
+        }
+        return false;
+    }
+
+    /// Dışarıdan "şimdi sor" (rozet değişti / oyuncu listesi değişti).
+    /// Uykudaki döngü 250 ms içinde uyanır: 5 sn beklenmez.
+    public static void hemenGonder() {
+        simdiIste = true;
     }
 
     private static String kac(String ham) {

@@ -79,6 +79,18 @@
 1. [Releases](https://github.com/YKSAMI1/yikimlient/releases) sayfasından `YIKIMLient_x64-setup.exe` indir
 2. Kur → aç → oyna. Java dahil her şey otomatik.
 
+> **“Windows kişisel bilgisayarınızı korudu” uyarısı çıkarsa:** bu, dosyanın
+> kötü amaçlı olduğu anlamına gelmez — kurulum dosyası henüz bir kod imzalama
+> sertifikasıyla imzalanmadığı için Windows “bilinmeyen yayıncı” der. Devam
+> etmek için **Ek bilgi → Yine de çalıştır**. Dosyanın bozulmadığını aynı
+> sürümdeki `SHA256SUMS.txt` ile doğrulayabilirsin:
+>
+> ```powershell
+> Get-FileHash .\YIKIMLient_x64-setup.exe -Algorithm SHA256
+> ```
+>
+> Sertifika temini ve imzalı derleme adımları: [docs/IMZALAMA-SMARTSREEN.md](docs/IMZALAMA-SMARTSREEN.md)
+
 ### Linux
 1. [Releases](https://github.com/YKSAMI1/yikimlient/releases) sayfasından:
    - **AppImage**: `yikimlient_amd64.AppImage` → `chmod +x` → çalıştır

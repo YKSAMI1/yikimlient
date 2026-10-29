@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.13.1";
+    public static final String MOD_VERSION = "1.13.2";
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
     private static boolean readyMarked;
     private static boolean firstJoinSeen;
@@ -85,6 +85,8 @@ implements ClientModInitializer {
             lastHeavyTick = now;
             YikimTheme.sync();       // dosya mtime kontrolü (1/sn)
             YikimGuard.tick(client);  // ayar kontrolü (1/sn, içte 20 sn throttle)
+            // v1.13.2: launcher rozeti oyun açıkken değiştirirse ~1 sn içinde yansısın
+            YikimAtolye.degisiklikleriIzle();
         }
         // HAFİF işlemler her tick'te (yer bellek, disk YOK):
         YikimMetrics.tick(client);   // FPS sayacı + CPS + bildirimler (1 sn'de bir gerçek iş — v1.8.2'de yanlışlıkla çıkarılmıştı, HUD 0 gösteriyordu)
@@ -101,6 +103,9 @@ implements ClientModInitializer {
                 // tazele — sunucu yeniden başlamış / ilk yükleme kaçmış olsa da
                 // diğer oyuncular logoyu görür.
                 YikimAtolye.sunucuyaTazele();
+                // v1.13.2: giriş anında "şimdi sor" + hızlı pencere — TAB'daki
+                // diğer YIKIM oyuncuları 5 sn beklenmeden rozetlenir.
+                YikimPresence.hemenGonder();
             }
             oyundaydi = oyunda;
         }

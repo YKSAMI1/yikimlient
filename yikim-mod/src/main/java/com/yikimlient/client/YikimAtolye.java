@@ -134,6 +134,46 @@ public final class YikimAtolye {
         return IZGARA.clone();
     }
 
+    /// v1.13.2: launcher oyun AÇIKKEN rozeti değiştirirse anında yansısın.
+    ///
+    /// Eskiden yeni çizim yalnız bir sonraki kalp atışında (30 sn) okunuyordu
+    /// → "değiştirdim ama oyunda eski logo duruyor". Artık mtime+boyut
+    /// değişimi ~1 sn içinde yakalanır: glif tazelenir, sunucuya yüklenir ve
+    /// presence'a "şimdi sor" denir (karşı taraf 1.2 sn içinde görür).
+    private static long sonIzleme = -1L;
+
+    public static void degisiklikleriIzle() {
+        if (CIZIM_KAPALI) {
+            return;
+        }
+        try {
+            Path dosya = YikimBridge.stateDir().resolve("rozet.png");
+            if (!Files.exists(dosya)) {
+                return;
+            }
+            long imza = Files.getLastModifiedTime(dosya).toMillis() ^ (Files.size(dosya) << 40);
+            if (sonIzleme == -1L) {
+                sonIzleme = imza; // ilk gözlem — oyun açılışında zaten yüklendi
+                return;
+            }
+            if (imza == sonIzleme) {
+                return;
+            }
+            sonIzleme = imza;
+            UUID ben = kendim();
+            yukluysaUygula();
+            if (ben != null) {
+                // launcher yükleyemediyse de diğer oyuncular görsün
+                arkaPlandaYukle(base64Png(), ben);
+            }
+            YikimPresence.hemenGonder();
+            YikimClient.LOGGER.info("YIKIM rozet: yerel çizim değişti → glif + sunucu tazelendi");
+        }
+        catch (Throwable ignored) {
+            // izleme rozeti asla bozmaz
+        }
+    }
+
     /// Kayıtlı çizim var mı (`.yikim/rozet.png`)?
     public static boolean dosyaVarMi() {
         try {

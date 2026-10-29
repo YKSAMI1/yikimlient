@@ -1,29 +1,29 @@
-﻿{
-    "schemaVersion":  1,
-    "id":  "yikimlient",
-    "version":  "1.13.1+1.21.11",
-    "name":  "YIKIM Client",
-    "description":  "YIKIMLient\u0027in oyun i?i ?ekirde?i. Sa? Shift ile YIKIM paneli; ?ak??mayan HUD d?zeni, tam ekran HUD edit?r?, kare h?z? te?hisi, oyun i?i katalog ve ba?lat?c? ile dosya k?pr?s?.",
-    "authors":  [
-                    "YIKIMLient"
-                ],
-    "license":  "MIT",
-    "environment":  "*",
-    "entrypoints":  {
-                        "client":  [
-                                       "com.yikimlient.client.YikimClient"
-                                   ],
-                        "main":  [
-                                     "com.yikimlient.client.YikimServer"
-                                 ]
-                    },
-    "mixins":  [
-                   "yikimlient.mixins.json"
-               ],
-    "depends":  {
-                    "fabricloader":  "\u003e=0.19.5",
-                    "fabric-api":  "*",
-                    "minecraft":  "1.21.11",
-                    "java":  "\u003e=21"
-                }
+{
+    "schemaVersion": 1,
+    "id": "yikimlient",
+    "version": "1.13.2+1.21.11",
+    "name": "YIKIM Client",
+    "description": "YIKIMLient'in oyun içi çekirdeği. Sağ Shift ile YIKIM paneli; çakışmayan HUD düzeni, tam ekran HUD editörü, kare hızı teşhisi, oyun içi katalog ve başlatıcı ile dosya köprüsü.",
+    "authors": [
+        "YIKIMLient"
+    ],
+    "license": "MIT",
+    "environment": "*",
+    "entrypoints": {
+        "client": [
+            "com.yikimlient.client.YikimClient"
+        ],
+        "main": [
+            "com.yikimlient.client.YikimServer"
+        ]
+    },
+    "mixins": [
+        "yikimlient.mixins.json"
+    ],
+    "depends": {
+        "fabricloader": ">=0.19.5",
+        "fabric-api": "*",
+        "minecraft": "1.21.11",
+        "java": ">=21"
+    }
 }
