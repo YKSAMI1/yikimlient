@@ -56,16 +56,34 @@
       blok(16, 48, 16, 16, "#2c3e50");
       // hafif gölge (dokunun düz görünmemesi için)
       blok(20, 20, 8, 12, kiyafet);
+      // ÜST KATMANLAR (şapka / ceket / kolluk / pantolon) — kartlarda görünmeli.
+      // Gerçek skinlerde bu piksellerin çoğu saydamdır; burada görünür olsun diye
+      // yalnız ön yüzler ve kenarlar boyanır.
+      blok(32, 0, 32, 8, sac);           // şapka üstü + yanları
+      blok(32, 8, 8, 8, sac);            // şapka sağ yan
+      blok(48, 8, 8, 8, sac);            // şapka sol yan
+      blok(56, 8, 8, 8, sac);            // şapka arka
+      blok(40, 8, 8, 2, sac);            // alın bandı (yüz görünsün)
+      blok(20, 36, 8, 12, kiyafet);      // ceket önü
+      blok(20, 36, 8, 1, "#1b1b1f");     // yaka
+      blok(44, 36, 4, 12, "#7a5230");    // sağ kolluk
+      blok(52, 52, 4, 12, "#7a5230");    // sol kolluk
+      blok(4, 36, 4, 12, "#1e2b3a");     // sağ pantolon
+      blok(4, 52, 4, 12, "#1e2b3a");     // sol pantolon
       return c.toDataURL("image/png");
     }
     function pelerinUrl(renk, kenar) {
       var c = bosTuval(64, 32), g = c.getContext("2d");
-      g.fillStyle = renk;
-      g.fillRect(1, 1, 10, 16);
-      g.fillStyle = kenar;
-      g.fillRect(1, 1, 10, 2);
-      g.fillRect(1, 15, 10, 2);
-      g.fillRect(5, 3, 2, 12);
+      function panel(px) {
+        g.fillStyle = renk; g.fillRect(px, 1, 10, 16);
+        g.fillStyle = kenar; g.fillRect(px, 1, 10, 2); g.fillRect(px, 15, 10, 2);
+        g.fillStyle = "#ffffff"; g.fillRect(px + 4, 4, 2, 10);
+      }
+      panel(1);  // iç yüz
+      panel(12); // dış yüz (görünen)
+      // 1 piksellik kenar şeritleri (gerçek Mojang paftasındaki gibi)
+      g.fillStyle = kenar; g.fillRect(1, 0, 10, 1); g.fillRect(11, 0, 10, 1);
+      g.fillStyle = renk; g.fillRect(0, 1, 1, 16); g.fillRect(11, 1, 1, 16);
       return c.toDataURL("image/png");
     }
 

@@ -665,44 +665,82 @@ input.search-in.input, .search-in.input {
   color: var(--text-faint);
 }
 .skin-adet { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
-.skin-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
+.skin-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(102px, 1fr)); gap: 12px; }
 
 .skin-kart {
-  position: relative; display: flex; flex-direction: column; gap: 5px;
-  padding: 7px 7px 6px; border: 1px solid var(--hairline); border-radius: var(--radius-sm);
-  background: var(--bg1); cursor: pointer; min-width: 0;
-  transition: border-color 0.15s, transform 0.15s, background 0.15s;
+  position: relative; display: flex; flex-direction: column; gap: 0; min-width: 0;
+  padding: 0; border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg3) 65%, var(--bg1)), var(--bg1));
+  cursor: pointer;
+  transition: border-color 0.16s, transform 0.16s, box-shadow 0.16s;
 }
-.skin-kart:hover { border-color: var(--hairline-strong); background: var(--bg3); transform: translateY(-1px); }
+.skin-kart:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--hairline-strong));
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px -14px rgba(0, 0, 0, 0.9), 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
 .skin-kart.secili {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset;
-  background: color-mix(in srgb, var(--accent) 8%, var(--bg1));
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 8px 20px -14px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 .skin-yuz {
-  width: 100%; aspect-ratio: 1 / 1; image-rendering: pixelated; display: block;
+  width: 100%; height: auto; aspect-ratio: 20 / 36;
+  image-rendering: pixelated; display: block;
+  /* Aydınlık sahne: koyu pantolon/saç kart zemininde kaybolmasın. */
   background:
-    repeating-conic-gradient(var(--bg3) 0% 25%, var(--bg2) 25% 50%) 0 0 / 12px 12px;
+    radial-gradient(58% 34% at 50% 18%, color-mix(in srgb, var(--accent) 16%, #34343f), transparent 78%),
+    radial-gradient(120% 54% at 50% 104%, color-mix(in srgb, var(--accent) 10%, #2a2a34), transparent 74%),
+    linear-gradient(180deg, #292933, #1b1b22 72%, #161620);
+  border-bottom: 1px solid var(--hairline);
 }
+.skin-yuz-sar { position: relative; display: block; }
 .skin-kart-ad {
+  padding: 7px 9px 8px;
   font-size: 11.5px; font-weight: 600; color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.skin-model {
+  position: absolute; left: 6px; bottom: 6px;
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--bg0) 62%, transparent);
+  padding: 2px 5px; border-radius: 4px;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
 .skin-rozet {
-  position: absolute; top: 5px; right: 5px;
-  font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
-  color: var(--text-dim); background: rgba(0, 0, 0, 0.55); padding: 2px 5px; border-radius: 3px;
+  position: absolute; top: 6px; right: 6px;
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--bg0) 78%, transparent);
+  padding: 2px 5px; border-radius: 4px;
+  backdrop-filter: blur(4px);
 }
 .skin-rozet.secim { background: var(--accent); color: #150b03; }
 .skin-rozet.aktif { background: var(--accent); color: #150b03; }
 .skin-sil {
-  position: absolute; top: 4px; left: 4px; width: 20px; height: 20px;
-  display: grid; place-items: center; border: 0; border-radius: 4px;
-  background: rgba(0, 0, 0, 0.55); color: #ffb3a8; cursor: pointer;
-  opacity: 0; transition: opacity 0.12s;
+  position: absolute; top: 6px; left: 6px; width: 21px; height: 21px;
+  display: grid; place-items: center; border: 0; border-radius: 5px;
+  background: color-mix(in srgb, var(--bg0) 78%, transparent); color: #ffb3a8; cursor: pointer;
+  opacity: 0; transition: opacity 0.12s, background 0.12s;
+  backdrop-filter: blur(4px);
 }
+.skin-sil:hover { background: color-mix(in srgb, #ff6b57 32%, var(--bg0)); }
 .skin-kart:hover .skin-sil { opacity: 1; }
 .skin-sil .ic svg { width: 12px; height: 12px; }
+
+/* Dosyadan eklerken model seçimi (wide / slim) */
+.skin-model-secim { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.skin-model-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 14px 10px; border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm);
+  background: var(--bg1); color: var(--text-dim); cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+}
+.skin-model-btn:hover { border-color: var(--accent); background: var(--bg3); transform: translateY(-1px); }
+.skin-model-btn .ic svg { width: 22px; height: 22px; }
+.skin-model-btn b { font-size: 13px; color: var(--text); }
+.skin-model-btn span { font-size: 11px; color: var(--text-faint); text-align: center; line-height: 1.35; }
 
 .skin-ekle {
   display: flex; flex-direction: column; align-items: center; gap: 3px;

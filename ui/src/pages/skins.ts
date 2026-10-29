@@ -7,6 +7,8 @@
 import { currentAccount, fileSrc, icon, invoke, navigate, openLoginModal, openModal, toast } from "../main";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import { PikselPafta } from "../sahne/piksel-pafta";
+import { PELERIN_DIS } from "../sahne/skin-bolgeler";
+import { KART_TUVAL_GENISLIK, KART_TUVAL_YUKSEKLIK, kartCiz } from "../sahne/skin-kart";
 import type { SkinHub, SkinKayit } from "../sahne/skin-tipleri";
 import { openSkinEditor } from "./skins-editor";
 
@@ -247,7 +249,7 @@ function ciz(root: HTMLElement): void {
       kitaplik.innerHTML = hub.kitaplik.map((k) => kartHtml(k)).join("");
       kitaplik.querySelectorAll<HTMLCanvasElement>(".skin-yuz").forEach((c) => {
         const yol = c.dataset.dosya;
-        if (yol) yuzCiz(c, yol);
+        if (yol) kartKarakterCiz(c, yol, c.dataset.slim === "1");
       });
     }
     const adet = root.querySelector("#sk-adet") as HTMLElement;
@@ -262,15 +264,18 @@ function ciz(root: HTMLElement): void {
         (v) => `
       <div class="skin-kart" data-tur="varsayilan" data-id="varsayilan:${kacis(v.ad)}" data-dosya="${kacis(v.dosya)}"
            data-slim="${v.slim ? 1 : 0}" data-ad="${kacis(v.ad)}">
-        <canvas class="skin-yuz" width="64" height="64" data-dosya="${kacis(v.dosya)}"></canvas>
+        <div class="skin-yuz-sar">
+          <canvas class="skin-yuz" width="${KART_TUVAL_GENISLIK}" height="${KART_TUVAL_YUKSEKLIK}"
+                  data-dosya="${kacis(v.dosya)}" data-slim="${v.slim ? 1 : 0}"></canvas>
+          <span class="skin-model">${v.slim ? "Slim" : "Wide"}</span>
+        </div>
         <div class="skin-kart-ad">${kacis(v.ad)}</div>
-        <div class="skin-rozet">${v.slim ? "Slim" : "Wide"}</div>
       </div>`,
       )
       .join("");
     vars.querySelectorAll<HTMLCanvasElement>(".skin-yuz").forEach((c) => {
       const yol = c.dataset.dosya;
-      if (yol) yuzCiz(c, yol);
+      if (yol) kartKarakterCiz(c, yol, c.dataset.slim === "1");
     });
   }
 
@@ -344,9 +349,12 @@ function kartHtml(k: SkinKayit): string {
   return `
     <div class="skin-kart" data-tur="kayit" data-id="${kacis(k.id)}" data-dosya="${kacis(k.dosya)}"
          data-slim="${k.slim ? 1 : 0}" data-ad="${kacis(k.ad)}">
-      <canvas class="skin-yuz" width="64" height="64" data-dosya="${kacis(k.dosya)}"></canvas>
+      <div class="skin-yuz-sar">
+        <canvas class="skin-yuz" width="${KART_TUVAL_GENISLIK}" height="${KART_TUVAL_YUKSEKLIK}"
+                data-dosya="${kacis(k.dosya)}" data-slim="${k.slim ? 1 : 0}"></canvas>
+        <span class="skin-model">${k.slim ? "Slim" : "Wide"}</span>
+      </div>
       <div class="skin-kart-ad">${kacis(k.ad)}</div>
-      <div class="skin-rozet">${k.slim ? "Slim" : "Wide"}</div>
       <button class="skin-sil" title="Sil">${icon("trash")}</button>
     </div>`;
 }
@@ -477,12 +485,59 @@ async function dosyaEkle(root: HTMLElement, hesapId: string, f: File): Promise<v
   try {
     const veri = Array.from(new Uint8Array(await f.arrayBuffer()));
     const ad = f.name.replace(/\.png$/i, "").slice(0, 48) || "Skin";
-    await invoke("cmd_skin_kaydet", { ad, veri, slim: false });
-    toast("Skin kitaplığa eklendi.");
+    const slim = await modelSor(ad);
+    if (slim === null) return;
+    await invoke("cmd_skin_kaydet", { ad, veri, slim });
+    toast(`Skin kitaplığa eklendi · ${slim ? "Slim" : "Wide"}`);
     await hubYukle(root, hesapId, false);
   } catch (e) {
     toast(String(e), "err");
   }
+}
+
+/** Dosyadan eklerken model seçimi: wide (klasik 4px kol) / slim (ince 3px kol). */
+function modelSor(ad: string): Promise<boolean | null> {
+  return new Promise((coz) => {
+    const { root, close } = openModal(`
+      <h2>Skin türü</h2>
+      <div class="sub" style="margin-bottom:14px"><b>${kacis(ad)}</b> hangi model için çizildi?</div>
+      <div class="skin-model-secim">
+        <button class="skin-model-btn" id="sm-wide">
+          ${icon("user")}
+          <b>Wide</b>
+          <span>Klasik model — 4px kol</span>
+        </button>
+        <button class="skin-model-btn" id="sm-slim">
+          ${icon("user")}
+          <b>Slim</b>
+          <span>İnce model — 3px kol (Alex)</span>
+        </button>
+      </div>
+      <div style="display:flex; justify-content:flex-end; margin-top:12px">
+        <button class="btn ghost" id="sm-iptal">Vazgeç</button>
+      </div>`);
+    let bitti = false;
+    // Escape / arka plan tıklaması modali kapatır; söz de iptal olarak çözülür,
+    // yoksa `dosyaEkle` sonsuza kadar bekler.
+    const tus = (e: KeyboardEvent) => {
+      if (e.key === "Escape") bitir(null);
+    };
+    const bitir = (v: boolean | null) => {
+      if (bitti) return;
+      bitti = true;
+      window.removeEventListener("keydown", tus);
+      close();
+      coz(v);
+    };
+    root.querySelector("#sm-wide")?.addEventListener("click", () => bitir(false));
+    root.querySelector("#sm-slim")?.addEventListener("click", () => bitir(true));
+    root.querySelector("#sm-iptal")?.addEventListener("click", () => bitir(null));
+    const arka = root.parentElement as HTMLElement | null;
+    arka?.addEventListener("click", (e) => {
+      if (e.target === arka) bitir(null);
+    });
+    window.addEventListener("keydown", tus);
+  });
 }
 
 async function editorAc(root: HTMLElement, hesapId: string): Promise<void> {
@@ -566,14 +621,12 @@ async function dosyaBaytlari(yol: string): Promise<number[]> {
   return Array.from(new Uint8Array(await r.arrayBuffer()));
 }
 
-function yuzCiz(canvas: HTMLCanvasElement, yol: string): void {
+function kartKarakterCiz(canvas: HTMLCanvasElement, yol: string, slim: boolean): void {
   const img = new Image();
   img.onload = () => {
     const g = canvas.getContext("2d");
     if (!g) return;
-    g.imageSmoothingEnabled = false;
-    g.clearRect(0, 0, canvas.width, canvas.height);
-    g.drawImage(img, 8, 8, 8, 8, 0, 0, canvas.width, canvas.height);
+    kartCiz(g, img, slim);
   };
   img.src = fileSrc(yol);
 }
@@ -585,7 +638,8 @@ function pelerinCiz(canvas: HTMLCanvasElement, yol: string): void {
     if (!g) return;
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, canvas.width, canvas.height);
-    g.drawImage(img, 1, 1, 10, 16, 0, 0, canvas.width, canvas.height);
+    // Dışarıdan görünen sırt paneli (12,1)–(22,17).
+    g.drawImage(img, PELERIN_DIS.x, PELERIN_DIS.y, PELERIN_DIS.w, PELERIN_DIS.h, 0, 0, canvas.width, canvas.height);
   };
   img.src = fileSrc(yol);
 }
