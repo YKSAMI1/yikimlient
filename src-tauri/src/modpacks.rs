@@ -415,6 +415,12 @@ pub fn standard_mods() -> Vec<StandardMod> {
             category: "yardarci".into(), enabled_by_default: false,
         },
         StandardMod {
+            id: "no-chat-restrictions".into(), slug: "no-chat-restrictions".into(),
+            name: "No Chat Restrictions".into(),
+            description: "Sohbet karakter/mesaj sınırlarını kaldırır; uzun mesaj yazmayı kolaylaştırır.".into(),
+            category: "yardarci".into(), enabled_by_default: true,
+        },
+        StandardMod {
             id: "gnetum".into(), slug: "gnetum".into(),
             name: "Gnetum".into(),
             description: "HUD güncellemelerini karelere dağıtarak yükü azaltır; scoreboard/actionbar düzeni.".into(),
