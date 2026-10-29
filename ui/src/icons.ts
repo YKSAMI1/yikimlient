@@ -94,10 +94,32 @@ const clock = `<svg ${A}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/
 /** lucide "square" — durdur (oyun sürecini kapat) */
 const stop = `<svg ${A}><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></svg>`;
 
+/** lucide "shirt" — skin merkezi */
+const shirt = `<svg ${A}><path d="M8.5 3 5 4.8 3 10l3.2 1.4.8-1.7V21h10V9.7l.8 1.7L21 10l-2-5.2L15.5 3a3.5 3.5 0 0 1-7 0z"/></svg>`;
+
+/** lucide "brush" — kalem fırçası */
+const brush = `<svg ${A}><path d="m14.5 4.5 5 5L9 20H4v-5z"/><path d="m12.5 6.5 5 5"/></svg>`;
+
+/** lucide "paint-bucket" — kova */
+const bucket = `<svg ${A}><path d="M4.5 11.5 11 5l7 7-6.5 6.5z"/><path d="M7 9 5 7"/><path d="M19 14.5s2 2.2 2 3.5a2 2 0 1 1-4 0c0-1.3 2-3.5 2-3.5z"/></svg>`;
+
+/** lucide "pipette" — damlacık */
+const picker = `<svg ${A}><path d="m14 6 4 4"/><path d="M11.5 8.5 4 16v4h4l7.5-7.5"/><path d="m17 3 4 4-2.5 2.5-4-4z"/></svg>`;
+
+/** lucide "undo" */
+const undo = `<svg ${A}><path d="M9 14 4 9l5-5"/><path d="M4 9h9a6 6 0 0 1 0 12h-3"/></svg>`;
+
+/** lucide "redo" */
+const redo = `<svg ${A}><path d="m15 14 5-5-5-5"/><path d="M20 9h-9a6 6 0 0 0 0 12h3"/></svg>`;
+
+/** lucide "lock" — premium kapısı */
+const lock = `<svg ${A}><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>`;
+
 export const ICONS: Record<string, string> = {
   home, grid, compass, news, gear, plus, search, play, image, folder,
   trash, copy, back, check, user, puzzle, box, cpu, args, term, chart,
   dl, mug, globe, sparkle, file, info, clock, stop,
+  shirt, brush, bucket, picker, undo, redo, lock,
 };
 
 /** içine gömülü SVG üretir; span'a sarılırsa .ic ile hizalanır */
