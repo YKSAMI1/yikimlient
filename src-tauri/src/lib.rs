@@ -119,6 +119,7 @@ pub fn run() {
             commands::cmd_kill_game,
             commands::cmd_cancel_downloads,
             commands::cmd_check_updates,
+            commands::cmd_upd_teshis,
             commands::cmd_get_community_stats,
             commands::cmd_pick_pack_file,
             commands::cmd_import_pack_file,

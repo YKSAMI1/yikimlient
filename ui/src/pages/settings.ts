@@ -220,8 +220,9 @@ export function renderSettings(root: HTMLElement): void {
       <div class="about-row"><span>YIKIMLient</span><b id="app-version">yükleniyor…</b></div>
       <div class="about-row"><span>Tür</span><b>Ultra-hafif Minecraft launcher</b></div>
       <div class="about-row"><span>Motor</span><b>Tauri 2 + Rust (Electron'suz)</b></div>
-      <div style="display:flex; gap:10px; margin-top:14px">
+      <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap">
         <button class="btn ghost" id="check-upd">Güncellemeleri Kontrol Et</button>
+        <button class="btn ghost" id="upd-page">${icon("dl")} İndirme Sayfası</button>
         <button class="btn ghost" id="open-dir">${icon("folder")} Veri Klasörü</button>
       </div>
       <p style="margin-top:12px; font-size:11.5px; color:var(--text-faint)">
@@ -362,12 +363,60 @@ export function renderSettings(root: HTMLElement): void {
         toast("YIKIMLient güncel ✓");
       }
     } catch (e) {
-      toast(`Güncelleme kontrolü başarısız: ${e}`, "err");
+      await updaterFallback(e);
     }
+  });
+  root.querySelector("#upd-page")?.addEventListener("click", () => {
+    openExternal(YAYIN_SAYFASI).catch(() =>
+      toast(`Tarayıcı açılamadı — adresi elle aç: ${YAYIN_SAYFASI}`, "err")
+    );
   });
   root.querySelector("#open-dir")?.addEventListener("click", async () => {
     const dir = await invoke("cmd_get_app_dir");
     openPath(dir).catch(() => {});
+  });
+}
+
+const YAYIN_SAYFASI = "https://github.com/YKSAMI1/yikimlient/releases/latest";
+
+/** "v0.3.48" / "0.3.48" gibi etiketleri karşılaştırılabilir biçime indirger. */
+function surumCek(s: unknown): string {
+  return String(s ?? "").trim().replace(/^v/i, "");
+}
+
+/** Otomatik güncelleyici hata verirse: GitHub API + manifest teşhisi ile
+    kullanıcıyı elle indirme yoluna yönlendirir. */
+async function updaterFallback(hata: unknown): Promise<void> {
+  let yeni = "";
+  let teshis = "";
+  try {
+    const r: any = await invoke("cmd_check_updates");
+    const cur = surumCek(r?.current);
+    const son = surumCek(r?.latest);
+    if (son && son !== cur) yeni = son;
+  } catch { /* ağ yok — sorun değil */ }
+  try {
+    const t: any = await invoke("cmd_upd_teshis");
+    const plat = Array.isArray(t?.platformlar) && t.platformlar.length ? t.platformlar.join(", ") : "yok";
+    const parca = [`HTTP ${t?.durum || "?"}`, `manifest ${t?.surum || "?"}`, `platform: ${plat}`];
+    if (t?.hata) parca.push(String(t.hata));
+    teshis = parca.join(" · ");
+  } catch { /* yoksay */ }
+  const { root: mRoot, close } = openModal(`
+    <h2>Güncelleme kontrolü başarısız</h2>
+    <div class="sub">Otomatik güncelleyici bu sefer çalışmadı. Launcher'ı elle de güncelleyebilirsin — kurulum dosyası GitHub'daki sürüm sayfasında.</div>
+    ${yeni ? `<div style="margin-top:10px; font-size:13px; color:var(--text)">GitHub'da yeni sürüm duruyor: <b>v${yeni}</b></div>` : ""}
+    <div style="margin-top:10px; font-size:11.5px; line-height:1.5; color:var(--text-faint); user-select:text">${teshis ? `Teşhis: ${teshis}` : `Hata: ${String(hata ?? "bilinmiyor")}`}</div>
+    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px">
+      <button class="btn ghost" id="upd-kapat">Kapat</button>
+      <button class="btn primary" id="upd-sayfa">${icon("dl")} İndirme Sayfası</button>
+    </div>
+  `);
+  mRoot.querySelector("#upd-kapat")?.addEventListener("click", () => close());
+  mRoot.querySelector("#upd-sayfa")?.addEventListener("click", () => {
+    openExternal(YAYIN_SAYFASI).catch(() =>
+      toast(`Tarayıcı açılamadı — adresi elle aç: ${YAYIN_SAYFASI}`, "err")
+    );
   });
 }
 

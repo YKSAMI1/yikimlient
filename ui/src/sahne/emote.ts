@@ -40,6 +40,12 @@ export interface Emote {
      * false/oidsız: eski Emotecraft JSON'u (mutlak px, body = gövde kutusu).
      */
     palUzay?: boolean;
+    /**
+     * true: PAL çözücüsü kemik konumlarından varsayılan pivotu çıkardı (delta px).
+     * false/oidsız: eski çözücüyle üretilmiş dosya — dinlenme payı konumların
+     * üstünde duruyor, yüklerken bir kez düzeltilir.
+     */
+    palDef?: boolean;
     /** isLoop true ise döngünün başladığı tick (Emotecraft returnToTickLoop) */
     loopBas?: number;
 }
@@ -86,6 +92,7 @@ function eskiFormat(js: any): Emote {
         kemikler: new Map(),
     };
     if (e.palUzay === true) emote.palUzay = true;
+    if (e.palDef === true) emote.palDef = true;
     // Emotecraft "returnToTickLoop": bitişte endTick'ten loopBas'a sarar
     const lb = say(e.loopBas);
     if (lb !== null && lb >= 0) emote.loopBas = lb;
@@ -115,7 +122,58 @@ function eskiFormat(js: any): Emote {
             }
         }
     }
+    // eski çözücüyle üretilmiş PAL dosyalarında konum kanallarını bir kez düzelt
+    if (emote.palUzay === true && emote.palDef !== true) palKonumDuzelt(emote);
     return emote;
+}
+
+/**
+ * PAL konum kanallarının dinlenme payı (launcher animasyon uzayı, px).
+ * Eski `.emotecraft` çözücüsü v2 dosyalarında kemik adı camelCase ("leftArm")
+ * olduğu için varsayılan pivotu çıkaramıyordu: kol/bacak `x/y/z` kanalları
+ * dinlenme değerlerini de taşıyor ve parçalar gövdeden kopuk çiziliyor.
+ */
+const PAL_DINLENME: Record<string, number[]> = {
+    leftArm: [5, -2, 0],
+    rightArm: [-5, -2, 0],
+    leftLeg: [1.9, -12, 0.1],
+    rightLeg: [-1.9, -12, 0.1],
+};
+
+function medyan(degerler: number[]): number {
+    if (degerler.length === 0) return 0;
+    const s = [...degerler].sort((a, b) => a - b);
+    const o = Math.floor(s.length / 2);
+    return s.length % 2 ? s[o] : (s[o - 1] + s[o]) / 2;
+}
+
+/**
+ * `palDef` işareti olmayan (eski çözücüyle üretilmiş) PAL dosyalarında kol/bacak
+ * konum kanallarının üstünde duran dinlenme payını bir kez geri alır. Yalnızca
+ * kanalın medyanı dinlenme değerine oturuyorsa dokunur; `palDef` işaretli yeni
+ * dosyalar ve zaten delta olan eski dosyalar (ör. v1 ikili) değişmez.
+ */
+function palKonumDuzelt(emote: Emote): void {
+    for (const [ad, sapma] of Object.entries(PAL_DINLENME)) {
+        const kanal = emote.kemikler.get(ad);
+        if (!kanal) continue;
+        let varOlan = 0;
+        let eslesen = 0;
+        for (const cn of ["x", "y"] as const) {
+            const kf = kanal[cn];
+            if (!kf || kf.length === 0) continue;
+            varOlan++;
+            const dinlenme = sapma[cn === "x" ? 0 : 1];
+            if (Math.abs(medyan(kf.map((k) => k.v)) - dinlenme) <= 2) eslesen++;
+        }
+        if (varOlan === 0 || eslesen !== varOlan) continue;
+        (["x", "y", "z"] as const).forEach((cn, i) => {
+            const kf = kanal[cn];
+            if (!kf) return;
+            for (const k of kf) k.v -= sapma[i];
+        });
+    }
+    emote.palDef = true;
 }
 
 /** PAL/geckolib biçemini parçalar (baz: x=pitch, y=yaw, z=roll; derece). */

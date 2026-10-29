@@ -1963,6 +1963,58 @@ pub async fn cmd_check_updates() -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({ "current": current, "latest": latest }))
 }
 
+/// Guncelleme teshisi: updater eklentisi "platform bulunamadi" derse, ayni
+/// yayin dosyasini bizim HTTP istemcimizle indirip ne gordugumuzu raporlar.
+/// Hata dondurmez (UI'da bilgi amacli gosterilir).
+#[tauri::command]
+pub async fn cmd_upd_teshis() -> serde_json::Value {
+    const URL: &str =
+        "https://github.com/YKSAMI1/yikimlient/releases/latest/download/latest.json";
+    let current = env!("CARGO_PKG_VERSION");
+    let mut durum: u16 = 0;
+    let mut surum = String::new();
+    let mut platformlar: Vec<String> = Vec::new();
+    let mut hata = String::new();
+    match crate::core::http_client()
+        .get(URL)
+        .header("User-Agent", "YIKIMLient")
+        .send()
+        .await
+    {
+        Ok(r) => {
+            durum = r.status().as_u16();
+            match r.text().await {
+                Ok(govde) => match serde_json::from_str::<serde_json::Value>(&govde) {
+                    Ok(js) => {
+                        surum = js["version"].as_str().unwrap_or("").to_string();
+                        if let Some(m) = js["platforms"].as_object() {
+                            platformlar = m.keys().cloned().collect();
+                            platformlar.sort();
+                        }
+                        if surum.is_empty() {
+                            let kisa: String = govde.chars().take(120).collect();
+                            hata = format!("beklenmeyen yanit: {kisa}");
+                        }
+                    }
+                    Err(e) => {
+                        let kisa: String = govde.chars().take(120).collect();
+                        hata = format!("JSON cozulemedi ({e}) - yanit: {kisa}");
+                    }
+                },
+                Err(e) => hata = format!("yanit okunamadi: {e}"),
+            }
+        }
+        Err(e) => hata = format!("istek basarisiz: {e}"),
+    }
+    serde_json::json!({
+        "current": current,
+        "durum": durum,
+        "surum": surum,
+        "platformlar": platformlar,
+        "hata": hata,
+    })
+}
+
 #[derive(Serialize)]
 pub struct CommunityStats {
     pub downloads: u64,

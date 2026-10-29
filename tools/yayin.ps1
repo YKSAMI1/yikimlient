@@ -68,13 +68,17 @@ gh release upload "v$V" (Join-Path $tmp "YIKIMLient_${V}_amd64.AppImage.sig") (J
 Write-Host "[6/7] birlesik latest.json - EN SON"
 $wsig = [System.IO.File]::ReadAllText("$nsis\YIKIMLient_${V}_x64-setup.exe.sig").Trim()
 $lsig = [System.IO.File]::ReadAllText((Join-Path $tmp "YIKIMLient_${V}_amd64.AppImage.sig")).Trim()
+$wurl = "https://github.com/YKSAMI1/yikimlient/releases/download/v$V/YIKIMLient_${V}_x64-setup.exe"
+$lurl = "https://github.com/YKSAMI1/yikimlient/releases/download/v$V/YIKIMLient_${V}_amd64.AppImage"
 $latest = @{
   version  = $V
   notes    = $Notlar
   pub_date = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ')
   platforms = @{
-    "windows-x86_64" = @{ signature = $wsig; url = "https://github.com/YKSAMI1/yikimlient/releases/download/v$V/YIKIMLient_${V}_x64-setup.exe" }
-    "linux-x86_64"   = @{ signature = $lsig; url = "https://github.com/YKSAMI1/yikimlient/releases/download/v$V/YIKIMLient_${V}_amd64.AppImage" }
+    "windows-x86_64"        = @{ signature = $wsig; url = $wurl }
+    "windows-x86_64-nsis"   = @{ signature = $wsig; url = $wurl }
+    "linux-x86_64"          = @{ signature = $lsig; url = $lurl }
+    "linux-x86_64-appimage" = @{ signature = $lsig; url = $lurl }
   }
 } | ConvertTo-Json -Depth 5
 [System.IO.File]::WriteAllText("$nsis\latest.json", $latest, (New-Object System.Text.UTF8Encoding($false)))
@@ -90,7 +94,7 @@ foreach ($deneme in 1..3) {
   $u = $icerik | ConvertFrom-Json
   $plat = $u.platforms.PSObject.Properties.Name
   Write-Host "surum: $($u.version)  platforms: $($plat -join ', ')"
-  if ($plat -contains 'windows-x86_64' -and $plat -contains 'linux-x86_64') { $dogru = $true; break }
+  if ($plat -contains 'windows-x86_64' -and $plat -contains 'windows-x86_64-nsis' -and $plat -contains 'linux-x86_64') { $dogru = $true; break }
   Write-Host "windows eksik - CI dosyasi ustune yazmis, birlesigi yeniden yukluyorum"
   gh release upload "v$V" "$nsis\latest.json" --clobber 2>&1 | Select-Object -First 1
 }

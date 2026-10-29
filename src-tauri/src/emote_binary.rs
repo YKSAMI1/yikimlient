@@ -130,8 +130,27 @@ struct Animasyon {
     uuid: String,
 }
 
+/// İkili dosyada kemik adları PAL'ın camelCase biçimiyle gelir ("leftArm");
+/// varsayılan pivotlar snake_case anahtarlarla tanımlı. İkisini de tek biçime
+/// indir, yoksa `varsayilan` 0 döner ve konum kanalları dinlenme payını
+/// (kol ±5/-2, bacak ±1.9/-12) taşır — parçalar gövdeden kopar.
+fn anahtar_ad(ad: &str) -> String {
+    let mut s = String::with_capacity(ad.len() + 2);
+    for (i, c) in ad.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                s.push('_');
+            }
+            s.push(c.to_ascii_lowercase());
+        } else {
+            s.push(c);
+        }
+    }
+    s
+}
+
 fn varsayilan(ad: &str) -> (f32, f32, f32) {
-    match ad {
+    match anahtar_ad(ad).as_str() {
         "right_arm" => (-5.0, 2.0, 0.0),
         "left_arm" => (5.0, 2.0, 0.0),
         "left_leg" => (1.9, 12.0, 0.1),
@@ -141,7 +160,8 @@ fn varsayilan(ad: &str) -> (f32, f32, f32) {
 }
 
 fn bend_var(ad: &str) -> bool {
-    ad != "head" && ad != "left_item" && ad != "right_item"
+    let a = anahtar_ad(ad);
+    a != "head" && a != "left_item" && a != "right_item"
 }
 
 /// İkili kemik adını launcher kanal adına çevirir (görülemeyen kemikler None).
@@ -243,10 +263,11 @@ fn kemik_oku(
     kf_boy: usize,
     ease_before: bool,
 ) -> Result<Kemik, String> {
-    let (dx, dy, dz) = varsayilan(ham_ad);
-    let govde = ham_ad == "body";
-    let esya = ham_ad == "left_item" || ham_ad == "right_item";
-    let pelerin = ham_ad == "cape";
+    let anahtar = anahtar_ad(ham_ad);
+    let (dx, dy, dz) = varsayilan(&anahtar);
+    let govde = anahtar == "body";
+    let esya = anahtar == "left_item" || anahtar == "right_item";
+    let pelerin = anahtar == "cape";
 
     let px = eksen_oku(o, surum, kf_boy, dx, govde, esya || pelerin || govde)?;
     let py = eksen_oku(o, surum, kf_boy, dy, govde, !govde)?;
@@ -256,7 +277,7 @@ fn kemik_oku(
     let rz = eksen_oku(o, surum, kf_boy, 0.0, false, esya || pelerin)?;
 
     let mut bend = Vec::new();
-    if bend_var(ham_ad) {
+    if bend_var(&anahtar) {
         // kullanılmayan "Y ekseni bend" kanalı (v2+)
         let _ = eksen_oku(o, surum, kf_boy, 0.0, false, false)?;
         bend = eksen_oku(o, surum, kf_boy, 0.0, false, false)?;
@@ -493,6 +514,10 @@ pub fn coz_json(bayt: &[u8]) -> Result<String, String> {
     emote.insert("returnTick".to_string(), json!(animasyon.geri_ham));
     emote.insert("degrees".to_string(), json!(true));
     emote.insert("palUzay".to_string(), json!(true));
+    // konum kanalları kemiğin varsayılan pivotundan çıkarıldı (delta px).
+    // Bu işaret olmayan eski PAL dosyalarında dinlenme payı hâlâ üstünde olabilir;
+    // ui/src/sahne/emote.ts bunları yüklerken bir kez düzeltir.
+    emote.insert("palDef".to_string(), json!(true));
     if animasyon.dongu {
         // launcher döngüyü returnTick'ten endTick'e sarar
         emote.insert("loopBas".to_string(), json!(animasyon.geri));
