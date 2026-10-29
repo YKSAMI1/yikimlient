@@ -2620,3 +2620,41 @@ fn unzip_to_dir(zip_path: &std::path::Path, dest: &std::path::Path) -> Result<()
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod yerlesik_emote_testleri {
+    /// Paket animasyonlarının HEPSİ çözülebilmeli ve Türkçe ad taşımalı.
+    /// Bozuk bir dosya sessizce listeden düşer → kullanıcı animasyonu hiç görmez.
+    #[test]
+    fn yerlesik_animasyonlar_cozulur() {
+        for (slug, baslik, bayt) in super::YERLESIK_EMOTELER {
+            let icerik = super::emote_icerik_coz(bayt)
+                .unwrap_or_else(|e| panic!("{slug} çözülemedi: {e}"));
+            let js: serde_json::Value =
+                serde_json::from_str(&icerik).unwrap_or_else(|e| panic!("{slug} json değil: {e}"));
+            assert!(
+                js.get("emote").is_some(),
+                "{slug} emote alanı yok (beklenen eski Emotecraft biçimi)"
+            );
+            assert!(!baslik.trim().is_empty(), "{slug} Türkçe adı boş");
+            let hareket = js["emote"]["moves"].as_array().map(|m| m.len()).unwrap_or(0);
+            assert!(hareket > 0, "{slug} hiç hareket içermiyor");
+        }
+    }
+
+    /// Rozet PNG'si 64 renkten üretilir, 8×8 olur ve boş pikseller saydamdır.
+    #[test]
+    fn rozet_png_uretimi() {
+        let mut pikseller = vec![String::new(); 64];
+        pikseller[0] = "#ff5a24".into();
+        pikseller[63] = "#5b9dff".into();
+        let png = crate::rozet::pikselleri_png(&pikseller).expect("png üretilemedi");
+        let img = image::load_from_memory(&png).expect("png okunamadı").to_rgba8();
+        assert_eq!((img.width(), img.height()), (8, 8));
+        assert_eq!(img.get_pixel(0, 0).0, [0xff, 0x5a, 0x24, 0xff]);
+        assert_eq!(img.get_pixel(7, 7).0, [0x5b, 0x9d, 0xff, 0xff]);
+        assert_eq!(img.get_pixel(1, 0).0[3], 0, "boş piksel saydam olmalı");
+        // yanlış uzunluk reddedilir
+        assert!(crate::rozet::pikselleri_png(&pikseller[..10]).is_err());
+    }
+}
