@@ -62,13 +62,30 @@ test("damla piksel rengini döner", () => {
   assert.deepEqual(p.damla(5, 6), MAVI);
 });
 
-test("bölge haritası kafa/şapka/gövde bilir", () => {
-  assert.equal(bolgeBul(1, 1)?.id, "kafa");
-  assert.equal(bolgeBul(33, 1)?.id, "sapka");
-  assert.equal(bolgeBul(17, 17)?.id, "govde");
-  assert.equal(bolgeBul(2, 50)?.id, "sol-pantolon");
+test("bölge haritası ön yüzleri doğru gösterir", () => {
+  // Ön yüzler: atlas düzeninde üst yüzün bir sağa/altta kalan kare.
+  assert.equal(bolgeBul(8, 8)?.id, "kafa");
+  assert.equal(bolgeBul(40, 8)?.id, "sapka");
+  assert.equal(bolgeBul(20, 20)?.id, "govde");
+  assert.equal(bolgeBul(44, 20)?.id, "sag-kol");
+  assert.equal(bolgeBul(4, 52)?.id, "sol-pantolon");
   assert.equal(bolgeBul(63, 63), null);
   assert.ok(BOLGELER.length >= 12);
+});
+
+test("her bölge altı yüzünü de bilir ve atlas dışına çıkmaz", () => {
+  for (const b of BOLGELER) {
+    assert.equal(b.dilimler.length, 6, `${b.ad} altı yüz olmalı`);
+    for (const d of b.dilimler) {
+      assert.ok(d.x >= 0 && d.y >= 0, `${b.ad} negatif dilim`);
+      assert.ok(d.x + d.w <= 64 && d.y + d.h <= 64, `${b.ad} atlas dışına taşıyor`);
+    }
+    // Seçilen ön yüz, parçanın dilimlerinden biri olmalı.
+    assert.ok(
+      b.dilimler.some((d) => d.x === b.x && d.y === b.y && d.w === b.w && d.h === b.h),
+      `${b.ad} ön yüz dilimlerde yok`,
+    );
+  }
 });
 
 test("yüz dilimi katalog kırpması", () => {

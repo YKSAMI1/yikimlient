@@ -136,8 +136,27 @@ export class Sahne {
     private canliDoku: THREE.CanvasTexture | null = null;
 
     /** Sahneyi başlatır; yeniden çağrılırsa öncekini temizler. */
+    /** Sahneyi boşalt: eski model, ışıklar ve kalan her şey.
+     *  Editör kendi tuvalinde aynı örneği kullandığı için bu şart — aksi hâlde
+     *  geri dönünce eski model sahnede kalıp karakter iki kez çiziliyor. */
+    private sahneTemizle(): void {
+        if (this.kok) {
+            (this.kok.parent ?? this.scene).remove(this.kok);
+            this.kok.traverse((o) => {
+                const m = o as THREE.Mesh;
+                if (m.geometry) m.geometry.dispose();
+            });
+        }
+        this.scene.clear(); // ışıklar dahil; kur() yeniden ekler
+        this.kok = null;
+        this.pelerinGrup = null;
+        this.pelerinSarkac = null;
+        this.aktif = null;
+    }
+
     kur(canvas: HTMLCanvasElement): void {
         if (this.renderer) this.kapati();
+        this.sahneTemizle();
         this.canvas = canvas;
         try {
             this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
@@ -337,7 +356,10 @@ export class Sahne {
 
     private modelKur(doku: THREE.Texture | null, slim: boolean): void {
         if (this.kok) {
-            this.scene.remove(this.kok);
+            // Gerçek ebeveynden çıkar: sahne dışında bir gruba bağlanmış eski model
+            // kalırsa karakter iki kez (üst üste) çizilirdi. `parent` kontrolü bunu
+            // imkânsız kılar.
+            (this.kok.parent ?? this.scene).remove(this.kok);
             this.kok.traverse((o) => {
                 const m = o as THREE.Mesh;
                 if (m.geometry) m.geometry.dispose();
@@ -459,7 +481,10 @@ export class Sahne {
             // canvas DOM'dan çekildiyse (sayfa değişimi) kendini temizle — sızıntı yok
             if (this.canvas && !this.canvas.isConnected) {
                 this.kapati();
-                sahneOrnegi = null;
+                // Yalnızca HÂLÂ bu örnek tekil ise sıfırla; sayfa değişiminde eski
+                // bir döngü yeni örneği unutturursa iki renderer aynı tuvale çizer
+                // ve karakter üst üste iki kez görünür.
+                if (sahneOrnegi === this) sahneOrnegi = null;
                 return;
             }
             this.rafId = requestAnimationFrame(adim);
@@ -608,6 +633,7 @@ export class Sahne {
     }
 
     kapati(): void {
+        this.sahneTemizle();
         cancelAnimationFrame(this.rafId);
         this.rafId = 0;
         if (this.boyutla) window.removeEventListener("resize", this.boyutla);

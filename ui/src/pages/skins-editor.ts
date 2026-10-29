@@ -171,16 +171,27 @@ export function openSkinEditor(
       }
     }
     if (bolge) {
+      // Parçanın yan/arka yüzleri ince, ön yüzü kalın kesikli çerçeveyle
+      ictx.strokeStyle = "rgba(255,150,60,0.35)";
+      ictx.lineWidth = 1;
+      ictx.setLineDash([]);
+      for (const d of bolge.dilimler) {
+        if (d.x === bolge.x && d.y === bolge.y) continue;
+        ictx.strokeRect(d.x * px + 0.5, d.y * px + 0.5, d.w * px - 1, d.h * px - 1);
+      }
       ictx.strokeStyle = "rgba(255,150,60,0.95)";
       ictx.lineWidth = 2;
       ictx.setLineDash([6, 4]);
       ictx.strokeRect(bolge.x * px + 1, bolge.y * px + 1, bolge.w * px - 2, bolge.h * px - 2);
       ictx.setLineDash([]);
       if (sadeceBolge) {
+        // "Sadece bu parça": parçanın TÜM yüzleri açık kalır, gerisi kararır.
         ictx.fillStyle = "rgba(0,0,0,0.55)";
         ictx.beginPath();
         ictx.rect(0, 0, izgara.width, izgara.height);
-        ictx.rect(bolge.x * px, bolge.y * px, bolge.w * px, bolge.h * px);
+        for (const d of bolge.dilimler) {
+          ictx.rect(d.x * px, d.y * px, d.w * px, d.h * px);
+        }
         ictx.fill("evenodd");
       }
     }
@@ -416,6 +427,36 @@ export function openSkinEditor(
   (sarmal.querySelector("#ske-geri") as HTMLElement).after(dosyaBtn);
   sarmal.appendChild(dosyaGiris);
 
+  /** Harici dosya alınırken model sorulur: wide (klasik) / slim (ince kol). */
+  function modelSor(): Promise<boolean | null> {
+    return new Promise((coz) => {
+      const { root, close } = openModal(`
+        <h2>Skin türü</h2>
+        <div class="sub" style="margin-bottom:14px">Bu skin hangi model için çizildi?</div>
+        <div class="skin-model-secim">
+          <button class="skin-model-btn" id="se-wide">
+            ${icon("user")}<b>Wide</b><span>Klasik model — 4px kol</span>
+          </button>
+          <button class="skin-model-btn" id="se-slim">
+            ${icon("user")}<b>Slim</b><span>İnce model — 3px kol (Alex)</span>
+          </button>
+        </div>
+        <div style="display:flex; justify-content:flex-end; margin-top:12px">
+          <button class="btn ghost" id="se-iptal">Vazgeç</button>
+        </div>`);
+      let bitti = false;
+      const bitir = (v: boolean | null) => {
+        if (bitti) return;
+        bitti = true;
+        close();
+        coz(v);
+      };
+      root.querySelector("#se-wide")?.addEventListener("click", () => bitir(false));
+      root.querySelector("#se-slim")?.addEventListener("click", () => bitir(true));
+      root.querySelector("#se-iptal")?.addEventListener("click", () => bitir(null));
+    });
+  }
+
   async function dosyaYukle(f: File): Promise<void> {
     try {
       const url = URL.createObjectURL(f);
@@ -432,16 +473,22 @@ export function openSkinEditor(
       g.drawImage(img, 0, 0);
       URL.revokeObjectURL(url);
       const imgData = g.getImageData(0, 0, img.width, img.height);
-      pafta.katmanBasla();
-      if (img.width === 64 && img.height === 64) {
-        pafta.veri.set(imgData.data);
-      } else if (img.width === 64 && img.height === 32) {
-        pafta.veri.set(eskiPaftayiGenislet(imgData.data));
-      } else {
+      if (!(img.width === 64 && (img.height === 64 || img.height === 32))) {
         toast(`Skin 64×64 veya 64×32 olmalı (bu dosya ${img.width}×${img.height})`, "err");
         return;
       }
+      // Harici skin: önce model sorulur, sonra uygulanır.
+      const secim = await modelSor();
+      if (secim === null) return;
+      slim = secim;
+      sarmal.querySelectorAll("[data-slim]").forEach((x) => {
+        x.classList.toggle("aktif", (x as HTMLElement).dataset.slim === (slim ? "1" : "0"));
+      });
+      pafta.katmanBasla();
+      if (img.height === 64) pafta.veri.set(imgData.data);
+      else pafta.veri.set(eskiPaftayiGenislet(imgData.data));
       yansit();
+      sahne.tuvalDoku(kaynak, slim);
     } catch (e) {
       toast(String(e), "err");
     }

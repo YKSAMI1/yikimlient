@@ -1,37 +1,60 @@
 // 64×64 skin atlasının bölge haritası — editörde "nereyi boyuyorum" vurgusu.
 // Taban katman + üst katman (şapka/ceket/kolluk/pantolon) bölgeleri.
 
-export interface SkinBolge {
-  id: string;
-  ad: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  katman: "taban" | "ust";
-}
-
-export const BOLGELER: SkinBolge[] = [
-  { id: "kafa", ad: "Kafa", x: 0, y: 0, w: 8, h: 8, katman: "taban" },
-  { id: "govde", ad: "Gövde", x: 16, y: 16, w: 8, h: 12, katman: "taban" },
-  { id: "sag-kol", ad: "Sağ Kol", x: 40, y: 16, w: 4, h: 12, katman: "taban" },
-  { id: "sol-kol", ad: "Sol Kol", x: 32, y: 48, w: 4, h: 12, katman: "taban" },
-  { id: "sag-bacak", ad: "Sağ Bacak", x: 0, y: 16, w: 4, h: 12, katman: "taban" },
-  { id: "sol-bacak", ad: "Sol Bacak", x: 16, y: 48, w: 4, h: 12, katman: "taban" },
-  { id: "sapka", ad: "Şapka", x: 32, y: 0, w: 8, h: 8, katman: "ust" },
-  { id: "ceket", ad: "Ceket", x: 16, y: 32, w: 8, h: 12, katman: "ust" },
-  { id: "sag-kolluk", ad: "Sağ Kolluk", x: 40, y: 32, w: 4, h: 12, katman: "ust" },
-  { id: "sol-kolluk", ad: "Sol Kolluk", x: 48, y: 48, w: 4, h: 12, katman: "ust" },
-  { id: "sag-pantolon", ad: "Sağ Pantolon", x: 0, y: 32, w: 4, h: 12, katman: "ust" },
-  { id: "sol-pantolon", ad: "Sol Pantolon", x: 0, y: 48, w: 4, h: 12, katman: "ust" },
-];
-
 export interface Dilim {
   x: number;
   y: number;
   w: number;
   h: number;
 }
+
+export interface SkinBolge {
+  id: string;
+  ad: string;
+  /** Ön yüz: listede seçilince vurgulanan (ve düzenlemede odaklanılan) kare. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  katman: "taban" | "ust";
+  /** Parçanın atlastaki TÜM yüzleri (ön/arka/sağ/sol/üst/alt). */
+  dilimler: Dilim[];
+}
+
+/** Bir parçanın altı yüzünü üretir (atlas düzeni: kutu köşesi + 2×2 döşeme).
+ *  `ox,oy` parçanın atlas üzerindeki kutu köşesidir (üst yüzün bir sol yukarısı).
+ *  Sıra: üst, alt, sağ, ön, sol, arka. */
+function altiYuz(ox: number, oy: number, w: number, h: number, d: number): Dilim[] {
+  return [
+    { x: ox + d, y: oy, w, h: d }, // üst
+    { x: ox + d + w, y: oy, w, h: d }, // alt
+    { x: ox, y: oy + d, w: d, h }, // sağ
+    { x: ox + d, y: oy + d, w, h }, // ön
+    { x: ox + d + w, y: oy + d, w: d, h }, // sol
+    { x: ox + d + w + d, y: oy + d, w, h }, // arka
+  ];
+}
+
+/** 64×64 atlastaki gerçek bölgeler.
+ *
+ *  Koordinatlar ÖN YÜZDÜR (karakterin yüzüne bakan kare). Atlas düzeni:
+ *  her parça 2×2 döşeme hâlinde durur — sol üst köşe "üst yüz"tür, ön yüz
+ *  bir kutu sağa/altta kalır. Editör listesinde bir parçaya basınca doğru
+ *  karenin vurgulanması için bu ofset şart. */
+export const BOLGELER: SkinBolge[] = [
+  { id: "kafa", ad: "Kafa", x: 8, y: 8, w: 8, h: 8, katman: "taban", dilimler: altiYuz(0, 0, 8, 8, 8) },
+  { id: "govde", ad: "Gövde", x: 20, y: 20, w: 8, h: 12, katman: "taban", dilimler: altiYuz(16, 16, 8, 12, 4) },
+  { id: "sag-kol", ad: "Sağ Kol", x: 44, y: 20, w: 4, h: 12, katman: "taban", dilimler: altiYuz(40, 16, 4, 12, 4) },
+  { id: "sol-kol", ad: "Sol Kol", x: 36, y: 52, w: 4, h: 12, katman: "taban", dilimler: altiYuz(32, 48, 4, 12, 4) },
+  { id: "sag-bacak", ad: "Sağ Bacak", x: 4, y: 20, w: 4, h: 12, katman: "taban", dilimler: altiYuz(0, 16, 4, 12, 4) },
+  { id: "sol-bacak", ad: "Sol Bacak", x: 20, y: 52, w: 4, h: 12, katman: "taban", dilimler: altiYuz(16, 48, 4, 12, 4) },
+  { id: "sapka", ad: "Şapka", x: 40, y: 8, w: 8, h: 8, katman: "ust", dilimler: altiYuz(32, 0, 8, 8, 8) },
+  { id: "ceket", ad: "Ceket", x: 20, y: 36, w: 8, h: 12, katman: "ust", dilimler: altiYuz(16, 32, 8, 12, 4) },
+  { id: "sag-kolluk", ad: "Sağ Kolluk", x: 44, y: 36, w: 4, h: 12, katman: "ust", dilimler: altiYuz(40, 32, 4, 12, 4) },
+  { id: "sol-kolluk", ad: "Sol Kolluk", x: 52, y: 52, w: 4, h: 12, katman: "ust", dilimler: altiYuz(48, 48, 4, 12, 4) },
+  { id: "sag-pantolon", ad: "Sağ Pantolon", x: 4, y: 36, w: 4, h: 12, katman: "ust", dilimler: altiYuz(0, 32, 4, 12, 4) },
+  { id: "sol-pantolon", ad: "Sol Pantolon", x: 4, y: 52, w: 4, h: 12, katman: "ust", dilimler: altiYuz(0, 48, 4, 12, 4) },
+];
 
 /** Pelerin paftası (64×32) — DIŞARIDAN görünen sırt paneli. */
 export const PELERIN_DIS: Dilim = { x: 12, y: 1, w: 10, h: 16 };

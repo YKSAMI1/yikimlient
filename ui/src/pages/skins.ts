@@ -585,8 +585,11 @@ async function editorAc(root: HTMLElement, hesapId: string): Promise<void> {
         renderSkins(root);
         return;
       }
-      // Editör sahneyi kapattı; ana sayfa sahnesini yeniden kur ve seçimi koru.
+      // Editör sahneyi kapattı; ana sayfa sahnesini SIFIRDAN kur ve seçimi koru.
+      // (Tekil örneği de yenile: eski döngü/renderer kalırsa karakter iki kez çizilir.)
       ciz(root);
+      sahneKapat();
+      sonPelerin = null; // yeni sahne pelerinsiz doğar; bilinen yol yeniden uygulanmalı
       sahneBaslat(root);
       sahnePelerin();
     },
@@ -608,7 +611,11 @@ async function paftaCoz(veri: number[]): Promise<PikselPafta> {
     c.height = 64;
     const g = c.getContext("2d") as CanvasRenderingContext2D;
     g.imageSmoothingEnabled = false;
-    g.drawImage(img, 0, 0);
+    // 64 pikselden büyük dosya (HD skin) kırpılmasın: 64 ızgarasına indir.
+    // 64×32 eski pafta ise üst yarıda kalır (dikey esnetilmez).
+    const kaynak = atlasHazirla(img);
+    const eski = img.naturalHeight === 32;
+    g.drawImage(kaynak, 0, 0, 64, eski ? 32 : 64);
     return new PikselPafta(new Uint8ClampedArray(g.getImageData(0, 0, 64, 64).data));
   } finally {
     URL.revokeObjectURL(url);
@@ -621,12 +628,29 @@ async function dosyaBaytlari(yol: string): Promise<number[]> {
   return Array.from(new Uint8Array(await r.arrayBuffer()));
 }
 
+/** Atlas 64 piksel ızgarasına göre okunur; dosya daha büyükse (HD skin)
+ *  doğrudan çizmek yakınlaşıp sadece bir kareyi gösterir. Bu yüzden kaynak
+ *  her zaman 64×64 (veya 64×32) ızgarasına indirgenir. */
+function atlasHazirla(img: HTMLImageElement): CanvasImageSource {
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  if (w === 64) return img;
+  const c = document.createElement("canvas");
+  c.width = 64;
+  c.height = Math.max(1, Math.round((h / w) * 64));
+  const g = c.getContext("2d");
+  if (!g) return img;
+  g.imageSmoothingEnabled = false;
+  g.drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+
 function kartKarakterCiz(canvas: HTMLCanvasElement, yol: string, slim: boolean): void {
   const img = new Image();
   img.onload = () => {
     const g = canvas.getContext("2d");
     if (!g) return;
-    kartCiz(g, img, slim);
+    kartCiz(g, atlasHazirla(img), slim);
   };
   img.src = fileSrc(yol);
 }
@@ -639,7 +663,7 @@ function pelerinCiz(canvas: HTMLCanvasElement, yol: string): void {
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, canvas.width, canvas.height);
     // Dışarıdan görünen sırt paneli (12,1)–(22,17).
-    g.drawImage(img, PELERIN_DIS.x, PELERIN_DIS.y, PELERIN_DIS.w, PELERIN_DIS.h, 0, 0, canvas.width, canvas.height);
+    g.drawImage(atlasHazirla(img), PELERIN_DIS.x, PELERIN_DIS.y, PELERIN_DIS.w, PELERIN_DIS.h, 0, 0, canvas.width, canvas.height);
   };
   img.src = fileSrc(yol);
 }
