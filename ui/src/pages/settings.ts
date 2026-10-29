@@ -137,10 +137,10 @@ export function renderSettings(root: HTMLElement): void {
       </div>
       <div class="row-between" style="margin-top:14px">
         <div>
-          <div style="font-size:12.5px; font-weight:600">Emote Deneme Alanı</div>
-          <div style="font-size:11.5px; color:var(--text-dim)">Blockbench emote'larını anlık dene — vitrin paketine gönder.</div>
+          <div style="font-size:12.5px; font-weight:600">Skin Merkezi</div>
+          <div style="font-size:11.5px; color:var(--text-dim)">Skinlerini düzenle, giy; Mojang pelerinlerini tak.</div>
         </div>
-        <button class="btn ghost sm" id="deneme-alani">${icon("gear")} Aç</button>
+        <button class="btn ghost sm" id="skins-alani">${icon("shirt")} Aç</button>
       </div>
       <div class="row-between" style="margin-top:14px" id="custom-row">
         <div>
@@ -268,7 +268,7 @@ export function renderSettings(root: HTMLElement): void {
   // özel vurgu rengi — tüm dünyalarda geçerli, dünya seçimini BOZMAZ
   const accentPick = root.querySelector("#accent-pick") as HTMLInputElement;
   const accentDefault = root.querySelector("#accent-default");
-  root.querySelector("#deneme-alani")?.addEventListener("click", () => navigate("deneme"));
+  root.querySelector("#skins-alani")?.addEventListener("click", () => navigate("skins"));
   accentPick?.addEventListener("input", (e) => {
     state.config.custom_accent = (e.target as HTMLInputElement).value;
     applyWorld();

@@ -81,7 +81,6 @@ async function handleDropped(path: string): Promise<void> {
       // .emotecraft (ikili veya zip) ya da düz emote.json — çöz ve vitrin paketine ekle
       const sonuc = await invoke("cmd_import_emote_dosyasi", { path });
       toast(`Emote vitrine eklendi: ${(sonuc as any).adi}`);
-      navigate("deneme");
     } else if (route === "zip") {
       await askZipKind(path, fileName);
     } else {
