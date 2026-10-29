@@ -10,6 +10,8 @@
 
 import * as THREE from "three";
 import { Emote, Poz, SIFIR_POZ, poz as pozAl } from "./emote";
+import { pelerinHazirla, pelerinPaneli } from "./pelerin";
+import { PELERIN_DIS, type Dilim } from "./skin-bolgeler";
 
 const KS = 1 / 24; // piksel → dünya (oyuncu boyu 32px = 1.33 birim)
 
@@ -131,6 +133,8 @@ export class Sahne {
     private pelerinGrup: THREE.Group | null = null;
     private pelerinSarkac: THREE.Group | null = null;
     private pelerinDoku: THREE.Texture | null = null;
+    /** Pelerin paftasındaki tasarım paneli (64×32 atlas). */
+    private pelerinPanel: Dilim = PELERIN_DIS;
     private _bekleyenPelerin: { url: string } | null = null;
     /** Editör tuvallerinden gelen canlı doku. */
     private canliDoku: THREE.CanvasTexture | null = null;
@@ -284,7 +288,10 @@ export class Sahne {
         if (!p?.url) return;
         try {
             const resim = await new THREE.ImageLoader().loadAsync(p.url);
-            const doku = new THREE.Texture(resim);
+            // 64×32 ızgarasına indir + desenin bulunduğu paneli seç.
+            const pafta = pelerinHazirla(resim);
+            this.pelerinPanel = pelerinPaneli(pafta);
+            const doku = new THREE.Texture(pafta);
             dokuAyarla(doku);
             doku.needsUpdate = true;
             this.pelerinDoku = doku;
@@ -310,10 +317,11 @@ export class Sahne {
         const belUst = this.bukulenler?.belUst;
         if (!belUst || !this.pelerinDoku) return;
         const geo = new THREE.PlaneGeometry(10 * KS, 16 * KS);
-        // 64×32 pelerin paftası: DIŞARIDAN görünen sırt paneli (12,1)–(22,17).
-        // İç panel (1,1) gövdeye bakan yüzdür; dışarıda kullanılırsa tasarım ters görünür.
+        // 64×32 pelerin paftası: tasarımı taşıyan panel (genelde (1,1)–(11,17)).
+        // Ayna almaması için düzlem arkaya dönük (rotation.y = π) ve u soldan sağa artar.
         const uv = geo.attributes.uv as THREE.BufferAttribute;
-        const u1 = 12 / 64, u2 = 22 / 64;
+        const p = this.pelerinPanel;
+        const u1 = p.x / 64, u2 = (p.x + p.w) / 64;
         const vUst = 1 - 1 / 32, vAlt = 1 - 17 / 32;
         uv.setXY(0, u1, vUst);
         uv.setXY(1, u2, vUst);

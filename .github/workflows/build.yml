@@ -1,9 +1,10 @@
 name: Build
 
+# Sadece sürüm tag'lerinde çalışır. `main` push'unda da çalışınca "main" adlı
+# bir release oluşuyor, GitHub'da "latest" o olduğu için Windows girdisi olmayan
+# latest.json yayınlanıyor ve Windows kullanıcıları güncellemeyi göremiyordu.
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"
   workflow_dispatch: {}

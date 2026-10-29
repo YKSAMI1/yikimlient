@@ -7,7 +7,7 @@
 import { currentAccount, fileSrc, icon, invoke, navigate, openLoginModal, openModal, toast } from "../main";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import { PikselPafta } from "../sahne/piksel-pafta";
-import { PELERIN_DIS } from "../sahne/skin-bolgeler";
+import { pelerinHazirla, pelerinPaneli } from "../sahne/pelerin";
 import { KART_TUVAL_GENISLIK, KART_TUVAL_YUKSEKLIK, kartCiz } from "../sahne/skin-kart";
 import type { SkinHub, SkinKayit } from "../sahne/skin-tipleri";
 import { openSkinEditor } from "./skins-editor";
@@ -662,8 +662,10 @@ function pelerinCiz(canvas: HTMLCanvasElement, yol: string): void {
     if (!g) return;
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, canvas.width, canvas.height);
-    // Dışarıdan görünen sırt paneli (12,1)–(22,17).
-    g.drawImage(atlasHazirla(img), PELERIN_DIS.x, PELERIN_DIS.y, PELERIN_DIS.w, PELERIN_DIS.h, 0, 0, canvas.width, canvas.height);
+    // Pelerin 64×32: tasarım paneli (desen hangi panelde varsa) tam boy çizilir.
+    const pafta = pelerinHazirla(img);
+    const p = pelerinPaneli(pafta);
+    g.drawImage(pafta, p.x, p.y, p.w, p.h, 0, 0, canvas.width, canvas.height);
   };
   img.src = fileSrc(yol);
 }

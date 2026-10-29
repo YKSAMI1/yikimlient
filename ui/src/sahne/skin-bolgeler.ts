@@ -56,10 +56,11 @@ export const BOLGELER: SkinBolge[] = [
   { id: "sol-pantolon", ad: "Sol Pantolon", x: 4, y: 52, w: 4, h: 12, katman: "ust", dilimler: altiYuz(0, 48, 4, 12, 4) },
 ];
 
-/** Pelerin paftası (64×32) — DIŞARIDAN görünen sırt paneli. */
-export const PELERIN_DIS: Dilim = { x: 12, y: 1, w: 10, h: 16 };
-/** Pelerin iç yüzü (gövdeye bakan taraf) — referans için. */
-export const PELERIN_IC: Dilim = { x: 1, y: 1, w: 10, h: 16 };
+/** Pelerin paftası (64×32) — DIŞARIDAN görünen panel, yani pelerinin TASARIMI.
+ *  Gerçek dosyalarda desen sol panelde durur; sağ panel iç astardır. */
+export const PELERIN_DIS: Dilim = { x: 1, y: 1, w: 10, h: 16 };
+/** Pelerin iç astarı (gövdeye bakan yüz). */
+export const PELERIN_IC: Dilim = { x: 12, y: 1, w: 10, h: 16 };
 
 export function bolgeBul(x: number, y: number): SkinBolge | null {
   for (const b of BOLGELER) {

@@ -10,9 +10,10 @@ import {
   kartParcalari,
 } from "./skin-bolgeler.ts";
 
-test("pelerin dış paneli sırt görünümüdür (12,1)-(22,17)", () => {
-  assert.deepEqual(PELERIN_DIS, { x: 12, y: 1, w: 10, h: 16 });
-  assert.deepEqual(PELERIN_IC, { x: 1, y: 1, w: 10, h: 16 });
+test("pelerin tasarımı sol panelde, iç astar sağ panelde", () => {
+  // Gerçek Mojang dosyalarında desen (1,1)–(11,17); (12,1) iç astardır.
+  assert.deepEqual(PELERIN_DIS, { x: 1, y: 1, w: 10, h: 16 });
+  assert.deepEqual(PELERIN_IC, { x: 12, y: 1, w: 10, h: 16 });
 });
 
 test("kart altı parçadan oluşur ve ayaklar 32. pikselde biter", () => {
