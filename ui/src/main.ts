@@ -218,12 +218,38 @@ export function toast(msg: string, kind: "ok" | "err" = "ok"): void {
 }
 
 // ---------- Modal ----------
+/** Açık modallar (en üstteki Escape ile kapanır). */
+const modalYigin: HTMLElement[] = [];
+
 export function openModal(contentHtml: string): { root: HTMLElement; close: () => void } {
-  const backdrop = el(`<div class="modal-backdrop"><div class="modal">${contentHtml}</div></div>`);
+  const backdrop = el(
+    `<div class="modal-backdrop"><div class="modal" role="dialog" aria-modal="true">${contentHtml}</div></div>`,
+  );
   document.body.appendChild(backdrop);
-  const close = () => backdrop.remove();
+  modalYigin.push(backdrop);
+
+  let kapandi = false;
+  const close = () => {
+    if (kapandi) return;
+    kapandi = true;
+    window.removeEventListener("keydown", tus);
+    const i = modalYigin.indexOf(backdrop);
+    if (i >= 0) modalYigin.splice(i, 1);
+    backdrop.remove();
+  };
+  const tus = (e: KeyboardEvent) => {
+    if (e.key !== "Escape") return;
+    if (modalYigin[modalYigin.length - 1] !== backdrop) return;
+    e.preventDefault();
+    e.stopPropagation();
+    close();
+  };
+  window.addEventListener("keydown", tus);
   backdrop.addEventListener("click", (e) => {
     if (e.target === backdrop) close();
+  });
+  requestAnimationFrame(() => {
+    backdrop.querySelector<HTMLElement>("input, button, select, textarea, [tabindex]")?.focus();
   });
   return { root: backdrop.firstElementChild as HTMLElement, close };
 }
@@ -258,7 +284,7 @@ const RAIL = [
   { page: "instances", icon: "grid", label: "Mod Paketleri" },
   { page: "explore", icon: "compass", label: "Keşfet" },
   { page: "news", icon: "news", label: "Haberler" },
-  { page: "deneme", icon: "play", label: "Deneme Alanı" },
+  { page: "skins", icon: "shirt", label: "Skin Merkezi" },
   { page: "settings", icon: "gear", label: "Ayarlar" },
 ];
 
@@ -372,8 +398,15 @@ export function renderAccountPill(): void {
 }
 
 // ---------- Giriş modalı (offline + MS device code) ----------
-export function openLoginModal(): void {
-  const { root, close } = openModal(`
+let girisModal: { root: HTMLElement; close: () => void } | null = null;
+
+/** Aynı anda tek giriş modalı; ikinci çağrı mevcut olanı öne alır. */
+export function openLoginModal(onSuccess?: () => void): void {
+  if (girisModal) {
+    girisModal.root.querySelector<HTMLInputElement>("#off-name")?.focus();
+    return;
+  }
+  const temel = openModal(`
     <h2>Hesap Girişi</h2>
     <div class="sub">Microsoft hesabınla gir ya da çevrimdışı oyna.</div>
     <div style="display:flex; flex-direction:column; gap:14px;">
@@ -390,6 +423,15 @@ export function openLoginModal(): void {
       <div style="font-size:11px; color:var(--text-faint); text-align:center">Resmî Microsoft oturum penceresi açılır; şifren launcher'a iletilmez.</div>
     </div>
   `);
+  const root = temel.root;
+  let acik = true;
+  const close = () => {
+    if (!acik) return;
+    acik = false;
+    girisModal = null;
+    temel.close();
+  };
+  girisModal = { root, close };
   root.querySelector("#off-go")?.addEventListener("click", async () => {
     const name = (root.querySelector("#off-name") as HTMLInputElement).value.trim();
     if (name.length < 3) return toast("İsim en az 3 karakter olmalı", "err");
@@ -399,6 +441,7 @@ export function openLoginModal(): void {
       renderUserCard();
       toast(`Hoş geldin, ${name}!`);
       close();
+      onSuccess?.();
     } catch (e) {
       toast(String(e), "err");
     }
@@ -415,6 +458,7 @@ export function openLoginModal(): void {
       renderUserCard();
       toast(`Hoş geldin, ${acc.name}!`);
       close();
+      onSuccess?.();
     } catch (e) {
       status.textContent = String(e);
       btn.disabled = false;

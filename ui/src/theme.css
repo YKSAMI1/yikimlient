@@ -919,7 +919,7 @@ select.input option { background: var(--bg2); }
 /* ---------- Modal ---------- */
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(4, 4, 5, 0.66);
-  display: flex; align-items: center; justify-content: center; z-index: 100;
+  display: flex; align-items: center; justify-content: center; z-index: 4000;
   animation: fadeIn 0.16s ease; padding: 20px;
 }
 .modal {

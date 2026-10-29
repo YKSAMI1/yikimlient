@@ -5,6 +5,7 @@ import { renderExplore } from "./explore";
 import { renderNews } from "./news";
 import { renderSettings } from "./settings";
 import { renderDeneme } from "./deneme";
+import { renderSkins } from "./skins";
 
 export function registerPages(): void {
   pages["home"] = renderHome;
@@ -13,4 +14,5 @@ export function registerPages(): void {
   pages["news"] = renderNews;
   pages["settings"] = renderSettings;
   pages["deneme"] = renderDeneme;
+  pages["skins"] = renderSkins;
 }
