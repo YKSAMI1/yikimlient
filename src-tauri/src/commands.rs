@@ -347,15 +347,51 @@ pub async fn cmd_rozet_ciz(pikseller: Vec<String>) -> Result<serde_json::Value, 
     let mut yuklendi = false;
     let mut hata = String::new();
     if let Ok(hesap) = selected_account() {
-        match crate::rozet::sunucuya_yukle(&png, &hesap.uuid, &ucak).await {
+        match crate::rozet::sunucuya_yukle(&png, &hesap.uuid, &hesap.name, &ucak).await {
             Ok(()) => yuklendi = true,
             Err(e) => hata = e,
         }
+    } else {
+        hata = "seçili hesap yok".into();
     }
     Ok(serde_json::json!({
         "kurulum": kurulum,
         "yuklendi": yuklendi,
         "hata": hata,
+    }))
+}
+
+/// Rozet atölyesi yetkim var mı?
+///
+/// Yöneticilik yerel config'ten (atolye_admin), izinlilik ise hem yerelden
+/// (atolye_izinli) hem PRESENCE SUNUCUSUNDAN okunur — böylece sahibin izin
+/// verdiği oyuncu, kendi launcher'ında listeyi görmeden atölyeyi kullanabilir.
+#[tauri::command]
+pub async fn cmd_rozet_yetki() -> Result<serde_json::Value, String> {
+    let cfg = YikimConfig::load_or_default();
+    let hesap = selected_account().ok();
+    let isim = hesap.as_ref().map(|h| h.name.clone()).unwrap_or_default();
+    let microsoft = hesap
+        .as_ref()
+        .map(|h| h.kind == "microsoft")
+        .unwrap_or(false);
+    let admin = microsoft && cfg.atolye_admin.iter().any(|a| a.eq_ignore_ascii_case(&isim));
+    let yerel_izin = cfg.atolye_izinli.iter().any(|a| a.eq_ignore_ascii_case(&isim));
+    let mut uzak: Vec<String> = Vec::new();
+    if let Some(h) = &hesap {
+        if let Ok(liste) =
+            crate::rozet::izin_listesi_oku(&h.uuid, &h.name, &crate::rozet::ucak(&cfg)).await
+        {
+            uzak = liste;
+        }
+    }
+    let uzak_izin = uzak.iter().any(|a| a.eq_ignore_ascii_case(&isim));
+    Ok(serde_json::json!({
+        "admin": admin,
+        "microsoft": microsoft,
+        "izinli": microsoft && (admin || yerel_izin || uzak_izin),
+        "isim": isim,
+        "izinler": uzak,
     }))
 }
 

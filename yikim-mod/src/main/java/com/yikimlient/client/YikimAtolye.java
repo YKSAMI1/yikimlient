@@ -169,6 +169,23 @@ public final class YikimAtolye {
         YikimClient.LOGGER.info("YIKIM atolye: ozel rozet kaydedildi ve sunucuya yukleniyor");
     }
 
+    /**
+     * Sunucuda çizimim yoksa yeniden yükle (v1.13.0).
+     *
+     * Eskiden yükleme yalnız "Kaydet"e basıldığında yapılıyordu; sunucu
+     * yeniden başladığında / ilk yükleme ağ hatasına düştüğünde çizim bir
+     * daha gitmiyor ve diğer oyuncular standart Y görüyordu. Artık dünyaya
+     * her girişte yerel dosya varsa sunucuya tazelenir (idempotent).
+     */
+    public static void sunucuyaTazele() {
+        UUID ben = kendim();
+        if (ben == null || !dosyaVarMi()) {
+            return;
+        }
+        yukluysaUygula();
+        arkaPlandaYukle(base64Png(), ben);
+    }
+
     /// Sıfırla: diski sil, ızgarayı boşalt, sunucudan da kaldır.
     public static synchronized void sifirla() {
         try {
@@ -188,6 +205,29 @@ public final class YikimAtolye {
             YikimSlotlar.temizAta(ben);
         }
         arkaPlandaYukle(null, ben);
+    }
+
+    /// Kendi hesap adım (TAB listesindeki GameProfile adı; yoksa görünen ad).
+    public static String benimAdim() {
+        try {
+            class_310 mc = class_310.method_1551();
+            if (mc == null || mc.field_1724 == null) {
+                return null;
+            }
+            if (mc.method_1562() != null) {
+                UUID ben = mc.field_1724.method_5667();
+                for (net.minecraft.class_640 girdi : mc.method_1562().method_2880()) {
+                    if (girdi.method_2966() != null && ben.equals(girdi.method_2966().id())) {
+                        return girdi.method_2966().name();
+                    }
+                }
+            }
+            return mc.field_1724.method_5797() != null
+                ? mc.field_1724.method_5797().getString() : null;
+        }
+        catch (Throwable ignored) {
+            return null;
+        }
     }
 
     public static UUID kendim() {
@@ -248,11 +288,15 @@ public final class YikimAtolye {
         if (uuid == null) {
             return;
         }
+        // v1.13.0: isim de gönderilir — sunucu çizimi hesap adıyla eşleştirir
+        // (izin listesi karşılaştırması isim üzerinden yapılır).
+        final String ad = benimAdim();
+        final String adAlani = ad == null ? "" : "\"n\":\"" + ad.replace("\\", "").replace("\"", "") + "\",";
         Thread t = new Thread(() -> {
             try {
                 String govde = base64Png == null
-                    ? "{\"u\":\"" + uuid + "\",\"sil\":true}"
-                    : "{\"u\":\"" + uuid + "\",\"png\":\"" + base64Png + "\"}";
+                    ? "{\"u\":\"" + uuid + "\"," + adAlani + "\"sil\":true}"
+                    : "{\"u\":\"" + uuid + "\"," + adAlani + "\"png\":\"" + base64Png + "\"}";
                 byte[] bayt = govde.getBytes(StandardCharsets.UTF_8);
                 HttpURLConnection bag = (HttpURLConnection) new URL(ucak()).openConnection();
                 bag.setConnectTimeout(5000);

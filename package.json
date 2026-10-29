@@ -1,7 +1,7 @@
 {
   "name": "yikimlient",
   "private": true,
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "YIKIMLient â€” ultra-hafif, hÄ±zlÄ± ve gÃ¼zel Minecraft launcher",
   "type": "module",
   "scripts": {

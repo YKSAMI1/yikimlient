@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.12.7";
+    public static final String MOD_VERSION = "1.13.0";
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
     private static boolean readyMarked;
     private static boolean firstJoinSeen;
@@ -97,7 +97,10 @@ implements ClientModInitializer {
             // "Bir kez kaydet, değiştirene kadar hep görünsün" tam bu.
             boolean oyunda = client.field_1724 != null;
             if (oyunda && !oyundaydi) {
-                YikimAtolye.yukluysaUygula();
+                // v1.13.0: yerel çizim varsa hem kendi glifine bas hem sunucuya
+                // tazele — sunucu yeniden başlamış / ilk yükleme kaçmış olsa da
+                // diğer oyuncular logoyu görür.
+                YikimAtolye.sunucuyaTazele();
             }
             oyundaydi = oyunda;
         }

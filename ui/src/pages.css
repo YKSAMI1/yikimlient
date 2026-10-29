@@ -569,6 +569,26 @@ input.search-in.input, .search-in.input {
 }
 .rozet-renk .ic svg { width: 14px; height: 14px; }
 .rozet-renk.aktif { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg1), 0 0 0 3px var(--accent); }
+.rozet-renk.secili { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* renk şeridi: hazır palet + kullanıcının eklediği renkler */
+.rozet-renkler { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1 1 100%; }
+.rozet-renkler .rozet-renk { width: 22px; height: 22px; }
+/* serbest renk seçici: gizli native input + üstünde "+" */
+.rozet-renk.ozel-renk {
+  position: relative; overflow: hidden; color: var(--text);
+  background: conic-gradient(#ff5a24, #ffd83d, #a3e635, #2fd6c3, #5b9dff, #c084fc, #ff4d8d, #ff5a24);
+}
+.rozet-renk.ozel-renk input[type="color"] { position: absolute; inset: -20%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.rozet-renk.ozel-renk .ozel-arti {
+  position: relative; z-index: 2; font-size: 15px; font-weight: 800; color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85); pointer-events: none;
+}
+.rozet-hex-satir { display: flex; align-items: center; gap: 8px; width: 256px; }
+.rozet-hex-onizleme {
+  width: 26px; height: 26px; flex: none; border-radius: var(--radius-sm);
+  background: var(--c); border: 1px solid var(--hairline-strong);
+}
+.rozet-hex { height: 28px; padding: 0 9px; font-size: 12px; width: 100px; flex: none; }
 .rozet-araclar { display: flex; gap: 8px; flex-wrap: wrap; }
 .rozet-sag { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .rozet-onizleme {

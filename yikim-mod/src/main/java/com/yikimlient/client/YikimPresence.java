@@ -173,18 +173,13 @@ public final class YikimPresence {
             YikimAtolye.uzaklariIsle(metin);
             // çizim izin listesi (admin panel + atölye kapısı için)
             izinListesi = izinleriOku(metin);
-            // İZİN GERİ ALındıysa çizim silinir (v1.12.3): admin seni listeden
-            // çıkaardıysa kendi rozetin sunucudan düşer, normal Y'ye dönersin.
-            try {
-                if (YikimAtolye.dosyaVarMi() && YikimAtolye.yetkiDuzeyi() == 0
-                    && !izinlimi(isim)) {
-                    YikimClient.LOGGER.info("YIKIM izin: cizim izni geri alindi — normal Y'ye donuluyor");
-                    YikimAtolye.sifirla();
-                }
-            }
-            catch (Throwable ignored) {
-                // izin temizliği oyunu asla etkilemez
-            }
+            // v1.13.0 KALICILIK DÜZELTMESİ: burada eskiden "izin listesinde
+            // değilsem çizimi sil" vardı. Liste boş/gecikmiş olduğunda (ya da
+            // yetki.json launcher tarafından yazılmadığında) HER kalp atışında
+            // kullanıcının kendi logosu siliniyordu — "bir türlü kalmıyor"
+            // şikâyetinin kaynağı buydu. Artık çizim SADECE kullanıcı silerse
+            // veya admin panelden açıkça kaldırılırsa (sunucu art'ı düşürür)
+            // kaybolur; istemci kendi kendine silmez.
             // kendi çizimimi her heartbeat'te yeniden bas (resource reload'a dayanıklı)
             if (YikimAtolye.dosyaVarMi()) {
                 YikimAtolye.yukluysaUygula();

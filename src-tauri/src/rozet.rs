@@ -60,10 +60,26 @@ pub fn pikselleri_png(pikseller: &[String]) -> Result<Vec<u8>, String> {
     Ok(cikti)
 }
 
-/// PNG'yi tüm kurulumların `.yikim/rozet.png` dosyasına yaz.
-/// Dönen sayı: yazılan kurulum adedi (hiç kurulum yoksa 0 — hata değil).
+/// Launcher'ın kendi ana kopyası: uygulama klasöründe `rozet.png`.
+///
+/// Kurulum sayısı 0 olsa bile çizim burada durur → editör her açılışta
+/// çizimi geri yükler ve sonradan oluşturulan kurulumlara da dağıtılır.
+pub fn ana_yol() -> std::path::PathBuf {
+    crate::core::app_dir().join("rozet.png")
+}
+
+/// Kurulumun `.yikim` klasörü (modun okuduğu yer).
+pub fn kurulum_yolu(inst: &crate::instances::Instance) -> std::path::PathBuf {
+    inst.dir().join(".yikim").join("rozet.png")
+}
+
+/// PNG'yi ana kopyaya + tüm kurulumların `.yikim/rozet.png` dosyasına yaz.
+/// Dönen sayı: yazılan yer adedi (ana kopya dahil; kurulum yoksa 1).
 pub fn tum_kurulumlara_yaz(png: &[u8]) -> usize {
     let mut sayi = 0usize;
+    if std::fs::write(ana_yol(), png).is_ok() {
+        sayi += 1;
+    }
     for inst in crate::instances::list() {
         let dir = inst.dir().join(".yikim");
         if std::fs::create_dir_all(&dir).is_err() {
@@ -76,23 +92,22 @@ pub fn tum_kurulumlara_yaz(png: &[u8]) -> usize {
     sayi
 }
 
-/// Tüm kurulumlardan rozet dosyasını sil (standart Y'ye dön).
+/// Ana kopyayı ve tüm kurulumlardaki rozet dosyasını sil (standart Y'ye dön).
 pub fn tum_kurulumlardan_sil() -> usize {
     let mut sayi = 0usize;
+    if std::fs::remove_file(ana_yol()).is_ok() {
+        sayi += 1;
+    }
     for inst in crate::instances::list() {
-        let yol = inst.dir().join(".yikim").join("rozet.png");
-        if std::fs::remove_file(&yol).is_ok() {
+        if std::fs::remove_file(kurulum_yolu(&inst)).is_ok() {
             sayi += 1;
         }
     }
     sayi
 }
 
-/// Kayıtlı rozeti oku (yol: ilk kurulumun .yikim/rozet.png). 64 renk döner.
-pub fn yerel_rozet() -> Option<Vec<String>> {
-    let inst = crate::instances::list().into_iter().next()?;
-    let yol = inst.dir().join(".yikim").join("rozet.png");
-    let img = image::open(&yol).ok()?.to_rgba8();
+fn png_oku(yol: &std::path::Path) -> Option<Vec<String>> {
+    let img = image::open(yol).ok()?.to_rgba8();
     if img.width() != BOY || img.height() != BOY {
         return None;
     }
@@ -110,14 +125,37 @@ pub fn yerel_rozet() -> Option<Vec<String>> {
     Some(out)
 }
 
-/// Çizimi presence sunucusuna yükle: {"u": uuid, "png": "<base64>"}.
+/// Kayıtlı rozeti oku: önce ana kopya, sonra kurulumlar. 64 renk döner.
+pub fn yerel_rozet() -> Option<Vec<String>> {
+    if let Some(pikseller) = png_oku(&ana_yol()) {
+        return Some(pikseller);
+    }
+    for inst in crate::instances::list() {
+        if let Some(pikseller) = png_oku(&kurulum_yolu(&inst)) {
+            return Some(pikseller);
+        }
+    }
+    None
+}
+
+/// Çizimi presence sunucusuna yükle:
+/// `{"u": uuid, "n": isim, "png": "<base64>"}`.
+///
+/// `n` ŞART: sunucu çizimi hesap adıyla eşleştirir (izin listesi ve diğer
+/// oyunculara "kimin logosu" bilgisi bu ad üzerinden gider).
 /// Sunucu yoksa sessiz hata döner — yerel rozet yine geçerlidir.
-pub async fn sunucuya_yukle(png: &[u8], uuid: &str, ucak: &str) -> Result<(), String> {
+pub async fn sunucuya_yukle(
+    png: &[u8],
+    uuid: &str,
+    isim: &str,
+    ucak: &str,
+) -> Result<(), String> {
     if uuid.trim().is_empty() {
         return Err("hesap uuid yok".into());
     }
     let govde = serde_json::json!({
         "u": uuid.trim(),
+        "n": isim.trim(),
         "png": base64::engine::general_purpose::STANDARD.encode(png),
     });
     let yanit = crate::core::http_client()
@@ -147,6 +185,39 @@ pub async fn sunucudan_sil(uuid: &str, ucak: &str) -> Result<(), String> {
         return Err(format!("sunucu {} döndü", yanit.status()));
     }
     Ok(())
+}
+
+/// Sunucudaki izin listesini oku: POST {"u": uuid, "n": isim} → "izinler" dizisi.
+///
+/// Neden gerekli: izin listesi sahibin launcher'ında tutulur; başka bir
+/// oyuncunun launcher'ı bu listeyi bilmediği için "kendi rozetini çizebilir"
+/// düğmesi ona hiç görünmüyordu. Artık yetki sunucudan okunur.
+pub async fn izin_listesi_oku(uuid: &str, isim: &str, ucak: &str) -> Result<Vec<String>, String> {
+    if uuid.trim().is_empty() {
+        return Err("hesap uuid yok".into());
+    }
+    let govde = serde_json::json!({ "u": uuid.trim(), "n": isim.trim() });
+    let yanit = crate::core::http_client()
+        .post(ucak)
+        .json(&govde)
+        .timeout(std::time::Duration::from_secs(8))
+        .send()
+        .await
+        .map_err(|e| format!("sunucuya ulaşılamadı: {e}"))?;
+    if !yanit.status().is_success() {
+        return Err(format!("sunucu {} döndü", yanit.status()));
+    }
+    let metin = yanit.text().await.map_err(|e| format!("yanıt okunamadı: {e}"))?;
+    let js: serde_json::Value = serde_json::from_str(&metin).map_err(|e| format!("yanıt bozuk: {e}"))?;
+    Ok(js
+        .get("izinler")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default())
 }
 
 /// Beyaz listeyi sunucuya yaz: {"izinler": ["isim", ...]}.

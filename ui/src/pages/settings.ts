@@ -482,13 +482,18 @@ export function renderSettings(root: HTMLElement): void {
 // ROZET — isim başı logosu (yalnız yönetici hesapta görünür)
 // ---------------------------------------------------------------------------
 
-/** Sahip/yönetici hesap mı? Yalnız Microsoft hesabı + atolye_admin listesi. */
+/**
+ * Rozet atölyesini kullanabilir mi? Yalnız ORİJİNAL (Microsoft) hesap ve
+ * ya yönetici (atolye_admin) ya da sahibin izin verdiği (atolye_izinli) isim.
+ * İzinli oyuncular da kendi logolarını çizebilir; offline hesapta kapalı.
+ */
 export function rozetYoneticiMi(cfg: any): boolean {
   const acc = currentAccount();
   if (!acc || acc.kind !== "microsoft") return false;
-  return (cfg?.atolye_admin || []).some(
-    (n: string) => String(n).toLowerCase() === acc.name.toLowerCase()
-  );
+  const ad = acc.name.toLowerCase();
+  const listede = (liste: any) =>
+    (Array.isArray(liste) ? liste : []).some((n: string) => String(n).toLowerCase() === ad);
+  return listede(cfg?.atolye_admin) || listede(cfg?.atolye_izinli);
 }
 
 const ROZET_RENKLER = [
@@ -500,13 +505,37 @@ const ROZET_RENKLER = [
 function rozetKarti(root: HTMLElement, cfg: any): void {
   const host = root.querySelector("#rozet-alani") as HTMLElement | null;
   if (!host) return;
-  if (!rozetYoneticiMi(cfg)) {
-    host.innerHTML = "";
+  if (rozetYoneticiMi(cfg)) {
+    rozetArayuzu(root, cfg);
     return;
   }
+  // Yerelde izin yok — sunucudaki listeye bak. Sahibin izin verdiği oyuncu
+  // kendi launcher'ında listeyi görmediği için atölyeyi açamıyordu.
+  host.innerHTML = "";
+  invoke("cmd_rozet_yetki")
+    .then((r: any) => {
+      if (r?.izinli) rozetArayuzu(root, cfg);
+    })
+    .catch(() => {});
+}
+
+function rozetArayuzu(root: HTMLElement, cfg: any): void {
+  const host = root.querySelector("#rozet-alani") as HTMLElement | null;
+  if (!host) return;
+  const acc = currentAccount();
+  const yonetici =
+    !!acc &&
+    (cfg?.atolye_admin || []).some(
+      (n: string) => String(n).toLowerCase() === acc.name.toLowerCase()
+    );
 
   let izgara: string[] = new Array(64).fill("");
-  let renk = "#ffd83d";
+  const renkGecerli = (c: unknown) => /^#[0-9a-fA-F]{6}$/.test(String(c || ""));
+  let renk = renkGecerli(cfg.rozet_renk) ? String(cfg.rozet_renk) : "#ffd83d";
+  /** kullanıcının kendi eklediği renkler — config'te kalıcı (en fazla 24) */
+  let ozelRenkler: string[] = (Array.isArray(cfg.rozet_renkler) ? cfg.rozet_renkler : [])
+    .filter(renkGecerli)
+    .slice(0, 24);
   let silgi = false;
   const gecmis: string[][] = [];
   let izinli: string[] = [...(cfg.atolye_izinli || [])];
@@ -527,10 +556,19 @@ function rozetKarti(root: HTMLElement, cfg: any): void {
             <button class="rozet-renk${silgi ? "" : " aktif"}" data-c="" title="Boya">
               ${icon("brush")}
             </button>
-            ${ROZET_RENKLER.map((c) => `<button class="rozet-renk" data-c="${c}" style="--c:${c}" title="${c}"></button>`).join("")}
+            <div class="rozet-renkler" id="rozet-renkler"></div>
+            <label class="rozet-renk ozel-renk" title="İstediğin rengi seç (sınırsız)">
+              <input type="color" id="rozet-renk-sec" value="${renk}" />
+              <span class="ozel-arti">+</span>
+            </label>
             <button class="rozet-renk${silgi ? " aktif" : ""}" id="rozet-silgi" title="Silgi">
               ${icon("trash")}
             </button>
+          </div>
+          <div class="rozet-hex-satir">
+            <span class="rozet-hex-onizleme" id="rozet-hex-onizleme" style="--c:${renk}"></span>
+            <input class="input rozet-hex" id="rozet-hex" maxlength="7" placeholder="#rrggbb" value="${renk}" />
+            <button class="btn ghost sm" id="rozet-renk-kaydet">Rengi kaydet</button>
           </div>
           <div class="rozet-araclar">
             <button class="btn ghost sm" id="rozet-geri">${icon("undo")} Geri</button>
@@ -557,22 +595,22 @@ function rozetKarti(root: HTMLElement, cfg: any): void {
         </div>
       </div>
 
-      <div class="rozet-izinler">
+      ${yonetici ? `<div class="rozet-izinler">
         <div class="rozet-izin-bas">
           <b>Kendi rozetini çizebilecekler</b>
-          <span class="set-sub" style="margin:0; font-size:11px">Orijinal (Microsoft) hesap adlarını yaz. Liste sunucuya da gönderilir.</span>
+          <span class="set-sub" style="margin:0; font-size:11px">Orijinal (Microsoft) hesap adlarını yaz. Liste sunucuya gönderilir; o oyuncu launcher'ını açtığında atölyeyi görür.</span>
         </div>
         <div class="rozet-izin-ekle">
           <input class="input" id="rozet-isim" placeholder="Oyuncu adı" maxlength="32" />
           <button class="btn ghost sm" id="rozet-ekle">${icon("plus")} Ekle</button>
         </div>
         <div class="rozet-cipler" id="rozet-cipler"></div>
-      </div>
+      </div>` : ""}
     </div>`;
 
   const hucreler = host.querySelector("#rozet-izgara") as HTMLElement;
   const onizleme = host.querySelector("#rozet-onizleme") as HTMLElement;
-  const cipler = host.querySelector("#rozet-cipler") as HTMLElement;
+  const cipler = host.querySelector("#rozet-cipler") as HTMLElement | null;
 
   const cizgara = () => {
     hucreler.innerHTML = izgara
@@ -599,17 +637,79 @@ function rozetKarti(root: HTMLElement, cfg: any): void {
     boya(Number(h.dataset.i));
   });
 
-  host.querySelectorAll(".rozet-renk[data-c]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const c = (b as HTMLElement).dataset.c || "";
-      silgi = false;
-      if (c) renk = c;
-      host.querySelectorAll(".rozet-renk").forEach((x) => x.classList.toggle("aktif", x === b));
-    })
-  );
+  // ---- renkler: hazır palet + kullanıcının kendi renkleri (kalıcı) ----
+  const renklerHost = host.querySelector("#rozet-renkler") as HTMLElement;
+  const hexGirdi = host.querySelector("#rozet-hex") as HTMLInputElement;
+  const hexOnizleme = host.querySelector("#rozet-hex-onizleme") as HTMLElement;
+  const renkSecici = host.querySelector("#rozet-renk-sec") as HTMLInputElement;
+
+  const renkleriCiz = () => {
+    const hepsi = [...ROZET_RENKLER, ...ozelRenkler];
+    renklerHost.innerHTML = hepsi
+      .map(
+        (c, i) =>
+          `<button class="rozet-renk${c.toLowerCase() === renk.toLowerCase() ? " secili" : ""}" data-c="${c}" style="--c:${c}" title="${c}" data-ozel="${i >= ROZET_RENKLER.length ? 1 : 0}"></button>`
+      )
+      .join("");
+    renklerHost.querySelectorAll(".rozet-renk").forEach((b) =>
+      b.addEventListener("click", () => {
+        const c = (b as HTMLElement).dataset.c || "";
+        silgi = false;
+        if (c) renkSec(c);
+      })
+    );
+  };
+
+  /** Rengi seç: silgiyi kapat, göstergeleri tazele, config'e yaz. */
+  const renkSec = (c: string, kaydet = true) => {
+    renk = c.toLowerCase();
+    silgi = false;
+    host.querySelector("#rozet-silgi")?.classList.remove("aktif");
+    hexGirdi.value = renk;
+    hexOnizleme.style.setProperty("--c", renk);
+    renkSecici.value = renk;
+    renkleriCiz();
+    if (kaydet) {
+      state.config.rozet_renk = renk;
+      void save();
+    }
+  };
+
+  /** Yeni rengi kalıcı palete ekle (aynı renk varsa yalnız seç). */
+  const renkEkle = (c: string) => {
+    if (!renkGecerli(c)) {
+      toast("Geçersiz renk — #rrggbb biçiminde yaz", "err");
+      return false;
+    }
+    const temiz = c.toLowerCase();
+    if (![...ROZET_RENKLER, ...ozelRenkler].some((x) => x.toLowerCase() === temiz)) {
+      ozelRenkler = [...ozelRenkler, temiz].slice(-24);
+      state.config.rozet_renkler = [...ozelRenkler];
+    }
+    renkSec(temiz);
+    return true;
+  };
+
+  renkSecici?.addEventListener("input", () => {
+    renkSec(renkSecici.value, false); // sürüklerken kaydetme — sadece seçim
+  });
+  renkSecici?.addEventListener("change", () => renkEkle(renkSecici.value));
+  host.querySelector("#rozet-renk-kaydet")?.addEventListener("click", () => {
+    const ham = hexGirdi.value.trim();
+    const tam = ham.startsWith("#") ? ham : `#${ham}`;
+    if (renkEkle(tam)) toast(`Renk paletine eklendi: ${tam.toLowerCase()}`);
+  });
+  hexGirdi?.addEventListener("keydown", (e) => {
+    if ((e as KeyboardEvent).key === "Enter") host.querySelector("#rozet-renk-kaydet")?.dispatchEvent(new Event("click"));
+  });
+  hexGirdi?.addEventListener("input", () => {
+    const ham = hexGirdi.value.trim();
+    const tam = ham.startsWith("#") ? ham : `#${ham}`;
+    hexOnizleme.style.setProperty("--c", renkGecerli(tam) ? tam : "transparent");
+  });
   host.querySelector("#rozet-silgi")?.addEventListener("click", () => {
     silgi = true;
-    host.querySelectorAll(".rozet-renk").forEach((x) => x.classList.remove("aktif"));
+    host.querySelectorAll(".rozet-renk").forEach((x) => x.classList.remove("aktif", "secili"));
     host.querySelector("#rozet-silgi")?.classList.add("aktif");
   });
   host.querySelector("#rozet-geri")?.addEventListener("click", () => {
@@ -638,8 +738,8 @@ function rozetKarti(root: HTMLElement, cfg: any): void {
       const r: any = await invoke("cmd_rozet_ciz", { pikseller: izgara });
       toast(
         r?.yuklendi
-          ? `Rozet kaydedildi — ${r.kurulum} kuruluma yazıldı ve yayınlandı`
-          : `Rozet kaydedildi — ${r.kurulum} kuruluma yazıldı (sunucuya ulaşılamadı)`
+          ? `Rozet kaydedildi — ${r.kurulum} yere yazıldı ve diğer oyunculara yayınlandı`
+          : `Rozet kaydedildi — ${r.kurulum} yere yazıldı (sunucuya ulaşılamadı: ${r?.hata || "ağ"})`
       );
     } catch (e) {
       toast(`Rozet kaydedilemedi: ${e}`, "err");
@@ -658,6 +758,7 @@ function rozetKarti(root: HTMLElement, cfg: any): void {
 
   // izinli listesi
   const cipleriCiz = () => {
+    if (!cipler) return;
     cipler.innerHTML = izinli.length
       ? izinli.map((n, i) => `<span class="rozet-cip">${n}<button data-i="${i}" title="Kaldır">×</button></span>`).join("")
       : `<span class="set-sub" style="margin:0; font-size:11.5px">Henüz kimse eklenmedi.</span>`;
@@ -695,6 +796,7 @@ function rozetKarti(root: HTMLElement, cfg: any): void {
   });
 
   cizgara();
+  renkleriCiz();
   cipleriCiz();
   // diskte kayıtlı çizim varsa editörü onunla doldur
   invoke("cmd_rozet_oku")

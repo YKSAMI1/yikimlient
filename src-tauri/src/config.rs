@@ -49,6 +49,11 @@ pub struct YikimConfig {
     pub atolye_admin: Vec<String>,
     /// Atölyeyi kullanmasına izin verilen oyuncular (her hesap türü olabilir).
     pub atolye_izinli: Vec<String>,
+    /// Rozet editöründe kullanıcının kendi eklediği renkler ("#rrggbb", en fazla 24).
+    /// Hazır paletin dışında istediği rengi kalıcı olarak saklar.
+    pub rozet_renkler: Vec<String>,
+    /// Rozet editöründe son seçili renk (açılışta hatırlanır).
+    pub rozet_renk: String,
     /// Dünya başına görsel özelleştirme: {"sahne": {"accent":"#ffd83d","radius":"yumusak"}}
     /// Boş alan = dünyanın kendi rengi/köşesi kullanılır.
     pub tema_ozel: std::collections::HashMap<String, TemaOzel>,
@@ -99,6 +104,8 @@ impl Default for YikimConfig {
             presence_url: None,
             atolye_admin: vec!["YKSAMI1".into()],
             atolye_izinli: vec![],
+            rozet_renkler: vec![],
+            rozet_renk: "#ffd83d".into(),
             tema_ozel: std::collections::HashMap::new(),
             sahne_arka: "kiraz".into(),
             menu_animasyon: true,
