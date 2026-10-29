@@ -131,6 +131,16 @@ pub fn run() {
             commands::cmd_route_dropped,
             commands::cmd_delete_content_file,
             commands::cmd_open_content_folder,
+            skins::cmd_skin_hub,
+            skins::cmd_skin_giy,
+            skins::cmd_skin_giy_kitaplik,
+            skins::cmd_skin_pelerin,
+            skins::cmd_skin_kaydet,
+            skins::cmd_skin_sil,
+            skins::cmd_skin_yeniden_adlandir,
+            skins::cmd_skin_yedek,
+            skins::cmd_skin_yedek_geri_yukle,
+            skins::cmd_skin_disa_aktar,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

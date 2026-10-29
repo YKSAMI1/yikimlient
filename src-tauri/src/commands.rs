@@ -14,7 +14,7 @@ fn accounts_path() -> PathBuf {
     core::accounts_path()
 }
 
-fn load_accounts() -> Vec<auth::Account> {
+pub(crate) fn load_accounts() -> Vec<auth::Account> {
     crate::util::read_json(&accounts_path()).unwrap_or_default()
 }
 
@@ -272,7 +272,8 @@ fn varsayilan_skin(slim: bool) -> serde_json::Value {
     serde_json::json!({
         "dosya": yol.to_string_lossy(),
         "slim": slim,
-        "varsayilan": true
+        "varsayilan": true,
+        "pelerin": null
     })
 }
 
@@ -355,6 +356,14 @@ pub async fn cmd_get_account_skin(id: String) -> Result<serde_json::Value, Strin
     std::fs::create_dir_all(&cache).map_err(|z| z.to_string())?;
     let png = cache.join(format!("skin-{anahtar}.png"));
     let meta = cache.join(format!("skin-{anahtar}.json"));
+    // Aktif pelerin (varsa) — ağa çıkmadan, son bilinen.
+    let pelerin_yol = cache.join(format!("cape-aktif-{anahtar}.png"));
+    let pelerin = || -> Option<String> {
+        std::fs::metadata(&pelerin_yol)
+            .ok()
+            .filter(|m| m.len() > 0)
+            .map(|_| pelerin_yol.to_string_lossy().to_string())
+    };
 
     let oku_slim = || -> bool {
         std::fs::read_to_string(&meta)
@@ -365,7 +374,7 @@ pub async fn cmd_get_account_skin(id: String) -> Result<serde_json::Value, Strin
     };
 
     if std::fs::metadata(&png).map(|m| m.len() > 0).unwrap_or(false) {
-        return Ok(serde_json::json!({ "dosya": png.to_string_lossy(), "slim": oku_slim() }));
+        return Ok(serde_json::json!({ "dosya": png.to_string_lossy(), "slim": oku_slim(), "pelerin": pelerin() }));
     }
 
     // Cache yok: Mojang kimliğini çöz (offline hesap gerçek bir premium hesaba aitse isimle)
@@ -386,7 +395,7 @@ pub async fn cmd_get_account_skin(id: String) -> Result<serde_json::Value, Strin
         .map_err(|z| z.to_string())?;
     let _ = std::fs::rename(&yari, &meta);
 
-    Ok(serde_json::json!({ "dosya": png.to_string_lossy(), "slim": slim }))
+    Ok(serde_json::json!({ "dosya": png.to_string_lossy(), "slim": slim, "pelerin": pelerin() }))
 }
 
 #[tauri::command]

@@ -762,6 +762,138 @@ pub async fn yedek_geri_yukle(acc: &crate::auth::Account) -> Result<SkinHub, Str
     skin_uygula(acc, &bayt, slim).await
 }
 
+// ---------- Tauri komutları ----------
+
+/// Yerel skin kitaplığının kökü (UI/Dışa aktarma için).
+pub fn kitaplik_kok() -> PathBuf {
+    skins_kok()
+}
+
+fn hesap_bul(id: &str) -> Result<crate::auth::Account, String> {
+    crate::commands::load_accounts()
+        .into_iter()
+        .find(|a| a.id == id)
+        .ok_or_else(|| "Hesap bulunamadı.".to_string())
+}
+
+#[tauri::command]
+pub async fn cmd_skin_hub(id: String) -> Result<SkinHub, String> {
+    let acc = hesap_bul(&id)?;
+    Ok(hub_getir(&acc).await)
+}
+
+/// Skini doğrular, (ad verilmişse) kitaplığa yazar ve Mojang'a yükler.
+#[tauri::command]
+pub async fn cmd_skin_giy(
+    id: String,
+    veri: Vec<u8>,
+    slim: bool,
+    ad: Option<String>,
+) -> Result<SkinHub, String> {
+    let acc = hesap_bul(&id)?;
+    let png = dogrula_png(&veri)?;
+    if let Some(ad) = ad.as_deref() {
+        kayit_ekle(&kitaplik_kok(), ad, &png, slim, "editor")?;
+    }
+    skin_uygula(&acc, &png, slim).await
+}
+
+/// Kitaplıktaki bir kaydı giyer.
+#[tauri::command]
+pub async fn cmd_skin_giy_kitaplik(id: String, kayit_id: String) -> Result<SkinHub, String> {
+    let acc = hesap_bul(&id)?;
+    let liste = kitaplik_oku(&kitaplik_kok());
+    let kayit = liste
+        .iter()
+        .find(|k| k.id == kayit_id)
+        .ok_or_else(|| "Skin bulunamadı.".to_string())?;
+    let veri = std::fs::read(&kayit.dosya).map_err(|_| "Skin dosyası okunamadı.".to_string())?;
+    skin_uygula(&acc, &veri, kayit.slim).await
+}
+
+#[tauri::command]
+pub async fn cmd_skin_pelerin(
+    id: String,
+    cape_id: Option<String>,
+) -> Result<SkinHub, String> {
+    let acc = hesap_bul(&id)?;
+    pelerin_uygula(&acc, cape_id.as_deref()).await
+}
+
+#[tauri::command]
+pub fn cmd_skin_kaydet(
+    ad: String,
+    veri: Vec<u8>,
+    slim: bool,
+) -> Result<SkinKayit, String> {
+    kayit_ekle(&kitaplik_kok(), &ad, &veri, slim, "editor")
+}
+
+#[tauri::command]
+pub fn cmd_skin_sil(kayit_id: String) -> bool {
+    kayit_sil(&kitaplik_kok(), &kayit_id)
+}
+
+#[tauri::command]
+pub fn cmd_skin_yeniden_adlandir(kayit_id: String, ad: String) -> Result<SkinKayit, String> {
+    if !guvenli_id(&kayit_id) {
+        return Err("Geçersiz skin kimliği.".to_string());
+    }
+    let kok = kitaplik_kok();
+    let mut liste = kitaplik_oku(&kok);
+    let kayit = liste
+        .iter_mut()
+        .find(|k| k.id == kayit_id)
+        .ok_or_else(|| "Skin bulunamadı.".to_string())?;
+    let temiz = ad.trim();
+    if !temiz.is_empty() {
+        kayit.ad = temiz.chars().take(48).collect();
+    }
+    let kopya = kayit.clone();
+    kitaplik_yaz(&kok, &liste)?;
+    Ok(kopya)
+}
+
+#[tauri::command]
+pub fn cmd_skin_yedek(id: String) -> Option<Vec<u8>> {
+    let acc = hesap_bul(&id).ok()?;
+    std::fs::read(yedek_yolu(&acc, "png")).ok()
+}
+
+#[tauri::command]
+pub async fn cmd_skin_yedek_geri_yukle(id: String) -> Result<SkinHub, String> {
+    let acc = hesap_bul(&id)?;
+    yedek_geri_yukle(&acc).await
+}
+
+/// PNG'yi `skins/disa/<ad>.png` olarak yazar; tam yolu döner.
+#[tauri::command]
+pub fn cmd_skin_disa_aktar(ad: String, veri: Vec<u8>) -> Result<String, String> {
+    let png = dogrula_png(&veri)?;
+    let temiz: String = ad
+        .trim()
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == ' ' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .take(48)
+        .collect();
+    let temiz = if temiz.trim().is_empty() {
+        "skin".to_string()
+    } else {
+        temiz.trim().to_string()
+    };
+    let dir = kitaplik_kok().join("disa");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Klasör açılamadı: {e}"))?;
+    let yol = dir.join(format!("{temiz}.png"));
+    atomik_yaz(&yol, &png)?;
+    Ok(yol.to_string_lossy().to_string())
+}
+
 #[cfg(test)]
 mod testler {
     use super::*;
