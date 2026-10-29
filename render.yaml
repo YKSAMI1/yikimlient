@@ -15,3 +15,9 @@ services:
     plan: free
     healthCheckPath: /presence
     autoDeploy: true
+    envVars:
+      # Rozet atölyesini yalnız bu hesaplar kullanabilir (virgülle ayrılmış).
+      # Ücretsiz katmanda disk kalıcı olmadığı için izin listesi her dağıtımda
+      # sıfırlanıyor; sahip buradan her zaman listeye eklenir.
+      - key: YIKIM_SAHIP
+        value: YKSAMI1

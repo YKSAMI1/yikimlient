@@ -69,6 +69,9 @@ public class PresenceServer {
     /// uuid → hesap adı (izin eşleşmesi ve "kimin logosu" bilgisi için)
     private static final Map<String, String> ISIMLER = new ConcurrentHashMap<>();
 
+    /// v3.1: ortam değişkeninden gelen, ASLA silinemeyen sahip isimleri.
+    private static final Set<String> SAHIPLER = new HashSet<>();
+
     /// çizim izinli oyuncu isimleri — ANAHTARLAR KÜÇÜK HARF
     private static final Map<String, Boolean> IZINLER = new ConcurrentHashMap<>();
 
@@ -90,6 +93,7 @@ public class PresenceServer {
             }
         }
         izinleriYukle();
+        sahipleriYukle();
         rozetleriYukle();
         HttpServer sunucu = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
         sunucu.createContext("/presence", PresenceServer::isle);
@@ -112,6 +116,9 @@ public class PresenceServer {
         }
         Set<String> eski = new HashSet<>(IZINLER.keySet());
         IZINLER.clear();
+        for (String sahip : SAHIPLER) {
+            IZINLER.put(sahip, Boolean.TRUE);
+        }
         for (String ad : adlar) {
             String temiz = ad.trim().toLowerCase(Locale.ROOT);
             if (temiz.length() > 1 && temiz.length() <= 32) {
@@ -140,6 +147,30 @@ public class PresenceServer {
             System.out.println("[YIKIM presence] izin geri alindi: " + temizlenen + " cizim silindi");
         }
         System.out.println("[YIKIM presence] izin listesi guncellendi: " + IZINLER.keySet());
+    }
+
+    /// Sahip isimleri ORTAM DEĞİŞKENİNDEN (YIKIM_SAHIP, virgülle ayrılmış).
+    ///
+    /// Neden: ücretsiz bulut katmanında disk kalıcı değildir; her dağıtımda
+    /// `izinler.json` sıfırlanıyor ve liste boşalınca sunucu "herkes çizebilir"
+    /// moduna düşüyordu. Sahip env'den her zaman listeye eklenir → dağıtım
+    /// sonrası bile atölye yalnız sahibe açık kalır.
+    private static void sahipleriYukle() {
+        String ham = System.getenv("YIKIM_SAHIP");
+        if (ham == null || ham.trim().isEmpty()) {
+            if (!IZINLER.isEmpty()) {
+                System.out.println("[YIKIM presence] YIKIM_SAHIP tanimsiz — yalniz izinler.json gecerli");
+            }
+            return;
+        }
+        for (String parca : ham.split(",")) {
+            String ad = parca.trim().toLowerCase(Locale.ROOT);
+            if (ad.length() > 1 && ad.length() <= 32) {
+                SAHIPLER.add(ad);
+                IZINLER.put(ad, Boolean.TRUE);
+            }
+        }
+        System.out.println("[YIKIM presence] sahip listesi env'den yuklendi: " + IZINLER.keySet());
     }
 
     private static String izinlerYaz() {
