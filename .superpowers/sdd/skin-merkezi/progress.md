@@ -29,7 +29,7 @@
 | 9 | Onboarding + modal düzeltmeleri | tamam (`ca38bcd`) |
 | 10 | Deneme alanını kaldır | tamam (`c1056ff`) |
 | 11 | Mock harness | tamam (`3d0179c`) |
-| 12 | Görsel doğrulama + 0.4.0 | canlı doğrulama geçti; sürüm yükseltme ayrı adım |
+| 12 | Görsel doğrulama + 0.4.0 | tamam (`331d89a` sürüm) |
 
 ## Kararlar
 
