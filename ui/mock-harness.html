@@ -149,6 +149,9 @@
         keep_launcher_open: true, show_news: true, stats_enabled: true,
         download_concurrency: 32, java_dir: null, custom_accent: "#ff7a1a",
         onboarding_done: !onboarding, guided_tour_done: true,
+        // geliştirici harness'ı: rozet panelini görebilmek için yönetici adı
+        atolye_admin: ["TestOyuncu"], atolye_izinli: ["YKSAMI1"],
+        menu_animasyon: true, menu_animasyon_hiz: "normal", tema_ozel: {},
       },
       accounts: onboarding
         ? []
@@ -181,6 +184,15 @@
       if (cmd === "cmd_get_state") return Promise.resolve(JSON.parse(JSON.stringify(state)));
       if (cmd === "cmd_save_settings") { Object.assign(state.config, args.config || {}); return Promise.resolve(true); }
       if (cmd === "cmd_list_news") return Promise.resolve([]);
+      if (cmd === "cmd_list_emotes") return Promise.resolve([
+        { adi: "yerlesik-mambo-donus.json", baslik: "Mambo Dönüş", yerlesik: true, icerik: "{}" },
+        { adi: "yerlesik-yaslanma.json", baslik: "Yaslanma", yerlesik: true, icerik: "{}" },
+        { adi: "yerlesik-breakdance-flare.json", baslik: "Breakdance Flare", yerlesik: true, icerik: "{}" },
+        { adi: "kendi-dans.json", baslik: "Kendi Dansım", yerlesik: false, icerik: "{}" },
+      ]);
+      if (cmd === "cmd_rozet_oku") return Promise.resolve({ pikseller: null });
+      if (cmd === "cmd_rozet_ciz") return Promise.resolve({ kurulum: 2, yuklendi: true });
+      if (cmd === "cmd_rozet_izinler") return Promise.resolve({ yuklendi: true });
       if (cmd === "cmd_add_offline_account") {
         var ad = String(args.name || "Oyuncu");
         state.accounts = [{ id: "off1", name: ad, kind: "offline", uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5" }];

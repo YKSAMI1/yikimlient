@@ -127,6 +127,8 @@ export class Sahne {
     public sonOynananAd = "";
     private durumBitis = 0;
     private emoteListe: Emote[] = [];
+    /** Animasyon temposu çarpanı (Ayarlar → Animasyonlar). */
+    private hiz = 1;
     private aktif: Emote | null = null;
     private tEmote = 0;
     /** Pelerin: gövde üst yarısına (belUst) bağlı sarkan düzlem. */
@@ -477,9 +479,11 @@ export class Sahne {
         }
     }
 
-    /** Emote listesini bağlar; rastgele çalar hemen başlar. */
-    emoteleriKur(liste: Emote[]): void {
+    /** Emote listesini bağlar; rastgele çalar hemen başlar.
+     *  `hiz`: 0.5 sakin · 1 normal · 1.8 canlı — bekleme sürelerini böler. */
+    emoteleriKur(liste: Emote[], hiz = 1): void {
         this.emoteListe = liste;
+        this.hiz = hiz > 0 ? hiz : 1;
         this.durum = "idle";
         this.durumBitis = this.zaman + 0.6;
     }
@@ -541,7 +545,7 @@ export class Sahne {
             hedef = SIFIR_POZ;
             if (this.zaman >= this.durumBitis) {
                 this.durum = "idle";
-                this.durumBitis = this.zaman + 0.9 + Math.random() * 1.8;
+                this.durumBitis = this.zaman + (0.9 + Math.random() * 1.8) / this.hiz;
             }
         }
 

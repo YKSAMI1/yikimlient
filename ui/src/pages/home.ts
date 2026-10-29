@@ -378,13 +378,20 @@ async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string }
   } catch {
     await sah.skin(null);
   }
+  // Ayarlar → Animasyonlar: kapalıysa vitrin sadece idle durur.
+  if (state.config?.menu_animasyon === false) {
+    sah.emoteleriKur([]);
+    return;
+  }
+  const tempo: Record<string, number> = { sakin: 0.6, normal: 1, canli: 1.8 };
+  const hiz = tempo[String(state.config?.menu_animasyon_hiz || "normal")] || 1;
   try {
     const emotes: { adi: string; icerik: string }[] = await invoke("cmd_list_emotes");
     const liste = [];
     for (const e of emotes) {
       try { liste.push(emoteParca(e.icerik)); } catch { /* bozuk emote atlanır */ }
     }
-    sah.emoteleriKur(liste);
+    sah.emoteleriKur(liste, hiz);
   } catch {
     sah.emoteleriKur([]);
   }

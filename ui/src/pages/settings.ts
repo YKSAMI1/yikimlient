@@ -1,26 +1,21 @@
 import { currentAccount, headAttrs, headUrl, icon, invoke, openModal, openLoginModal, state, toast, applyWorld, refreshState, openPath, openExternal, navigate } from "../main";
 
-/* Dört dünya — her kart o dünyanın kendi zemininde mini önizleme taşır.
-   preview html'i inline style'la çizilir; tema motoruna bağımlı değil. */
+/* Beş dünya — her kart o dünyanın kendi zemininde mini önizleme taşır.
+   Diğer denemeler (Devre Panosu, Kategori Standardı, Karanlık Oda, Kumaş,
+   Perde, Buzul, Skala) kaldırıldı: hepsi aynı düzenin sadece farklı arka
+   planıydı. Kalan her dünya kendi kimliğini taşır; rengi ve köşesi ayrıca
+   özelleştirilebilir (aşağıdaki "Bu dünyayı özelleştir" paneli). */
 const WORLDS = [
   {
     id: "sahne", name: "Sahne", desc: "Imperial uslübü — ortada karakter, piksel yazı, sarı blok butonlar",
     bg: "#0d0e12", panel: "#17181f", line: "#2a2c3a", text: "#f2edde", dim: "#71695c", accent: "#ffd83d",
   },
   {
-    id: "pano", name: "Devre Panosu", desc: "Hatlar, lambalar, şalter",
-    bg: "#0b0b0d", panel: "#141419", line: "#26262e", text: "#e9e7e2", dim: "#6d6b66", accent: "#ff7a18",
-  },
-  {
     id: "sokum", name: "Söküm Sahası", desc: "Sıcak işlik zemini, kızıl turuncu, keskin köşe",
     bg: "#14100c", panel: "#201a14", line: "#382c1f", text: "#f2e9dd", dim: "#7d7264", accent: "#ff5a24",
   },
   {
-    id: "standart", name: "Kategori Standardı", desc: "Arc/Linear cilası — yumuşak köşe, çelik mavisi",
-    bg: "#0e1016", panel: "#171a24", line: "#2b3044", text: "#eceffa", dim: "#666e8a", accent: "#6e8bff",
-  },
-  {
-    id: "afis", name: "Afiş Provası", desc: "Sıfırdan yeni tasarım — baskı kâğıdı, sert mürekkep çizgi, ofset gölge",
+    id: "afis", name: "Afiş Provası", desc: "Baskı kâğıdı, sert mürekkep çizgi, ofset gölge",
     bg: "#f3ecdd", panel: "#faf6ea", line: "#16130c", text: "#16130c", dim: "#8a7f6b", accent: "#ff4d00",
   },
   {
@@ -31,27 +26,12 @@ const WORLDS = [
     id: "rihtim", name: "Rıhtım", desc: "Yüzen cam dock altta ortada — gece lacivert, deniz feneri teal",
     bg: "#0a0f18", panel: "#111a29", line: "#22304a", text: "#e6effa", dim: "#5e6d85", accent: "#2fd6c3",
   },
-  {
-    id: "oda", name: "Karanlık Oda", desc: "Fotoğraf laboratuvarı — safelight kırmızı, mono tip, ikon-only ray",
-    bg: "#0e0a0b", panel: "#191214", line: "#2c2022", text: "#e8ddd8", dim: "#655a57", accent: "#e0301e",
-  },
-  {
-    id: "kumas", name: "Kumaş", desc: "Terzi rafı — krem keten, kesik dikişli çizgiler, erik moru",
-    bg: "#f7f2e9", panel: "#fffaf1", line: "#ddcfb6", text: "#3f3226", dim: "#97897a", accent: "#a04ac2",
-  },
-  {
-    id: "perde", name: "Perde", desc: "Kızıl kadife sahne — altın vurgular, serif tipografisi",
-    bg: "#17090f", panel: "#24111a", line: "#3f1f2b", text: "#f3e8dd", dim: "#857162", accent: "#d4af37",
-  },
-  {
-    id: "buz", name: "Buzul", desc: "Buzlu cam yüzeyler (frosted) — kar beyazı, kobalt mavi",
-    bg: "#e6edf4", panel: "#f2f6fb", line: "#c7d5e3", text: "#14202c", dim: "#8296a8", accent: "#0b57d0",
-  },
-  {
-    id: "skala", name: "Skala", desc: "Fosforlu CRT tüpü — tarama çizgileri, glow yeşil, mono her şey",
-    bg: "#07130c", panel: "#0d2015", line: "#1a3a26", text: "#d6f5df", dim: "#5e8069", accent: "#45f882",
-  },
 ];
+
+/** Kaldırılan dünyalar eski config'lerde kalmış olabilir → sahne'ye düşür. */
+const KALDIRILAN: Record<string, string> = {
+  pano: "sahne", standart: "sahne", oda: "sahne", kumas: "afis", perde: "sahne", buz: "rihtim", skala: "sira",
+};
 
 /// Dünyanın mini önizlemesi: kendi paletiyle pano + 3 hat + lambalar
 function worldPreview(w: typeof WORLDS[number]): string {
@@ -72,10 +52,13 @@ export function renderSettings(root: HTMLElement): void {
   // DİKKAT: refreshState() state.config'i YENİ nesneyle değiştirir; save() sonrası
   // ölü nesneye yazmamak için cfg her kayıttan sonra tazelenir (save() içinde).
   let cfg = state.config;
-  // eski tema değerlerini dünyalara eşle (orange/dark/neon/light artık dünya adlarıyla yaşar)
-  const legacy: Record<string, string> = { dark: "standart", neon: "pano", light: "pano", orange: "sahne", anons: "pano" };
+  // eski tema değerlerini yaşayan beş dünyaya eşle
+  const legacy: Record<string, string> = { dark: "sahne", neon: "sahne", light: "afis", orange: "sahne", anons: "sahne", ...KALDIRILAN };
   const activeTheme = legacy[cfg.theme] ?? cfg.theme;
-  const customOn = !!(cfg.custom_accent || "").trim();
+  const ozel = (cfg.tema_ozel || {})[activeTheme] || {};
+  const dTop = WORLDS.find((w) => w.id === activeTheme) || WORLDS[0];
+  const temaAccent = (ozel.accent || "").trim();
+  const temaRadius = ozel.radius || "";
   // dinamik sürüm — Tauri'nin kendi getVersion()'undan
   try {
     const app = (window as any).__TAURI__?.app;
@@ -142,14 +125,33 @@ export function renderSettings(root: HTMLElement): void {
         </div>
         <button class="btn ghost sm" id="skins-alani">${icon("shirt")} Aç</button>
       </div>
-      <div class="row-between" style="margin-top:14px" id="custom-row">
-        <div>
-          <b style="font-size:13px">Özel vurgu rengi</b>
-          <div style="font-size:11.5px; color:var(--text-dim)">Her dünyada çalışır — lamba, şalter ve vurgu renklerini boyar. Dünya rengine dönmek için kapat.</div>
+      <div class="tema-ozel" id="tema-ozel">
+        <div class="tema-ozel-bas">
+          ${icon("picker")}
+          <div>
+            <b>Bu dünyayı özelleştir — ${dTop.name}</b>
+            <small>Sadece bu tema için geçerli. Renk ve köşe değişir, düzen aynı kalır.</small>
+          </div>
+          <button class="btn ghost sm" id="tema-sifirla" title="Bu dünyanın tüm özelleştirmelerini sil">${icon("undo")} Sıfırla</button>
         </div>
-        <div style="display:flex; gap:8px; align-items:center">
-          <button class="btn ghost sm ${customOn ? "" : "sel"}" id="accent-default">Dünya rengi</button>
-          <input type="color" id="accent-pick" value="${cfg.custom_accent || activeTheme === "standart" ? "#6e8bff" : "#ff7a18"}" style="width:56px; height:34px; border:none; background:none; cursor:pointer" />
+        <div class="tema-ozel-satir">
+          <span class="to-etiket">Vurgu rengi</span>
+          <div class="to-kontrol">
+            <button class="tema-renk${temaAccent ? "" : " aktif"}" data-renk="" style="--sw:${dTop.accent}" title="Dünya rengi"></button>
+            ${["#ff5a24", "#ffd83d", "#a3e635", "#2fd6c3", "#5b9dff", "#c084fc", "#ff4d8d", "#f5f5f5"].map((c) =>
+              `<button class="tema-renk${temaAccent.toLowerCase() === c ? " aktif" : ""}" data-renk="${c}" style="--sw:${c}"></button>`).join("")}
+            <label class="tema-renk-ozel" title="Özel renk">
+              <input type="color" id="tema-accent-pick" value="${temaAccent || dTop.accent}" />
+            </label>
+          </div>
+        </div>
+        <div class="tema-ozel-satir">
+          <span class="to-etiket">Köşe</span>
+          <div class="sk-edit-seg" id="tema-radius">
+            ${[["", "Dünya"], ["keskin", "Keskin"], ["yumusak", "Yumuşak"], ["hap", "Hap"]].map(([v, l]) =>
+              `<button class="seg-btn${temaRadius === v ? " aktif" : ""}" data-r="${v}">${l}</button>`).join("")}
+          </div>
+          <span class="to-ornek" id="tema-ornek">Örnek buton</span>
         </div>
       </div>
     </div>
@@ -184,6 +186,25 @@ export function renderSettings(root: HTMLElement): void {
     </div>
 
     <div class="card set-card anim-fade-up">
+      <h3>${icon("sparkle")} Ana Menü Animasyonları</h3>
+      <p class="set-sub">Karakter vitrininde rastgele oynayan hareketler. Paketle gelenler herkeste hazır; kendin de ekleyebilirsin — eklediklerin yalnız sende görünür.</p>
+      ${toggleRow("menu-anim", "Animasyonlar oynasın", cfg.menu_animasyon !== false)}
+      <div class="row-between" style="margin-top:8px">
+        <span>Tempo</span>
+        <select class="input" id="menu-anim-hiz" style="width:150px">
+          <option value="sakin" ${cfg.menu_animasyon_hiz === "sakin" ? "selected" : ""}>Sakin</option>
+          <option value="normal" ${!cfg.menu_animasyon_hiz || cfg.menu_animasyon_hiz === "normal" ? "selected" : ""}>Normal</option>
+          <option value="canli" ${cfg.menu_animasyon_hiz === "canli" ? "selected" : ""}>Canlı</option>
+        </select>
+      </div>
+      <div class="anim-liste" id="anim-liste"><div class="spinner" style="margin:14px auto"></div></div>
+      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
+        <button class="btn ghost" id="anim-ekle">${icon("plus")} Dışarıdan ekle</button>
+        <button class="btn ghost" id="anim-yenile">${icon("undo")} Listeyi yenile</button>
+      </div>
+    </div>
+
+    <div class="card set-card anim-fade-up">
       <h3>${icon("mug")} Java</h3>
       <div class="row-between">
         <div>
@@ -214,6 +235,8 @@ export function renderSettings(root: HTMLElement): void {
         </div>
       </div>
     </div>
+
+    <div id="rozet-alani"></div>
 
     <div class="card set-card anim-fade-up">
       <h3>${icon("info")} Hakkında</h3>
@@ -259,29 +282,52 @@ export function renderSettings(root: HTMLElement): void {
     c.addEventListener("click", async () => {
       state.config.theme = (c as HTMLElement).dataset.t!;
       applyWorld(); // canlı önizleme
-      root.querySelectorAll(".world-card").forEach((x) => x.classList.remove("sel"));
-      c.classList.add("sel");
       await save();
+      renderSettings(root); // özelleştirme paneli yeni dünyaya geçsin
     })
   );
-
-  // özel vurgu rengi — tüm dünyalarda geçerli, dünya seçimini BOZMAZ
-  const accentPick = root.querySelector("#accent-pick") as HTMLInputElement;
-  const accentDefault = root.querySelector("#accent-default");
   root.querySelector("#skins-alani")?.addEventListener("click", () => navigate("skins"));
-  accentPick?.addEventListener("input", (e) => {
-    state.config.custom_accent = (e.target as HTMLInputElement).value;
+
+  // ---- dünya başına özelleştirme (renk + köşe) ----
+  const temaOzel = (): Record<string, { accent?: string; radius?: string }> =>
+    (state.config.tema_ozel ||= {});
+  const ozelYaz = async (alan: "accent" | "radius", deger: string) => {
+    const kayit = (temaOzel()[activeTheme] ||= {});
+    kayit[alan] = deger;
+    if (!kayit.accent && !kayit.radius) delete temaOzel()[activeTheme];
+    applyWorld();
+    await save();
+  };
+  root.querySelectorAll(".tema-renk").forEach((b) =>
+    b.addEventListener("click", async () => {
+      const renk = (b as HTMLElement).dataset.renk || "";
+      root.querySelectorAll(".tema-renk").forEach((x) => x.classList.toggle("aktif", x === b));
+      await ozelYaz("accent", renk);
+      toast(renk ? "Vurgu rengi güncellendi" : "Dünya rengine dönüldü");
+    })
+  );
+  const temaPick = root.querySelector("#tema-accent-pick") as HTMLInputElement | null;
+  temaPick?.addEventListener("input", () => {
+    state.config.tema_ozel ||= {};
+    (state.config.tema_ozel[activeTheme] ||= {}).accent = temaPick.value;
     applyWorld();
   });
-  accentPick?.addEventListener("change", async () => {
+  temaPick?.addEventListener("change", async () => {
     await save();
     toast("Vurgu rengi kaydedildi");
   });
-  accentDefault?.addEventListener("click", async () => {
-    state.config.custom_accent = ""; // dünya rengine dön
+  root.querySelectorAll("#tema-radius .seg-btn").forEach((b) =>
+    b.addEventListener("click", async () => {
+      root.querySelectorAll("#tema-radius .seg-btn").forEach((x) => x.classList.toggle("aktif", x === b));
+      await ozelYaz("radius", (b as HTMLElement).dataset.r || "");
+    })
+  );
+  root.querySelector("#tema-sifirla")?.addEventListener("click", async () => {
+    delete temaOzel()[activeTheme];
     applyWorld();
     await save();
-    toast("Dünya rengine dönüldü");
+    renderSettings(root);
+    toast("Bu dünyanın özelleştirmesi sıfırlandı");
   });
 
   // ambiens parçacıklar + özel imleç
@@ -319,6 +365,27 @@ export function renderSettings(root: HTMLElement): void {
   wireToggle(root, "stats-enabled", "stats_enabled");
   wireToggle(root, "use-java25", "use_java25");
   wireToggle(root, "discord-rpc", "discord_rpc");
+  wireToggle(root, "menu-anim", "menu_animasyon");
+
+  // ---- ana menü animasyonları ----
+  root.querySelector("#menu-anim-hiz")?.addEventListener("change", async (e) => {
+    state.config.menu_animasyon_hiz = (e.target as HTMLSelectElement).value;
+    await save();
+  });
+  const animYukle = () => animasyonlariYukle(root);
+  root.querySelector("#anim-yenile")?.addEventListener("click", animYukle);
+  root.querySelector("#anim-ekle")?.addEventListener("click", async () => {
+    try {
+      const eklenen = (await invoke("cmd_pick_emote")) as any[];
+      if (eklenen?.length) {
+        toast(`${eklenen.length} animasyon eklendi`);
+        animYukle();
+      }
+    } catch (e) {
+      toast(`Animasyon eklenemedi: ${e}`, "err");
+    }
+  });
+  animYukle();
 
   const dlc = root.querySelector("#dlc-range") as HTMLInputElement;
   dlc.addEventListener("input", () => (root.querySelector("#dlc-val") as HTMLElement).textContent = dlc.value);
@@ -375,6 +442,255 @@ export function renderSettings(root: HTMLElement): void {
     const dir = await invoke("cmd_get_app_dir");
     openPath(dir).catch(() => {});
   });
+
+  rozetKarti(root, cfg);
+}
+
+// ---------------------------------------------------------------------------
+// ROZET — isim başı logosu (yalnız yönetici hesapta görünür)
+// ---------------------------------------------------------------------------
+
+/** Sahip/yönetici hesap mı? Yalnız Microsoft hesabı + atolye_admin listesi. */
+export function rozetYoneticiMi(cfg: any): boolean {
+  const acc = currentAccount();
+  if (!acc || acc.kind !== "microsoft") return false;
+  return (cfg?.atolye_admin || []).some(
+    (n: string) => String(n).toLowerCase() === acc.name.toLowerCase()
+  );
+}
+
+const ROZET_RENKLER = [
+  "#ffffff", "#c9ced8", "#5b6472", "#12151c",
+  "#ff5a24", "#ffd83d", "#a3e635", "#2fd6c3",
+  "#5b9dff", "#c084fc", "#ff4d8d", "#8b3a1e",
+];
+
+function rozetKarti(root: HTMLElement, cfg: any): void {
+  const host = root.querySelector("#rozet-alani") as HTMLElement | null;
+  if (!host) return;
+  if (!rozetYoneticiMi(cfg)) {
+    host.innerHTML = "";
+    return;
+  }
+
+  let izgara: string[] = new Array(64).fill("");
+  let renk = "#ffd83d";
+  let silgi = false;
+  const gecmis: string[][] = [];
+  let izinli: string[] = [...(cfg.atolye_izinli || [])];
+
+  host.innerHTML = `
+    <div class="card set-card anim-fade-up">
+      <h3>${icon("brush")} Rozet — İsim Logosu <span class="chip">yalnız sahip</span></h3>
+      <p class="set-sub">
+        Bu logoyu yalnız sen çizebilirsin. Çizim <b>tüm kurulumlarına</b> yazılır ve oyun içinde
+        adının başına basılır — hangi sunucu olursa olsun, TAB ve F5 dahil. İzin verdiğin
+        oyuncular da kendi logolarını çizebilir.
+      </p>
+
+      <div class="rozet-duzen">
+        <div class="rozet-sol">
+          <div class="rozet-izgara" id="rozet-izgara"></div>
+          <div class="rozet-palet">
+            <button class="rozet-renk${silgi ? "" : " aktif"}" data-c="" title="Boya">
+              ${icon("brush")}
+            </button>
+            ${ROZET_RENKLER.map((c) => `<button class="rozet-renk" data-c="${c}" style="--c:${c}" title="${c}"></button>`).join("")}
+            <button class="rozet-renk${silgi ? " aktif" : ""}" id="rozet-silgi" title="Silgi">
+              ${icon("trash")}
+            </button>
+          </div>
+          <div class="rozet-araclar">
+            <button class="btn ghost sm" id="rozet-geri">${icon("undo")} Geri</button>
+            <button class="btn ghost sm" id="rozet-temizle">Temizle</button>
+            <button class="btn ghost sm" id="rozet-stok">Standart Y</button>
+          </div>
+        </div>
+        <div class="rozet-sag">
+          <div class="rozet-onizleme">
+            <span class="ro-ambiyans"></span>
+            <span class="ro-etiket">Önizleme</span>
+            <span class="ro-satir">
+              <span class="ro-rozet" id="rozet-onizleme"></span>
+              <b class="ro-isim">${currentAccount()?.name || "oyuncu"}</b>
+            </span>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <button class="btn primary sm" id="rozet-kaydet">Kaydet ve yayınla</button>
+            <button class="btn danger sm" id="rozet-sil">Rozeti kaldır</button>
+          </div>
+          <div class="set-sub" style="margin:0; font-size:11px">
+            Kaydedince dosya tüm kurulumlara yazılır ve oyun içinde en geç 30 saniyede görünür.
+          </div>
+        </div>
+      </div>
+
+      <div class="rozet-izinler">
+        <div class="rozet-izin-bas">
+          <b>Kendi rozetini çizebilecekler</b>
+          <span class="set-sub" style="margin:0; font-size:11px">Orijinal (Microsoft) hesap adlarını yaz. Liste sunucuya da gönderilir.</span>
+        </div>
+        <div class="rozet-izin-ekle">
+          <input class="input" id="rozet-isim" placeholder="Oyuncu adı" maxlength="32" />
+          <button class="btn ghost sm" id="rozet-ekle">${icon("plus")} Ekle</button>
+        </div>
+        <div class="rozet-cipler" id="rozet-cipler"></div>
+      </div>
+    </div>`;
+
+  const hucreler = host.querySelector("#rozet-izgara") as HTMLElement;
+  const onizleme = host.querySelector("#rozet-onizleme") as HTMLElement;
+  const cipler = host.querySelector("#rozet-cipler") as HTMLElement;
+
+  const cizgara = () => {
+    hucreler.innerHTML = izgara
+      .map((c, i) => `<button class="rozet-hucre${c ? " dolu" : ""}" data-i="${i}" style="--c:${c || "transparent"}"></button>`)
+      .join("");
+    // önizleme (32×32)
+    onizleme.innerHTML = izgara
+      .map((c) => `<i style="--c:${c || "transparent"}"></i>`)
+      .join("");
+  };
+
+  const boya = (i: number) => {
+    const yeni = silgi ? "" : renk;
+    if (izgara[i] === yeni) return;
+    izgara[i] = yeni;
+    cizgara();
+  };
+
+  hucreler.addEventListener("click", (e) => {
+    const h = (e.target as HTMLElement).closest(".rozet-hucre") as HTMLElement | null;
+    if (!h) return;
+    gecmis.push([...izgara]);
+    if (gecmis.length > 40) gecmis.shift();
+    boya(Number(h.dataset.i));
+  });
+
+  host.querySelectorAll(".rozet-renk[data-c]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const c = (b as HTMLElement).dataset.c || "";
+      silgi = false;
+      if (c) renk = c;
+      host.querySelectorAll(".rozet-renk").forEach((x) => x.classList.toggle("aktif", x === b));
+    })
+  );
+  host.querySelector("#rozet-silgi")?.addEventListener("click", () => {
+    silgi = true;
+    host.querySelectorAll(".rozet-renk").forEach((x) => x.classList.remove("aktif"));
+    host.querySelector("#rozet-silgi")?.classList.add("aktif");
+  });
+  host.querySelector("#rozet-geri")?.addEventListener("click", () => {
+    const onceki = gecmis.pop();
+    if (onceki) {
+      izgara = onceki;
+      cizgara();
+    }
+  });
+  host.querySelector("#rozet-temizle")?.addEventListener("click", () => {
+    gecmis.push([...izgara]);
+    izgara = new Array(64).fill("");
+    cizgara();
+  });
+  host.querySelector("#rozet-stok")?.addEventListener("click", () => {
+    gecmis.push([...izgara]);
+    izgara = standartY();
+    cizgara();
+  });
+
+  host.querySelector("#rozet-kaydet")?.addEventListener("click", async () => {
+    const btn = host.querySelector("#rozet-kaydet") as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = "Kaydediliyor…";
+    try {
+      const r: any = await invoke("cmd_rozet_ciz", { pikseller: izgara });
+      toast(
+        r?.yuklendi
+          ? `Rozet kaydedildi — ${r.kurulum} kuruluma yazıldı ve yayınlandı`
+          : `Rozet kaydedildi — ${r.kurulum} kuruluma yazıldı (sunucuya ulaşılamadı)`
+      );
+    } catch (e) {
+      toast(`Rozet kaydedilemedi: ${e}`, "err");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Kaydet ve yayınla";
+    }
+  });
+  host.querySelector("#rozet-sil")?.addEventListener("click", async () => {
+    if (!confirm("Rozet kaldırılsın mı? İsimlerin başında standart Y logosu görünür.")) return;
+    await invoke("cmd_rozet_sil");
+    izgara = new Array(64).fill("");
+    cizgara();
+    toast("Rozet kaldırıldı");
+  });
+
+  // izinli listesi
+  const cipleriCiz = () => {
+    cipler.innerHTML = izinli.length
+      ? izinli.map((n, i) => `<span class="rozet-cip">${n}<button data-i="${i}" title="Kaldır">×</button></span>`).join("")
+      : `<span class="set-sub" style="margin:0; font-size:11.5px">Henüz kimse eklenmedi.</span>`;
+    cipler.querySelectorAll("button").forEach((b) =>
+      b.addEventListener("click", () => {
+        izinli.splice(Number((b as HTMLElement).dataset.i), 1);
+        void izinleriKaydet();
+      })
+    );
+  };
+  const izinleriKaydet = async () => {
+    state.config.atolye_izinli = [...izinli];
+    await save();
+    cipleriCiz();
+    try {
+      const r: any = await invoke("cmd_rozet_izinler", { isimler: izinli });
+      if (!r?.yuklendi) toast("Liste sunucuya gönderilemedi (yerel kaydedildi)", "err");
+    } catch { /* ağ yok */ }
+  };
+  host.querySelector("#rozet-ekle")?.addEventListener("click", () => {
+    const girdi = host.querySelector("#rozet-isim") as HTMLInputElement;
+    const ad = girdi.value.trim();
+    if (!ad) return;
+    if (izinli.some((n) => n.toLowerCase() === ad.toLowerCase())) {
+      toast("Bu isim zaten listede");
+      return;
+    }
+    izinli.push(ad);
+    girdi.value = "";
+    void izinleriKaydet();
+    toast(`${ad} eklendi`);
+  });
+  (host.querySelector("#rozet-isim") as HTMLInputElement)?.addEventListener("keydown", (e) => {
+    if ((e as KeyboardEvent).key === "Enter") (host.querySelector("#rozet-ekle") as HTMLElement)?.click();
+  });
+
+  cizgara();
+  cipleriCiz();
+  // diskte kayıtlı çizim varsa editörü onunla doldur
+  invoke("cmd_rozet_oku")
+    .then((r: any) => {
+      const p = r?.pikseller;
+      if (Array.isArray(p) && p.length === 64) {
+        izgara = p;
+        cizgara();
+      }
+    })
+    .catch(() => {});
+}
+
+/** Standart Y + şimşek (modun varsayılan glifinin birebir kopyası). */
+function standartY(): string[] {
+  const B = "#ffffff";
+  const T = "#ff5a24";
+  const g = [
+    [B, "", "", "", "", T, "", ""],
+    [B, "", "", "", T, T, "", ""],
+    ["", B, "", "", "", T, "", ""],
+    ["", B, "", "", T, "", "", ""],
+    ["", "", B, "", T, "", "", ""],
+    ["", "", B, "", T, "", "", ""],
+    ["", "", B, "", "", "", "", ""],
+    ["", "", B, "", "", "", "", ""],
+  ];
+  return g.flat();
 }
 
 const YAYIN_SAYFASI = "https://github.com/YKSAMI1/yikimlient/releases/latest";
@@ -418,6 +734,37 @@ async function updaterFallback(hata: unknown): Promise<void> {
       toast(`Tarayıcı açılamadı — adresi elle aç: ${YAYIN_SAYFASI}`, "err")
     );
   });
+}
+
+/** Animasyon listesi: paket animasyonları + kullanıcının ekledikleri. */
+async function animasyonlariYukle(root: HTMLElement): Promise<void> {
+  const host = root.querySelector("#anim-liste") as HTMLElement | null;
+  if (!host) return;
+  try {
+    const liste = (await invoke("cmd_list_emotes")) as { adi: string; baslik: string; yerlesik: boolean }[];
+    if (!liste.length) {
+      host.innerHTML = `<p class="set-sub" style="margin:10px 0 0">Henüz animasyon yok.</p>`;
+      return;
+    }
+    host.innerHTML = "";
+    for (const a of liste) {
+      const satir = document.createElement("div");
+      satir.className = "anim-satir";
+      satir.innerHTML = `
+        <span class="anim-ad">${a.baslik || a.adi}</span>
+        ${a.yerlesik ? `<span class="chip gray">paket</span>` : `<span class="chip">kendi</span>`}
+        ${a.yerlesik ? "" : `<button class="btn danger sm anim-sil" title="Kaldır">${icon("trash")}</button>`}`;
+      satir.querySelector(".anim-sil")?.addEventListener("click", async () => {
+        if (!confirm(`"${a.baslik}" kaldırılsın mı?`)) return;
+        await invoke("cmd_delete_emote", { adi: a.adi });
+        toast("Animasyon kaldırıldı");
+        animasyonlariYukle(root);
+      });
+      host.appendChild(satir);
+    }
+  } catch (e) {
+    host.innerHTML = `<p class="set-sub" style="margin:10px 0 0">Liste yüklenemedi: ${String(e)}</p>`;
+  }
 }
 
 function toggleRow(id: string, label: string, on: boolean): string {

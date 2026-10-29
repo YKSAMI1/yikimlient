@@ -160,9 +160,13 @@ public final class YikimGlifFabrika {
         }
 
         @Override
-        public class_11767.class_12238 method_73399(float x, float y, int renk, int isik,
+        public class_11767.class_12238 method_73399(float x, float y, int renk, int golgeRenk,
                                                     class_2583 stil, float f1, float f2) {
-            return super.method_73399(x, y, 0xFFFFFFFF, 0xFFFFFFFF, stil, f1, f2);
+            // v1.13.0 ÇİFT GÖRÜNTÜ DÜZELTMESİ: eski kod gölge rengini de beyaza
+            // zorluyordu → gölge, 1px kaymış BEYAZ bir kopya olarak çiziliyor ve
+            // rozet "üst üste binmiş / iki tane" görünüyordu. Gölge şeffaf:
+            // tek, keskin rozet; hangi takım renginde olursa olsun beyaz kalır.
+            return super.method_73399(x, y, 0xFFFFFFFF, 0x00000000, stil, f1, f2);
         }
     }
 

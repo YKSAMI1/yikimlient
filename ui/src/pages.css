@@ -476,6 +476,131 @@ input.search-in.input, .search-in.input {
 .wc-preview .wc-row { position: absolute; height: 3px; border-radius: 2px; }
 .wc-preview .wc-lamp { position: absolute; width: 5px; height: 5px; border-radius: 50%; }
 
+/* ---------- Dünya özelleştirme paneli ---------- */
+.tema-ozel {
+  margin-top: 14px; padding: 14px;
+  border: 1px dashed var(--hairline-strong); border-radius: var(--radius);
+  background: var(--bg1);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.tema-ozel-bas { display: flex; align-items: center; gap: 10px; }
+.tema-ozel-bas .ic { color: var(--accent); }
+.tema-ozel-bas > div { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
+.tema-ozel-bas b { font-size: 13px; }
+.tema-ozel-bas small { font-size: 11px; color: var(--text-dim); }
+.tema-ozel-bas .btn { margin-left: auto; flex: none; }
+.tema-ozel-satir { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.to-etiket { font-size: 11px; color: var(--text-dim); width: 88px; flex: none; }
+.to-kontrol { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tema-renk {
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; background: var(--sw); padding: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  transition: transform 0.12s var(--ease), border-color 0.12s;
+}
+.tema-renk:hover { transform: scale(1.12); }
+.tema-renk.aktif { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg1), 0 0 0 3px var(--text); }
+.tema-renk-ozel {
+  width: 26px; height: 26px; border-radius: 50%; overflow: hidden; cursor: pointer;
+  border: 1px dashed var(--text-faint); display: grid; place-items: center;
+  background: conic-gradient(#ff5a24, #ffd83d, #a3e635, #2fd6c3, #5b9dff, #c084fc, #ff5a24);
+}
+.tema-renk-ozel input {
+  width: 150%; height: 150%; border: 0; padding: 0; background: none;
+  cursor: pointer; opacity: 0;
+}
+.to-ornek {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px;
+  background: var(--accent); color: var(--on-accent);
+  padding: 5px 12px; border-radius: var(--radius-sm);
+}
+
+/* ---------- Rozet editörü (Ayarlar > yalnız sahip) ---------- */
+.rozet-duzen {
+  margin-top: 12px; display: grid; grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px; align-items: start;
+}
+@media (max-width: 860px) { .rozet-duzen { grid-template-columns: 1fr; } }
+.rozet-sol { display: flex; flex-direction: column; gap: 10px; }
+.rozet-izgara {
+  width: 256px; height: 256px; display: grid; grid-template-columns: repeat(8, 1fr);
+  border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm);
+  overflow: hidden; background:
+    repeating-conic-gradient(var(--bg1) 0% 25%, var(--bg2) 25% 50%) 0 0 / 16px 16px;
+}
+.rozet-hucre {
+  border: 0; padding: 0; margin: 0; cursor: crosshair;
+  background: var(--c); box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18);
+}
+.rozet-hucre:hover { box-shadow: inset 0 0 0 1px var(--accent); }
+.rozet-palet { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 256px; }
+.rozet-renk {
+  width: 28px; height: 28px; border-radius: var(--radius-sm); cursor: pointer;
+  border: 1px solid var(--hairline-strong); background: var(--c, var(--bg2));
+  display: grid; place-items: center; color: var(--text-dim); padding: 0;
+}
+.rozet-renk .ic svg { width: 14px; height: 14px; }
+.rozet-renk.aktif { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg1), 0 0 0 3px var(--accent); }
+.rozet-araclar { display: flex; gap: 8px; flex-wrap: wrap; }
+.rozet-sag { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.rozet-onizleme {
+  position: relative; border: 1px solid var(--hairline); border-radius: var(--radius);
+  background: radial-gradient(circle at 50% 20%, var(--bg3), var(--bg1));
+  padding: 22px 18px 16px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; min-height: 132px;
+}
+.ro-etiket {
+  position: absolute; top: 8px; left: 10px; font-size: 9.5px;
+  letter-spacing: 1.2px; color: var(--text-faint); text-transform: uppercase;
+}
+.ro-satir { display: flex; align-items: center; gap: 8px; }
+.ro-rozet {
+  width: 32px; height: 32px; display: grid;
+  grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
+  image-rendering: pixelated; flex: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
+}
+.ro-rozet i { background: var(--c); }
+.ro-isim { font-size: 15px; letter-spacing: 0.3px; color: #fff; }
+.rozet-izinler {
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hairline);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.rozet-izin-bas { display: flex; flex-direction: column; gap: 2px; }
+.rozet-izin-bas b { font-size: 13px; }
+.rozet-izin-ekle { display: flex; gap: 8px; max-width: 360px; }
+.rozet-cipler { display: flex; flex-wrap: wrap; gap: 6px; }
+.rozet-cip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 600; padding: 4px 6px 4px 10px;
+  border: 1px solid var(--hairline-strong); border-radius: 999px; background: var(--bg2);
+}
+.rozet-cip button {
+  border: 0; background: var(--bg4); color: var(--text-dim); cursor: pointer;
+  width: 16px; height: 16px; border-radius: 50%; line-height: 1; padding: 0;
+}
+.rozet-cip button:hover { background: var(--danger); color: #fff; }
+
+/* ---------- Animasyon listesi (Ayarlar) ---------- */
+.anim-liste {
+  margin-top: 12px; border: 1px solid var(--hairline); border-radius: var(--radius);
+  background: var(--bg1); max-height: 232px; overflow-y: auto;
+}
+.anim-satir {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-bottom: 1px solid var(--hairline); font-size: 12.5px;
+}
+.anim-satir:last-child { border-bottom: none; }
+.anim-ad { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Köşe yumuşaklığı — dünya başına (Ayarlar > Görsel Dünya) */
+:root[data-radius="keskin"] { --radius: 0px; --radius-sm: 0px; }
+:root[data-radius="yumusak"] { --radius: 10px; --radius-sm: 7px; }
+:root[data-radius="hap"] { --radius: 16px; --radius-sm: 999px; }
+:root[data-radius="hap"] .btn,
+:root[data-radius="hap"] .input,
+:root[data-radius="hap"] .chip { border-radius: 999px; }
+
 .about-row {
   display: flex; justify-content: space-between; padding: 7px 0;
   border-bottom: 1px solid var(--hairline); font-size: 13px; color: var(--text-dim);

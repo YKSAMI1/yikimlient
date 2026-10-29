@@ -39,11 +39,13 @@ public final class YikimAtolye {
     private static final int[] IZGARA = new int[BOY * BOY];
     private static boolean yuklendi;
 
-    /// v1.12.7 SİMGE KAPATMA: çizim/izin sistemi geçici kaldırıldı — farklı bir
-    /// sistemle geri gelecek, o yüzden bulut presence sunucusu çalışmaya devam
-    /// eder. Bu bayrak açıkken herkes standart Y simgesini görür; eski çizim
-    /// dosyaları açılışta silinir.
-    private static final boolean CIZIM_KAPALI = true;
+    /// v1.13.0: çizim sistemi LAUNCHER'a taşındı.
+    ///
+    /// Tek doğruluk kaynağı artık launcher: rozet 8×8 PNG olarak her kurulumun
+    /// `.yikim/rozet.png` dosyasına yazılır (portal `cmd_rozet_ciz`). Mod yalnız
+    /// OKUR; hiçbir isim kendiliğinden izinli olamaz. Uzak çizimler presence
+    /// sunucusu üzerinden gelir ("b" alanı) ve yalnız izinli oyuncularda çizilir.
+    private static final boolean CIZIM_KAPALI = false;
 
     /// başkalarının rozetleri: uuid → base64 png
     private static final Map<UUID, String> UZAK = new ConcurrentHashMap<UUID, String>();

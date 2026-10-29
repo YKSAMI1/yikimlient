@@ -49,6 +49,24 @@ pub struct YikimConfig {
     pub atolye_admin: Vec<String>,
     /// Atölyeyi kullanmasına izin verilen oyuncular (her hesap türü olabilir).
     pub atolye_izinli: Vec<String>,
+    /// Dünya başına görsel özelleştirme: {"sahne": {"accent":"#ffd83d","radius":"yumusak"}}
+    /// Boş alan = dünyanın kendi rengi/köşesi kullanılır.
+    pub tema_ozel: std::collections::HashMap<String, TemaOzel>,
+    /// Ana menü karakter animasyonları (emote) oynasın mı?
+    pub menu_animasyon: bool,
+    /// Animasyon oynatma sıklığı: "sakin" | "normal" | "canli"
+    pub menu_animasyon_hiz: String,
+}
+
+/// Tek bir dünyanın kullanıcı özelleştirmesi. Hepsi opsiyonel: boş alan
+/// dünyanın kendi değerini korur.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TemaOzel {
+    /// Vurgu rengi (hex, "#rrggbb")
+    pub accent: String,
+    /// Köşe yumuşaklığı: "" (dünya varsayılanı) | "keskin" | "yumusak" | "hap"
+    pub radius: String,
 }
 
 impl Default for YikimConfig {
@@ -78,6 +96,9 @@ impl Default for YikimConfig {
             presence_url: None,
             atolye_admin: vec!["YKSAMI1".into()],
             atolye_izinli: vec![],
+            tema_ozel: std::collections::HashMap::new(),
+            menu_animasyon: true,
+            menu_animasyon_hiz: "normal".into(),
         }
     }
 }

@@ -104,8 +104,11 @@ export function applyWorld(): void {
   // "custom" eski bir değer: pano dünyasında yaşar; bilinmeyen/ayboş → sahne (varsayılan)
   const world = t === "custom" ? "pano" : (legacy[t] ?? t) || "sahne";
 
-  // Özel vurgu rengi: boş değilse HANGİ dünyada olursa olsun vurguları boyar
-  const accent = (state.config.custom_accent || "").trim();
+  // Dünya başına özelleştirme: her temanın kendi vurgu rengi + köşesi olabilir.
+  // (Eski global custom_accent yalnız "sahne" için geriye dönük yedek olarak kalır.)
+  const ozel = (state.config.tema_ozel || {})[world] || {};
+  const geriye = world === "sahne" ? state.config.custom_accent : "";
+  const accent = String(ozel.accent || geriye || "").trim();
   root.setAttribute("data-world", world);
   if (accent && /^#[0-9a-fA-F]{3,8}$/.test(accent)) {
     root.setAttribute("data-world-custom", "1");
@@ -113,6 +116,13 @@ export function applyWorld(): void {
   } else {
     root.removeAttribute("data-world-custom");
     root.style.removeProperty("--custom-accent");
+  }
+  // Köşe: keskin | yumusak | hap — boşsa dünyanın kendi köşe dili geçerli
+  const radius = String(ozel.radius || "");
+  if (radius === "keskin" || radius === "yumusak" || radius === "hap") {
+    root.setAttribute("data-radius", radius);
+  } else {
+    root.removeAttribute("data-radius");
   }
   // Ambiens parçacıklar + özel imleç — dünyaya ve ayarlara bağlı
   applyFx();

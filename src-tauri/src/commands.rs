@@ -100,10 +100,51 @@ pub async fn cmd_list_accounts() -> Result<Vec<SanitizedAccount>, String> {
 
 // ---------- sahne emote paketleri ----------
 
-/// Launcher karakter vitrinine eklenmiş emote'ları listeler: [{adi, icerik}]
+/// Paketle gelen animasyonlar (herkeste hazır, Türkçe adlarla).
+/// Dosyalar derlemeye gömülür (include_bytes!) → kurulumda ayrı kaynak gerekmez.
+/// Adlar Türkçe ve kullanıcıya görünen addır; dosya adı ASCII slug'dır.
+const YERLESIK_EMOTELER: &[(&str, &str, &[u8])] = &[
+    ("mambo-donus", "Mambo Dönüş", include_bytes!("../resources/emotes/mambo-donus.emotecraft")),
+    ("yaslanma", "Yaslanma", include_bytes!("../resources/emotes/yaslanma.emotecraft")),
+    ("eller-arkada-yaslanma", "Eller Arkada Yaslanma", include_bytes!("../resources/emotes/eller-arkada-yaslanma.emotecraft")),
+    ("eller-kafa-arkasinda", "Eller Kafa Arkasında Yaslanma", include_bytes!("../resources/emotes/eller-kafa-arkasinda-yaslanma.emotecraft")),
+    ("yana-uzanma", "Yana Uzanma", include_bytes!("../resources/emotes/yana-uzanma.emotecraft")),
+    ("meditasyon", "Meditasyon", include_bytes!("../resources/emotes/meditasyon.emotecraft")),
+    ("dramatik-olum", "Dramatik Şekilde Ölüm", include_bytes!("../resources/emotes/dramatik-olum.emotecraft")),
+    ("cehenneme-cekilme", "Cehenneme Çekilme", include_bytes!("../resources/emotes/cehenneme-cekilme.emotecraft")),
+    ("breakdance-flare", "Breakdance Flare", include_bytes!("../resources/emotes/breakdance-flare.emotecraft")),
+    ("ta-da", "Ta da!", include_bytes!("../resources/emotes/ta-da.emotecraft")),
+    ("67", "67", include_bytes!("../resources/emotes/67.emotecraft")),
+];
+
+/// Paket animasyonlarını `emotes/` klasörüne bir kez açar.
+/// Var olan dosyaya DOKUNMAZ (kullanıcı silerse geri gelmez); yalnız eksik
+/// olanları yazar. JSON'un `name` alanı Türkçe görünen adla değiştirilir,
+/// `yikim_yerlesik: true` işareti paket animasyonu olduğunu söyler.
+fn yerlesik_emoteleri_kur(dir: &std::path::Path) {
+    if std::fs::create_dir_all(dir).is_err() {
+        return;
+    }
+    for (slug, baslik, bayt) in YERLESIK_EMOTELER {
+        let hedef = dir.join(format!("yerlesik-{slug}.json"));
+        if hedef.exists() {
+            continue;
+        }
+        let Ok(icerik) = emote_icerik_coz(bayt) else { continue };
+        let Ok(mut js) = serde_json::from_str::<serde_json::Value>(&icerik) else { continue };
+        if let Some(nesne) = js.as_object_mut() {
+            nesne.insert("name".into(), serde_json::json!(baslik));
+            nesne.insert("yikim_yerlesik".into(), serde_json::json!(true));
+        }
+        let _ = std::fs::write(&hedef, serde_json::to_string(&js).unwrap_or(icerik));
+    }
+}
+
+/// Launcher karakter vitrinine eklenmiş emote'ları listeler: [{adi, baslik, icerik, yerlesik}]
 #[tauri::command]
 pub fn cmd_list_emotes() -> Result<Vec<serde_json::Value>, String> {
     let dir = crate::core::app_dir().join("emotes");
+    yerlesik_emoteleri_kur(&dir);
     let mut out: Vec<serde_json::Value> = Vec::new();
     if let Ok(rd) = std::fs::read_dir(&dir) {
         let mut dosyalar: Vec<std::path::PathBuf> =
@@ -115,7 +156,19 @@ pub fn cmd_list_emotes() -> Result<Vec<serde_json::Value>, String> {
             }
             if let Ok(icerik) = std::fs::read_to_string(&yol) {
                 let adi = yol.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-                out.push(serde_json::json!({ "adi": adi, "icerik": icerik }));
+                let yerlesik = adi.starts_with("yerlesik-");
+                // Görünen ad: JSON'daki `name` (paket animasyonlarında Türkçe),
+                // yoksa dosya adı.
+                let baslik = serde_json::from_str::<serde_json::Value>(&icerik)
+                    .ok()
+                    .and_then(|j| j["name"].as_str().map(str::to_string))
+                    .unwrap_or_else(|| adi.trim_end_matches(".json").to_string());
+                out.push(serde_json::json!({
+                    "adi": adi,
+                    "baslik": baslik,
+                    "icerik": icerik,
+                    "yerlesik": yerlesik,
+                }));
             }
         }
     }
@@ -228,6 +281,34 @@ pub fn cmd_import_emote_dosyasi(path: String) -> Result<serde_json::Value, Strin
     Ok(r)
 }
 
+/// Dışarıdan animasyon ekle: dosya seçici (çoklu) → emotes/ klasörüne yaz.
+/// Eklenen animasyon YALNIZ bu bilgisayardaki bu kullanıcıda geçerlidir;
+/// paket animasyonlarını etkilemez ve başka oyunculara gitmez.
+#[tauri::command]
+pub async fn cmd_pick_emote(app: AppHandle) -> Result<Vec<serde_json::Value>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<String>>();
+    app.dialog()
+        .file()
+        .set_title("Animasyon ekle (.emotecraft)")
+        .add_filter("Emotecraft animasyonu", &["emotecraft", "json"])
+        .pick_files(move |yollar| {
+            let liste = yollar
+                .map(|v| v.into_iter().map(|p| p.to_string()).collect())
+                .unwrap_or_default();
+            let _ = tx.send(liste);
+        });
+    let yollar = rx.recv().map_err(|_| "seçim penceresi kapandı".to_string())?;
+    let mut eklenen = Vec::new();
+    for yol in yollar {
+        match cmd_import_emote_dosyasi(yol) {
+            Ok(v) => eklenen.push(v),
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(eklenen)
+}
+
 /// Deneme alanı (tarayıcı dosya seçici / HTML5 sürükle-bırak) için:
 /// baytları çöz ama KAYDETME — oturum listesine eklenip önizlensin.
 #[tauri::command]
@@ -245,6 +326,77 @@ pub fn cmd_delete_emote(adi: String) -> Result<bool, String> {
     match std::fs::remove_file(&yol) {
         Ok(()) => Ok(true),
         Err(_) => Ok(false),
+    }
+}
+
+// ---------- rozet (isim başı logosu) ----------
+
+/// Launcher'da çizilen 8×8 logoyu kaydet.
+///
+/// - Tüm kurulumların `.yikim/rozet.png` dosyasına yazılır → mod oyun içinde
+///   isim başına basar (sunucu fark etmez, F5/TAB dahil).
+/// - Presence sunucusuna yüklenir → diğer YIKIMLient oyuncuları da görür.
+///
+/// `pikseller`: 64 giriş, her biri "#rrggbb" ya da "" (boş piksel).
+#[tauri::command]
+pub async fn cmd_rozet_ciz(pikseller: Vec<String>) -> Result<serde_json::Value, String> {
+    let png = crate::rozet::pikselleri_png(&pikseller)?;
+    let kurulum = crate::rozet::tum_kurulumlara_yaz(&png);
+    let cfg = YikimConfig::load_or_default();
+    let ucak = crate::rozet::ucak(&cfg);
+    let mut yuklendi = false;
+    let mut hata = String::new();
+    if let Ok(hesap) = selected_account() {
+        match crate::rozet::sunucuya_yukle(&png, &hesap.uuid, &ucak).await {
+            Ok(()) => yuklendi = true,
+            Err(e) => hata = e,
+        }
+    }
+    Ok(serde_json::json!({
+        "kurulum": kurulum,
+        "yuklendi": yuklendi,
+        "hata": hata,
+    }))
+}
+
+/// Kayıtlı rozeti oku (launcher açılışında editörü doldurmak için).
+#[tauri::command]
+pub fn cmd_rozet_oku() -> Result<serde_json::Value, String> {
+    Ok(serde_json::json!({ "pikseller": crate::rozet::yerel_rozet() }))
+}
+
+/// Rozeti sil: dosyalar kaldırılır + sunucudan düşer (standart Y'ye dönüş).
+#[tauri::command]
+pub async fn cmd_rozet_sil() -> Result<serde_json::Value, String> {
+    let kurulum = crate::rozet::tum_kurulumlardan_sil();
+    let cfg = YikimConfig::load_or_default();
+    let ucak = crate::rozet::ucak(&cfg);
+    let mut silindi = false;
+    if let Ok(hesap) = selected_account() {
+        silindi = crate::rozet::sunucudan_sil(&hesap.uuid, &ucak).await.is_ok();
+    }
+    Ok(serde_json::json!({ "kurulum": kurulum, "sunucu": silindi }))
+}
+
+/// Beyaz listeyi yayınla: yalnız bu isimler kendi rozetini çizebilir.
+#[tauri::command]
+pub async fn cmd_rozet_izinler(isimler: Vec<String>) -> Result<serde_json::Value, String> {
+    let cfg = YikimConfig::load_or_default();
+    let ucak = crate::rozet::ucak(&cfg);
+    // Yönetici hesapları her zaman listede kalsın (kendini kilitlemesin).
+    let mut liste: Vec<String> = isimler
+        .iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    for admin in &cfg.atolye_admin {
+        if !liste.iter().any(|l| l.eq_ignore_ascii_case(admin)) {
+            liste.push(admin.clone());
+        }
+    }
+    match crate::rozet::izin_listesi_yaz(&liste, &ucak).await {
+        Ok(()) => Ok(serde_json::json!({ "yuklendi": true, "izinler": liste })),
+        Err(e) => Ok(serde_json::json!({ "yuklendi": false, "izinler": liste, "hata": e })),
     }
 }
 

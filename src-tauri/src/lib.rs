@@ -10,6 +10,7 @@ pub mod instances;
 pub mod launcher;
 pub mod modpacks;
 pub mod repos;
+pub mod rozet;
 pub mod server_list;
 pub mod skins;
 pub mod stats;
@@ -71,6 +72,11 @@ pub fn run() {
             commands::cmd_add_emote,
             commands::cmd_emote_bayt_coz,
             commands::cmd_import_emote_dosyasi,
+            commands::cmd_pick_emote,
+            commands::cmd_rozet_ciz,
+            commands::cmd_rozet_oku,
+            commands::cmd_rozet_sil,
+            commands::cmd_rozet_izinler,
             commands::cmd_delete_emote,
             commands::cmd_add_offline_account,
             commands::cmd_ms_login_begin,
