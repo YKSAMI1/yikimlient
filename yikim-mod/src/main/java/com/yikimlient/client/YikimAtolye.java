@@ -292,11 +292,16 @@ public final class YikimAtolye {
         // (izin listesi karşılaştırması isim üzerinden yapılır).
         final String ad = benimAdim();
         final String adAlani = ad == null ? "" : "\"n\":\"" + ad.replace("\\", "").replace("\"", "") + "\",";
+        // v1.13.1: ham RGBA ("x") de gönderilir. PNG yolu renk kanalı
+        // sırasına (RGBA/ABGR) bağlıydı; karşı tarafta kırmızı↔mavi
+        // takas ediliyordu (turuncu kalp → MAVİ). Ham baytta takas YOK.
+        final String px = base64Px();
         Thread t = new Thread(() -> {
             try {
                 String govde = base64Png == null
                     ? "{\"u\":\"" + uuid + "\"," + adAlani + "\"sil\":true}"
-                    : "{\"u\":\"" + uuid + "\"," + adAlani + "\"png\":\"" + base64Png + "\"}";
+                    : "{\"u\":\"" + uuid + "\"," + adAlani + (px == null ? ""
+                        : "\"x\":\"" + px + "\",") + "\"png\":\"" + base64Png + "\"}";
                 byte[] bayt = govde.getBytes(StandardCharsets.UTF_8);
                 HttpURLConnection bag = (HttpURLConnection) new URL(ucak()).openConnection();
                 bag.setConnectTimeout(5000);
@@ -319,7 +324,12 @@ public final class YikimAtolye {
         t.start();
     }
 
-    /// Presence yanıtından başkalarının rozetlerini al ({"b":{uuid:"<b64>"}}).
+    /// Presence yanıtından başkalarının rozetlerini al.
+    ///
+    /// v1.13.1: ÖNCELİK `"x"` alanı — 64 pikselin HAM RGBA baytları (base64).
+    /// `"b"` (eski PNG) hâlâ okunur ama yalnız `x` yoksa: PNG çözümü
+    /// (NativeImage) platforma göre ABGR/ARGB yorumlayabildiği için
+    /// kırmızı↔mavi takasına açıktı.
     public static void uzaklariIsle(String json) {
         if (CIZIM_KAPALI) {
             return; // v1.12.7: uzak çizimler yok — standart Y herkeste
@@ -328,46 +338,116 @@ public final class YikimAtolye {
             if (json == null) {
                 return;
             }
-            int b = json.indexOf("\"b\"");
-            if (b < 0) {
-                return;
+            // 1) HAM RGBA ("x") — yeni istemciler; kanal takası imkânsız.
+            Map<UUID, String> ham = new java.util.HashMap<UUID, String>();
+            anahtarDegerler(json, "x", ham);
+            for (java.util.Map.Entry<UUID, String> e : ham.entrySet()) {
+                int[] piksel = pxdenOku(e.getValue());
+                if (piksel != null) {
+                    UZAK.put(e.getKey(), e.getValue());
+                    YikimSlotlar.ata(e.getKey(), piksel);
+                }
             }
-            int i = json.indexOf('{', b);
-            while (i >= 0 && i < json.length() - 2) {
-                int t1 = json.indexOf('"', i + 1);
-                if (t1 < 0) return;
-                int t2 = json.indexOf('"', t1 + 1);
-                if (t2 < 0) return;
-                String anahtar = json.substring(t1 + 1, t2);
-                if (anahtar.length() != 36) {
-                    i = json.indexOf('{', t2 + 1);
+            // 2) PNG ("b") — eski istemciden yüklenmiş çizimler. `x`i olan
+            // oyuncular atlanır (aynı oyuncu iki yoldan da gelmesin).
+            Map<UUID, String> eski = new java.util.HashMap<UUID, String>();
+            anahtarDegerler(json, "b", eski);
+            for (java.util.Map.Entry<UUID, String> e : eski.entrySet()) {
+                if (e.getValue().length() > MAX_ART_BAYT) {
                     continue;
                 }
-                int d1 = json.indexOf('"', t2 + 1);
-                int d2 = d1 < 0 ? -1 : json.indexOf('"', d1 + 1);
-                if (d2 < 0) return;
-                String png = json.substring(d1 + 1, d2);
-                if (png.length() <= MAX_ART_BAYT) {
-                    try {
-                        UZAK.put(UUID.fromString(anahtar), png);
-                    }
-                    catch (IllegalArgumentException bozuk) {
-                        // atla
-                    }
+                String onceki = UZAK.get(e.getKey());
+                if (onceki != null && !onceki.equals(e.getValue()) && ham.containsKey(e.getKey())) {
+                    continue; // bu oyuncu için ham veri öncelikli
                 }
-                i = json.indexOf('{', d2 + 1);
-            }
-            // HER uzak oyuncunun cizimi KENDI slotuna yazilir (v1.12 — tek
-            // glif paylasimi kalkti: birinin cizimi baskasinin rozetinde cikmaz)
-            for (java.util.Map.Entry<UUID, String> e : UZAK.entrySet()) {
                 int[] piksel = pngdenOku(e.getValue());
                 if (piksel != null) {
+                    UZAK.put(e.getKey(), e.getValue());
                     YikimSlotlar.ata(e.getKey(), piksel);
                 }
             }
         }
         catch (Throwable ignored) {
             // asla patlamayalim
+        }
+    }
+
+    /// `"alan":{"<uuid>":"<deger>", ...}` eşlemesini kütüphanesiz çıkar.
+    private static void anahtarDegerler(String json, String alan, Map<UUID, String> hedef) {
+        int b = json.indexOf("\"" + alan + "\"");
+        if (b < 0) {
+            return;
+        }
+        int i = json.indexOf('{', b);
+        if (i < 0) {
+            return;
+        }
+        while (i >= 0 && i < json.length() - 2) {
+            int t1 = json.indexOf('"', i + 1);
+            if (t1 < 0) {
+                return;
+            }
+            int t2 = json.indexOf('"', t1 + 1);
+            if (t2 < 0) {
+                return;
+            }
+            String anahtar = json.substring(t1 + 1, t2);
+            if (anahtar.length() != 36) {
+                i = json.indexOf('{', t2 + 1);
+                continue;
+            }
+            int d1 = json.indexOf('"', t2 + 1);
+            int d2 = d1 < 0 ? -1 : json.indexOf('"', d1 + 1);
+            if (d2 < 0) {
+                return;
+            }
+            try {
+                hedef.put(UUID.fromString(anahtar), json.substring(d1 + 1, d2));
+            }
+            catch (IllegalArgumentException bozuk) {
+                // atla
+            }
+            i = json.indexOf('{', d2 + 1);
+        }
+    }
+
+    /// Ham RGBA (64×4 bayt) base64 → ARGB dizisi. Kanal takası YOK.
+    private static int[] pxdenOku(String base64) {
+        try {
+            byte[] bayt = Base64.getDecoder().decode(base64);
+            if (bayt.length != BOY * BOY * 4) {
+                return null;
+            }
+            int[] cikti = new int[BOY * BOY];
+            for (int i = 0; i < cikti.length; i++) {
+                int r = bayt[i * 4] & 0xFF;
+                int g = bayt[i * 4 + 1] & 0xFF;
+                int bl = bayt[i * 4 + 2] & 0xFF;
+                int a = bayt[i * 4 + 3] & 0xFF;
+                cikti[i] = (a << 24) | (r << 16) | (g << 8) | bl;
+            }
+            return cikti;
+        }
+        catch (Throwable problem) {
+            return null;
+        }
+    }
+
+    /// Kendi ızgaramın ham RGBA base64'ü (sunucuya "x" alanı).
+    private static synchronized String base64Px() {
+        try {
+            byte[] bayt = new byte[BOY * BOY * 4];
+            for (int i = 0; i < BOY * BOY; i++) {
+                int p = IZGARA[i];
+                bayt[i * 4] = (byte) ((p >>> 16) & 0xFF);
+                bayt[i * 4 + 1] = (byte) ((p >>> 8) & 0xFF);
+                bayt[i * 4 + 2] = (byte) (p & 0xFF);
+                bayt[i * 4 + 3] = (byte) ((p >>> 24) & 0xFF);
+            }
+            return Base64.getEncoder().encodeToString(bayt);
+        }
+        catch (Throwable problem) {
+            return null;
         }
     }
 

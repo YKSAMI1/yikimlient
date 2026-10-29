@@ -341,13 +341,15 @@ pub fn cmd_delete_emote(adi: String) -> Result<bool, String> {
 #[tauri::command]
 pub async fn cmd_rozet_ciz(pikseller: Vec<String>) -> Result<serde_json::Value, String> {
     let png = crate::rozet::pikselleri_png(&pikseller)?;
+    // Ham RGBA: renk kanalı sırası protokolde sabit → turuncu↔mavi takası yok.
+    let px = crate::rozet::pikselleri_px(&pikseller)?;
     let kurulum = crate::rozet::tum_kurulumlara_yaz(&png);
     let cfg = YikimConfig::load_or_default();
     let ucak = crate::rozet::ucak(&cfg);
     let mut yuklendi = false;
     let mut hata = String::new();
     if let Ok(hesap) = selected_account() {
-        match crate::rozet::sunucuya_yukle(&png, &hesap.uuid, &hesap.name, &ucak).await {
+        match crate::rozet::sunucuya_yukle(&png, &px, &hesap.uuid, &hesap.name, &ucak).await {
             Ok(()) => yuklendi = true,
             Err(e) => hata = e,
         }
@@ -2692,5 +2694,21 @@ mod yerlesik_emote_testleri {
         assert_eq!(img.get_pixel(1, 0).0[3], 0, "boş piksel saydam olmalı");
         // yanlış uzunluk reddedilir
         assert!(crate::rozet::pikselleri_png(&pikseller[..10]).is_err());
+    }
+
+    /// Ham RGBA ("x") bayt sırası R,G,B,A — turuncu kalp karşı tarafta mavi
+    /// çıkmasın diye kanal sırası sözleşme hâline getirildi.
+    #[test]
+    fn rozet_px_kanal_sirasi() {
+        use base64::Engine as _;
+        let mut pikseller = vec![String::new(); 64];
+        pikseller[0] = "#ff7a18".into();
+        let px = crate::rozet::pikselleri_px(&pikseller).expect("px üretilemedi");
+        let bayt = base64::engine::general_purpose::STANDARD
+            .decode(px)
+            .expect("base64 çözülemedi");
+        assert_eq!(bayt.len(), 256, "64 piksel x 4 bayt olmalı");
+        assert_eq!(&bayt[0..4], &[0xff, 0x7a, 0x18, 0xff], "R,G,B,A sırası");
+        assert_eq!(&bayt[4..8], &[0, 0, 0, 0], "boş piksel saydam olmalı");
     }
 }

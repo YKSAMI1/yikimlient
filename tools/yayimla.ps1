@@ -33,7 +33,15 @@ New-Item -ItemType Directory -Force -Path $cikti | Out-Null
 # NSIS kurulum dosyasi + imzasi
 $exe = Get-ChildItem "$bundle\nsis" -Filter "*-setup.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $exe) { throw "kurulum exe bulunamadi" }
+
+# Authenticode imzası — SmartScreen uyarısının tek kalıcı çözümü.
+# Sertifika tanımlı değilse betik uyarı basıp devam eder (imzasız çıkar).
+& powershell -ExecutionPolicy Bypass -File "$koku\tools\imzala.ps1" -Dosya $exe.FullName
 Copy-Item $exe.FullName $cikti -Force
+
+# Sağlama toplamı: kullanıcı dosyayı doğrulayabilir, AV incelemelerinde işe yarar.
+$ozet = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
+[System.IO.File]::WriteAllText("$cikti\SHA256SUMS.txt", "$ozet  $(Split-Path $exe -Leaf)`n", (New-Object System.Text.UTF8Encoding($false)))
 $sig = "$($exe.FullName).sig"
 if (-not (Test-Path $sig)) { throw "imza dosyasi yok - TAURI_SIGNING_PRIVATE_KEY set edilmedi mi?" }
 $signatur = (Get-Content $sig -Raw).Trim()

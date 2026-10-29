@@ -60,6 +60,32 @@ pub fn pikselleri_png(pikseller: &[String]) -> Result<Vec<u8>, String> {
     Ok(cikti)
 }
 
+/// Aynı 64 rengi presence sunucusunun `"x"` alanı için HAM RGBA base64'e çevir.
+///
+/// Neden PNG değil: PNG'yi oyun tarafında çözen API platforma göre kanal
+/// sırasını (ABGR/ARGB) farklı yorumlayabiliyordu ve kırmızı↔mavi takas
+/// ediliyordu — turuncu kalp karşı tarafta MAVİ çıkıyordu. Ham baytta
+/// yorum yoktur: bayt sırası protokolün parçasıdır (R,G,B,A).
+pub fn pikselleri_px(pikseller: &[String]) -> Result<String, String> {
+    if pikseller.len() != (BOY * BOY) as usize {
+        return Err(format!("64 piksel bekleniyordu, {} geldi", pikseller.len()));
+    }
+    let mut bayt = Vec::with_capacity((BOY * BOY * 4) as usize);
+    for ham in pikseller {
+        let metin = ham.trim().trim_start_matches('#');
+        if metin.is_empty() {
+            bayt.extend_from_slice(&[0, 0, 0, 0]);
+            continue;
+        }
+        if metin.len() != 6 {
+            return Err(format!("geçersiz renk: {ham}"));
+        }
+        let oku = |s: &str| u8::from_str_radix(s, 16).map_err(|_| format!("geçersiz renk: {ham}"));
+        bayt.extend_from_slice(&[oku(&metin[0..2])?, oku(&metin[2..4])?, oku(&metin[4..6])?, 255]);
+    }
+    Ok(base64::engine::general_purpose::STANDARD.encode(bayt))
+}
+
 /// Launcher'ın kendi ana kopyası: uygulama klasöründe `rozet.png`.
 ///
 /// Kurulum sayısı 0 olsa bile çizim burada durur → editör her açılışta
@@ -146,6 +172,7 @@ pub fn yerel_rozet() -> Option<Vec<String>> {
 /// Sunucu yoksa sessiz hata döner — yerel rozet yine geçerlidir.
 pub async fn sunucuya_yukle(
     png: &[u8],
+    px: &str,
     uuid: &str,
     isim: &str,
     ucak: &str,
@@ -153,9 +180,11 @@ pub async fn sunucuya_yukle(
     if uuid.trim().is_empty() {
         return Err("hesap uuid yok".into());
     }
+    // `x`: ham RGBA (yeni istemciler), `png`: eski istemciler için yedek.
     let govde = serde_json::json!({
         "u": uuid.trim(),
         "n": isim.trim(),
+        "x": px,
         "png": base64::engine::general_purpose::STANDARD.encode(png),
     });
     let yanit = crate::core::http_client()

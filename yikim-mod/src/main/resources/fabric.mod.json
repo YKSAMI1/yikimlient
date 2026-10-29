@@ -1,7 +1,7 @@
 ﻿{
     "schemaVersion":  1,
     "id":  "yikimlient",
-    "version":  "1.13.0+1.21.11",
+    "version":  "1.13.1+1.21.11",
     "name":  "YIKIM Client",
     "description":  "YIKIMLient\u0027in oyun i?i ?ekirde?i. Sa? Shift ile YIKIM paneli; ?ak??mayan HUD d?zeni, tam ekran HUD edit?r?, kare h?z? te?hisi, oyun i?i katalog ve ba?lat?c? ile dosya k?pr?s?.",
     "authors":  [

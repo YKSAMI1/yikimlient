@@ -33,12 +33,24 @@ public final class YikimGlifFabrika {
     /// ESKİ Y BADGE'ININ VANILLA GEOMETRİSİYLE BİREBİR (0.3.32): bitmap provider
     /// 8×8/ascent-7 png için (0, 8, 0, 8) float'larını üretiyordu — aynı değerler
     /// aynı yerleşimi verir (TAB'da çakışmasız, nametag'te metin hizasında).
-    private static final float ADVANS = 8.0f;
-    /// v1.12.6 KESKINLIK: UV'yi piksel MERKEZINE yapıştırır (8×8 → 0.0625,
-    /// 0.9375). Eski (0.001, 0.999) aralığı her ekran pikselinin ikiser
-    /// texel karışımı örneklemesine yol açıyordu → "fotoğraf gibi / blurlu".
-    /// Merkez-snap ile hangi filtre modunda olursa olsun birebir keskin.
-    private static final float UV_MERKEZ = 0.5f / BOY;
+    /// v1.13.1: vanilya bitmap sağlayıcısı 8 px geniş glif için advance = 8+1
+    /// kullanır. 8 kaldığında isim harfi 1 px sola kayıyor, rozet sonraki
+    /// harfe değiyordu ("üst üste binmiş / kalın" görünümü).
+    private static final float ADVANS = 9.0f;
+    /// v1.13.1 KESKINLIK: UV artık dokunun TAMAMI (0..1).
+    ///
+    /// v1.12.6'da "piksel merkezine yapıştır" diye 0.0625..0.9375 aralığı
+    /// kullanılıyordu; bu, 8 texel'i quad'ın %87.5'ine sığdırıp her texeli
+    /// 1.1428 birime GERİYORDU → texel'ler 1/2 ekran pikseli arasında
+    /// bölünüyor, rozet "bulanık / tam pixel değil" görünüyordu. Tam aralık
+    /// ile texel = birim eşlemesi birebir (nearest'te de, merkez örneklemede
+    /// de keskin).
+    private static final float UV_SOL = 0.0f;
+    private static final float UV_SAG = 1.0f;
+    /// v1.13.1 KESKİNLİK: doku kenarı = 8 sanat pikseli × OLCEK texel.
+    /// 4× seçildi: 8×8 sanat 16/24/32 px'e büyütüldüğünde bile her ekran
+    /// pikseli tek bir bloğun içine düşer (komşu renkle karışmaz).
+    private static final int OLCEK = 4;
     private static final float QUAD_SOL = 0.0f;
     private static final float QUAD_SAG = 8.0f;
     private static final float QUAD_UST = 0.0f;
@@ -79,11 +91,21 @@ public final class YikimGlifFabrika {
             if (DOKU_OZETI[slot] == ozet) {
                 return; // içerik aynı — GPU'ya gereksiz yükleme yok (heartbeat ~0 maliyet)
             }
-            class_1011 kanvas = new class_1011(BOY, BOY, true);
+            int boy = BOY * OLCEK;
+            class_1011 kanvas = new class_1011(boy, boy, true);
             for (int y = 0; y < BOY; y++) {
                 int satir = y * BOY;
                 for (int x = 0; x < BOY; x++) {
-                    kanvas.method_4305(x, y, abgr(pikseller[satir + x]));
+                    // Her sanat pikseli OLCEK×OLCEK texel olarak yazılır: doku
+                    // büyür, GÖRÜNTÜ aynı kalır. Örnekleme sırasında komşu
+                    // pikseller arasında interpolasyon (bulanıklık) artık
+                    // blok içinde kalır → her ölçekte keskin pixel art.
+                    int renk = abgr(pikseller[satir + x]);
+                    for (int dy = 0; dy < OLCEK; dy++) {
+                        for (int dx = 0; dx < OLCEK; dx++) {
+                            kanvas.method_4305(x * OLCEK + dx, y * OLCEK + dy, renk);
+                        }
+                    }
                 }
             }
             RenderSystem.getDevice().createCommandEncoder().writeToTexture(doku.method_68004(), kanvas);
@@ -108,7 +130,7 @@ public final class YikimGlifFabrika {
         if (mc == null) {
             return null;
         }
-        doku = new YikimGlifDokusu(BOY, slot);
+        doku = new YikimGlifDokusu(BOY * OLCEK, slot);
         mc.method_1531().method_4616(glifId(slot), doku);
         DOKULAR[slot] = doku;
         return doku;
@@ -126,7 +148,7 @@ public final class YikimGlifFabrika {
                 class_379.method_73329(ADVANS),
                 class_8538.method_51643(glifId(slot)),
                 doku.method_71659(),
-                UV_MERKEZ, 1.0f - UV_MERKEZ, UV_MERKEZ, 1.0f - UV_MERKEZ,
+                UV_SOL, UV_SAG, UV_SOL, UV_SAG,
                 QUAD_SOL, QUAD_SAG, QUAD_UST, QUAD_ALT);
             PISINMIS[slot] = glif;
         }

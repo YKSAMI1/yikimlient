@@ -86,11 +86,17 @@ public final class YikimBadge {
         }
     }
 
-    /** Metin zaten rozetli mi (idempotence — çift ön ek imkânsız). */
+    /** Metin zaten rozetli mi (idempotence — çift ön ek imkânsız).
+     *
+     * v1.13.1: eskiden yalnız İLK karaktere bakılıyordu. Sunucu eklentileri
+     * ismin başına kendi önekini (rütbe ikonu, renk kodu, takım etiketi)
+     * koyduğunda glif 1. karakter olmaktan çıkıyor, "zaten rozetli" kontrolü
+     * kaçırıyor ve ikinci bir rozet ekleniyordu → TAB'da üst üste binmiş,
+     * kalınlaşmış görünüm. Artık metnin HERHANGİ bir yerinde glif varsa
+     * rozet çoktan eklenmiştir. */
     public static boolean kapsar(class_2561 ad) {
         try {
-            return ad != null && !ad.getString().isEmpty()
-                && ad.getString().charAt(0) == VARSAYILAN_GLIF;
+            return ad != null && ad.getString().indexOf(VARSAYILAN_GLIF) >= 0;
         }
         catch (Throwable ignored) {
             return false;
@@ -120,6 +126,12 @@ public final class YikimBadge {
         try {
             if (name == null) {
                 return null;
+            }
+            // ÇİFT ROZET KORUMASI: aynı isim birden çok katmandan (kaynak
+            // adı, render state, TAB satırı, başka mod) geçebilir. Glif
+            // metnin neresinde olursa olsun ikinci kez eklenmez.
+            if (kapsar(name)) {
+                return name;
             }
             if (LOGLANMADI.compareAndSet(false, true)) {
                 // canlı kanıt: mixin zinciri çalışıyor mu? (sunucu bağımsız teşhis)
