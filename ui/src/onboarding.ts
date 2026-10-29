@@ -6,9 +6,18 @@
    Bu akış bir kez çalışır (onboarding_done); mevcut kullanıcılar
    hesap/kurulum sahibi oldukları için asla görmez.
    ============================================================ */
-import { invoke, navigate, openLoginModal, refreshState, state } from "./main";
+import { invoke, navigate, refreshState, state } from "./main";
 
 let overlay: HTMLElement | null = null;
+/** Adım 2'deki hesap yoklaması — adım değişince mutlaka temizlenir. */
+let hesapTik: ReturnType<typeof setInterval> | null = null;
+
+function temizleTik(): void {
+  if (hesapTik !== null) {
+    clearInterval(hesapTik);
+    hesapTik = null;
+  }
+}
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c] as string));
@@ -23,6 +32,7 @@ async function markDone(): Promise<void> {
 }
 
 function finish(goHome: boolean): void {
+  temizleTik();
   overlay?.remove();
   overlay = null;
   void markDone();
@@ -75,38 +85,105 @@ export function maybeStartOnboarding(): boolean {
     card.querySelector("#ob-next")?.addEventListener("click", step2);
   }
 
-  // ---------- ADIM 2: hesap ----------
+  // ---------- ADIM 2: hesap (satır içi giriş, modal yok) ----------
   function step2(): void {
+    temizleTik();
     card.innerHTML = `
       ${dots(1)}
       <div class="ob-step-label">2 / 4 — Hesap</div>
       <h2 style="font-size:16px">Hesabını bağla</h2>
-      <p class="ob-sub" style="margin-bottom:12px">Microsoft hesabıyla premium giriş ya da çevrimdışı.</p>
-      <div style="display:flex; flex-direction:column; gap:8px">
-        <button class="btn primary" id="ob-ms">Microsoft ile Giriş</button>
-        <button class="btn ghost" id="ob-off">Çevrimdışı Ekle</button>
+      <p class="ob-sub" style="margin-bottom:12px">Microsoft hesabıyla premium giriş ya da doğrudan çevrimdışı oyna.</p>
+      <button class="btn primary lg" id="ob-ms" style="width:100%">Microsoft ile Giriş</button>
+      <div id="ob-ms-durum" class="ob-durum" style="display:none"></div>
+      <div class="or-divider"><span>veya çevrimdışı</span></div>
+      <div class="ob-offline">
+        <input class="input" id="ob-off-ad" placeholder="OyuncuAdı" maxlength="16" autocomplete="off" spellcheck="false" />
+        <button class="btn" id="ob-off-go">Giriş</button>
       </div>
+      <div class="ob-opt" id="ob-off-uyari"></div>
       <div class="ob-ok" id="ob-acc-ok" style="display:none"></div>
       ${actions({ back: true, next: "İleri →", nextId: "ob-next", skip: "Sonra", skipId: "ob-skip" })}
     `;
-    card.querySelector("#ob-back")?.addEventListener("click", step1);
+    card.querySelector("#ob-back")?.addEventListener("click", () => {
+      temizleTik();
+      step1();
+    });
     card.querySelector("#ob-skip")?.addEventListener("click", () => finish(true));
-    card.querySelector("#ob-ms")?.addEventListener("click", () => openLoginModal());
-    card.querySelector("#ob-off")?.addEventListener("click", () => openLoginModal());
+
     const ok = card.querySelector("#ob-acc-ok") as HTMLElement;
     const next = card.querySelector("#ob-next") as HTMLButtonElement;
-    const tick = setInterval(async () => {
+    const durum = card.querySelector("#ob-ms-durum") as HTMLElement;
+    const uyari = card.querySelector("#ob-off-uyari") as HTMLElement;
+    const msBtn = card.querySelector("#ob-ms") as HTMLButtonElement;
+    const offBtn = card.querySelector("#ob-off-go") as HTMLButtonElement;
+    const offAd = card.querySelector("#ob-off-ad") as HTMLInputElement;
+
+    const hesabiGoster = (ad: string): void => {
+      ok.style.display = "flex";
+      ok.textContent = `✓ Hesap hazır: ${ad}`;
+      next.disabled = false;
+      temizleTik();
+    };
+
+    if (state.accounts.length) hesabiGoster(state.accounts[0]?.name ?? "");
+    else next.disabled = true;
+
+    msBtn.addEventListener("click", async () => {
+      if (msBtn.disabled) return;
+      msBtn.disabled = true;
+      durum.style.display = "block";
+      durum.innerHTML = `<span class="spinner"></span> Microsoft oturum penceresi açılıyor…`;
       try {
-        if (state.accounts.length) {
-          ok.style.display = "flex";
-          ok.textContent = `✓ Hesap hazır: ${state.accounts[0]?.name ?? ""}`;
-          next.disabled = false;
-          clearInterval(tick);
-        }
-      } catch { /* hesap yok — dinlemeye devam */ }
-    }, 500);
-    next.disabled = true;
-    card.querySelector("#ob-next")?.addEventListener("click", step3);
+        const acc = (await invoke("cmd_ms_login_begin")) as { name?: string };
+        await refreshState();
+        durum.textContent = "";
+        durum.style.display = "none";
+        hesabiGoster(acc?.name ?? state.accounts[0]?.name ?? "");
+      } catch (e) {
+        durum.textContent = String(e);
+        msBtn.disabled = false;
+      }
+    });
+
+    const offlineGir = async (): Promise<void> => {
+      if (offBtn.disabled) return;
+      const name = offAd.value.trim();
+      if (name.length < 3) {
+        uyari.textContent = "İsim en az 3 karakter olmalı.";
+        offAd.focus();
+        return;
+      }
+      uyari.textContent = "";
+      offBtn.disabled = true;
+      offBtn.textContent = "…";
+      try {
+        await invoke("cmd_add_offline_account", { name });
+        await refreshState();
+        hesabiGoster(name);
+        offBtn.textContent = "✓";
+      } catch (e) {
+        uyari.textContent = String(e);
+        offBtn.disabled = false;
+        offBtn.textContent = "Giriş";
+      }
+    };
+    offBtn.addEventListener("click", () => void offlineGir());
+    offAd.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        void offlineGir();
+      }
+    });
+
+    // Modal yerine kendi kendine yoklama: dışarıdan giriş olursa yakala.
+    hesapTik = setInterval(() => {
+      if (state.accounts.length) hesabiGoster(state.accounts[0]?.name ?? "");
+    }, 600);
+
+    next.addEventListener("click", () => {
+      temizleTik();
+      void step3();
+    });
   }
 
   // ---------- ADIM 3: ilk paket ----------
@@ -189,6 +266,7 @@ export function maybeStartOnboarding(): boolean {
   return true;
 
   function navToExplore(): void {
+    temizleTik();
     overlay?.remove();
     overlay = null;
     void markDone();
