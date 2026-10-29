@@ -377,7 +377,7 @@ export function openSkinEditor(
     try {
       await kaydet({ veri, slim, ad }, giy);
       uyari("");
-      kapat();
+      kapatFn();
     } catch (e) {
       uyari(String(e));
       btn.disabled = false;

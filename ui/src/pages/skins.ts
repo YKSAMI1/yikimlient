@@ -500,25 +500,41 @@ async function editorAc(root: HTMLElement, hesapId: string): Promise<void> {
   }
   const simdi = new Date();
   const varsayilanAd = `Skinim ${String(simdi.getDate()).padStart(2, "0")}.${String(simdi.getMonth() + 1).padStart(2, "0")}`;
+  let kaydedildi = false;
   openSkinEditor(
     root,
     { pafta, slim: secili?.slim ?? false, ad: varsayilanAd },
     async (cikti, giyMi) => {
+      // Önce kitaplığa yaz: kimliği elimizde tutup doğrudan o kaydı giyiyoruz.
+      const kayit = (await invoke("cmd_skin_kaydet", {
+        ad: cikti.ad,
+        veri: cikti.veri,
+        slim: cikti.slim,
+      })) as SkinKayit;
       if (giyMi) {
-        hub = (await invoke("cmd_skin_giy", {
+        hub = (await invoke("cmd_skin_giy_kitaplik", {
           id: hesapId,
-          veri: cikti.veri,
-          slim: cikti.slim,
-          ad: cikti.ad,
+          kayitId: kayit.id,
         })) as SkinHub;
-        giyiliId = null;
+        giyiliId = kayit.id;
         toast("Skin giyildi — sunucularda görünecek.");
       } else {
-        await invoke("cmd_skin_kaydet", { ad: cikti.ad, veri: cikti.veri, slim: cikti.slim });
+        hub = (await invoke("cmd_skin_hub", { id: hesapId })) as SkinHub;
         toast("Kitaplığa kaydedildi.");
       }
+      secili = kayitSecim(kayit);
+      kaydedildi = true;
     },
-    () => renderSkins(root),
+    () => {
+      if (!kaydedildi) {
+        renderSkins(root);
+        return;
+      }
+      // Editör sahneyi kapattı; ana sayfa sahnesini yeniden kur ve seçimi koru.
+      ciz(root);
+      sahneBaslat(root);
+      sahnePelerin();
+    },
   );
 }
 
