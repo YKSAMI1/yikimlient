@@ -12,7 +12,9 @@
     "isolatedModules": true,
     "noEmit": true,
     "useDefineForClassFields": true,
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    "allowImportingTsExtensions": true
   },
-  "include": ["ui/src"]
+  "include": ["ui/src"],
+  "exclude": ["ui/src/**/*.test.ts"]
 }
