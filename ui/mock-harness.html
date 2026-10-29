@@ -1,6 +1,13 @@
 <!doctype html>
 <!-- MOCK HARNESS — vite dev sunucuda gerçek modül grafiğini mock Tauri ile çalıştırır.
-     Boot testi: TauriEvent bilerek tanımsız (gerçek global bundle davranışı). -->
+     Boot testi: TauriEvent bilerek tanımsız (gerçek global bundle davranışı).
+
+     Sorgu parametreleri:
+       ?hesap=ms        → premium (microsoft) hesap; skin merkezi açılır
+       ?hesap=offline   → çevrimdışı hesap; "Orijinal hesap ile girmen lazım" kapısı
+       ?sayfa=skins     → açılışta skin merkezine git
+       ?onboarding=1    → ilk kurulum sihirbazını göster (hesap yok / kurulum yok)
+-->
 <html lang="tr">
 <head>
 <meta charset="UTF-8" />
@@ -18,14 +25,120 @@
   };
   window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(performance.now()); }, 16); };
   (function () {
+    var q = new URLSearchParams(location.search);
+    var premium = q.get("hesap") !== "offline";
+    var hesapTuru = premium ? "microsoft" : "offline";
+    var onboarding = q.get("onboarding") === "1";
+    var sayfa = q.get("sayfa") || "";
+
+    /* ---- sahte skin / pelerin dokuları (data: URL) ---- */
+    function bosTuval(w, h) {
+      var c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      return c;
+    }
+    function skinUrl(ten, kiyafet, sac) {
+      var c = bosTuval(64, 64), g = c.getContext("2d");
+      function blok(x, y, w, h, renk) { g.fillStyle = renk; g.fillRect(x, y, w, h); }
+      // kafa + yüz
+      blok(0, 0, 32, 16, ten);
+      blok(8, 8, 8, 8, ten);
+      blok(9, 10, 2, 2, "#1b1b1f");
+      blok(13, 10, 2, 2, "#1b1b1f");
+      blok(11, 14, 2, 1, "#7a3b2a");
+      blok(8, 8, 8, 2, sac);
+      // gövde / kollar / bacaklar
+      blok(16, 16, 24, 16, kiyafet);
+      blok(40, 16, 16, 16, ten);
+      blok(32, 48, 16, 16, ten);
+      blok(0, 16, 16, 16, "#2c3e50");
+      blok(16, 48, 16, 16, "#2c3e50");
+      // hafif gölge (dokunun düz görünmemesi için)
+      blok(20, 20, 8, 12, kiyafet);
+      return c.toDataURL("image/png");
+    }
+    function pelerinUrl(renk, kenar) {
+      var c = bosTuval(64, 32), g = c.getContext("2d");
+      g.fillStyle = renk;
+      g.fillRect(1, 1, 10, 16);
+      g.fillStyle = kenar;
+      g.fillRect(1, 1, 10, 2);
+      g.fillRect(1, 15, 10, 2);
+      g.fillRect(5, 3, 2, 12);
+      return c.toDataURL("image/png");
+    }
+
+    var SKINLER = [
+      { renkler: ["#f0c8a0", "#c0392b", "#3b2416"], ad: "Kızıl Şövalye", slim: false },
+      { renkler: ["#e8b98c", "#2e86de", "#1b1b1f"], ad: "Mavi Kaşif", slim: true },
+      { renkler: ["#8d5524", "#27ae60", "#2c1a0e"], ad: "Orman Bekçisi", slim: false },
+      { renkler: ["#ffdbac", "#8e44ad", "#d4af37"], ad: "Mor Büyücü", slim: true },
+    ];
+    var kitaplik = SKINLER.map(function (s, i) {
+      return {
+        id: "k" + (i + 1),
+        ad: s.ad,
+        dosya: skinUrl(s.renkler[0], s.renkler[1], s.renkler[2]),
+        slim: s.slim,
+        kaynak: "editor",
+        tarih: Date.now() - i * 3600000,
+      };
+    });
+    var varsayilanlar = [
+      { ad: "Steve", dosya: skinUrl("#c99e76", "#2e8b8b", "#3b2416"), slim: false },
+      { ad: "Alex", dosya: skinUrl("#f0c8a0", "#3aa655", "#c98b3e"), slim: true },
+    ];
+    var pelerinler = [
+      { id: "c1", ad: "Migrator", dosya: pelerinUrl("#c0392b", "#f1c40f"), aktif: true },
+      { id: "c2", ad: "Mojang Studios", dosya: pelerinUrl("#1f2d3d", "#e67e22"), aktif: false },
+      { id: "c3", ad: "Vanilla", dosya: pelerinUrl("#2c3e50", "#95a5a6"), aktif: false },
+    ];
+    var aktifSkin = { dosya: kitaplik[0].dosya, slim: kitaplik[0].slim, kaynak: "mojang" };
+    var yedekVar = true;
+
+    function aktifPelerin() {
+      for (var i = 0; i < pelerinler.length; i++) if (pelerinler[i].aktif) return pelerinler[i].id;
+      return null;
+    }
+    function hub() {
+      return JSON.parse(JSON.stringify({
+        premium: premium,
+        cevrimdisi: false,
+        aktif: aktifSkin,
+        kitaplik: kitaplik,
+        pelerinler: pelerinler,
+        pelerin_aktif: aktifPelerin(),
+        yedek_var: yedekVar,
+        varsayilanlar: varsayilanlar,
+        hata: premium ? null : "premium_gerekli",
+      }));
+    }
+    function veriUrl(veri) {
+      if (!veri || !veri.length) return null;
+      var ikili = "";
+      for (var i = 0; i < veri.length; i++) ikili += String.fromCharCode(veri[i] & 255);
+      return "data:image/png;base64," + btoa(ikili);
+    }
+    function kayitBul(id) {
+      for (var i = 0; i < kitaplik.length; i++) if (kitaplik[i].id === id) return kitaplik[i];
+      return null;
+    }
+
     var state = {
       config: {
         theme: "orange", last_selected_account: "a1", default_ram_mb: 4096,
         keep_launcher_open: true, show_news: true, stats_enabled: true,
         download_concurrency: 32, java_dir: null, custom_accent: "#ff7a1a",
+        onboarding_done: !onboarding, guided_tour_done: true,
       },
-      accounts: [{ id: "a1", name: "TestOyuncu", kind: "offline", uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5" }],
-      instances: [
+      accounts: onboarding
+        ? []
+        : [{
+            id: "a1", name: "TestOyuncu", kind: hesapTuru,
+            uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+          }],
+      instances: onboarding ? [] : [
         {
           id: "i1", name: "Test Kurulum", mc_version: "1.21.1", mod_loader: "fabric",
           ram_mb: 4096, icon: "🔥", cover: null, playtime_ms: 3600000,
@@ -46,14 +159,88 @@
     var calls = [];
     function invoke(cmd, args) {
       calls.push(cmd);
+      args = args || {};
       if (cmd === "cmd_get_state") return Promise.resolve(JSON.parse(JSON.stringify(state)));
-      if (cmd === "cmd_save_settings") { Object.assign(state.config, (args && args.config) || {}); return Promise.resolve(true); }
+      if (cmd === "cmd_save_settings") { Object.assign(state.config, args.config || {}); return Promise.resolve(true); }
       if (cmd === "cmd_list_news") return Promise.resolve([]);
+      if (cmd === "cmd_add_offline_account") {
+        var ad = String(args.name || "Oyuncu");
+        state.accounts = [{ id: "off1", name: ad, kind: "offline", uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5" }];
+        state.config.last_selected_account = "off1";
+        return Promise.resolve(true);
+      }
+      if (cmd === "cmd_ms_login_begin") {
+        premium = true;
+        state.accounts = [{ id: "a1", name: "TestOyuncu", kind: "microsoft", uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5" }];
+        state.config.last_selected_account = "a1";
+        return Promise.resolve({ name: "TestOyuncu" });
+      }
+      if (cmd === "cmd_get_account_skin") {
+        return Promise.resolve({
+          dosya: aktifSkin ? aktifSkin.dosya : null,
+          slim: aktifSkin ? aktifSkin.slim : false,
+          pelerin: (function () {
+            var id = aktifPelerin();
+            for (var i = 0; i < pelerinler.length; i++) if (pelerinler[i].id === id) return pelerinler[i].dosya;
+            return null;
+          })(),
+        });
+      }
+      if (cmd === "cmd_skin_hub") return Promise.resolve(hub());
+      if (cmd === "cmd_skin_giy") {
+        var url = veriUrl(args.veri);
+        if (url) aktifSkin = { dosya: url, slim: !!args.slim, kaynak: "mojang" };
+        if (args.ad) {
+          kitaplik.unshift({
+            id: "k" + Date.now(), ad: String(args.ad), dosya: url,
+            slim: !!args.slim, kaynak: "editor", tarih: Date.now(),
+          });
+        }
+        return Promise.resolve(hub());
+      }
+      if (cmd === "cmd_skin_giy_kitaplik") {
+        var kayit = kayitBul(args.kayitId);
+        if (!kayit) return Promise.reject("Skin bulunamadı.");
+        aktifSkin = { dosya: kayit.dosya, slim: kayit.slim, kaynak: "mojang" };
+        return Promise.resolve(hub());
+      }
+      if (cmd === "cmd_skin_pelerin") {
+        var secili = args.capeId || null;
+        for (var pi = 0; pi < pelerinler.length; pi++) pelerinler[pi].aktif = pelerinler[pi].id === secili;
+        return Promise.resolve(hub());
+      }
+      if (cmd === "cmd_skin_kaydet") {
+        var kayit2 = {
+          id: "k" + Date.now(), ad: String(args.ad || "Skin"), dosya: veriUrl(args.veri),
+          slim: !!args.slim, kaynak: "editor", tarih: Date.now(),
+        };
+        kitaplik.unshift(kayit2);
+        return Promise.resolve(kayit2);
+      }
+      if (cmd === "cmd_skin_sil") {
+        kitaplik = kitaplik.filter(function (k) { return k.id !== args.kayitId; });
+        return Promise.resolve(true);
+      }
+      if (cmd === "cmd_skin_yeniden_adlandir") {
+        var k3 = kayitBul(args.kayitId);
+        if (k3) k3.ad = String(args.ad || k3.ad);
+        return Promise.resolve(k3);
+      }
+      if (cmd === "cmd_skin_yedek") return Promise.resolve(null);
+      if (cmd === "cmd_skin_yedek_geri_yukle") {
+        aktifSkin = { dosya: kitaplik[0].dosya, slim: kitaplik[0].slim, kaynak: "mojang" };
+        return Promise.resolve(hub());
+      }
+      if (cmd === "cmd_skin_disa_aktar") return Promise.resolve("C:\\mock\\skins\\disa\\" + String(args.ad || "skin") + ".png");
       if (String(cmd).startsWith("plugin:")) return Promise.resolve(null);
       return Promise.resolve([]);
     }
     window.__TAURI_INTERNALS__ = {
-      convertFileSrc: function (p) { return "http://asset.localhost/" + encodeURIComponent(p); },
+      // data: URL'ler olduğu gibi geçer; gerçek yollar asset protokolüne çevrilir.
+      convertFileSrc: function (p) {
+        if (/^(data:|https?:|blob:)/.test(String(p))) return p;
+        return "http://asset.localhost/" + encodeURIComponent(p);
+      },
       transformCallback: function (cb) { return cb; },
     };
     window.__TAURI__ = {
@@ -76,12 +263,26 @@
     };
     window.__BOOT_ERRORS__ = [];
     window.__BOOT_CALLS__ = calls;
+    window.__MOCK_AYAR__ = { hesap: hesapTuru, sayfa: sayfa, onboarding: onboarding };
     window.addEventListener("error", function (e) {
       window.__BOOT_ERRORS__.push(String((e && e.message) || e.error || e) + " @" + (e.lineno || "?"));
     });
     window.addEventListener("unhandledrejection", function (e) {
       window.__BOOT_ERRORS__.push("rejection: " + String(e.reason && (e.reason.stack || e.reason.message) || e.reason));
     });
+    // ?sayfa=… → kabuk kurulduktan sonra ray öğesine tıkla (üretim koduna dokunmadan).
+    if (sayfa) {
+      var deneme = 0;
+      var zaman = setInterval(function () {
+        var dugme = document.querySelector('.rail-item[data-page="' + sayfa + '"]');
+        if (dugme) {
+          clearInterval(zaman);
+          dugme.click();
+        } else if (++deneme > 120) {
+          clearInterval(zaman);
+        }
+      }, 50);
+    }
   })();
 </script>
 </head>
