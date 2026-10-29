@@ -217,8 +217,19 @@ public final class YikimPresence {
         }
     }
 
-    /// Bir tur: anahtarları sırayla dener. Tercih edilen anahtar (geçen tur
-    /// akran döndüren) önce sorulur; akran yoksa diğer anahtar da denenir.
+    /// Tur sayacı — normal modda anahtarlar SIRAYLA döner (round-robin).
+    private static volatile int anahtarSirasi;
+
+    /// Bir tur: anahtarların HEPSİ sorgulanır.
+    ///
+    /// v1.13.4 KÖK NEDEN DÜZELTMESİ: eskiden ilk anahtar "kendi" havuzunu
+    /// bulduğu anda döngü KIRILIYORDU (break). Servis oyuncuları girdiği adres
+    /// metnine göre havuza ayırdığı için, sen `play.sunucu.com` yazıp
+    /// kaydolduysan, arkadaşın `1.2.3.4` yazıp kaydolduğunda o ikinci havuz
+    /// HİÇ sorulmuyordu → "bazı sunucularda rozet yok" şikâyeti. Artık:
+    ///  - HIZLI modda (TAB'da rozetsiz oyuncu var) TÜM anahtarlar sorulur,
+    ///  - normal modda anahtarlar sırayla (turda 1) döner → ücretsiz uç nokta
+    ///    yorulmaz ama en geç birkaç turda her havuz görülür.
     private static void gonder() {
         if (System.currentTimeMillis() - sonHata < HATA_SESSIZLIGI) {
             return; // uç nokta bilinen şekilde ölü — sessiz kal
@@ -226,30 +237,41 @@ public final class YikimPresence {
         java.util.List<String> denenecek = new java.util.ArrayList<String>(anahtarlar);
         String tercih = iyiAnahtar;
         if (!tercih.isEmpty() && denenecek.remove(tercih)) {
-            denenecek.add(0, tercih);
+            denenecek.add(0, tercih); // iş gören anahtar önce (hızlı sonuç)
         }
+        boolean hizli = System.currentTimeMillis() < hizliBitis;
         int akran = -1;
+        int toplam = 0;
         String tutan = "";
+        int tutanSayi = -1;
+        int basla = hizli ? 0 : Math.floorMod(anahtarSirasi, denenecek.size());
         int deneme = 0;
-        for (String anahtar : denenecek) {
-            if (++deneme > 3) {
-                break; // tur başına en fazla 3 istek — ücretsiz uç noktayı yormayalım
+        for (int adim = 0; adim < denenecek.size(); adim++) {
+            String anahtar = denenecek.get((basla + adim) % denenecek.size());
+            if (!hizli && ++deneme > 1) {
+                break; // normal mod: turda tek anahtar (round-robin)
+            }
+            if (hizli && ++deneme > 5) {
+                break; // tur başına en fazla 5 istek
             }
             int sayi = tekGonder(anahtar);
-            if (sayi > 0) {
-                akran = sayi;
-                tutan = anahtar;
-                break; // bu anahtar iş gördü — ikinci isteğe gerek yok
+            if (sayi < 0) {
+                continue; // istek düştü — diğerini dene
             }
-            if (sayi == 0 && akran < 0) {
-                akran = 0;
+            toplam += sayi;
+            if (sayi > tutanSayi) {
+                tutanSayi = sayi;
                 tutan = anahtar;
             }
         }
-        if (akran < 0) {
+        anahtarSirasi++;
+        if (tutanSayi < 0) {
             return; // hiçbir istek tutmadı
         }
-        iyiAnahtar = tutan;
+        akran = toplam;
+        if (!tutan.isEmpty()) {
+            iyiAnahtar = tutan;
+        }
         String durum = tutan + "|" + akran;
         if (!durum.equals(sonDurum)) {
             sonDurum = durum;

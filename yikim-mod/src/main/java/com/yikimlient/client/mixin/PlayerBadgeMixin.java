@@ -80,10 +80,21 @@ public abstract class PlayerBadgeMixin {
                     }
                 }
             }
-            else if (st.field_53337 != null && YikimBadge.isKnown(e.method_5667())
-                    && !YikimBadge.kapsar(st.field_53337)) {
-                kanitla();
-                st.field_53337 = YikimBadge.tag(st.field_53337, e.method_5667());
+            else if (YikimBadge.isKnown(e.method_5667())) {
+                // v1.13.4: bazı sunucular/eklentiler görünen adı boş bırakıyor;
+                // eskiden burada `field_53337 != null` şartı yüzünden rozet hiç
+                // yazılmıyordu ("isim başında görünmüyor"). Artık ad yoksa
+                // varlığın kendi adından kurulur ve rozet yine eklenir.
+                if (st.field_53337 == null) {
+                    st.field_53337 = e.method_5797();
+                    if (st.field_53338 == null) {
+                        st.field_53338 = new class_243(0.0, (double) e.method_5751() + 0.5, 0.0);
+                    }
+                }
+                if (st.field_53337 != null && !YikimBadge.kapsar(st.field_53337)) {
+                    kanitla();
+                    st.field_53337 = YikimBadge.tag(st.field_53337, e.method_5667());
+                }
             }
         }
         catch (Throwable ignored) {
