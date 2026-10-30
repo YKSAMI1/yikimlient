@@ -52,17 +52,21 @@ impl AppState {
 pub fn run() {
     let cfg = config::YikimConfig::load_or_default();
 
-    // LINUX BEYAZ EKRAN EMNİYETİ (v0.4.10): WebKitGTK 2.42+ DMABUF aktarımı,
-    // eski Mesa/NVIDIA/VM sürücülerinde pencereyi bembeyaz bırakıyor
-    // ("okuldaki cihazda hiçbir şey görünmüyor"). DMABUF kapatılınca WebKit
-    // paylaşımlı bellek yoluna düşer — CSS/WebGL çalışmaya devam eder.
-    // Hızlı yolu geri açmak isteyen `YIKIM_WEBKIT_HIZLI=1` verir.
+    // LINUX RENDER YOLU (v0.4.12 — GERİ ALINDI):
+    // v0.4.10'da DMABUF aktarımı herkese kapatılmıştı. Sonuç: WebKitGTK
+    // yazılım çizimine düşüyor → launcher kasıyor ve WebGL bağlamı hiç
+    // açılmadığı için 3B karakter önizlemesi boş kalıyordu. Beyaz ekranın
+    // asıl sebebi zaten düzeltilen kaynak yolu hatasıydı; bu yüzden varsayılan
+    // olarak GPU yolu AÇIK. Şüpheli sürücüde hâlâ boş pencere görülürse
+    //   YIKIM_WEBKIT_GUVENLI=1
+    // ortam değişkeni verilerek güvenli (yazılım) yol isteğe bağlı seçilir.
     #[cfg(target_os = "linux")]
     {
-        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none()
-            && std::env::var_os("YIKIM_WEBKIT_HIZLI").is_none()
+        if std::env::var_os("YIKIM_WEBKIT_GUVENLI").is_some()
+            && std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none()
         {
             std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+            core::yikim_log("WebKit: güvenli (yazılım) çizim yolu seçildi".to_string());
         }
     }
 

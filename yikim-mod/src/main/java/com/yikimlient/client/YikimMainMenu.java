@@ -166,6 +166,9 @@ public final class YikimMainMenu {
         if (this.cardWidth > 0 && this.cardX - (this.columnX + this.columnWidth) >= 24) {
             this.drawSidePanel(graphics, client, font, this.cardX, this.cardY, this.cardWidth, screenHeight - this.cardY - footerHeight - margin, mouseX, mouseY);
         }
+        // v1.15.0: diğer modlarin tuslari ARTIK yan panelin icinde degil —
+        // ekranin SAG ALTINDA kendi piksel bloku olarak duruyorlar.
+        this.drawModDock(graphics, font, screenWidth, screenHeight, mouseX, mouseY, footerHeight, margin);
         this.drawFooter(graphics, font, screenWidth, screenHeight, footerHeight);
         if (now < this.hintUntil && !this.hint.isEmpty()) {
             int hintY = Math.min(screenHeight - footerHeight - 18, this.buttonsTop + blockHeight + chipsHeight + 12);
@@ -263,9 +266,8 @@ public final class YikimMainMenu {
         int headerHeight = 49;
         int rowHeight = 21;
         int tipHeight = 9 + this.cacheTipLines.size() * 11;
-        int modCount = this.modButtons.size();
-        // MOD TUŞLARI bölümü: başlık + her mod tuşu 20px (sağ panelde, ipucunun altında)
-        int modSectionHeight = modCount > 0 ? 10 + modCount * 20 : 0;
+        // MOD TUŞLARI sağ alta taşındı (drawModDock) — panelde yer açılmıyor.
+        int modSectionHeight = 0;
         int maxRows = Math.max(0, (availableHeight - pad * 2 - headerHeight - 6 - 10 - tipHeight - modSectionHeight) / rowHeight);
         shownRows = Math.min(rows.length, maxRows);
         int height = pad * 2 + headerHeight + 6 + shownRows * rowHeight + (shownRows > 0 ? 10 : 0) + tipHeight + modSectionHeight;
@@ -294,32 +296,68 @@ public final class YikimMainMenu {
             YikimAdapter.text(graphics, font, line, x + pad, tipY, -6645082, false);
             tipY += 11;
         }
-        // ---- MOD TUŞLARI: diğer modların (Flashback vb.) menü tuşları, ipucunun altında ----
-        if (modCount > 0) {
-            int modY = tipY + 6;
-            YikimAdapter.text(graphics, font, "MOD TUSLARI", x + pad, modY, YikimTheme.accent, false);
-            modY += 10;
-            for (class_4185 modButton : this.modButtons) {
-                String label = YikimModButtons.label(modButton);
-                boolean hovered = YikimDraw.inside(mouseX, mouseY, x + pad - 2, modY, inner + 4, 18);
-                int chipFill = hovered ? YikimTheme.alpha(YikimTheme.accent, 200) : YikimTheme.alpha(YikimTheme.accent, 26);
-                YikimDraw.roundedFill(graphics, x + pad - 2, modY, x + width - pad + 2, modY + 18, chipFill);
-                YikimDraw.outline(graphics, x + pad - 2, modY, inner + 4, 18, YikimTheme.alpha(YikimTheme.accent, hovered ? 200 : 80));
-                // MODUN GERÇEK LOGOSU: etiket kurulu modla eşleşirse launcher'ın indirdiği
-                // PNG çizilir; eşleşmezse mod adının ilk harfi rozet olarak kalır.
-                String jarName = YikimModButtons.jarIconFor(label);
-                if (jarName != null) {
-                    YikimIcons.draw(graphics, font, jarName, null, label, x + pad + 1, modY + 1, 16);
-                } else {
-                    YikimDraw.roundedFill(graphics, x + pad + 2, modY + 2, x + pad + 16, modY + 16, YikimTheme.alpha(YikimTheme.accent, 70));
-                    String letter = label.isEmpty() ? "?" : label.substring(0, 1).toUpperCase(Locale.ROOT);
-                    YikimAdapter.text(graphics, font, letter, x + pad + 5, modY + 5, hovered ? -15724524 : YikimTheme.alpha(YikimTheme.accent, 220), true);
-                }
-                YikimAdapter.text(graphics, font, YikimDraw.clip(font, label, inner - 24), x + pad + 22, modY + 5, hovered ? -15724524 : -723722, !hovered);
-                class_4185 target = modButton;
-                this.addHit(x + pad - 2, modY, inner + 4, 18, () -> YikimModButtons.press(target));
-                modY += 20;
+    }
+
+    /**
+     * SAĞ ALT MOD BLOĞU (v1.15.0).
+     *
+     * Diğer modların ana menüye mixin ile eklediği tuşlar (Flashback Essentials
+     * vb.) daha önce YIKIM yan panelinin içinde düz satırlar hâlinde duruyordu;
+     * artık ekranın sağ altında, kendi piksel bloklarında: koyu zemin, turuncu
+     * köşe çizgisi, modun GERÇEK logosu (launcher'ın indirdiği PNG) ve etiket.
+     * Tıklama davranışı aynı: modun gerçek onPress handler'ı çalışır.
+     */
+    private void drawModDock(class_332 graphics, class_327 font, int screenWidth, int screenHeight,
+                             int mouseX, int mouseY, int footerHeight, int margin) {
+        int count = this.modButtons.size();
+        if (count == 0) {
+            return;
+        }
+        int rowH = 18;
+        int gap = 3;
+        int bottom = screenHeight - footerHeight - 10;
+        // Sığmayanları kırp (küçük pencerede menüyü kaplamasın)
+        int maxRows = Math.max(1, (bottom - 40) / (rowH + gap));
+        int shown = Math.min(count, maxRows);
+        int dockW = Math.min(250, Math.max(150, screenWidth / 3));
+        int x = screenWidth - margin - dockW;
+        // Sol sütunla çakışmasın
+        if (x <= this.columnX + this.columnWidth + 12) {
+            return;
+        }
+        int toplam = shown * (rowH + gap) - gap;
+        int y = bottom - toplam;
+        // blok zemini + çerçeve (piksel görünüm: 2px köşe aksanları)
+        YikimDraw.roundedFill(graphics, x - 7, y - 18, x + dockW + 7, bottom + 7, -1728053248);
+        YikimDraw.outline(graphics, x - 7, y - 18, dockW + 14, toplam + 25, YikimTheme.alpha(YikimTheme.accent, 70));
+        graphics.method_25294(x - 7, y - 18, x - 4, y - 15, YikimTheme.accent);
+        graphics.method_25294(x + dockW + 4, y - 18, x + dockW + 7, y - 15, YikimTheme.accent);
+        YikimAdapter.text(graphics, font, "MOD TUSLARI", x, y - 14, YikimTheme.accent, false);
+        for (int i = 0; i < shown; ++i) {
+            class_4185 modButton = this.modButtons.get(i);
+            String label = YikimModButtons.label(modButton);
+            int rowY = y + i * (rowH + gap);
+            boolean hovered = YikimDraw.inside(mouseX, mouseY, x, rowY, dockW, rowH);
+            YikimDraw.roundedFill(graphics, x, rowY, x + dockW, rowY + rowH,
+                hovered ? YikimTheme.alpha(YikimTheme.accent, 220) : YikimTheme.alpha(YikimTheme.accent, 26));
+            YikimDraw.outline(graphics, x, rowY, dockW, rowH, YikimTheme.alpha(YikimTheme.accent, hovered ? 210 : 70));
+            String jarName = YikimModButtons.jarIconFor(label);
+            if (jarName != null) {
+                YikimIcons.draw(graphics, font, jarName, null, label, x + 1, rowY + 1, 16);
+            } else {
+                YikimDraw.roundedFill(graphics, x + 2, rowY + 2, x + 16, rowY + 16, YikimTheme.alpha(YikimTheme.accent, 70));
+                String letter = label.isEmpty() ? "?" : label.substring(0, 1).toUpperCase(Locale.ROOT);
+                YikimAdapter.text(graphics, font, letter, x + 5, rowY + 5,
+                    hovered ? -15724524 : YikimTheme.alpha(YikimTheme.accent, 220), true);
             }
+            YikimAdapter.text(graphics, font, YikimDraw.clip(font, label, dockW - 24), x + 22, rowY + 5,
+                hovered ? -15724524 : -723722, !hovered);
+            final class_4185 target = modButton;
+            this.addHit(x, rowY, dockW, rowH, () -> YikimModButtons.press(target));
+        }
+        if (count > shown) {
+            YikimAdapter.text(graphics, font, "+" + (count - shown) + " tus  (panelden ac)",
+                x, bottom + 9, -9539974, false);
         }
     }
 

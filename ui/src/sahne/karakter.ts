@@ -257,12 +257,39 @@ export class Sahne {
 
     private _bekleyenSkin: { url: string; slim: boolean } | null = null;
 
+    /**
+     * Dokuyu getir: önce fetch + blob (aynı kaynak → WebGL'de CORS/taint derdi yok),
+     * olmazsa klasik ImageLoader (asset:// fetch'e kapalı bazı WebKit sürümleri).
+     * Linux'ta skin dokusunun hiç yüklenmemesi (boş karakter) bu yolu gerektirdi.
+     */
+    private async dokuResmi(url: string): Promise<CanvasImageSource & { width: number; height: number }> {
+        try {
+            const yanit = await fetch(url);
+            if (yanit.ok) {
+                const blob = await yanit.blob();
+                if (typeof createImageBitmap === "function") {
+                    return await createImageBitmap(blob);
+                }
+                return await new Promise<HTMLImageElement>((coz, reddet) => {
+                    const url2 = URL.createObjectURL(blob);
+                    const img = new Image();
+                    img.onload = () => { URL.revokeObjectURL(url2); coz(img); };
+                    img.onerror = () => { URL.revokeObjectURL(url2); reddet(new Error("görsel açılamadı")); };
+                    img.src = url2;
+                });
+            }
+        } catch {
+            // asset:// fetch desteklenmiyorsa aşağıdaki klasik yol devreye girer
+        }
+        return await new THREE.ImageLoader().loadAsync(url);
+    }
+
     /** Skin yükler (asset-protocol/file URL); null ise düz manken. */
     async skin(skin: { url: string; slim: boolean } | null): Promise<void> {
         let doku: THREE.Texture | null = null;
         if (skin?.url) {
             try {
-                const resim = await new THREE.ImageLoader().loadAsync(skin.url);
+                const resim = await this.dokuResmi(skin.url);
                 // eski 64x32 paftalar: UV eşlemi 64 yüksekliğine göre → 64x64 tuvale genişlet
                 if (resim.height === 32) {
                     const tuval = document.createElement("canvas");
@@ -289,7 +316,7 @@ export class Sahne {
         this.pelerinTemizle();
         if (!p?.url) return;
         try {
-            const resim = await new THREE.ImageLoader().loadAsync(p.url);
+            const resim = await this.dokuResmi(p.url);
             // 64×32 ızgarasına indir + desenin bulunduğu paneli seç.
             const pafta = pelerinHazirla(resim);
             this.pelerinPanel = pelerinPaneli(pafta);
