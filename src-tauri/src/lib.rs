@@ -52,6 +52,20 @@ impl AppState {
 pub fn run() {
     let cfg = config::YikimConfig::load_or_default();
 
+    // LINUX BEYAZ EKRAN EMNİYETİ (v0.4.10): WebKitGTK 2.42+ DMABUF aktarımı,
+    // eski Mesa/NVIDIA/VM sürücülerinde pencereyi bembeyaz bırakıyor
+    // ("okuldaki cihazda hiçbir şey görünmüyor"). DMABUF kapatılınca WebKit
+    // paylaşımlı bellek yoluna düşer — CSS/WebGL çalışmaya devam eder.
+    // Hızlı yolu geri açmak isteyen `YIKIM_WEBKIT_HIZLI=1` verir.
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none()
+            && std::env::var_os("YIKIM_WEBKIT_HIZLI").is_none()
+        {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
@@ -151,6 +165,16 @@ pub fn run() {
         ])
         .setup(|app| {
             let handle = app.handle().clone();
+            // Arayüz dosyalarının gerçek yerini Tauri'ye sor (Linux deb/AppImage'da
+            // /usr/lib/YIKIMLient, Windows'ta kurulum dizini) — exe yanı varsayımı
+            // Linux'ta her zaman yanlıştı ve beyaz ekrana yol açıyordu.
+            yikim_ui::kaynak_kok_kur(&handle);
+            match yikim_ui::etkin_dir() {
+                Some(yol) => core::yikim_log(format!("UI: {}", yol.display())),
+                None => core::yikim_log(
+                    "UI BULUNAMADI: gömülü arayüz de sıcak paket de yok (beyaz ekran nedeni)".to_string(),
+                ),
+            }
             // Teşhis probe'u: `--__yikim_probe <inst_id>` ile başlatılırsa
             // 5 sn sonra başlatma tetikler, launch-cmd.txt diskе yazılır, sonra çıkar.
             let mut args = std::env::args().skip(1);
