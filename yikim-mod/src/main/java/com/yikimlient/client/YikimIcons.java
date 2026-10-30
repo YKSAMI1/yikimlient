@@ -27,7 +27,11 @@ import net.minecraft.class_332;
 public final class YikimIcons {
     private static final Map<String, String> URLS = new HashMap<String, String>();
     private static final Map<String, class_2960> TEXTURES = new HashMap<String, class_2960>();
-    private static final Set<String> FAILED = new HashSet<String>();
+    /// key → yeniden deneme zamanı. Önceden kalıcı bir "başarısız" kümesiydi:
+    /// ilk karede doku kurulamazsa (doku yöneticisi henüz hazır değilken,
+    /// dosya inerken) modun ikonu OTURUM BOYUNCA harf kalıyordu.
+    private static final Map<String, Long> FAILED = new HashMap<String, Long>();
+    private static final long TEKRAR_MS = 8000L;
     private static final long MANIFEST_TTL_MS = 5000L;
     private static long manifestAt;
 
@@ -80,7 +84,29 @@ public final class YikimIcons {
     /** Render iş parçacığında: yerel PNG'den doku kur. Her hata rozete düşer, asla istisna fırlatmaz. */
     private static class_2960 register(String key, Path file) {
         try (InputStream in = Files.newInputStream(file)) {
-            class_1011 image = class_1011.method_4309(in);
+            return YikimIcons.registerImage(key, class_1011.method_4309(in));
+        }
+        catch (Throwable ignored) {
+            YikimIcons.markFailed(key);
+            return null;
+        }
+    }
+
+    private static void markFailed(String key) {
+        synchronized (YikimIcons.FAILED) {
+            YikimIcons.FAILED.put(key, System.currentTimeMillis() + YikimIcons.TEKRAR_MS);
+        }
+    }
+
+    private static boolean bekletiliyor(String key) {
+        synchronized (YikimIcons.FAILED) {
+            Long t = YikimIcons.FAILED.get(key);
+            return t != null && System.currentTimeMillis() < t;
+        }
+    }
+
+    private static class_2960 registerImage(String key, class_1011 image) {
+        try {
             class_1043 texture = new class_1043(() -> "yikim-icon", image);
             String safe = key.replaceAll("[^a-z0-9_-]", "-");
             if (safe.length() > 48) {
@@ -93,22 +119,61 @@ public final class YikimIcons {
             return id;
         }
         catch (Throwable ignored) {
-            YikimIcons.FAILED.add(key);
+            YikimIcons.markFailed(key);
             return null;
         }
+    }
+
+    /**
+     * MODUN KENDİ JAR'INDAN ikon: `fabric.mod.json` içindeki "icon" yolu okunur.
+     * Neden: launcher yalnız Modrinth/CurseForge'ta bulunabilen modlar için PNG
+     * indirebiliyor; yerel/özel modlarda hiç ikon olmıyordu ve harf rozeti
+     * kalıyordu ("mod isimlerinin baş harfi yerine fotoğrafları olsun").
+     */
+    private static class_2960 fromJar(String key) {
+        try {
+            String dosya = key.endsWith(".jar.disabled") ? key.substring(0, key.length() - 9) : key;
+            for (net.fabricmc.loader.api.ModContainer mod : net.fabricmc.loader.api.FabricLoader.getInstance().getAllMods()) {
+                boolean eslesti = false;
+                for (Path p : mod.getOrigin().getPaths()) {
+                    Path ad = p.getFileName();
+                    if (ad != null && ad.toString().equals(dosya)) {
+                        eslesti = true;
+                        break;
+                    }
+                }
+                if (!eslesti) continue;
+                java.util.Optional<String> ikon = mod.getMetadata().getIconPath(64);
+                if (ikon.isEmpty()) ikon = mod.getMetadata().getIconPath(32);
+                if (ikon.isEmpty()) return null;
+                java.util.Optional<Path> yol = mod.findPath(ikon.get());
+                if (yol.isEmpty()) return null;
+                try (InputStream in = Files.newInputStream(yol.get())) {
+                    return YikimIcons.registerImage(key, class_1011.method_4309(in));
+                }
+            }
+        }
+        catch (Throwable ignored) {
+            // jar ikonu okunamazsa harf rozeti kalır — oyun etkilenmez
+        }
+        return null;
     }
 
     /** İkonu çiz; her koşulda güvenli: doku → rozet. */
     public static void draw(class_332 graphics, class_327 font, String key, String url, String label, int x, int y, int size) {
         try {
             class_2960 id = YikimIcons.TEXTURES.get(key);
-            if (id == null && !YikimIcons.FAILED.contains(key)) {
+            if (id == null && !YikimIcons.bekletiliyor(key)) {
                 String realUrl = YikimIcons.urlFor(key, url);
                 if (realUrl != null) {
                     Path file = YikimIcons.cacheFile(realUrl);
                     if (Files.isRegularFile(file)) {
                         id = YikimIcons.register(key, file);
                     }
+                }
+                // Launcher'ın indirdiği PNG yoksa/olmadıysa modun kendi jar'ından oku
+                if (id == null && !key.startsWith("catalog:")) {
+                    id = YikimIcons.fromJar(key);
                 }
             }
             if (id == null) {

@@ -901,6 +901,11 @@ select.input option { background: var(--bg2); }
   image-rendering: crisp-edges;
 }
 .vitrin canvas.sahne-arka.on { opacity: 1; }
+/* SIZINTI DÜZELTMESİ (v0.4.13): manzara tuvali saydam bırakıldığı için
+   pixel-art'taki boşluklardan alttaki kapak fotoğrafı/GIF görünüyordu
+   ("sahne teması bozuk görünüyor"). Tuval artık opak: boşluklar tema
+   yüzeyiyle dolar, kapak yalnız liste kartında görünür. */
+:root[data-world="sahne"] .vitrin canvas.sahne-arka { background: var(--bg2); }
 /* Manzaranın üstüne hafif alt gölge: isim etiketi ve zemin okunur kalsın.
    z-index:1 → karakter tuvalinin (z-index:auto, DOM'da sonra) ALTINDA kalır;
    karakter yıkanmaz. */
