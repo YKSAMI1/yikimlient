@@ -387,13 +387,24 @@ pub async fn cmd_rozet_yetki() -> Result<serde_json::Value, String> {
             uzak = liste;
         }
     }
-    let uzak_izin = uzak.iter().any(|a| a.eq_ignore_ascii_case(&isim));
+    let mut izinler = uzak;
+    // KALICILIK (v0.4.11): presence sunucusu ücretsiz katmanda yeniden
+    // başlayınca izin listesini kaybediyor → "verdiğim yetkiler gidiyor".
+    // Sunucu boş liste döndürdüğünde, launcher'ın kendi kaydı (atolye_izinli)
+    // varsa geri basılır. Böylece yetki bir kez verilir, açıkça listeden
+    // çıkarılana kadar kalır.
+    if izinler.is_empty() && !cfg.atolye_izinli.is_empty() && admin {
+        match crate::rozet::izin_listesi_yaz(&cfg.atolye_izinli, &crate::rozet::ucak(&cfg)).await {
+            Ok(()) => izinler = cfg.atolye_izinli.clone(),
+            Err(e) => crate::core::yikim_log(format!("izin geri yazılamadı: {e}")),
+        }
+    }
     Ok(serde_json::json!({
         "admin": admin,
         "microsoft": microsoft,
-        "izinli": microsoft && (admin || yerel_izin || uzak_izin),
+        "izinli": microsoft && (admin || yerel_izin || izinler.iter().any(|a| a.eq_ignore_ascii_case(&isim))),
         "isim": isim,
-        "izinler": uzak,
+        "izinler": izinler,
     }))
 }
 
@@ -432,6 +443,10 @@ pub async fn cmd_rozet_izinler(isimler: Vec<String>) -> Result<serde_json::Value
             liste.push(admin.clone());
         }
     }
+    // Yerel kayıt: sunucu listeyi kaybederse buradan geri yazılır.
+    let mut kayit = YikimConfig::load_or_default();
+    kayit.atolye_izinli = liste.clone();
+    let _ = kayit.save();
     match crate::rozet::izin_listesi_yaz(&liste, &ucak).await {
         Ok(()) => Ok(serde_json::json!({ "yuklendi": true, "izinler": liste })),
         Err(e) => Ok(serde_json::json!({ "yuklendi": false, "izinler": liste, "hata": e })),
@@ -992,6 +1007,25 @@ fn copy_image_to(src: &str, dest: &std::path::Path, max_side: u32) -> Result<(),
 #[tauri::command]
 pub async fn cmd_resolve_mod_icons(filenames: Vec<String>) -> Result<std::collections::HashMap<String, String>, String> {
     Ok(repos::resolve_mod_icon_urls(&filenames).await)
+}
+
+/// Kurulumdaki modların güncellemelerini Modrinth'ten sor (hash ile).
+#[tauri::command]
+pub async fn cmd_check_mod_updates(instance_id: String) -> Result<Vec<repos::ModGuncelleme>, String> {
+    let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
+    Ok(repos::mod_guncellemeleri(&inst).await)
+}
+
+/// Tek tıkla güncelleme: yeni sürümü indirir, eski jar'ı siler.
+#[tauri::command]
+pub async fn cmd_update_mod(
+    instance_id: String,
+    filename: String,
+    url: String,
+    yeni_ad: String,
+) -> Result<String, String> {
+    let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
+    repos::mod_guncelle(&inst, &filename, &url, &yeni_ad).await
 }
 
 #[tauri::command]

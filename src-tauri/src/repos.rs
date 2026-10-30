@@ -544,6 +544,136 @@ pub async fn versions_for(
     }
 }
 
+// ---------- Mod güncellemeleri (v0.4.11) ----------
+
+/// Bir mod dosyasının güncellemesi: eski dosya → sunucudaki en yeni sürüm.
+#[derive(Debug, Clone, Serialize)]
+pub struct ModGuncelleme {
+    pub filename: String,
+    pub yeni_ad: String,
+    pub url: String,
+    pub surum: String,
+}
+
+/// Kurulumdaki her mod jar'ının sha1'ini Modrinth'e sorar; hash farklıysa
+/// (yani yayınlanmış daha yeni bir sürüm varsa) güncelleme döner.
+/// Hash tabanlı eşleştirme dosya adına bağlı değil — yeniden adlandırılmış
+/// ya da "-1.2.3+1.21.1" gibi ekler almış jar'lar da doğru eşleşir.
+pub async fn mod_guncellemeleri(inst: &crate::instances::Instance) -> Vec<ModGuncelleme> {
+    use sha1::{Digest, Sha1};
+
+    let mods = inst.mods_dir();
+    // (sha1, dosya adı, kapalı mı)
+    let mut kayitlar: Vec<(String, String, bool)> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&mods) {
+        for e in entries.flatten() {
+            let ad = e.file_name().to_string_lossy().to_string();
+            let kapali = ad.ends_with(".jar.disabled");
+            if !ad.ends_with(".jar") && !kapali {
+                continue;
+            }
+            // YIKIM çekirdeği launcher tarafından yönetilir — dokunma.
+            if ad.to_ascii_lowercase().starts_with("yikimlient-") {
+                continue;
+            }
+            let Ok(bayt) = std::fs::read(e.path()) else { continue };
+            if bayt.len() < 1024 {
+                continue; // boş/bozuk jar
+            }
+            let mut h = Sha1::new();
+            h.update(&bayt);
+            kayitlar.push((hex::encode(h.finalize()), ad, kapali));
+        }
+    }
+    if kayitlar.is_empty() {
+        return Vec::new();
+    }
+    let hashler: Vec<String> = kayitlar.iter().map(|(h, _, _)| h.clone()).collect();
+    let loader = match inst.mod_loader.as_str() {
+        "forge" => "forge",
+        "neoforge" => "neoforge",
+        "quilt" => "quilt",
+        _ => "fabric",
+    };
+    let govde = serde_json::json!({
+        "hashes": hashler,
+        "algorithm": "sha1",
+        "loaders": [loader],
+        "game_versions": [inst.mc_version],
+    });
+    let yanit = match api_json_req(http_client().post("https://api.modrinth.com/v2/version_files/update").json(&govde)).await {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+    let Some(harita) = yanit.as_object() else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for (sha, ad, _kapali) in &kayitlar {
+        let Some(surum) = harita.get(sha) else { continue };
+        let dosyalar = surum.get("files").and_then(|f| f.as_array());
+        let Some(dosya) = dosyalar.and_then(|d| d.iter().find(|f| f.get("primary").and_then(|p| p.as_bool()).unwrap_or(false)).or_else(|| d.first())) else {
+            continue;
+        };
+        let yeni_hash = dosya
+            .get("hashes")
+            .and_then(|h| h.get("sha1"))
+            .and_then(|h| h.as_str())
+            .unwrap_or("");
+        if yeni_hash == sha {
+            continue; // zaten en yeni sürüm
+        }
+        let Some(url) = dosya.get("url").and_then(|u| u.as_str()) else { continue };
+        let yeni_ad = dosya
+            .get("filename")
+            .and_then(|u| u.as_str())
+            .unwrap_or(ad.as_str())
+            .to_string();
+        out.push(ModGuncelleme {
+            filename: ad.clone(),
+            yeni_ad,
+            url: url.to_string(),
+            surum: surum
+                .get("version_number")
+                .and_then(|v| v.as_str())
+                .unwrap_or("yeni")
+                .to_string(),
+        });
+    }
+    out
+}
+
+/// Modu güncelle: yeni jar'ı indir, eskisini sil, yerine koy.
+/// Eski dosya kapalıysa (.jar.disabled) yenisi de kapalı kalır.
+pub async fn mod_guncelle(
+    inst: &crate::instances::Instance,
+    eski_ad: &str,
+    url: &str,
+    yeni_ad: &str,
+) -> Result<String, String> {
+    let mods = inst.mods_dir();
+    let eski = mods.join(eski_ad);
+    let kapali = eski_ad.ends_with(".jar.disabled");
+    let temiz_ad = if yeni_ad.ends_with(".jar") { yeni_ad.to_string() } else { format!("{yeni_ad}.jar") };
+    let gecici = mods.join(format!("{temiz_ad}.indiriliyor"));
+    download_file(url, &gecici, &temiz_ad).await?;
+    let boyut = std::fs::metadata(&gecici).map(|m| m.len()).unwrap_or(0);
+    if boyut < 1024 {
+        let _ = std::fs::remove_file(&gecici);
+        return Err("indirilen dosya bozuk (çok küçük)".into());
+    }
+    let hedef_ad = if kapali { format!("{temiz_ad}.disabled") } else { temiz_ad.clone() };
+    let hedef = mods.join(&hedef_ad);
+    if eski != hedef {
+        let _ = std::fs::remove_file(&eski);
+        // eski sürümün kapalı kopyası da kalmasın
+        let _ = std::fs::remove_file(mods.join(format!("{}.disabled", eski_ad.trim_end_matches(".disabled"))));
+    }
+    std::fs::rename(&gecici, &hedef).map_err(|e| format!("yerine konulamadı: {e}"))?;
+    crate::core::yikim_log(format!("mod güncellendi: {eski_ad} → {hedef_ad}"));
+    Ok(hedef_ad)
+}
+
 // ---------- İndirme ----------
 
 /// Tek dosya indir, progress event'leriyle (içerik indirmeleri de kullanır).

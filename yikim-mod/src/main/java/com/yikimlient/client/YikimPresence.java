@@ -62,6 +62,12 @@ public final class YikimPresence {
     private static volatile long sonHata;
     private static volatile String aktifImza = "";
     private static volatile java.util.List<String> izinListesi = java.util.List.of();
+    /// v1.14.0 KALICILIK: sunucunun bildiği SON dolu izin listesi.
+    /// Ücretsiz bulut katmanı (Render) yeniden başlayınca `izinler.json`
+    /// siliniyor, liste boşalıyor ve "verdiğim yetkiler gidiyor" oluyordu.
+    /// Sunucu boş liste dönerse elimizdeki son liste geri basılır — yetki
+    /// bir kez verildiğinde, açıkça geri alınmadıkça kalıcı olur.
+    private static volatile java.util.List<String> sonIyiIzinler = java.util.List.of();
     private static volatile long izinGonderimZamani;
 
     private YikimPresence() {
@@ -324,7 +330,17 @@ public final class YikimPresence {
             // başkalarının özel rozetleri ("b" alanı) → atölye kataloğuna
             YikimAtolye.uzaklariIsle(metin);
             // çizim izin listesi (admin panel + atölye kapısı için)
-            izinListesi = izinleriOku(metin);
+            java.util.List<String> gelen = izinleriOku(metin);
+            if (gelen != null) {
+                izinListesi = gelen;
+                if (gelen.isEmpty() && !sonIyiIzinler.isEmpty()) {
+                    // Sunucu listeyi kaybetmiş (yeniden başlatma/dağıtım) → geri bas.
+                    izinKaydet(sonIyiIzinler);
+                }
+                else if (!gelen.isEmpty()) {
+                    sonIyiIzinler = java.util.List.copyOf(gelen);
+                }
+            }
             // v1.13.0 KALICILIK DÜZELTMESİ: burada eskiden "izin listesinde
             // değilsem çizimi sil" vardı. Liste boş/gecikmiş olduğunda (ya da
             // yetki.json launcher tarafından yazılmadığında) HER kalp atışında

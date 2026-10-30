@@ -366,6 +366,15 @@ async function tabMods(content: HTMLElement, inst: any): Promise<void> {
   if (mods.length) {
     try { icons = await invoke("cmd_resolve_mod_icons", { filenames: mods.map((m) => m.filename) }); } catch { /* yok */ }
   }
+  // Güncellemeler: Modrinth'e jar hash'i sorulur; yeni sürümü olanlara
+  // "Güncelle" düğmesi çıkar (tek tık: indir + eskiyi sil).
+  let updates: Record<string, any> = {};
+  if (mods.length) {
+    try {
+      const list: any[] = await invoke("cmd_check_mod_updates", { instanceId: inst.id });
+      updates = Object.fromEntries(list.map((u: any) => [u.filename, u]));
+    } catch { /* internet yok / sunucu kapalı — sessiz */ }
+  }
   // ÖNEMLİ: filtre değişince SADECE liste yeniden çizilir; toolbar (arama kutusu)
   // DOM'da kalır — her tuşta kutu yeniden kurulursa yazma sırası bozuluyor (ters yazma).
   content.innerHTML = `
@@ -397,6 +406,9 @@ async function tabMods(content: HTMLElement, inst: any): Promise<void> {
             <div class="ms">${fmtBytes(m.size)}</div>
           </div>
           <div style="flex:1"></div>
+          ${updates[m.filename]
+            ? `<button class="btn primary sm upd-mod" data-fn="${m.filename}" data-url="${updates[m.filename].url}" data-ad="${updates[m.filename].yeni_ad}" title="Yeni sürüm: ${updates[m.filename].surum}">Güncelle</button>`
+            : ""}
           <div class="switch ${m.enabled ? "on" : ""}" data-fn="${m.filename}" data-en="${m.enabled}"></div>
           <button class="btn danger sm del-mod" data-fn="${m.filename}">Sil</button>
         </div>
@@ -408,6 +420,25 @@ async function tabMods(content: HTMLElement, inst: any): Promise<void> {
         await invoke("cmd_toggle_mod", { instanceId: inst.id, filename: fn, enabled: en });
         m.enabled = en;
         render((content.querySelector("#mod-search") as HTMLInputElement).value);
+      });
+      row.querySelector(".upd-mod")?.addEventListener("click", async (e) => {
+        const b = e.currentTarget as HTMLButtonElement;
+        b.disabled = true;
+        b.textContent = "Güncelleniyor…";
+        try {
+          await invoke("cmd_update_mod", {
+            instanceId: inst.id,
+            filename: b.dataset.fn,
+            url: b.dataset.url,
+            yeniAd: b.dataset.ad,
+          });
+          toast("Mod güncellendi");
+          await tabMods(content, inst);
+        } catch (err) {
+          b.disabled = false;
+          b.textContent = "Güncelle";
+          toast(`Güncellenemedi: ${err}`, "err");
+        }
       });
       row.querySelector(".del-mod")?.addEventListener("click", async () => {
         await invoke("cmd_delete_mod", { instanceId: inst.id, filename: m.filename });

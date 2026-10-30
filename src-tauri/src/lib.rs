@@ -113,6 +113,8 @@ pub fn run() {
             commands::cmd_list_versions,
             commands::cmd_list_mods,
             commands::cmd_toggle_mod,
+            commands::cmd_check_mod_updates,
+            commands::cmd_update_mod,
             commands::cmd_delete_mod,
             commands::cmd_open_mods_folder,
             commands::cmd_open_instance_folder,

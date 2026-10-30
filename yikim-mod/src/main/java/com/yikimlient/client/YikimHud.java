@@ -26,19 +26,14 @@ public final class YikimHud {
     private YikimHud() {
     }
 
-    // PERFORMANS (v1.9.0): YikimLayout.arrange() her karede yeniden hesaplanıyordu
-    // (pencere boyutu değişmeden sonuç aynı) — ekran boyutu değişmedikçe önbellekten döner.
-    private static int cacheW = -1;
-    private static int cacheH = -1;
-    private static List<YikimLayout.Slot> cacheSlots = List.of();
-
+    // ÖNBELLEK (v1.14.0 DÜZELTMESİ): burada AYRICA bir önbellek tutuluyordu ve
+    // yalnız ekran boyutuna bakıyordu. Panelden bir HUD öğesi kapatılınca
+    // YikimLayout.invalidate() çağrılıyor ama bu ikinci önbellek yenilenmediği
+    // için öğe ekranda kalmaya devam ediyordu ("kapattım, gitmiyor").
+    // YikimLayout.arrange() zaten kendi önbelleğini (boyut + font + sürüm)
+    // tutuyor; doğrudan onu çağırmak hem doğru hem yeterince hızlı.
     private static List<YikimLayout.Slot> arrangeCached(class_327 font, int w, int h) {
-        if (w != YikimHud.cacheW || h != YikimHud.cacheH) {
-            YikimHud.cacheW = w;
-            YikimHud.cacheH = h;
-            YikimHud.cacheSlots = YikimLayout.arrange(font, w, h);
-        }
-        return YikimHud.cacheSlots;
+        return YikimLayout.arrange(font, w, h);
     }
 
     public static void render(class_332 graphics, class_9779 delta) {
