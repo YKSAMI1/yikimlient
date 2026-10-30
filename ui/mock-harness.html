@@ -191,6 +191,8 @@
         { adi: "kendi-dans.json", baslik: "Kendi Dansım", yerlesik: false, icerik: "{}" },
       ]);
       if (cmd === "cmd_rozet_oku") return Promise.resolve({ pikseller: null });
+      if (cmd === "cmd_kozmetik_oku") return Promise.resolve({ pelerin: null, kanat: null, pelerin_dosya: null, kanat_dosya: null });
+      if (cmd === "cmd_kozmetik_kaydet") return Promise.resolve({ kurulum: 2, yuklendi: true, hata: "" });
       if (cmd === "cmd_rozet_ciz") return Promise.resolve({ kurulum: 2, yuklendi: true });
       if (cmd === "cmd_rozet_izinler") return Promise.resolve({ yuklendi: true });
       if (cmd === "cmd_add_offline_account") {

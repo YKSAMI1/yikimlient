@@ -329,6 +329,94 @@ pub fn cmd_delete_emote(adi: String) -> Result<bool, String> {
     }
 }
 
+// ---------- kozmetik (özel pelerin + elitra kanadı) ----------
+
+/// Özel pelerin ve/veya elitra kanadı tasarımını kaydet.
+///
+/// `pelerin`: 160 renk (10×16), `kanat`: 200 renk (10×20) — her girdi
+/// "#rrggbb" ya da "" (saydam). `None` → o kozmetiğe dokunma.
+/// Tümü boş liste → kozmetik kaldırılır (dosya silinir, sunucudan düşer).
+/// Dosyalar tüm kurulumların `.yikim/pelerin.png` / `.yikim/elytra.png`
+/// yoluna yazılır → mod oyun açıkken bile bir sonraki kalp atışında uygular.
+#[tauri::command]
+pub async fn cmd_kozmetik_kaydet(
+    pelerin: Option<Vec<String>>,
+    kanat: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
+    let var_mi = |liste: &Option<Vec<String>>| -> bool {
+        liste
+            .as_ref()
+            .map(|p| p.iter().any(|h| !h.trim().is_empty()))
+            .unwrap_or(false)
+    };
+    let mut yuklenen_pelerin: Option<String> = None;
+    let mut yuklenen_kanat: Option<String> = None;
+    let mut kurulum = 0usize;
+
+    if let Some(liste) = pelerin.as_ref() {
+        if var_mi(&pelerin) {
+            let png = crate::kozmetik::pelerin_png(liste)?;
+            kurulum += crate::kozmetik::tum_kurulumlara_yaz("pelerin.png", &png);
+            yuklenen_pelerin = Some(crate::kozmetik::b64(&png));
+        } else {
+            crate::kozmetik::tum_kurulumlardan_sil("pelerin.png");
+            yuklenen_pelerin = Some(String::new());
+        }
+    }
+    if let Some(liste) = kanat.as_ref() {
+        if var_mi(&kanat) {
+            let png = crate::kozmetik::kanat_png(liste)?;
+            kurulum += crate::kozmetik::tum_kurulumlara_yaz("elytra.png", &png);
+            yuklenen_kanat = Some(crate::kozmetik::b64(&png));
+        } else {
+            crate::kozmetik::tum_kurulumlardan_sil("elytra.png");
+            yuklenen_kanat = Some(String::new());
+        }
+    }
+
+    let cfg = YikimConfig::load_or_default();
+    let ucak = crate::kozmetik::ucak(&cfg);
+    let mut yuklendi = false;
+    let mut hata = String::new();
+    if yuklenen_pelerin.is_some() || yuklenen_kanat.is_some() {
+        match selected_account() {
+            Ok(hesap) => {
+                match crate::kozmetik::sunucuya_yukle(
+                    &hesap.uuid,
+                    &hesap.name,
+                    yuklenen_pelerin,
+                    yuklenen_kanat,
+                    &ucak,
+                )
+                .await
+                {
+                    Ok(()) => yuklendi = true,
+                    Err(e) => hata = e,
+                }
+            }
+            Err(_) => hata = "seçili hesap yok".into(),
+        }
+    }
+    Ok(serde_json::json!({
+        "kurulum": kurulum,
+        "yuklendi": yuklendi,
+        "hata": hata,
+    }))
+}
+
+/// Kayıtlı kozmetikleri oku + sahne önizlemesi için dosya yolları.
+#[tauri::command]
+pub fn cmd_kozmetik_oku() -> Result<serde_json::Value, String> {
+    let pelerin_yol = crate::core::app_dir().join("pelerin.png");
+    let kanat_yol = crate::core::app_dir().join("elytra.png");
+    Ok(serde_json::json!({
+        "pelerin": crate::kozmetik::yerel_pelerin(),
+        "kanat": crate::kozmetik::yerel_kanat(),
+        "pelerin_dosya": pelerin_yol.is_file().then(|| pelerin_yol.to_string_lossy().to_string()),
+        "kanat_dosya": kanat_yol.is_file().then(|| kanat_yol.to_string_lossy().to_string()),
+    }))
+}
+
 // ---------- rozet (isim başı logosu) ----------
 
 /// Launcher'da çizilen 8×8 logoyu kaydet.

@@ -1081,3 +1081,56 @@ input.search-in.input, .search-in.input {
   border-color: var(--accent);
   background: var(--accent-dim);
 }
+
+/* ---------- Kozmetikler: pelerin + elitra kanadı ---------- */
+.kozmetik-sayfa { display: flex; flex-direction: column; gap: 16px; }
+.kz-izgara {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px;
+}
+.kz-kart {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 14px; border-radius: var(--radius);
+  background: var(--bg2); border: 1px solid var(--hairline);
+}
+.kz-kart-ust { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.kz-kart-ust h3 {
+  display: flex; align-items: center; gap: 7px; margin: 0;
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+.kz-kart-ust h3 svg { width: 15px; height: 15px; color: var(--accent); }
+.kz-rozet {
+  font-size: 9.5px; letter-spacing: 0.9px; font-weight: 700;
+  color: var(--accent); border: 1px solid var(--accent-dim);
+  border-radius: 999px; padding: 2px 7px; min-height: 16px;
+}
+.kz-govde { display: flex; gap: 14px; align-items: flex-start; }
+.kz-tuval {
+  border-radius: 6px; border: 1px solid var(--hairline-strong);
+  image-rendering: pixelated; cursor: crosshair; touch-action: none;
+  flex-shrink: 0;
+}
+.kz-yan { display: flex; flex-direction: column; gap: 9px; min-width: 0; flex: 1; }
+.kz-onizleme { display: flex; flex-direction: column; gap: 4px; }
+.kz-onizleme span {
+  font-size: 9.5px; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-faint);
+}
+.kz-onizleme canvas {
+  background: var(--bg4); border: 1px solid var(--hairline); border-radius: 6px;
+  image-rendering: pixelated; width: 100%; max-width: 160px;
+}
+.kz-araclar { display: flex; flex-wrap: wrap; gap: 4px; }
+.kz-renk {
+  width: 18px; height: 18px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--hairline-strong); padding: 0;
+}
+.kz-renk:hover { transform: scale(1.12); }
+.kz-renk.aktif { outline: 2px solid var(--accent); outline-offset: 1px; }
+.kz-renk-satir { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kz-renk-satir label { font-size: 10.5px; color: var(--text-faint); }
+.kz-renk-satir input[type="color"] {
+  width: 30px; height: 24px; padding: 0; border: 1px solid var(--hairline-strong);
+  border-radius: 5px; background: var(--bg3); cursor: pointer;
+}
+.kz-alt { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kz-ipucu { font-size: 10.5px; color: var(--text-faint); margin-left: auto; }
+.kz-dipnot { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; max-width: 720px; }

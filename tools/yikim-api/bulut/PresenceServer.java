@@ -47,11 +47,20 @@ import java.util.concurrent.Executors;
 public class PresenceServer {
 
     private static final long TTL_MS = 90_000L;
-    private static final int MAX_BODY = 8192;
+    // v4: gövdeye kozmetik (pelerin/elitra, iki adet ~3-6 KB base64) sığmalı
+    private static final int MAX_BODY = 32768;
     private static final int MAX_PLAYERS = 200;
     private static final int MAX_ROZET_B64 = 4096;
     /** protokol sürümü — GET yanıtında görünür, dağıtım doğrulaması için */
-    private static final int SURUM = 3;
+    private static final int SURUM = 4;
+
+    /// KOZMETİKLER (v4): uuid → base64 PNG doku (64×32).
+    ///   PELERINLER: "kc" — özel pelerin dokusu
+    ///   KANATLAR  : "ke" — elitra kanat dokusu
+    /// Herkes kullanabilir (ücretsiz); izin listesine bağlı DEĞİL.
+    private static final Map<String, String> PELERINLER = new ConcurrentHashMap<>();
+    private static final Map<String, String> KANATLAR = new ConcurrentHashMap<>();
+    private static final int MAX_KOZMETIK_B64 = 6144;
 
     /// sunucu adresi → (uuid → oyuncu bilgisi)
     private static final Map<String, Map<String, Oyuncu>> KAYIT = new ConcurrentHashMap<>();
@@ -95,6 +104,7 @@ public class PresenceServer {
         izinleriYukle();
         sahipleriYukle();
         rozetleriYukle();
+        kozmetikleriYukle();
         HttpServer sunucu = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
         sunucu.createContext("/presence", PresenceServer::isle);
         sunucu.setExecutor(Executors.newFixedThreadPool(2));
@@ -281,6 +291,83 @@ public class PresenceServer {
         } catch (Throwable yoksay) { /* yok say */ }
     }
 
+    // ---------------------------------------------------------------- kozmetik
+
+    /// Kozmetikleri diske yaz: {"<uuid>":{"kc":"<b64>","ke":"<b64>"}, ...}
+    private static void kozmetikleriKaydet() {
+        StringBuilder json = new StringBuilder("{");
+        boolean ilk = true;
+        Set<String> hepsi = new HashSet<>(PELERINLER.keySet());
+        hepsi.addAll(KANATLAR.keySet());
+        for (String uuid : hepsi) {
+            if (!ilk) json.append(',');
+            ilk = false;
+            json.append('"').append(uuid).append("\":{");
+            boolean alan = false;
+            String p = PELERINLER.get(uuid);
+            if (p != null) {
+                json.append("\"kc\":\"").append(p).append('"');
+                alan = true;
+            }
+            String k = KANATLAR.get(uuid);
+            if (k != null) {
+                if (alan) json.append(',');
+                json.append("\"ke\":\"").append(k).append('"');
+            }
+            json.append('}');
+        }
+        json.append('}');
+        try {
+            Files.write(Path.of("kozmetikler.json"), json.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (Throwable yoksay) { /* yok say */ }
+    }
+
+    private static void kozmetikleriYukle() {
+        try {
+            Path yol = Path.of("kozmetikler.json");
+            if (!Files.exists(yol)) {
+                return;
+            }
+            String json = new String(Files.readAllBytes(yol), StandardCharsets.UTF_8);
+            int i = 0;
+            while ((i = json.indexOf('"', i)) >= 0) {
+                int son = json.indexOf('"', i + 1);
+                if (son < 0) break;
+                String uuid = json.substring(i + 1, son);
+                if (!uuidGuvenli(uuid)) {
+                    i = son + 1;
+                    continue;
+                }
+                String p = alan(json, son, "kc");
+                String k = alan(json, son, "ke");
+                if (p != null && p.length() <= MAX_KOZMETIK_B64) PELERINLER.put(uuid, p);
+                if (k != null && k.length() <= MAX_KOZMETIK_B64) KANATLAR.put(uuid, k);
+                int kapanis = json.indexOf('}', son);
+                i = kapanis < 0 ? son + 1 : kapanis + 1;
+            }
+            if (!PELERINLER.isEmpty() || !KANATLAR.isEmpty()) {
+                System.out.println("[YIKIM presence] kozmetik diskten yuklendi: "
+                    + PELERINLER.size() + " pelerin, " + KANATLAR.size() + " kanat");
+            }
+        } catch (Throwable yoksay) { /* yok say */ }
+    }
+
+    /// Aynı sunucudaki oyuncuların kozmetikleri {"uuid":"<b64>"}.
+    private static String kozmetikYaz(Map<String, String> kaynak, String istekSahibi,
+                                      Map<String, Oyuncu> ayniSunucu) {
+        StringBuilder json = new StringBuilder("{");
+        boolean ilk = true;
+        for (String akran : ayniSunucu.keySet()) {
+            if (akran.equals(istekSahibi)) continue;
+            String doku = kaynak.get(akran);
+            if (doku == null) continue;
+            if (!ilk) json.append(',');
+            ilk = false;
+            json.append('"').append(akran).append("\":\"").append(doku).append('"');
+        }
+        return json.append('}').toString();
+    }
+
     /// Aynı sunucudaki oyuncuların çizimleri {"uuid":"<b64>"} — başka sunucular SIZMAZ.
     private static String rozetlerYaz(String istekSahibi, Map<String, Oyuncu> ayniSunucu) {
         StringBuilder json = new StringBuilder("{");
@@ -380,6 +467,25 @@ public class PresenceServer {
             // (görüntü kodlayıcı/çözücü yok, kanal sırası tahmini yok): gelen
             // baytı saklar, aynen dağıtır. Yeni istemci "x"i, eski istemci
             // "b"yi okur. Kırmızı↔mavi takasının tek kaynağı buydu.
+            // --- kozmetik (pelerin/elitra): ücretsiz, izin listesine bağlı değil ---
+            // Boş dizge = "kaldır" (alan() boşu null sayar, bu yüzden hamAlan).
+            String pelerin = hamAlan(govde, "kc");
+            String kanat = hamAlan(govde, "ke");
+            boolean kozmetikDegisti = false;
+            if (pelerin != null && pelerin.length() <= MAX_KOZMETIK_B64) {
+                if (pelerin.isEmpty()) PELERINLER.remove(uuid);
+                else PELERINLER.put(uuid, pelerin);
+                kozmetikDegisti = true;
+            }
+            if (kanat != null && kanat.length() <= MAX_KOZMETIK_B64) {
+                if (kanat.isEmpty()) KANATLAR.remove(uuid);
+                else KANATLAR.put(uuid, kanat);
+                kozmetikDegisti = true;
+            }
+            if (kozmetikDegisti) {
+                kozmetikleriKaydet();
+            }
+
             String ham = alan(govde, "x");
             if (ham != null && pxGecerli(ham)) {
                 if (izinliMi(uuid, isim)) {
@@ -398,6 +504,14 @@ public class PresenceServer {
                 PIXEL.remove(uuid);
                 if (ROZETLER.remove(uuid) != null) {
                     rozetleriKaydet();
+                }
+            }
+
+            // yalnız kozmetik isteği (presence bilgisi yok) burada biter
+            if (pelerin != null || kanat != null) {
+                if (sunucu == null) {
+                    cevap(degis, 200, "{\"p\":[],\"b\":{},\"kc\":{},\"ke\":{}}");
+                    return;
                 }
             }
 
@@ -439,6 +553,8 @@ public class PresenceServer {
             }
             json.append("],\"b\":").append(rozetlerYaz(uuid, liste))
                 .append(",\"x\":").append(pixelYaz(uuid, liste))
+                .append(",\"kc\":").append(kozmetikYaz(PELERINLER, uuid, liste))
+                .append(",\"ke\":").append(kozmetikYaz(KANATLAR, uuid, liste))
                 .append(",\"izinler\":").append(izinlerYaz()).append('}');
             cevap(degis, 200, json.toString());
         }
@@ -487,6 +603,20 @@ public class PresenceServer {
         if (t2 < 0) return null;
         String deger = govde.substring(t1 + 1, t2).trim();
         return deger.isEmpty() ? null : deger;
+    }
+
+    /// "alan":"değer" — BOŞ dizge de döner ("kaldır" sinyali için).
+    private static String hamAlan(String govde, String ad) {
+        String igne = "\"" + ad + "\"";
+        int i = govde.indexOf(igne);
+        if (i < 0) return null;
+        int ikiNokta = govde.indexOf(':', i + igne.length());
+        if (ikiNokta < 0) return null;
+        int t1 = govde.indexOf('"', ikiNokta + 1);
+        if (t1 < 0) return null;
+        int t2 = govde.indexOf('"', t1 + 1);
+        if (t2 < 0) return null;
+        return govde.substring(t1 + 1, t2).trim();
     }
 
     private static boolean uuidGuvenli(String uuid) {

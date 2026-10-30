@@ -298,8 +298,9 @@ public final class YikimPresence {
                 isim = mc.field_1724.method_5797() != null
                     ? mc.field_1724.method_5797().getString() : "oyuncu";
             }
+            // kozmetik (pelerin/elitra) yalnız DEĞİŞTİYSE gövdeye eklenir
             String govde = "{\"v\":1,\"s\":\"" + kac(anahtar) + "\",\"u\":\"" + uuid
-                + "\",\"n\":\"" + kac(isim) + "\"}";
+                + "\",\"n\":\"" + kac(isim) + "\"" + YikimKozmetik.govdeEk() + "}";
             byte[] bayt = govde.getBytes(StandardCharsets.UTF_8);
             HttpURLConnection bag = (HttpURLConnection) new URL(ucak()).openConnection();
             bag.setConnectTimeout(5000);
@@ -329,6 +330,8 @@ public final class YikimPresence {
             String metin = yanit.toString();
             // başkalarının özel rozetleri ("b" alanı) → atölye kataloğuna
             YikimAtolye.uzaklariIsle(metin);
+            // başkalarının pelerin/elitra dokuları ("kc"/"ke") → kozmetik
+            YikimKozmetik.uzaklariIsle(metin);
             // çizim izin listesi (admin panel + atölye kapısı için)
             java.util.List<String> gelen = izinleriOku(metin);
             if (gelen != null) {

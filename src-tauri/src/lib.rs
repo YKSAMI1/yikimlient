@@ -7,6 +7,7 @@ pub mod discord_rpc;
 pub mod emote_binary;
 pub mod game_options;
 pub mod instances;
+pub mod kozmetik;
 pub mod launcher;
 pub mod modpacks;
 pub mod repos;
@@ -91,6 +92,8 @@ pub fn run() {
             commands::cmd_emote_bayt_coz,
             commands::cmd_import_emote_dosyasi,
             commands::cmd_pick_emote,
+            commands::cmd_kozmetik_kaydet,
+            commands::cmd_kozmetik_oku,
             commands::cmd_rozet_ciz,
             commands::cmd_rozet_oku,
             commands::cmd_rozet_yetki,

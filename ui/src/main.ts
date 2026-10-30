@@ -295,6 +295,7 @@ const RAIL = [
   { page: "explore", icon: "compass", label: "Keşfet" },
   { page: "news", icon: "news", label: "Haberler" },
   { page: "skins", icon: "shirt", label: "Skin Merkezi" },
+  { page: "kozmetik", icon: "sparkle", label: "Kozmetikler" },
   { page: "settings", icon: "gear", label: "Ayarlar" },
 ];
 

@@ -6,6 +6,8 @@
     "refmap":  null,
     "mixins":  [],
     "client":  [
+                   "KozmetikMixin",
+                   "KozmetikPlayerMixin",
                    "PlayerBadgeMixin",
                    "TabBadgeMixin",
                    "YikimFontStokMixin",
