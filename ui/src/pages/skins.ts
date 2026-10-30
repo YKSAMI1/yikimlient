@@ -75,6 +75,7 @@ function iskelet(ad: string): string {
         </div>
         <div class="skin-ust-aksiyon">
           <span class="skin-premium">${icon("check")} Orijinal hesap</span>
+          <button class="btn" id="sk-kozmetik">${icon("sparkle")} Kozmetikler</button>
           <button class="btn primary" id="sk-duzenle">${icon("brush")} Skin Düzenle</button>
         </div>
       </div>
@@ -121,6 +122,8 @@ function iskelet(ad: string): string {
 
 function baglantilar(root: HTMLElement, hesapId: string): void {
   root.querySelector("#sk-duzenle")?.addEventListener("click", () => void editorAc(root, hesapId));
+  // Kozmetikler ayrı sayfa ama Skin Merkezi'nin altında keşfedilsin.
+  root.querySelector("#sk-kozmetik")?.addEventListener("click", () => navigate("kozmetik"));
   root.querySelector("#sk-giy")?.addEventListener("click", () => void giy(root, hesapId));
   root.querySelector("#sk-yedek")?.addEventListener("click", () => void yedekGeri(root, hesapId));
 
