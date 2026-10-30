@@ -28,6 +28,9 @@ public final class YikimBadge {
     private static final char VARSAYILAN_GLIF = '\uE000';
     private static final String BOSLUK = " ";
     private static final Set<UUID> KNOWN = new HashSet<UUID>();
+    /** v1.18: isimle eşleşme — proxy/offline modda UUID değişebiliyor.
+     *  Presence aynı sunucudaki oyuncuların İSİMLERİNİ de verir ("pn"). */
+    private static final Set<String> KNOWN_ADLAR = new HashSet<String>();
     private static final AtomicBoolean LOGLANMADI = new AtomicBoolean(false);
 
     private YikimBadge() {
@@ -50,6 +53,64 @@ public final class YikimBadge {
     public static void clear() {
         synchronized (KNOWN) {
             KNOWN.clear();
+            KNOWN_ADLAR.clear();
+        }
+    }
+
+    /** Presence yanıtındaki "pn" haritası: uuid → isim. */
+    public static void setKnownIsimler(String json) {
+        if (json == null || json.isEmpty()) {
+            return;
+        }
+        try {
+            int p = json.indexOf("\"pn\"");
+            if (p < 0) {
+                return;
+            }
+            int sol = json.indexOf('{', p);
+            int sag = sol < 0 ? -1 : json.indexOf('}', sol);
+            if (sol < 0 || sag <= sol) {
+                return;
+            }
+            String ic = json.substring(sol + 1, sag);
+            int i = 0;
+            while (i < ic.length()) {
+                int a1 = ic.indexOf('"', i);
+                int a2 = a1 < 0 ? -1 : ic.indexOf('"', a1 + 1);
+                int b1 = a2 < 0 ? -1 : ic.indexOf('"', a2 + 1);
+                int b2 = b1 < 0 ? -1 : ic.indexOf('"', b1 + 1);
+                if (b2 < 0) {
+                    break;
+                }
+                knownName(ic.substring(b1 + 1, b2));
+                i = b2 + 1;
+            }
+        }
+        catch (Throwable ignored) {
+            // bozuk yanıt rozet eşleşmesini bozmaz
+        }
+    }
+
+    /** İsimle tanıma: UUID farklıysa da (proxy/offline) rozet çıkar. */
+    public static void knownName(String ad) {
+        if (ad == null || ad.isEmpty()) {
+            return;
+        }
+        String temiz = ad.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!temiz.isEmpty()) {
+            synchronized (KNOWN) {
+                KNOWN_ADLAR.add(temiz);
+            }
+        }
+    }
+
+    public static boolean isKnownName(String ad) {
+        if (ad == null || ad.isEmpty()) {
+            return false;
+        }
+        String temiz = ad.trim().toLowerCase(java.util.Locale.ROOT);
+        synchronized (KNOWN) {
+            return KNOWN_ADLAR.contains(temiz);
         }
     }
 

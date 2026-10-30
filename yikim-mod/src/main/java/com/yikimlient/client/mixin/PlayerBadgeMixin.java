@@ -4,6 +4,7 @@ import com.yikimlient.client.YikimBadge;
 import com.yikimlient.client.YikimClient;
 import net.minecraft.class_10017;
 import net.minecraft.class_1297;
+import net.minecraft.class_640;
 import net.minecraft.class_243;
 import net.minecraft.class_2561;
 import net.minecraft.class_310;
@@ -40,6 +41,29 @@ public abstract class PlayerBadgeMixin {
         }
     }
 
+    /** İsim etiketinde de İSİM eşleşmesi: proxy/offline modda UUID değişse bile rozet çıkar. */
+    private static boolean yikim$taniniyor(class_1297 e) {
+        try {
+            if (YikimBadge.isKnown(e.method_5667())) {
+                return true;
+            }
+            class_310 mc = class_310.method_1551();
+            if (mc.method_1562() != null) {
+                class_640 giris = mc.method_1562().method_2871(e.method_5667());
+                if (giris != null) {
+                    com.mojang.authlib.GameProfile profil = giris.method_2966();
+                    if (profil != null && YikimBadge.isKnownName(profil.name())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        catch (Throwable ignored) {
+            // eşleşme başarısızsa rozet yok — çökme yok
+        }
+        return false;
+    }
+
     @Inject(method = "method_62426", at = @At("RETURN"), cancellable = true, require = 0)
     private void yikim$kaynak(class_1297 e, CallbackInfoReturnable<class_2561> cir) {
         try {
@@ -50,7 +74,7 @@ public abstract class PlayerBadgeMixin {
                 return; // zaten rozetli — çift ön ek yok
             }
             class_310 mc = class_310.method_1551();
-            if (mc.field_1724 == e || YikimBadge.isKnown(e.method_5667())) {
+            if (mc.field_1724 == e || PlayerBadgeMixin.yikim$taniniyor(e)) {
                 kanitla();
                 cir.setReturnValue(YikimBadge.tag(cir.getReturnValue(), e.method_5667()));
             }
@@ -80,7 +104,7 @@ public abstract class PlayerBadgeMixin {
                     }
                 }
             }
-            else if (YikimBadge.isKnown(e.method_5667())) {
+            else if (PlayerBadgeMixin.yikim$taniniyor(e)) {
                 // v1.13.4: bazı sunucular/eklentiler görünen adı boş bırakıyor;
                 // eskiden burada `field_53337 != null` şartı yüzünden rozet hiç
                 // yazılmıyordu ("isim başında görünmüyor"). Artık ad yoksa

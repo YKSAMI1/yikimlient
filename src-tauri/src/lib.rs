@@ -213,6 +213,28 @@ pub fn run() {
             }
             // SICAK kanal: derlemesiz güncellemeler (mod vb.) — hemen + 15 dk'da bir.
             yikim_sicak::kanali_dagit(handle.clone());
+            // ROZET YETKİSİ KALICILIĞI (v0.4.15): presence sunucusu ücretsiz
+            // katmanda yeniden başlayınca izin listesini kaybediyor → "verdiğim
+            // yetki gidiyor". Launcher'ın kendi kaydı (config.atolye_izinli)
+            // açılışta sessizce sunucuya geri basılır; liste ancak adı listeden
+            // çıkardığında değişir.
+            {
+                let cfg = config::YikimConfig::load_or_default();
+                let sahip = commands::selected_account()
+                    .map(|h| h.name)
+                    .unwrap_or_default();
+                let admin = cfg.atolye_admin.iter().any(|a| a.eq_ignore_ascii_case(&sahip));
+                if admin && !cfg.atolye_izinli.is_empty() {
+                    let liste = cfg.atolye_izinli.clone();
+                    let ucak = rozet::ucak(&cfg);
+                    tauri::async_runtime::spawn(async move {
+                        match rozet::izin_listesi_yaz(&liste, &ucak).await {
+                            Ok(()) => core::yikim_log("rozet izin listesi sunucuya geri yazıldı".into()),
+                            Err(e) => core::yikim_log(format!("rozet izin listesi yazılamadı: {e}")),
+                        }
+                    });
+                }
+            }
             tauri::async_runtime::spawn(async move {
                 // Arka plan ısıtma: sürüm manifesti + haberler (best-effort, UI'yi engellemez).
                 if let Err(e) = repos::warm_caches(&handle).await {

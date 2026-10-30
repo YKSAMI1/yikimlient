@@ -260,16 +260,18 @@ export class Sahne {
     /**
      * Dokuyu getir: önce fetch + blob (aynı kaynak → WebGL'de CORS/taint derdi yok),
      * olmazsa klasik ImageLoader (asset:// fetch'e kapalı bazı WebKit sürümleri).
-     * Linux'ta skin dokusunun hiç yüklenmemesi (boş karakter) bu yolu gerektirdi.
+     *
+     * DİKKAT: `createImageBitmap` BİLİNÇLİ olarak kullanılmıyor. WebKitGTK
+     * (Linux) ImageBitmap dokularında `flipY` bayrağını yok sayıyor → pafta
+     * dikey ters düşüyor ve karakter "yamuk yumuk" görünüyordu (Windows'ta
+     * WebView2 aynı hatayı yapmadığı için sorun yalnız Linux'ta çıkıyordu).
+     * HTMLImageElement + tuval yolu iki platformda birebir aynı sonucu verir.
      */
     private async dokuResmi(url: string): Promise<CanvasImageSource & { width: number; height: number }> {
         try {
             const yanit = await fetch(url);
             if (yanit.ok) {
                 const blob = await yanit.blob();
-                if (typeof createImageBitmap === "function") {
-                    return await createImageBitmap(blob);
-                }
                 return await new Promise<HTMLImageElement>((coz, reddet) => {
                     const url2 = URL.createObjectURL(blob);
                     const img = new Image();
@@ -290,20 +292,22 @@ export class Sahne {
         if (skin?.url) {
             try {
                 const resim = await this.dokuResmi(skin.url);
-                // eski 64x32 paftalar: UV eşlemi 64 yüksekliğine göre → 64x64 tuvale genişlet
-                if (resim.height === 32) {
-                    const tuval = document.createElement("canvas");
-                    tuval.width = 64;
-                    tuval.height = 64;
-                    const ctx = tuval.getContext("2d");
-                    if (ctx) {
-                        ctx.imageSmoothingEnabled = false;
-                        ctx.drawImage(resim, 0, 0);
-                        doku = new THREE.Texture(tuval);
-                    }
+                // Her skin 64×64 tuvale oturtulur:
+                //  - 64×32 (eski pafta): sol üst 1:1 kopya, alt yarı saydam kalır
+                //  - 128×128 (HD): 64'e indirgenir
+                // Tuval dokusu iki platformda da flipY/sRGB davranışı aynıdır.
+                const tuval = document.createElement("canvas");
+                tuval.width = 64;
+                tuval.height = 64;
+                const ctx = tuval.getContext("2d");
+                if (ctx) {
+                    ctx.imageSmoothingEnabled = false;
+                    if (resim.height === 32) ctx.drawImage(resim, 0, 0);
+                    else ctx.drawImage(resim, 0, 0, 64, 64);
+                    doku = new THREE.Texture(tuval);
+                    dokuAyarla(doku);
+                    doku.needsUpdate = true;
                 }
-                if (!doku) doku = new THREE.Texture(resim);
-                doku.needsUpdate = true;
             } catch { doku = null; }
         }
         this._bekleyenSkin = skin; // edge: kur() çağrısından önce geldiyse kur After re-apply

@@ -37,6 +37,9 @@ public final class YikimLayout {
 
     public static void invalidate() {
         ++revision;
+        // Bayat listeyi hemen bırak: eski slotlar bir sonraki arrange'a kadar çizilmesin.
+        cached = List.of();
+        cachedRevision = -1;
     }
 
     public static List<Slot> arrange(class_327 font, int screenWidth, int screenHeight) {

@@ -39,7 +39,7 @@ fn sanitize(a: &auth::Account) -> SanitizedAccount {
     }
 }
 
-fn selected_account() -> Result<auth::Account, String> {
+pub fn selected_account() -> Result<auth::Account, String> {
     let cfg = YikimConfig::load_or_default();
     let list = load_accounts();
     list.iter()

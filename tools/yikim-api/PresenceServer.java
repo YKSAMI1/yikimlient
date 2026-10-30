@@ -352,6 +352,27 @@ public class PresenceServer {
         } catch (Throwable yoksay) { /* yok say */ }
     }
 
+    /// Aynı sunucudaki oyuncuların İSİMLERİ {"uuid":"isim"}.
+    ///
+    /// Neden: rozet eşleşmesi yalnız UUID ile yapıldığında, proxy/offline
+    /// modda oyuncunun görünen UUID'si presence'a kaydolandan farklı olabiliyor
+    /// → TAB'da rozet çıkarken isim etiketinde çıkmıyordu (veya tersi).
+    /// İsim eşleşmesi bu farkı kapatır; iki tarafta da aynı kural işler.
+    private static String isimlerYaz(String istekSahibi, Map<String, Oyuncu> ayniSunucu) {
+        StringBuilder json = new StringBuilder("{");
+        boolean ilk = true;
+        for (String akran : ayniSunucu.keySet()) {
+            if (akran.equals(istekSahibi)) continue;
+            String ad = ISIMLER.get(akran);
+            if (ad == null || ad.isEmpty()) continue;
+            if (!ilk) json.append(',');
+            ilk = false;
+            json.append('"').append(akran).append("\":\"")
+                .append(ad.replace("\\", "").replace("\"", "")).append('"');
+        }
+        return json.append('}').toString();
+    }
+
     /// Aynı sunucudaki oyuncuların kozmetikleri {"uuid":"<b64>"}.
     private static String kozmetikYaz(Map<String, String> kaynak, String istekSahibi,
                                       Map<String, Oyuncu> ayniSunucu) {
@@ -555,6 +576,7 @@ public class PresenceServer {
                 .append(",\"x\":").append(pixelYaz(uuid, liste))
                 .append(",\"kc\":").append(kozmetikYaz(PELERINLER, uuid, liste))
                 .append(",\"ke\":").append(kozmetikYaz(KANATLAR, uuid, liste))
+                .append(",\"pn\":").append(isimlerYaz(uuid, liste))
                 .append(",\"izinler\":").append(izinlerYaz()).append('}');
             cevap(degis, 200, json.toString());
         }

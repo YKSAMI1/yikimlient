@@ -199,7 +199,11 @@ export function renderHome(root: HTMLElement): void {
         ? `<img class="hero-inst-icon" src="${fileSrc(sel.icon)}" draggable="false" />`
         : `<span class="hero-inst-icon emoji">${sel.icon || "🔥"}</span>`)
     : "";
-  const heroCover = sel?.cover ? ` style="background-image:url('${fileSrc(sel.cover)}')"` : "";
+  // Sahne dünyasında (piksel manzara) kapak GÖSTERİLMEZ: GIF/fotoğraf
+  // pixel-art katmanının boşluklarından sızıp "bozuk tema" gibi görünüyordu.
+  // Kapak yalnız kurulum listesi kartında kalır.
+  const heroKapak = !!sel?.cover && !sahneDunyasi();
+  const heroCover = heroKapak ? ` style="background-image:url('${fileSrc(sel!.cover!)}')"` : "";
   const heroLamp = sel
     ? (launch.activeId === sel.id ? "warn" : "ok")
     : "off";
@@ -208,7 +212,7 @@ export function renderHome(root: HTMLElement): void {
   root.innerHTML = `
     <div class="page-wrap">
     <!-- HERO HAT: seçili kurulum tek satırda — lamba, ad, ölçümler, OYNA şalteri -->
-    <section class="home-hero${sel?.cover ? " has-cover" : ""}"${heroCover}>
+    <section class="home-hero${heroKapak ? " has-cover" : ""}"${heroCover}>
       <div class="vitrin" aria-label="Karakter vitrini">
         <canvas id="sahne-arka" class="sahne-arka"></canvas>
         <canvas id="sahne-katman"></canvas>

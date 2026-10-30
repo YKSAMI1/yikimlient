@@ -332,6 +332,8 @@ public final class YikimPresence {
             YikimAtolye.uzaklariIsle(metin);
             // başkalarının pelerin/elitra dokuları ("kc"/"ke") → kozmetik
             YikimKozmetik.uzaklariIsle(metin);
+            // isimle rozet eşleşmesi ("pn"): proxy/offline UUID farkını kapatır
+            YikimBadge.setKnownIsimler(metin);
             // çizim izin listesi (admin panel + atölye kapısı için)
             java.util.List<String> gelen = izinleriOku(metin);
             if (gelen != null) {

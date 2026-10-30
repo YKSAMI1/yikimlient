@@ -24,7 +24,9 @@ public abstract class TabBadgeMixin {
             if (profile == null) {
                 return;
             }
-            if (YikimBadge.isKnown(profile.id())) {
+            // UUID eşleşmezse İSİM eşleşmesi de kabul edilir (proxy/offline
+            // modda görünen UUID presence kaydından farklı olabiliyor).
+            if (YikimBadge.isKnown(profile.id()) || YikimBadge.isKnownName(profile.name())) {
                 cir.setReturnValue(YikimBadge.tag(cir.getReturnValue(), profile.id()));
             }
         }

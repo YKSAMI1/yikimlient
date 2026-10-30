@@ -56,6 +56,12 @@ public final class YikimHud {
             class_327 font = client.field_1772;
             List<YikimLayout.Slot> slots = YikimHud.arrangeCached(font, client.method_22683().method_4486(), client.method_22683().method_4502());
             for (YikimLayout.Slot slot : slots) {
+                // ÇİFT KONTROL: düzen önbelleği bir şekilde bayatlasa bile
+                // kapatılan öğe ÇİZİLMEZ ("kapattım, ekrandan gitmiyor").
+                YikimConfig.WidgetState durum = config.widget(slot.widget.id());
+                if (durum == null || !durum.enabled) {
+                    continue;
+                }
                 YikimAdapter.push(graphics, slot.x, slot.y, slot.scale);
                 slot.widget.draw(graphics, font, false);
                 YikimAdapter.pop(graphics);
