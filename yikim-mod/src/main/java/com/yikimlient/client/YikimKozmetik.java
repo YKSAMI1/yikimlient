@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.class_1011;
 import net.minecraft.class_1043;
+import net.minecraft.class_1060;
 import net.minecraft.class_2960;
 import net.minecraft.class_310;
 
@@ -195,12 +196,22 @@ public final class YikimKozmetik {
         }
     }
 
-    /** base64 PNG → TextureManager'a kayıtlı Identifier (bir kez). */
+    /** base64 PNG → TextureManager'a kayıtlı Identifier (bir kez).
+     *
+     * v1.19.1 — "bilinmeyen doku" hatasının kökü:
+     * vanilla `AssetInfo.TextureAssetInfo(id)` dokuyu `textures/<id-yolu>.png`
+     * altında ARAR (tek argümanlı kurucu yolu kendisi önekler). Doku eskiden
+     * yalnız `yikimlient:kozmetik/...` kimliğine kaydedildiği için renderer
+     * `yikimlient:textures/kozmetik/....png` bulamıyor, pelerin/elitra mor-siyah
+     * "eksik doku" olarak çiziliyordu. Artık aynı doku hem asset kimliğine hem
+     * de aranabilecek tüm yol biçimlerine kaydedilir.
+     */
     private static class_2960 doku(String anahtar, String b64) {
         if (b64 == null || b64.isEmpty()) {
             return null;
         }
         String imza = anahtar + ":" + Integer.toHexString(b64.hashCode()) + ":" + b64.length();
+        YikimKozmetik.kayitlariTazele();
         class_2960 var = YikimKozmetik.DOKULAR.get(imza);
         if (var != null) {
             return var;
@@ -211,23 +222,82 @@ public final class YikimKozmetik {
         try {
             byte[] png = Base64.getDecoder().decode(b64);
             class_1011 image = class_1011.method_4309(new ByteArrayInputStream(png));
+            if (image == null) {
+                YikimKozmetik.BASARISIZ.add(imza);
+                return null;
+            }
             class_1043 texture = new class_1043(() -> "yikim-kozmetik", image);
             String guvenli = anahtar.replaceAll("[^a-z0-9-]", "-");
             if (guvenli.length() > 40) {
                 guvenli = guvenli.substring(0, 40);
             }
-            class_2960 id = class_2960.method_43902(
-                "yikimlient",
-                "kozmetik/" + Integer.toHexString(imza.hashCode()) + "-" + guvenli
-            );
-            class_310.method_1551().method_1531().method_4616(id, texture);
-            texture.method_4524();
+            String yol = "kozmetik/" + Integer.toHexString(imza.hashCode()) + "-" + guvenli;
+            class_2960 id = class_2960.method_43902("yikimlient", yol);
+            class_2960 dokuYolu = class_2960.method_43902("yikimlient", "textures/" + yol + ".png");
+            class_2960 dokuYoluUzantisiz = class_2960.method_43902("yikimlient", "textures/" + yol);
+            YikimKozmetik.kaydet(id, texture, dokuYolu, dokuYoluUzantisiz);
             YikimKozmetik.DOKULAR.put(imza, id);
             return id;
         }
         catch (Throwable ignored) {
             YikimKozmetik.BASARISIZ.add(imza);
             return null;
+        }
+    }
+
+    /** id → [doku, aranan yollar...] — kaynak yenilenmesinden sonra tekrar kurulur. */
+    private static final Map<class_2960, Object[]> KAYITLI =
+        new ConcurrentHashMap<class_2960, Object[]>();
+    private static long sonTazeleme;
+
+    private static void kaydet(class_2960 id, class_1043 texture, class_2960... yollar) {
+        try {
+            class_1060 tm = class_310.method_1551().method_1531();
+            tm.method_4616(id, texture);
+            for (class_2960 yol : yollar) {
+                tm.method_4616(yol, texture);
+            }
+            texture.method_4524();
+            Object[] kayit = new Object[yollar.length + 1];
+            kayit[0] = texture;
+            System.arraycopy(yollar, 0, kayit, 1, yollar.length);
+            YikimKozmetik.KAYITLI.put(id, kayit);
+        }
+        catch (Throwable ignored) {
+            // kayıt başarısızsa çağıran BASARISIZ'a düşer
+        }
+    }
+
+    /**
+     * F3+T / dil değişimi gibi kaynak yenilemelerinde TextureManager dinamik
+     * dokuları bırakır. Saniyede en fazla bir kez kontrol edilip yeniden
+     * kaydedilir; aksi hâlde pelerin bir kez yenilemeden sonra kayboluyordu.
+     */
+    private static void kayitlariTazele() {
+        long simdi = System.currentTimeMillis();
+        if (simdi - YikimKozmetik.sonTazeleme < 1000L) {
+            return;
+        }
+        YikimKozmetik.sonTazeleme = simdi;
+        if (YikimKozmetik.KAYITLI.isEmpty()) {
+            return;
+        }
+        try {
+            class_1060 tm = class_310.method_1551().method_1531();
+            for (Map.Entry<class_2960, Object[]> e : YikimKozmetik.KAYITLI.entrySet()) {
+                Object[] kayit = e.getValue();
+                class_1043 texture = (class_1043) kayit[0];
+                if (tm.method_4619(e.getKey()) == texture) {
+                    continue;
+                }
+                tm.method_4616(e.getKey(), texture);
+                for (int i = 1; i < kayit.length; i++) {
+                    tm.method_4616((class_2960) kayit[i], texture);
+                }
+            }
+        }
+        catch (Throwable ignored) {
+            // yenileme sırasında hata olursa oyun etkilenmez
         }
     }
 

@@ -140,6 +140,11 @@ export class Sahne {
     private _bekleyenPelerin: { url: string } | null = null;
     /** Editör tuvallerinden gelen canlı doku. */
     private canliDoku: THREE.CanvasTexture | null = null;
+    /** Elitra kanatları (kozmetik önizleme): gövde arkasında iki düzlem. */
+    private kanatGrup: THREE.Group | null = null;
+    private kanatDoku: THREE.Texture | null = null;
+    /** Kanatların son çizilen paftası — model yeniden kurulunca tekrar bağlanır. */
+    private _bekleyenKanat: HTMLCanvasElement | null = null;
 
     /** Sahneyi başlatır; yeniden çağrılırsa öncekini temizler. */
     /** Sahneyi boşalt: eski model, ışıklar ve kalan her şey.
@@ -157,6 +162,7 @@ export class Sahne {
         this.kok = null;
         this.pelerinGrup = null;
         this.pelerinSarkac = null;
+        this.kanatGrup = null;
         this.aktif = null;
     }
 
@@ -330,6 +336,82 @@ export class Sahne {
             this.pelerinDoku = doku;
             this.pelerinMeshKur();
         } catch { /* pelerin yüklenemedi — pelerinsiz devam */ }
+    }
+
+    /**
+     * Pelerini doğrudan bir TUVALDEN besle (launcher önizlemesi).
+     * `pelerin(url)` ağdan görsel çeker; editör tuvalleri ise her fırça
+     * darbesinde tazelenir — bu yüzden ayrı yol.
+     */
+    pelerinTuval(pafta: HTMLCanvasElement | null): void {
+        this._bekleyenPelerin = null;
+        this.pelerinTemizle();
+        if (!pafta) return;
+        const doku = new THREE.CanvasTexture(pafta);
+        dokuAyarla(doku);
+        doku.needsUpdate = true;
+        this.pelerinDoku = doku;
+        this.pelerinPanel = PELERIN_DIS;
+        this.pelerinMeshKur();
+    }
+
+    /** Kanatları (elitra paftası 64×32) tuvallerden besle; null → kanatları kaldırır. */
+    kanatTuval(pafta: HTMLCanvasElement | null): void {
+        this._bekleyenKanat = pafta;
+        this.kanatTemizle();
+        if (!pafta) return;
+        const doku = new THREE.CanvasTexture(pafta);
+        dokuAyarla(doku);
+        doku.needsUpdate = true;
+        this.kanatDoku = doku;
+        this.kanatMeshKur();
+    }
+
+    private kanatTemizle(): void {
+        if (this.kanatGrup?.parent) this.kanatGrup.parent.remove(this.kanatGrup);
+        this.kanatGrup?.traverse((o) => {
+            const m = o as THREE.Mesh;
+            m.geometry?.dispose();
+            const mat = m.material as THREE.Material | undefined;
+            mat?.dispose();
+        });
+        this.kanatGrup = null;
+        this.kanatDoku?.dispose();
+        this.kanatDoku = null;
+    }
+
+    /** Elitra paftasındaki kanat adası: dış yüz (24,2)–(34,22). */
+    private kanatMeshKur(): void {
+        const belUst = this.bukulenler?.belUst;
+        if (!belUst || !this.kanatDoku) return;
+        const mat = new THREE.MeshLambertMaterial({
+            map: this.kanatDoku,
+            transparent: true,
+            alphaTest: 0.01,
+            side: THREE.DoubleSide,
+        });
+        const grup = new THREE.Group();
+        grup.position.set(0, 5 * KS, -2.2 * KS);
+        for (const yon of [-1, 1]) {
+            const geo = new THREE.PlaneGeometry(10 * KS, 20 * KS);
+            const uv = geo.attributes.uv as THREE.BufferAttribute;
+            const u1 = 24 / 64;
+            const u2 = 34 / 64;
+            const vUst = 1 - 2 / 32;
+            const vAlt = 1 - 22 / 32;
+            uv.setXY(0, u1, vUst);
+            uv.setXY(1, u2, vUst);
+            uv.setXY(2, u1, vAlt);
+            uv.setXY(3, u2, vAlt);
+            uv.needsUpdate = true;
+            const kanat = new THREE.Mesh(geo, mat);
+            kanat.position.set(yon * 1.2 * KS, 0, 0);
+            kanat.rotation.y = yon > 0 ? 0.42 : Math.PI - 0.42;
+            kanat.rotation.z = yon > 0 ? -0.34 : 0.34;
+            grup.add(kanat);
+        }
+        belUst.add(grup);
+        this.kanatGrup = grup;
     }
 
     private pelerinTemizle(): void {
@@ -508,6 +590,11 @@ export class Sahne {
             if (this.pelerinDoku) this.pelerinMeshKur();
             else void this.pelerin(this._bekleyenPelerin);
         }
+        // Kanatlar da yeni gövdeye taşınır (yoksa eski modelle birlikte giderdi).
+        if (this._bekleyenKanat) {
+            if (this.kanatDoku) this.kanatMeshKur();
+            else this.kanatTuval(this._bekleyenKanat);
+        }
     }
 
     /** Emote listesini bağlar; rastgele çalar hemen başlar.
@@ -583,6 +670,15 @@ export class Sahne {
         const kar = this.durum === "soft" ? Math.min(1, dt * 7) : 1;
         this.uygula(hedef, kar);
         this.pelerinSalin();
+        this.kanatSalin();
+    }
+
+    /** Kanat çırpınması: önizlemede hafif, canlı görünsün. */
+    private kanatSalin(): void {
+        const g = this.kanatGrup;
+        if (!g) return;
+        g.rotation.x = -0.12 + Math.sin(this.zaman * 2.1) * 0.06;
+        g.position.y = 5 * KS + Math.sin(this.zaman * 2.1) * 0.4 * KS;
     }
 
     /** Pelerin salınımı: idle'da hafif, emote sırasında geniş. Pozitif açı = gövdeden dışa. */
@@ -683,7 +779,9 @@ export class Sahne {
         this.boyutla = null;
         this.yorungeKapat();
         this.pelerinTemizle();
+        this.kanatTemizle();
         this._bekleyenPelerin = null;
+        this._bekleyenKanat = null;
         this.canliDoku?.dispose();
         this.canliDoku = null;
         this.renderer?.dispose();
