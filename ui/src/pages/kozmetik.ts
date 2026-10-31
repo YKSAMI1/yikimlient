@@ -6,8 +6,9 @@
 // sunucusuna gönderilir. Böylece hem kendi oyununda hem aynı sunucudaki diğer
 // YIKIMLient oyuncularında görünür. Kredi/ücret YOKTUR.
 //
-// Önizleme 2D değil: Skin Merkezi ile aynı 3D karakter sahnesi kullanılır,
-// çizilen pelerin/kanat her fırça darbesinde karakterin üstünde güncellenir.
+// Önizleme 2D değil: Skin Merkezi ile aynı 3D karakter sahnesi kullanılır.
+// Aynı anda YALNIZ seçili kozmetik gösterilir (ikisi üst üste binmez).
+// "3D Çiz" ile doğrudan model üzerine boyanır; oyuncu modeli gizlenebilir.
 
 import { currentAccount, fileSrc, icon, invoke, toast } from "../main";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
@@ -29,6 +30,8 @@ interface Izgara {
   renk: string;
 }
 
+type KozmetikTur = "pelerin" | "kanat";
+
 const PALET = [
   "#0b0b10", "#1d1d24", "#3a3a46", "#6b6b7a", "#a8a8b6", "#e8e8ef",
   "#ff8a3d", "#ff5a1f", "#ffd166", "#f6f6f6", "#ff4d6d", "#b8132f",
@@ -41,6 +44,13 @@ const OLC = 14;
 
 let pelerin: Izgara | null = null;
 let kanat: Izgara | null = null;
+/** Önizlemede gösterilen kozmetik — aynı anda yalnız biri. */
+let secili: KozmetikTur = "pelerin";
+/** 3D çizim modu + silgi durumu. */
+let cizimde = false;
+let cizimSilgi = false;
+/** Izgara → 2D tuvali + sahneyi tazeleyen kapanış (duzenle içinde kurulur). */
+const tazeleyiciler = new Map<Izgara, () => void>();
 
 const kacis = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
@@ -49,6 +59,10 @@ export function renderKozmetik(root: HTMLElement): void {
   sahneKapat();
   pelerin = null;
   kanat = null;
+  secili = "pelerin";
+  cizimde = false;
+  cizimSilgi = false;
+  tazeleyiciler.clear();
   root.innerHTML = iskelet();
   void yukle(root);
 }
@@ -65,13 +79,23 @@ function iskelet(): string {
       </div>
 
       <div class="kz-yerlesim">
-        <aside class="kz-oniz3d">
+        <aside class="kz-oniz3d" id="kz-oniz3d">
           <div class="kz-oniz3d-ust">
             <span>${icon("user")} Karakterde görünüm</span>
-            <span class="kz-ipucu">Sürükleyerek döndür</span>
+            <span class="kz-ipucu" id="kz-sahne-ipucu">Sürükleyerek döndür</span>
+          </div>
+          <div class="kz-secim" id="kz-secim" role="group" aria-label="Önizlenecek kozmetik">
+            <button class="seg-btn aktif" data-secim="pelerin" title="Yalnız pelerini göster">Pelerin</button>
+            <button class="seg-btn" data-secim="kanat" title="Yalnız elitra kanadını göster">Elitra</button>
           </div>
           <canvas id="kz-sahne"></canvas>
-          <p class="kz-ipucu kz-oniz3d-alt">Çizdikçe anında güncellenir. Oyun açıkken kaydetmek yeterli.</p>
+          <div class="kz-cizim-arac" id="kz-cizim-arac" hidden>
+            <button class="seg-btn aktif" id="kz-3d-kalem">${icon("brush")} Kalem</button>
+            <button class="seg-btn" id="kz-3d-silgi">${icon("trash")} Silgi</button>
+            <button class="seg-btn" id="kz-3d-oyuncu">${icon("user")} Oyuncuyu gizle</button>
+            <button class="seg-btn" id="kz-3d-bitir">${icon("check")} Bitir</button>
+          </div>
+          <p class="kz-ipucu kz-oniz3d-alt" id="kz-sahne-alt">Çizdikçe anında güncellenir. Oyun açıkken kaydetmek yeterli.</p>
         </aside>
 
         <div class="kz-izgara">
@@ -89,6 +113,9 @@ function iskelet(): string {
                   <input type="color" id="kz-pelerin-renk" value="#ff8a3d" />
                   <button class="btn" id="kz-pelerin-sil" title="Silgi (çizerek siler)">Silgi</button>
                   <button class="btn" id="kz-pelerin-temizle" title="Tümünü temizle">${icon("trash")} Temizle</button>
+                </div>
+                <div class="kz-renk-satir">
+                  <button class="btn" id="kz-pelerin-3d" title="Pelerini doğrudan 3D model üzerinde boya">${icon("box")} 3D Çiz</button>
                 </div>
               </div>
             </div>
@@ -115,6 +142,9 @@ function iskelet(): string {
                   <input type="color" id="kz-kanat-renk" value="#3d5afe" />
                   <button class="btn" id="kz-kanat-sil" title="Silgi (çizerek siler)">Silgi</button>
                   <button class="btn" id="kz-kanat-temizle" title="Tümünü temizle">${icon("trash")} Temizle</button>
+                </div>
+                <div class="kz-renk-satir">
+                  <button class="btn" id="kz-kanat-3d" title="Kanatları doğrudan 3D model üzerinde boya">${icon("box")} 3D Çiz</button>
                 </div>
               </div>
             </div>
@@ -161,9 +191,15 @@ async function yukle(root: HTMLElement): Promise<void> {
   sahnayiKur(root);
   duzenle(root, pelerin);
   duzenle(root, kanat);
+  secimiUygula(root);
+  cizimDinleyicileri(root);
 }
 
 const bos = (n: number): string[] => Array.from({ length: n }, () => "");
+
+function hedefAl(tur: KozmetikTur): Izgara | null {
+  return tur === "pelerin" ? pelerin : kanat;
+}
 
 /** 3D karakter sahnesi: oyuncunun kendi skini üstünde kozmetik önizlemesi. */
 function sahnayiKur(root: HTMLElement): void {
@@ -188,13 +224,149 @@ function sahnayiKur(root: HTMLElement): void {
   })();
 }
 
-/** Izgara değişti → 3D önizlemeyi tazele. */
-function onizle(hedef: Izgara): void {
+/** Tasarım boşken 3D çizim için hafif bir iskelet yüzey ver.
+ *  Boş ızgarada mesh hiç kurulmazsa modele tıklanacak bir yüzey kalmazdı;
+ *  "3D Çiz" basınca normal Minecraft pelerini/elitrası görünsün diye
+ *  tasarım alanı saydam bir siluetle doldurulur. Kaydedilmez. */
+function paftaVer(hedef: Izgara): HTMLCanvasElement | null {
+  if (!bosMu(hedef.pikseller)) {
+    return hedef.ad === "Pelerin" ? pelerinPaftasi(hedef.pikseller) : kanatPaftasi(hedef.pikseller);
+  }
+  if (!cizimde) return null;
+  const t = hedef.ad === "Pelerin" ? pelerinPaftasi(hedef.pikseller) : kanatPaftasi(hedef.pikseller);
+  const g = t.getContext("2d");
+  if (g) {
+    g.fillStyle = "rgba(150, 152, 170, 0.22)";
+    if (hedef.ad === "Pelerin") {
+      g.fillRect(1, 1, 10, 16);
+      g.fillRect(12, 1, 10, 16);
+    } else {
+      g.fillRect(24, 2, 10, 20);
+      g.fillRect(36, 2, 10, 20);
+    }
+  }
+  return t;
+}
+
+/** Seçili kozmetiği sahneye besle; diğerini KALDIR (üst üste binmesin). */
+function secimiUygula(root: HTMLElement): void {
   const sahne = sahneGetir();
-  if (hedef.ad === "Pelerin") {
-    sahne.pelerinTuval(bosMu(hedef.pikseller) ? null : pelerinPaftasi(hedef.pikseller));
-  } else {
-    sahne.kanatTuval(bosMu(hedef.pikseller) ? null : kanatPaftasi(hedef.pikseller));
+  const p = secili === "pelerin" ? pelerin : null;
+  const k = secili === "kanat" ? kanat : null;
+  sahne.pelerinTuval(p ? paftaVer(p) : null);
+  sahne.kanatTuval(k ? paftaVer(k) : null);
+
+  root.querySelectorAll<HTMLElement>("[data-secim]").forEach((b) => {
+    b.classList.toggle("aktif", b.dataset.secim === secili);
+  });
+  root.querySelector("#kz-pelerin-kart")?.classList.toggle("secili", secili === "pelerin");
+  root.querySelector("#kz-kanat-kart")?.classList.toggle("secili", secili === "kanat");
+}
+
+/** 3D çizim modunu aç/kapat (hedef verilirse o kozmetiğe geç). */
+function cizimModu(root: HTMLElement, acik: boolean, hedef?: KozmetikTur): void {
+  if (acik && hedef) secili = hedef;
+  cizimde = acik;
+  cizimSilgi = false;
+  const sahne = sahneGetir();
+  sahne.etkilesimKapali = acik;
+  const kutu = root.querySelector<HTMLElement>("#kz-oniz3d");
+  kutu?.classList.toggle("cizim", acik);
+  const arac = root.querySelector<HTMLElement>("#kz-cizim-arac");
+  if (arac) arac.hidden = !acik;
+  const ipucu = root.querySelector<HTMLElement>("#kz-sahne-ipucu");
+  if (ipucu) ipucu.textContent = acik ? "Tıkla / sürükle: boya" : "Sürükleyerek döndür";
+  const alt = root.querySelector<HTMLElement>("#kz-sahne-alt");
+  if (alt) {
+    alt.textContent = acik
+      ? "3D çizim açık — modelin üstüne boyuyorsun, 2D ızgara anında güncellenir."
+      : "Çizdikçe anında güncellenir. Oyun açıkken kaydetmek yeterli.";
+  }
+  root.querySelector("#kz-3d-kalem")?.classList.toggle("aktif", acik && !cizimSilgi);
+  root.querySelector("#kz-3d-silgi")?.classList.toggle("aktif", acik && cizimSilgi);
+  secimiUygula(root);
+}
+
+/** Sahnedeki tuvale 3D boyama olayları. */
+function cizimDinleyicileri(root: HTMLElement): void {
+  const canvas = root.querySelector<HTMLCanvasElement>("#kz-sahne");
+  if (!canvas) return;
+  let ciziyor = false;
+
+  const boya = (e: PointerEvent): void => {
+    const hedef = hedefAl(secili);
+    if (!hedef) return;
+    const n = sahneGetir().kozmetikNoktasi(e, secili);
+    if (!n) return;
+    const i = n.y * hedef.g + n.x;
+    const renk = cizimSilgi ? "" : hedef.renk;
+    if (hedef.pikseller[i] === renk) return;
+    hedef.pikseller[i] = renk;
+    tazeleyiciler.get(hedef)?.();
+  };
+
+  canvas.addEventListener("contextmenu", (e) => {
+    if (cizimde) e.preventDefault();
+  });
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!cizimde) return;
+    if (e.pointerType === "mouse" && e.button !== 0 && e.button !== 2) return;
+    ciziyor = e.button !== 2;
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {
+      /* pencere kapanmış olabilir */
+    }
+    boya(e);
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (cizimde && ciziyor) boya(e);
+  });
+  const birak = (): void => {
+    ciziyor = false;
+  };
+  canvas.addEventListener("pointerup", birak);
+  canvas.addEventListener("pointercancel", birak);
+
+  root.querySelectorAll<HTMLElement>("[data-secim]").forEach((b) => {
+    b.addEventListener("click", () => {
+      secili = (b.dataset.secim as KozmetikTur) ?? "pelerin";
+      secimiUygula(root);
+    });
+  });
+
+  root.querySelector("#kz-3d-kalem")?.addEventListener("click", () => {
+    cizimSilgi = false;
+    root.querySelector("#kz-3d-kalem")?.classList.add("aktif");
+    root.querySelector("#kz-3d-silgi")?.classList.remove("aktif");
+  });
+  root.querySelector("#kz-3d-silgi")?.addEventListener("click", () => {
+    cizimSilgi = true;
+    root.querySelector("#kz-3d-silgi")?.classList.add("aktif");
+    root.querySelector("#kz-3d-kalem")?.classList.remove("aktif");
+  });
+  root.querySelector("#kz-3d-oyuncu")?.addEventListener("click", () => {
+    const b = root.querySelector<HTMLElement>("#kz-3d-oyuncu");
+    const gizli = b?.classList.toggle("aktif") ?? false;
+    sahneGetir().oyuncuGoster(!gizli);
+    if (b) b.innerHTML = `${icon("user")} ${gizli ? "Oyuncuyu göster" : "Oyuncuyu gizle"}`;
+  });
+  root.querySelector("#kz-3d-bitir")?.addEventListener("click", () => {
+    sahneGetir().oyuncuGoster(true);
+    const b = root.querySelector<HTMLElement>("#kz-3d-oyuncu");
+    if (b) {
+      b.classList.remove("aktif");
+      b.innerHTML = `${icon("user")} Oyuncuyu gizle`;
+    }
+    cizimModu(root, false);
+  });
+
+  // Kartlardaki "3D Çiz" düğmeleri: o kozmetiği seçip çizim modunu açar.
+  for (const tur of ["pelerin", "kanat"] as KozmetikTur[]) {
+    root.querySelector(`#kz-${tur}-3d`)?.addEventListener("click", () => {
+      cizimModu(root, true, tur);
+      root.querySelector("#kz-oniz3d")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
   }
 }
 
@@ -209,6 +381,14 @@ function duzenle(root: HTMLElement, hedef: Izgara): void {
   if (renkGirdi) renkGirdi.value = hedef.renk;
   ciz(hedef, tuval);
 
+  // 3D çizim de aynı tazeleyiciyi kullanır: 2D tuval + seçiliyse sahne.
+  tazeleyiciler.set(hedef, () => {
+    ciz(hedef, tuval);
+    const d = root.querySelector<HTMLElement>(`#kz-${on}-durum`);
+    if (d) d.textContent = bosMu(hedef.pikseller) ? "" : "KAYITLI";
+    if (secili === (hedef.ad === "Pelerin" ? "pelerin" : "kanat")) secimiUygula(root);
+  });
+
   let ciziyor = false;
   let silerek = false;
   const pikselAl = (e: PointerEvent): void => {
@@ -218,8 +398,7 @@ function duzenle(root: HTMLElement, hedef: Izgara): void {
     if (x < 0 || y < 0 || x >= hedef.g || y >= hedef.y) return;
     const indeks = y * hedef.g + x;
     hedef.pikseller[indeks] = silerek ? "" : hedef.renk;
-    ciz(hedef, tuval);
-    onizle(hedef);
+    tazeleyiciler.get(hedef)?.();
   };
   tuval.addEventListener("contextmenu", (e) => e.preventDefault());
   tuval.addEventListener("pointerdown", (e) => {
@@ -251,15 +430,13 @@ function duzenle(root: HTMLElement, hedef: Izgara): void {
 
   root.querySelector(`#kz-${on}-temizle`)?.addEventListener("click", () => {
     for (let i = 0; i < hedef.pikseller.length; i++) hedef.pikseller[i] = "";
-    ciz(hedef, tuval);
-    onizle(hedef);
+    tazeleyiciler.get(hedef)?.();
   });
 
   root.querySelector(`#kz-${on}-kaydet`)?.addEventListener("click", () => void kaydet(root, hedef));
   root.querySelector(`#kz-${on}-kaldir`)?.addEventListener("click", () => {
     for (let i = 0; i < hedef.pikseller.length; i++) hedef.pikseller[i] = "";
-    ciz(hedef, tuval);
-    onizle(hedef);
+    tazeleyiciler.get(hedef)?.();
     void kaydet(root, hedef);
   });
 
@@ -269,8 +446,6 @@ function duzenle(root: HTMLElement, hedef: Izgara): void {
     if (f) void fotograftan(root, hedef, tuval, f);
     dosya.value = "";
   });
-
-  onizle(hedef);
 }
 
 function paletCiz(root: HTMLElement, hedef: Izgara): void {
@@ -356,8 +531,7 @@ async function fotograftan(root: HTMLElement, hedef: Izgara, tuval: HTMLCanvasEl
       const yeni = paftadanOku(ga, hedef);
       if (bosMu(yeni)) throw new Error("paftada tasarım paneli boş — 64×32 pelerin şablonu bekleniyordu");
       for (let i = 0; i < yeni.length; i++) hedef.pikseller[i] = yeni[i];
-      ciz(hedef, tuval);
-      onizle(hedef);
+      tazeleyiciler.get(hedef)?.();
       toast("Pafta okundu — tasarım ızgaraya alındı.");
       return;
     }
@@ -388,8 +562,8 @@ async function fotograftan(root: HTMLElement, hedef: Izgara, tuval: HTMLCanvasEl
       }
       hedef.pikseller[i] = `#${hex(veri[i * 4])}${hex(veri[i * 4 + 1])}${hex(veri[i * 4 + 2])}`;
     }
-    ciz(hedef, tuval);
-    onizle(hedef);
+    tazeleyiciler.get(hedef)?.();
+    void tuval;
     toast("Fotoğraf indirgendi — istersen fırçayla düzeltebilirsin.");
   } catch (e) {
     toast(String(e), "err");

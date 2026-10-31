@@ -145,6 +145,14 @@ export class Sahne {
     private kanatDoku: THREE.Texture | null = null;
     /** Kanatların son çizilen paftası — model yeniden kurulunca tekrar bağlanır. */
     private _bekleyenKanat: HTMLCanvasElement | null = null;
+    /** 3D çizim ışın hedefleri: taban katman ve üst (overlay) katman mesh'leri. */
+    private tabanMeshler: THREE.Mesh[] = [];
+    private ustMeshler: THREE.Mesh[] = [];
+    /** Oyuncu gizle/göster: kozmetik mesh'leri dışındaki tüm parçalar. */
+    private oyuncuMeshler: THREE.Mesh[] = [];
+    private oyuncuGorunur = true;
+    /** 3D çizimde kamera sürüklemeyi kapatır (çizim olayları tuvali kullanır). */
+    public etkilesimKapali = false;
 
     /** Sahneyi başlatır; yeniden çağrılırsa öncekini temizler. */
     /** Sahneyi boşalt: eski model, ışıklar ve kalan her şey.
@@ -163,6 +171,9 @@ export class Sahne {
         this.pelerinGrup = null;
         this.pelerinSarkac = null;
         this.kanatGrup = null;
+        this.tabanMeshler = [];
+        this.ustMeshler = [];
+        this.oyuncuMeshler = [];
         this.aktif = null;
     }
 
@@ -211,6 +222,7 @@ export class Sahne {
         canvas.style.cursor = "grab";
         canvas.style.touchAction = "pan-y";
         this.isaretciBas = (e: PointerEvent) => {
+            if (this.etkilesimKapali) return;
             if (e.pointerType === "mouse" && e.button !== 0) return;
             this.surukleX = e.clientX;
             canvas.style.cursor = "grabbing";
@@ -380,7 +392,13 @@ export class Sahne {
         this.kanatDoku = null;
     }
 
-    /** Elitra paftasındaki kanat adası: dış yüz (24,2)–(34,22). */
+    /** Elitra kanatları: sırtın üstünden (omuz hizası) aşağı sarkan iki kanat.
+     *
+     *  Vanilla elitra 10×20 piksel kanat adası kullanır ve kanatlar üst kenardan
+     *  (omuzdan) bağlanır. Daha önce düzlemin MERKEZİ grupta duruyordu; bu yüzden
+     *  kanatların yarısı başın üstüne taşıyor ve önizleme bozuk görünüyordu.
+     *  Artık geometri, dönme noktası kanadın üst-iç köşesine gelecek şekilde
+     *  kaydırılıyor. */
     private kanatMeshKur(): void {
         const belUst = this.bukulenler?.belUst;
         if (!belUst || !this.kanatDoku) return;
@@ -391,9 +409,12 @@ export class Sahne {
             side: THREE.DoubleSide,
         });
         const grup = new THREE.Group();
-        grup.position.set(0, 5 * KS, -2.2 * KS);
+        // belUst dünyada y=18 (bel); +4 → omuz hizası (22). Sırtın 2,1 px arkası.
+        grup.position.set(0, 4 * KS, -2.1 * KS);
         for (const yon of [-1, 1]) {
             const geo = new THREE.PlaneGeometry(10 * KS, 20 * KS);
+            // Dönme noktası: kanadın ÜST-İÇ köşesi (gövdeye bağlandığı yer).
+            geo.translate(yon * 5 * KS, -10 * KS, 0);
             const uv = geo.attributes.uv as THREE.BufferAttribute;
             const u1 = 24 / 64;
             const u2 = 34 / 64;
@@ -405,9 +426,10 @@ export class Sahne {
             uv.setXY(3, u2, vAlt);
             uv.needsUpdate = true;
             const kanat = new THREE.Mesh(geo, mat);
-            kanat.position.set(yon * 1.2 * KS, 0, 0);
-            kanat.rotation.y = yon > 0 ? 0.42 : Math.PI - 0.42;
-            kanat.rotation.z = yon > 0 ? -0.34 : 0.34;
+            // Dışa açılma (±26°) + hafif aşağı eğim: oyun içi elitra silueti.
+            kanat.rotation.y = yon * 0.46;
+            kanat.rotation.z = -yon * 0.14;
+            kanat.rotation.x = -0.05;
             grup.add(kanat);
         }
         belUst.add(grup);
@@ -477,6 +499,56 @@ export class Sahne {
         if (this.canliDoku) this.canliDoku.needsUpdate = true;
     }
 
+    /** Oyuncu modelini gizle/göster — kozmetik (pelerin/kanat) görünür kalır. */
+    oyuncuGoster(goster: boolean): void {
+        this.oyuncuGorunur = goster;
+        for (const m of this.oyuncuMeshler) m.visible = goster;
+    }
+
+    /** 3D çizim (skin): tuval olayı → 64×64 atlas pikseli. */
+    atlasNoktasi(e: PointerEvent, katman: "taban" | "ust" = "taban"): { x: number; y: number } | null {
+        const hedef = katman === "ust" ? this.ustMeshler : this.tabanMeshler;
+        return this.isin(e, hedef, 64, 64);
+    }
+
+    /** 3D çizim (kozmetik): tasarım ızgarasındaki piksel (pelerin 10×16 · kanat 10×20). */
+    kozmetikNoktasi(e: PointerEvent, tur: "pelerin" | "kanat"): { x: number; y: number } | null {
+        if (tur === "pelerin") {
+            if (!this.pelerinGrup) return null;
+            const n = this.isin(e, this.pelerinGrup.children, 64, 32);
+            if (!n) return null;
+            const p = this.pelerinPanel;
+            const x = n.x - p.x;
+            const y = n.y - p.y;
+            return x < 0 || y < 0 || x >= p.w || y >= p.h ? null : { x, y };
+        }
+        if (!this.kanatGrup) return null;
+        const n = this.isin(e, this.kanatGrup.children, 64, 32);
+        if (!n) return null;
+        const x = n.x - 24;
+        const y = n.y - 2;
+        return x < 0 || y < 0 || x >= 10 || y >= 20 ? null : { x, y };
+    }
+
+    /** Işın: tuval koordinatı → dokudaki piksel (gw×gh doku). */
+    private isin(e: PointerEvent, nesneler: THREE.Object3D[], gw: number, gh: number): { x: number; y: number } | null {
+        const canvas = this.canvas;
+        if (!canvas || !this.renderer || nesneler.length === 0) return null;
+        const r = canvas.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return null;
+        const ndc = new THREE.Vector2(
+            ((e.clientX - r.left) / r.width) * 2 - 1,
+            -((e.clientY - r.top) / r.height) * 2 + 1,
+        );
+        const ray = new THREE.Raycaster();
+        ray.setFromCamera(ndc, this.camera);
+        const kesisim = ray.intersectObjects(nesneler, false).find((h) => !!h.uv);
+        if (!kesisim?.uv) return null;
+        const x = Math.min(gw - 1, Math.max(0, Math.floor(kesisim.uv.x * gw)));
+        const y = Math.min(gh - 1, Math.max(0, Math.floor((1 - kesisim.uv.y) * gh)));
+        return { x, y };
+    }
+
     private modelKur(doku: THREE.Texture | null, slim: boolean): void {
         if (this.kok) {
             // Gerçek ebeveynden çıkar: sahne dışında bir gruba bağlanmış eski model
@@ -491,6 +563,9 @@ export class Sahne {
         // Eski modelle birlikte giden pelerin grubu: dokusu korunur, mesh yeniden kurulur.
         this.pelerinGrup = null;
         this.pelerinSarkac = null;
+        this.tabanMeshler = [];
+        this.ustMeshler = [];
+        this.oyuncuMeshler = [];
         this.kok = new THREE.Group();
         this.kok.position.y = -0.66;
         // Kalça düğümü: parçalar buna göre konumlanır; PAL `body` kemiği bu düğümü
@@ -517,12 +592,18 @@ export class Sahne {
         hat.scale.setScalar(1.125);
         hat.position.set(0, 4 * KS, 0);
         head.add(hat);
+        this.tabanMeshler.push(headMesh);
+        this.ustMeshler.push(hat);
+        this.oyuncuMeshler.push(headMesh, hat);
 
         body.position.set(0, 12 * KS, 0);
         body.userData.pivotPx = [0, 12, 0];
         // Bükülebilir uzuv kurucusu: üst yarı kemiğe, alt yarı eklem grubuna bağlanır.
         // `ortaY` = orijinal kutu merkezinin kemik pivotuna göre yüksekliği.
-        const uzuv = (parca: THREE.Group, bolge: Bölge, ortaY: number, x: number): THREE.Group => {
+        // `kaplama` verilirse aynı uzvun ÜST katmanı (ceket/kolluk/pantolon) da
+        // kurulur: hafif şişirilmiş, yarı saydam dokulu ikinci kutu. Böylece skin
+        // önizlemesi overlay'i gösterir ve 3D çizimde üst katmana boyanabilir.
+        const uzuv = (parca: THREE.Group, bolge: Bölge, ortaY: number, x: number, kaplama?: Bölge): THREE.Group => {
             const ust = yarimKutuYap(bolge, false, doku);
             ust.position.set(x, ortaY + (bolge.h / 4) * KS, 0);
             parca.add(ust);
@@ -532,6 +613,27 @@ export class Sahne {
             alt.position.set(x, -(bolge.h / 4) * KS, 0);
             eklem.add(alt);
             parca.add(eklem);
+            this.tabanMeshler.push(ust, alt);
+            this.oyuncuMeshler.push(ust, alt);
+            if (kaplama) {
+                const sisir = (m: THREE.Mesh): void => {
+                    m.scale.set(
+                        (kaplama.w + 0.5) / kaplama.w,
+                        (kaplama.h + 0.25) / kaplama.h,
+                        (kaplama.d + 0.5) / kaplama.d,
+                    );
+                };
+                const ustKaplama = yarimKutuYap(kaplama, false, doku, true);
+                ustKaplama.position.set(x, ortaY + (kaplama.h / 4) * KS, 0);
+                sisir(ustKaplama);
+                parca.add(ustKaplama);
+                const altKaplama = yarimKutuYap(kaplama, true, doku, true);
+                altKaplama.position.set(x, -(kaplama.h / 4) * KS, 0);
+                sisir(altKaplama);
+                eklem.add(altKaplama);
+                this.ustMeshler.push(ustKaplama, altKaplama);
+                this.oyuncuMeshler.push(ustKaplama, altKaplama);
+            }
             return eklem;
         };
 
@@ -549,6 +651,18 @@ export class Sahne {
         const govdeAlt = yarimKutuYap({ u: 16, v: 16, w: 8, h: 12, d: 4 }, true, doku);
         govdeAlt.position.set(0, -9 * KS, 0);
         body.add(govdeAlt);
+        // Ceket (üst katman) — gövdenin yarılarıyla aynı bükülmeyi izler.
+        const ceketUst = yarimKutuYap({ u: 16, v: 32, w: 8, h: 12, d: 4 }, false, doku, true);
+        ceketUst.position.set(0, 3 * KS, 0);
+        ceketUst.scale.set(1.0625, 1.0208, 1.125);
+        bel.add(ceketUst);
+        const ceketAlt = yarimKutuYap({ u: 16, v: 32, w: 8, h: 12, d: 4 }, true, doku, true);
+        ceketAlt.position.set(0, -9 * KS, 0);
+        ceketAlt.scale.set(1.0625, 1.0208, 1.125);
+        body.add(ceketAlt);
+        this.tabanMeshler.push(govdeUst, govdeAlt);
+        this.ustMeshler.push(ceketUst, ceketAlt);
+        this.oyuncuMeshler.push(govdeUst, govdeAlt, ceketUst, ceketAlt);
 
         // BEL ÜSTÜ: kafa + kollar. Aynı bel hizasında (dünya 18) durur. PAL gövde
         // bükülmesi (`APPLY_BEND_TO_OTHER_BONES`, ikili emote okunurken otomatik açılır)
@@ -565,17 +679,17 @@ export class Sahne {
         head.userData.pivotPx = [0, 6, 0];
         armL.position.set(5 * KS, 4 * KS, 0);
         armL.userData.pivotPx = [5, 4, 0];
-        const armLEklem = uzuv(armL, { u: 32, v: 48, w: armW, h: 12, d: 4 }, -4 * KS, KS);
+        const armLEklem = uzuv(armL, { u: 32, v: 48, w: armW, h: 12, d: 4 }, -4 * KS, KS, { u: 48, v: 48, w: armW, h: 12, d: 4 });
         armR.position.set(-5 * KS, 4 * KS, 0);
         armR.userData.pivotPx = [-5, 4, 0];
-        const armREklem = uzuv(armR, { u: 40, v: 16, w: armW, h: 12, d: 4 }, -4 * KS, -KS);
+        const armREklem = uzuv(armR, { u: 40, v: 16, w: armW, h: 12, d: 4 }, -4 * KS, -KS, { u: 40, v: 32, w: armW, h: 12, d: 4 });
 
         legL.position.set(1.9 * KS, 0, 0);
         legL.userData.pivotPx = [1.9, 0, 0];
-        const legLEklem = uzuv(legL, { u: 16, v: 48, w: 4, h: 12, d: 4 }, -6 * KS, 0);
+        const legLEklem = uzuv(legL, { u: 16, v: 48, w: 4, h: 12, d: 4 }, -6 * KS, 0, { u: 0, v: 48, w: 4, h: 12, d: 4 });
         legR.position.set(-1.9 * KS, 0, 0);
         legR.userData.pivotPx = [-1.9, 0, 0];
-        const legREklem = uzuv(legR, { u: 0, v: 16, w: 4, h: 12, d: 4 }, -6 * KS, 0);
+        const legREklem = uzuv(legR, { u: 0, v: 16, w: 4, h: 12, d: 4 }, -6 * KS, 0, { u: 0, v: 32, w: 4, h: 12, d: 4 });
 
         this.bukulenler = {
             body: bel, belUst, armL: armLEklem, armR: armREklem,
@@ -585,6 +699,9 @@ export class Sahne {
         belUst.add(head, armL, armR);
         this.kalca.add(body, belUst, legL, legR);
         this.scene.add(this.kok);
+        if (!this.oyuncuGorunur) {
+            for (const m of this.oyuncuMeshler) m.visible = false;
+        }
         // Bekleyen pelerini yeni modele bağla (kur()/skin() sonrası).
         if (this._bekleyenPelerin) {
             if (this.pelerinDoku) this.pelerinMeshKur();
@@ -677,8 +794,8 @@ export class Sahne {
     private kanatSalin(): void {
         const g = this.kanatGrup;
         if (!g) return;
-        g.rotation.x = -0.12 + Math.sin(this.zaman * 2.1) * 0.06;
-        g.position.y = 5 * KS + Math.sin(this.zaman * 2.1) * 0.4 * KS;
+        g.rotation.x = -0.02 + Math.sin(this.zaman * 2.1) * 0.05;
+        g.position.y = 4 * KS + Math.sin(this.zaman * 2.1) * 0.35 * KS;
     }
 
     /** Pelerin salınımı: idle'da hafif, emote sırasında geniş. Pozitif açı = gövdeden dışa. */

@@ -1158,6 +1158,19 @@ input.search-in.input, .search-in.input {
 }
 .kz-oniz3d canvas:active { cursor: grabbing; }
 .kz-oniz3d-alt { margin-left: 0; text-align: center; }
+.kz-secim { display: flex; gap: 4px; background: var(--bg1); padding: 3px; border-radius: var(--radius-sm); }
+.kz-secim .seg-btn { flex: 1; }
+.kz-cizim-arac { display: flex; flex-wrap: wrap; gap: 4px; }
+.kz-cizim-arac[hidden] { display: none; }
+.kz-cizim-arac .seg-btn svg { width: 12px; height: 12px; vertical-align: -2px; }
+.kz-oniz3d.cizim canvas { cursor: crosshair; }
+.kz-kart.secili { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.sk-edit-3dbar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; flex: 0 0 auto; }
+.sk-edit-onizleme { flex: 0 0 auto; }
+.sk-edit-3dbar .seg-btn { font-size: 11.5px; }
+.sk-edit-3dbar .ic svg { width: 12px; height: 12px; vertical-align: -2px; }
+.sk-edit-onizleme canvas.cizim { cursor: crosshair; }
+.sk-edit-3dipucu { font-size: 10.5px; color: var(--text-faint); }
 @media (max-width: 1080px) {
   .kz-yerlesim { grid-template-columns: 1fr; }
   .kz-oniz3d { position: static; }

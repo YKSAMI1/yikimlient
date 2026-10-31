@@ -337,9 +337,20 @@ public final class YikimKozmetik {
         }
     }
 
-    /** Benzersiz (oyuncu, doku) → derlenmiş SkinTextures. Kare başına iş yok. */
-    private static final Map<String, Object> ONBELLEK =
-        new ConcurrentHashMap<String, Object>();
+    /** Kaynak SkinTextures → {doku anahtarı, sonuç}. Kare başına iş yok.
+     *
+     * v1.19.2 — "pelerin takınca skin gidiyor" hatasının kökü:
+     * önbellek yalnız oyuncu kimliği + doku kimlikleriyle anahtarlanıyordu.
+     * Giriş anında oyuncu varlığı (`class_742.method_52814`) henüz oyuncu
+     * listesi girişine sahip olmayabilir; o durumda vanilla
+     * `class_1068.method_4648` ile VARSAYILAN (Steve/Alex) gövdesini döndürür.
+     * Sonuç önbelleğe yazıldığı için gerçek skin sonradan gelse bile hep
+     * varsayılan gövde gösteriliyordu. Artık kaynak nesnenin kimliği de
+     * anahtarın parçası: vanilla yeni bir SkinTextures döndürdüğünde
+     * (skin yüklendiğinde) sonuç yeniden hesaplanır.
+     * Zayıf (weak) anahtar: kaynak nesne bırakılınca kayıt kendiliğinden düşer. */
+    private static final Map<Object, Object[]> ONBELLEK =
+        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<Object, Object[]>());
 
     /**
      * Oyuncunun kozmetiğini uygular; sonuç önbelleğe alınır.
@@ -348,24 +359,27 @@ public final class YikimKozmetik {
      */
     public static Object onbellekli(Object mevcut, UUID id) {
         try {
+            if (mevcut == null) {
+                return null;
+            }
             class_2960 pelerin = YikimKozmetik.pelerin(id);
             class_2960 kanat = YikimKozmetik.kanat(id);
             if (pelerin == null && kanat == null) {
                 return null;
             }
-            String anahtar = id + "|" + pelerin + "|" + kanat;
-            Object var = YikimKozmetik.ONBELLEK.get(anahtar);
-            if (var != null) {
-                return var;
+            String anahtar = pelerin + "|" + kanat;
+            Object[] kayit = YikimKozmetik.ONBELLEK.get(mevcut);
+            if (kayit != null && anahtar.equals(kayit[0])) {
+                return kayit[1];
             }
-            var = YikimKozmetik.uygula(mevcut, pelerin, kanat);
+            Object var = YikimKozmetik.uygula(mevcut, pelerin, kanat);
             if (var == null) {
                 return null;
             }
-            if (YikimKozmetik.ONBELLEK.size() > 256) {
+            if (YikimKozmetik.ONBELLEK.size() > 512) {
                 YikimKozmetik.ONBELLEK.clear();
             }
-            YikimKozmetik.ONBELLEK.put(anahtar, var);
+            YikimKozmetik.ONBELLEK.put(mevcut, new Object[] {anahtar, var});
             return var;
         }
         catch (Throwable ignored) {

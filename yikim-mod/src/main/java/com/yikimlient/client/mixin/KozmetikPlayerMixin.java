@@ -25,6 +25,12 @@ public abstract class KozmetikPlayerMixin {
                 return;
             }
             class_742 oyuncu = (class_742) (Object) this;
+            // Oyuncu listesi girişi yoksa vanilla VARSAYILAN skini (Steve/Alex)
+            // döndürür; o gövdeyi kozmetikle birlikte önbelleğe almak gerçek
+            // skini eziyordu. Giriş yoksa hiç dokunma.
+            if (oyuncu.method_3123() == null) {
+                return;
+            }
             Object yeni = YikimKozmetik.onbellekli(mevcut, oyuncu.method_5667());
             if (yeni != null) {
                 cir.setReturnValue(yeni);

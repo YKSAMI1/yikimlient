@@ -78,6 +78,13 @@ export function openSkinEditor(
         </div>
       </section>
       <aside class="sk-edit-sag">
+        <div class="sk-edit-3dbar">
+          <button class="seg-btn" id="ske-3d" title="Doğrudan modelin üstüne çiz">${icon("box")} 3D Çiz</button>
+          <span class="sk-edit-seg" id="ske-katman" hidden>
+            <button class="seg-btn aktif" data-kat="taban">Skin</button>
+            <button class="seg-btn" data-kat="ust">Overlay</button>
+          </span>
+        </div>
         <div class="sk-edit-onizleme">
           <canvas id="ske-onizleme"></canvas>
         </div>
@@ -311,6 +318,71 @@ export function openSkinEditor(
       else uyari("");
     });
   });
+
+  // ---- 3D ÇİZİM: doğrudan modelin üstüne boya (NovaSkin'deki gibi) ----
+  // Işın (raycast) sonucu dokunun 64×64 atlas pikseline çevrilir; "Skin"
+  // katmanında taban kutu, "Overlay" katmanında şapka/ceket/kolluk/pantolon
+  // hedeflenir. Böylece overlay'in altındaki skin de boyanabilir.
+  let cizim3d = false;
+  let katman3d: "taban" | "ust" = "taban";
+  let modeldeCiziyor = false;
+  const katmanKutu = sarmal.querySelector<HTMLElement>("#ske-katman");
+  const ucBoyutBtn = sarmal.querySelector<HTMLElement>("#ske-3d");
+
+  const cizim3dUygula = (acik: boolean): void => {
+    cizim3d = acik;
+    modeldeCiziyor = false;
+    sahne.etkilesimKapali = acik;
+    onizleme.classList.toggle("cizim", acik);
+    if (katmanKutu) katmanKutu.hidden = !acik;
+    ucBoyutBtn?.classList.toggle("aktif", acik);
+    if (ucBoyutBtn) ucBoyutBtn.innerHTML = `${icon("box")} ${acik ? "2D'ye dön" : "3D Çiz"}`;
+    uyari(acik ? "3D çizim açık: modelin üstüne tıkla/sürükle." : "");
+  };
+  ucBoyutBtn?.addEventListener("click", () => cizim3dUygula(!cizim3d));
+
+  sarmal.querySelectorAll<HTMLElement>("[data-kat]").forEach((b) => {
+    b.addEventListener("click", () => {
+      katman3d = b.dataset.kat === "ust" ? "ust" : "taban";
+      sarmal.querySelectorAll("[data-kat]").forEach((x) => x.classList.remove("aktif"));
+      b.classList.add("aktif");
+      uyari(
+        katman3d === "ust"
+          ? "Overlay seçili — şapka, ceket, kolluk ve pantolon üstüne çiziyorsun."
+          : "Skin (taban) seçili — overlay'in altındaki katmana çiziyorsun.",
+      );
+    });
+  });
+
+  const modelNokta = (e: PointerEvent, ilk: boolean): void => {
+    const n = sahne.atlasNoktasi(e, katman3d);
+    if (!n) return;
+    if (ilk) pafta.katmanBasla();
+    pafta.boya(n.x, n.y, boyaRengi(), kalinlik);
+    yansit();
+  };
+  onizleme.addEventListener("contextmenu", (e) => {
+    if (cizim3d) e.preventDefault();
+  });
+  onizleme.addEventListener("pointerdown", (e) => {
+    if (!cizim3d) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    modeldeCiziyor = true;
+    try {
+      onizleme.setPointerCapture(e.pointerId);
+    } catch {
+      /* pencere kapanmış olabilir */
+    }
+    modelNokta(e, true);
+  });
+  onizleme.addEventListener("pointermove", (e) => {
+    if (cizim3d && modeldeCiziyor) modelNokta(e, false);
+  });
+  const modelBirak = (): void => {
+    modeldeCiziyor = false;
+  };
+  onizleme.addEventListener("pointerup", modelBirak);
+  onizleme.addEventListener("pointercancel", modelBirak);
 
   sarmal.querySelector("#ske-bolgeler")?.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-bolge]");
