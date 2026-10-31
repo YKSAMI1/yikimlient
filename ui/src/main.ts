@@ -721,4 +721,36 @@ function fatalBoot(e: unknown): void {
   }
 }
 
+/// SICAK ARAYÜZ TAKİBİ — launcher AÇIKKEN yayınlanan yeni arayüz paketi
+/// kendiliğinden uygulanır. `surum.txt` her istekte ETKİN arayüz klasöründen
+/// sunulur (Rust `yikim_ui::etkin_dir`); sıcak paket indirilip aktif.json
+/// yazılınca bu dosya değişir. Açılışta okuduğumuz sürümden farklıysa sayfa
+/// tazelenir — böylece "kapat-aç" gerekmez.
+function arayuzSurumIzle(): void {
+  if (!(window as unknown as { __TAURI__?: unknown }).__TAURI__) return; // tarayıcı önizlemesi
+  const oku = async (): Promise<string | null> => {
+    try {
+      const y = await fetch(`surum.txt?t=${Date.now()}`, { cache: "no-store" });
+      if (!y.ok) return null;
+      const t = (await y.text()).trim();
+      return t || null;
+    } catch {
+      return null;
+    }
+  };
+  void (async () => {
+    const baslangic = await oku();
+    if (!baslangic) return;
+    const kontrol = async (): Promise<void> => {
+      // Açık modal varken (örn. güncelleme onayı) tazeleme yapma.
+      if (document.querySelector(".modal-backdrop")) return;
+      const simdi = await oku();
+      if (simdi && simdi !== baslangic) window.location.reload();
+    };
+    setTimeout(() => void kontrol(), 12_000);
+    setInterval(() => void kontrol(), 60_000);
+  })();
+}
+
 boot();
+arayuzSurumIzle();
