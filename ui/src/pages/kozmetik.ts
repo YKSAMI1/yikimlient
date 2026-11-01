@@ -280,17 +280,25 @@ function sahnayiKur(root: HTMLElement): void {
   sahne.kur(canvas);
   void (async () => {
     try {
+      // v0.6.2: cracked/offline hesapta da karakter görünür. Eskiden burada
+      // `kind !== "microsoft"` kapısı vardı → `sahne.skin(...)` hiç çağrılmıyor,
+      // model kurulmuyor ve önizleme tamamen boş kalıyordu. Artık:
+      //   1) aktif skin varsa o (premium),
+      //   2) yoksa gömülü varsayılan kart (Steve),
+      //   3) o da yoksa düz manken çizilir.
       const acc = currentAccount();
-      if (!acc || acc.kind !== "microsoft") return;
-      const hub = (await invoke("cmd_skin_hub", { id: acc.id })) as {
-        aktif?: { dosya?: string; slim?: boolean } | null;
-      };
-      const aktif = hub?.aktif;
-      if (aktif?.dosya) {
-        await sahne.skin({ url: fileSrc(aktif.dosya), slim: !!aktif.slim });
+      let kaynak: { dosya?: string; slim?: boolean } | null = null;
+      if (acc) {
+        const hub = (await invoke("cmd_skin_hub", { id: acc.id })) as {
+          aktif?: { dosya?: string; slim?: boolean } | null;
+          varsayilanlar?: { dosya?: string; slim?: boolean }[];
+        };
+        kaynak = hub?.aktif?.dosya ? hub.aktif : (hub?.varsayilanlar?.[0] ?? null);
       }
+      await sahne.skin(kaynak?.dosya ? { url: fileSrc(kaynak.dosya), slim: !!kaynak.slim } : null);
     } catch {
-      // skin alınamazsa varsayılan model kalır — önizleme yine çalışır
+      // skin alınamazsa düz manken kalır — önizleme yine çalışır
+      try { await sahne.skin(null); } catch { /* yok say */ }
     }
   })();
 }
