@@ -1,9 +1,11 @@
-// PELERİN PAFTASI — 64×32 doku, iki panel: tasarım ve iç astar.
+// PELERİN PAFTASI — 64×32 doku, iki panel: iç astar ve dış (görünen) yüz.
 //
-// Gerçek Mojang dosyalarında desen `(1,1)` panelinde, iç astar `(12,1)`
-// panelinde durur. Yanlış paneli çizmek pelerini yakınlaşmış/bozuk bir parça
-// gibi gösterir. Bu yüzden panel, dolu piksel sayısına bakılarak seçilir:
-// desen hangi panelde varsa o kullanılır (eşitlikte tasarım paneli kazanır).
+// Vanilla düzen: `(1,1)` paneli gövdeye bakan İÇ yüzdür, `(12,1)` paneli ise
+// oyunda arkadan görünen DIŞ yüzdür — tasarım oraya gider. Katalogda da
+// oyuncunun gördüğü yüz (12,1) çizilir; (1,1) çizilince kapakların "arkası"
+// görünüyordu. Bir ara "dolu panel
+// kazanır" kuralı kullanılıyordu; iki panel de boyanmış pelerinlerde yanlış
+// panel (iç astar) seçiliyor ve katalogda desen "ters" görünüyordu.
 
 import { PELERIN_DIS, PELERIN_IC, type Dilim } from "./skin-bolgeler";
 
@@ -19,7 +21,7 @@ export function pelerinHazirla(resim: CanvasImageSource & { width: number; heigh
   return tuval;
 }
 
-/** Tasarımı taşıyan paneli döner. */
+/** Pelerinde gösterilecek paneli döner: önce DIŞ yüz, boşsa iç astar. */
 export function pelerinPaneli(pafta: HTMLCanvasElement): Dilim {
   const g = pafta.getContext("2d", { willReadFrequently: true });
   if (!g) return PELERIN_DIS;
@@ -33,5 +35,6 @@ export function pelerinPaneli(pafta: HTMLCanvasElement): Dilim {
     }
     return n;
   };
-  return dolu(PELERIN_IC) > dolu(PELERIN_DIS) ? PELERIN_IC : PELERIN_DIS;
+  // Dış yüz boşsa (eski/yeni tasarımlar iç panele çizmiş olabilir) ona düş.
+  return dolu(PELERIN_DIS) > 0 ? PELERIN_DIS : PELERIN_IC;
 }

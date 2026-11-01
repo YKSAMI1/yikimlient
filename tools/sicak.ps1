@@ -52,7 +52,36 @@ foreach ($m in $mcp.mods) {
     $mods += @{ mcVersion = $m.mcVersion; file = $ojar; modVersion = $MV; url = $url; sha256 = $sha }
 }
 $exp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$sj = @{ v = 1; exp = $exp; not = $Notlar; mods = $mods; kaynaklar = @() } | ConvertTo-Json -Depth 5
+
+# KAYNAKLAR KORUNUR (KRITIK): ui ve emote paketleri tools\sicak-ui.ps1 ile
+# ayrica yayinlanir. Burada sabit @() yazmak, o girdileri manifestten SILER;
+# launcherlar bir daha arayuz paketi indirmez ve exe'si eski kullanicilar
+# eski menude takilir (v0.5.x vakasi: canli kaynaklar bos kaldi).
+# Canli manifestteki girdiler aynen tasinir; hic yoksa bos dizi kalir.
+$klr = @()
+$relOnce = $null
+try {
+    $relOnce = gh api "repos/YKSAMI1/yikimlient/releases/tags/sicak" 2>$null | ConvertFrom-Json
+} catch { $relOnce = $null }
+if ($relOnce) {
+    $mid = ($relOnce.assets | Where-Object { $_.name -eq 'sicak.json' } | Select-Object -First 1).id
+    if ($mid) {
+        try {
+            $canli = gh api "repos/YKSAMI1/yikimlient/releases/assets/$mid" --header 'Accept: application/octet-stream' 2>$null | ConvertFrom-Json
+            if ($canli -and $canli.kaynaklar) {
+                $klr = @($canli.kaynaklar)
+                Write-Host ("      korunan kaynak girdisi: {0}" -f $klr.Count)
+            }
+        } catch {
+            Write-Host "      UYARI: canli kaynaklar okunamadi (kaynaklar bos yazilacak)"
+        }
+    }
+}
+if ($klr.Count -eq 0) {
+    Write-Host "      UYARI: canli manifestte kaynak yok - arayuz sicak kanali bos kalacak"
+    Write-Host "      (arayuz yayinlamak icin: tools\sicak-ui.ps1 -Surum <surum>)"
+}
+$sj = @{ v = 1; exp = $exp; not = $Notlar; mods = $mods; kaynaklar = $klr } | ConvertTo-Json -Depth 8
 $tempJson = Join-Path $env:TEMP "sicak.json"
 [System.IO.File]::WriteAllText($tempJson, $sj, (New-Object System.Text.UTF8Encoding($false)))
 
@@ -79,6 +108,10 @@ $id = ($rel.assets | Where-Object { $_.name -eq 'sicak.json' } | Select-Object -
 $canli = gh api "repos/YKSAMI1/yikimlient/releases/assets/$id" --header 'Accept: application/octet-stream' | ConvertFrom-Json
 if ($canli.v -ne 1) { Write-Host "manifest dogrulamasi bozuk"; exit 1 }
 if ($canli.mods[0].modVersion -ne $MV) { Write-Host "manifest modVersion eslesmiyor"; exit 1 }
+# Kaynaklar (ui/emote) yayin sirasinda silinmemis mi? En sik sessiz kirilma buydu.
+$klrSon = 0
+if ($canli.kaynaklar) { $klrSon = @($canli.kaynaklar).Count }
+if ($klrSon -lt $klr.Count) { Write-Host "DOGRLAMA HATA: kaynaklar silindi ($klrSon <- $($klr.Count))"; exit 1 }
 $say = $canli.mods.Count
-Write-Host "[6/6] TAMAM - sicak kanal yayinda: mod $MV (manifest'te $say mcVersion girdisi)"
+Write-Host "[6/6] TAMAM - sicak kanal yayinda: mod $MV (manifest'te $say mcVersion girdisi, $klrSon kaynak girdisi)"
 Write-Host "      Launcherlar acilista/15 dk icinde otomatik indirip-kuracak; exe derlemesi GEREKMEDI."

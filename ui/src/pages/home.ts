@@ -390,6 +390,18 @@ async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string }
   } catch {
     await sah.skin(null);
   }
+  // Kozmetik: özel pelerin varsa ve etkinse ana menüde de görünsün (rozet gibi).
+  try {
+    const koz = (await invoke("cmd_kozmetik_oku")) as {
+      pelerin_dosya: string | null;
+      pelerin_aktif?: boolean;
+    };
+    if (koz?.pelerin_dosya && koz.pelerin_aktif !== false) {
+      await sah.pelerin({ url: fileSrc(String(koz.pelerin_dosya)) });
+    }
+  } catch {
+    // kozmetik okunamazsa pelerinsiz vitrin
+  }
   // Ayarlar → Animasyonlar: kapalıysa vitrin sadece idle durur.
   if (state.config?.menu_animasyon === false) {
     sah.emoteleriKur([]);

@@ -24,29 +24,39 @@ import java.util.UUID;
 public final class YikimSlotlar {
     public static final int SLOT_SONU = 15;
     private static final Map<UUID, Integer> SLOT = new LinkedHashMap<UUID, Integer>();
+    /// İSİM → slot: proxy/offline sunucularda ve launcher'ın yüklediği UUID
+    /// ile oyundaki entity UUID'si farklı olduğunda çizim yine bulunsun.
+    private static final Map<String, Integer> AD_SLOT = new HashMap<String, Integer>();
     private static int sonrakiSlot = 1;
     private static boolean yuklendi;
 
     private YikimSlotlar() {
     }
 
-    public static int slotOf(UUID id) {
-        synchronized (SLOT) {
-            Integer s = SLOT.get(id);
-            return s == null ? 0 : s;
-        }
+    public static synchronized int slotOf(UUID id) {
+        Integer s = SLOT.get(id);
+        return s == null ? 0 : s;
     }
 
-    /** Çizim ata (yoksa yeni slot). Kanvas doku güncellemesi tetiklenir. */
-    public static synchronized void ata(UUID id, int[] pikseller) {
+    /** İsimle slot (UUID tutmadığında yedek yol). */
+    public static synchronized int slotOfAd(String ad) {
+        if (ad == null || ad.isEmpty()) {
+            return 0;
+        }
+        Integer s = AD_SLOT.get(ad.trim().toLowerCase(java.util.Locale.ROOT));
+        return s == null ? 0 : s;
+    }
+
+    /** Çizim ata (yoksa yeni slot). Dönen: slot (0 = atanamadı). */
+    public static synchronized int ata(UUID id, int[] pikseller) {
         if (id == null || pikseller == null || pikseller.length < YikimAtolye.UZUNLUK) {
-            return;
+            return 0;
         }
         int slot = 0;
         Integer mevcut = SLOT.get(id);
         if (mevcut == null) {
             if (sonrakiSlot > SLOT_SONU) {
-                return; // slotlar dolu — nadir değil (16 oyuncu çizimi)
+                return 0; // slotlar dolu — nadir değil (16 oyuncu çizimi)
             }
             slot = sonrakiSlot++;
             SLOT.put(id, slot);
@@ -55,6 +65,41 @@ public final class YikimSlotlar {
             slot = mevcut;
         }
         YikimRozetDoku.uygula(slot, pikseller);
+        return slot;
+    }
+
+    /** Var olan slotu bir isme bağla (aynı çizim iki anahtarla aranabilsin). */
+    public static synchronized void bagla(String ad, int slot) {
+        if (ad == null || ad.isEmpty() || slot < 1 || slot > SLOT_SONU) {
+            return;
+        }
+        AD_SLOT.put(ad.trim().toLowerCase(java.util.Locale.ROOT), slot);
+    }
+
+    /**
+     * Çizimi İSİM anahtarıyla ata. UUID eşleşmesi tutmadığında (offline/proxy
+     * sunucu, launcher'ın Microsoft UUID'si ile oyundaki UUID farkı) rozetin
+     * yine çizilmesini sağlar.
+     */
+    public static synchronized int ataAd(String ad, int[] pikseller) {
+        if (ad == null || ad.isEmpty() || pikseller == null
+            || pikseller.length < YikimAtolye.UZUNLUK) {
+            return 0;
+        }
+        String anahtar = ad.trim().toLowerCase(java.util.Locale.ROOT);
+        Integer mevcut = AD_SLOT.get(anahtar);
+        int slot;
+        if (mevcut != null) {
+            slot = mevcut;
+        } else {
+            if (sonrakiSlot > SLOT_SONU) {
+                return 0;
+            }
+            slot = sonrakiSlot++;
+            AD_SLOT.put(anahtar, slot);
+        }
+        YikimRozetDoku.uygula(slot, pikseller);
+        return slot;
     }
 
     public static synchronized void temizAta(UUID id) {

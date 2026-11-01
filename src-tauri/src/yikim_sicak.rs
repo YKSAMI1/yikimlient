@@ -2,8 +2,8 @@
 //!
 //! Niçin var: küçük değişiklikler için 20 dakikalık tam derleme hattı
 //! (Rust + NSIS + iki platform CI + imzalar + latest.json) gereksizdi. Bu
-//! kanal sayesinde launcher, açılışta ve 15 dakikada bir GitHub'daki küçük
-//! bir manifest dosyasını okur; gömülü olandan yeni bir yapı varsa onu
+//! kanal sayesinde launcher, her açılışta GitHub'daki küçük bir manifest
+//! dosyasını okur; gömülü olandan yeni bir yapı varsa onu
 //! arka planda indirir ve oyunu başlatırken otomatik kurar. Exe değişmeden
 //! dağıtılır — yayınlama `tools/sicak.ps1` ile dakikalar içinde biter.
 //!
@@ -49,9 +49,7 @@ use crate::yikim_mod;
 /// --clobber ile değiştirilir; adres asla değişmez, derleme gerektirmez.
 const SICAK_URL: &str = "https://github.com/YKSAMI1/yikimlient/releases/download/sicak/sicak.json";
 
-/// Kanal dolaşımı: 15 dakikada bir manifest kontrolü (küçük bir GET isteği;
-/// değişiklik yoksa indirme olmaz).
-const DOLA: u64 = 15 * 60;
+
 
 // ---------------------------------------------------------------------------
 // şema
@@ -318,14 +316,17 @@ pub async fn yazi_senkonize(handle: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Arka plan döngüsü: hemen bir kez + 15 dakikada bir dola.
+/// Sıcak kanal: YALNIZ açılışta bir kez sorulur.
+///
+/// Bant genişliği: açılışta çekilen `sicak.json` yalnızca birkaç KB'lık bir
+/// metin. Jar (≈170 KB) SADECE yayınlanan sürümün sha256'sı yereldekiyle
+/// farklıysa indirilir; arada açılıp kapanan launcher'larda tekrar indirme
+/// olmaz. Sürekli yoklama (zamanlayıcı) bilinçli olarak YOK: kullanıcı
+/// launcher'ı her açtığında güncel sürümü alır, arka planda trafik üretmez.
 pub fn kanali_dagit(handle: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
-        loop {
-            if let Err(h) = yazi_senkonize(handle.clone()).await {
-                core::yikim_log(format!("sicak: {h}"));
-            }
-            tokio::time::sleep(std::time::Duration::from_secs(DOLA)).await;
+        if let Err(h) = yazi_senkonize(handle).await {
+            core::yikim_log(format!("sicak: {h}"));
         }
     });
 }
@@ -333,6 +334,39 @@ pub fn kanali_dagit(handle: tauri::AppHandle) {
 // ---------------------------------------------------------------------------
 // 'ui' kaynak işleyicisi — launcher ara yüzü paketi (tema/sayfalar)
 // ---------------------------------------------------------------------------
+
+/// "Bu arayüz sürümü zaten kurulu mu?" — sürüm numarası TEK BAŞINA yetmez.
+///
+/// `aktif.json` yazıldıktan sonra klasör silinirse (kullanıcı temizliği,
+/// bozuk kurulum, yarım paket) sadece sürüme bakan eski kontrol sonsuza dek
+/// "güncel" der ve launcher bir daha indirmez → kullanıcı eski arayüzde
+/// takılır. Bu yüzden klasörün gerçekten kullanılabilir olduğu (index.html
+/// var) da doğrulanır.
+fn guncel_mi(aktif: &serde_json::Value, ui_kok: &Path, yeni: &str) -> bool {
+    let Some(eski) = aktif["surum"].as_str() else {
+        return false;
+    };
+    let Some(klasor) = aktif["klasor"].as_str() else {
+        return false;
+    };
+    if klasor.is_empty()
+        || klasor.contains('/')
+        || klasor.contains('\\')
+        || klasor.contains("..")
+    {
+        return false;
+    }
+    if !ui_kok.join(klasor).join("index.html").is_file() {
+        return false;
+    }
+    match (
+        crate::yikim_mod::parse_version(eski),
+        crate::yikim_mod::parse_version(yeni),
+    ) {
+        (Some(a), Some(b)) => a >= b,
+        _ => false,
+    }
+}
 
 /// UI paketi uygula: indir → sha doğrula → zip aç → aktif.json yaz →
 /// eski sürümü temizle. Uygulama SONRAKİ AÇILIŞta etkinleşir (yikim_ui).
@@ -350,14 +384,13 @@ async fn ui_paketi_uygula(e: &serde_json::Value) -> Result<(), String> {
         return Err(format!("ui sürüm adı uygunsuz: {ver}"));
     }
 
-    // Aktif sürüm aynı/büyüksa atla (karşılaştırma: sayısal 0.3.x)
-    if let Ok(bayt) = fs::read(core::app_dir().join("ui").join("aktif.json")) {
+    // Aktif sürüm aynı/büyükse atla (karşılaştırma: sayısal 0.3.x).
+    // Klasör gerçekten duruyorsa; bozuk/silinmiş paket "güncel" sayılmaz.
+    let ui_kok_once = core::app_dir().join("ui");
+    if let Ok(bayt) = fs::read(ui_kok_once.join("aktif.json")) {
         if let Ok(js) = serde_json::from_slice::<serde_json::Value>(&bayt) {
-            if let Some(eski) = js["surum"].as_str() {
-                match (crate::yikim_mod::parse_version(eski), crate::yikim_mod::parse_version(&ver)) {
-                    (Some(a), Some(b)) if a >= b => return Ok(()), // zaten güncel
-                    _ => {}
-                }
+            if guncel_mi(&js, &ui_kok_once, &ver) {
+                return Ok(()); // zaten güncel ve sağlam
             }
         }
     }
@@ -531,5 +564,32 @@ mod tests {
         assert!(daha_yeni((1, 12, 7), (1, 12, 6)));
         assert!(!daha_yeni((1, 12, 6), (1, 12, 6)));
         assert!(daha_yeni((1, 13, 0), (1, 12, 99)));
+    }
+
+    /// Eski hata: aktif.json "0.5.13" diyor ama klasör silinmiş → launcher
+    /// bir daha indirmiyordu ("kardeşimin PC'sinde eski menü" vakası).
+    #[test]
+    fn aktif_json_tek_basina_yetmez() {
+        let kok = std::env::temp_dir().join(format!("yikim-ui-guncel-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&kok);
+        std::fs::create_dir_all(kok.join("0.5.13")).unwrap();
+        std::fs::write(kok.join("0.5.13").join("index.html"), "<!doctype html>").unwrap();
+
+        let js = serde_json::json!({ "surum": "0.5.13", "klasor": "0.5.13" });
+        assert!(guncel_mi(&js, &kok, "0.5.13"));
+        assert!(guncel_mi(&js, &kok, "0.5.12"));
+        assert!(!guncel_mi(&js, &kok, "0.5.14"));
+
+        // Klasör gitti: aynı sürüm bile yeniden indirilmeli.
+        std::fs::remove_dir_all(kok.join("0.5.13")).unwrap();
+        assert!(!guncel_mi(&js, &kok, "0.5.13"));
+
+        // Güvensiz klasör adı kabul edilmez.
+        let kotu = serde_json::json!({ "surum": "0.5.13", "klasor": "../x" });
+        assert!(!guncel_mi(&kotu, &kok, "0.5.13"));
+
+        // Eksik alanlar.
+        assert!(!guncel_mi(&serde_json::json!({}), &kok, "0.5.13"));
+        let _ = std::fs::remove_dir_all(&kok);
     }
 }

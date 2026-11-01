@@ -87,6 +87,17 @@ public final class YikimKozmetik {
         return "pelerin.png".equals(ad) ? YikimKozmetik.pelerinYerel : YikimKozmetik.kanatYerel;
     }
 
+    /** Hızlı kapı: hiçbir kozmetik yoksa (yerel dosya + uzak liste boş) hiçbir
+     *  iş yapılmaz. getSkinTextures her karede çağrılır → bu kontrol bedava
+     *  olmalı: yalnız alan okuma, kilit/ağ/reflection yok. */
+    public static boolean etkinMi() {
+        YikimKozmetik.dosyalariTazele(); // saniyede en fazla bir dosya kontrolü
+        return !YikimKozmetik.pelerinYerel.isEmpty()
+            || !YikimKozmetik.kanatYerel.isEmpty()
+            || !YikimKozmetik.UZAK_PELERIN.isEmpty()
+            || !YikimKozmetik.UZAK_KANAT.isEmpty();
+    }
+
     /** Presence gövdesine eklenecek alanlar: yalnız DEĞİŞEN kozmetik gönderilir. */
     public static synchronized String govdeEk() {
         YikimKozmetik.dosyalariTazele();
@@ -173,9 +184,21 @@ public final class YikimKozmetik {
     /** Oyuncunun pelerin dokusu (yoksa null → vanilla). */
     public static class_2960 pelerin(UUID id) {
         try {
-            String b64 = YikimKozmetik.kendim(id)
-                ? YikimKozmetik.dosyaB64("pelerin.png")
-                : YikimKozmetik.UZAK_PELERIN.get(id);
+            String b64;
+            if (YikimKozmetik.kendim(id)) {
+                // KENDİ oyuncu: launcher'ın yazdığı yerel dosya. Dosya yoksa
+                // (launcher bu kuruluma yazamadı / oyun klasörü farklı)
+                // presence sunucusundaki KENDİ tasarımımıza düşeriz —
+                // aksi hâlde "herkes benim pelerinimi görüyor ama ben
+                // görmüyorum" durumu çıkıyordu.
+                b64 = YikimKozmetik.dosyaB64("pelerin.png");
+                if (b64 == null || b64.isEmpty()) {
+                    b64 = YikimKozmetik.UZAK_PELERIN.get(id);
+                }
+            }
+            else {
+                b64 = YikimKozmetik.UZAK_PELERIN.get(id);
+            }
             return YikimKozmetik.doku("pelerin-" + id, b64);
         }
         catch (Throwable ignored) {
@@ -186,9 +209,16 @@ public final class YikimKozmetik {
     /** Oyuncunun elitra kanat dokusu (yoksa null → vanilla). */
     public static class_2960 kanat(UUID id) {
         try {
-            String b64 = YikimKozmetik.kendim(id)
-                ? YikimKozmetik.dosyaB64("elytra.png")
-                : YikimKozmetik.UZAK_KANAT.get(id);
+            String b64;
+            if (YikimKozmetik.kendim(id)) {
+                b64 = YikimKozmetik.dosyaB64("elytra.png");
+                if (b64 == null || b64.isEmpty()) {
+                    b64 = YikimKozmetik.UZAK_KANAT.get(id);
+                }
+            }
+            else {
+                b64 = YikimKozmetik.UZAK_KANAT.get(id);
+            }
             return YikimKozmetik.doku("kanat-" + id, b64);
         }
         catch (Throwable ignored) {
@@ -327,6 +357,19 @@ public final class YikimKozmetik {
         }
     }
 
+    /** İki doku kimliği (AssetInfo) AYNI metni mi gösteriyor? (doku yolu) */
+    private static boolean ayniDoku(Object a, Object b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        Object pa = YikimKozmetik.cagir(a, "comp_3627");
+        Object pb = YikimKozmetik.cagir(b, "comp_3627");
+        if (pa != null && pb != null) {
+            return pa.equals(pb);
+        }
+        return a.equals(b);
+    }
+
     private static Object cagir(Object hedef, String ad) {
         try {
             Method m = hedef.getClass().getMethod(ad);
@@ -357,9 +400,29 @@ public final class YikimKozmetik {
      * Hem PlayerListEntry hem oyuncu varlığı noktası bunu çağırır — ikinci
      * çağrı aynı nesneye düşer, çift doku kurulumu olmaz.
      */
+    /** Vanilla'nın "skin yok" varsayılanı mı? (Steve/Alex)
+     *
+     * Giriş anında oyuncu listesi girişi hazır değilken `method_52814`
+     * `class_1068.method_4648(uuid)` varsayılanını döndürür. O gövdeyi
+     * kozmetikle birlikte uygulamak gerçek skini gizlerdi; varsayılan
+     * nesneyle AYNI örnekse hiç dokunma. */
+    private static boolean varsayilanMi(Object mevcut, UUID id) {
+        try {
+            Class<?> c = YikimKozmetik.sinif("net.minecraft.class_1068");
+            if (c == null) {
+                return false;
+            }
+            Method m = c.getMethod("method_4648", UUID.class);
+            return mevcut == m.invoke(null, id);
+        }
+        catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     public static Object onbellekli(Object mevcut, UUID id) {
         try {
-            if (mevcut == null) {
+            if (mevcut == null || YikimKozmetik.varsayilanMi(mevcut, id)) {
                 return null;
             }
             class_2960 pelerin = YikimKozmetik.pelerin(id);
@@ -427,7 +490,17 @@ public final class YikimKozmetik {
                 if (p.length != 5 || p[4] != boolean.class) {
                     continue;
                 }
-                return c.newInstance(govde, yeniPelerin, yeniKanat, model, secure);
+                Object var = c.newInstance(govde, yeniPelerin, yeniKanat, model, secure);
+                // GÜVENLİK KİLİDİ (v1.19.3) — "kozmetik takınca skinim Steve
+                // oldu" hatası: yansımayla kurulan nesnenin bileşen sırası
+                // sürümler arasında değişebilir. Yeni nesnenin GÖVDE dokusu
+                // mevcutla birebir aynı değilse hiçbir şey uygulanmaz → oyuncu
+                // kendi skinini asla kaybetmez, en fazla kozmetik görünmez.
+                Object varGovde = YikimKozmetik.cagir(var, "comp_1626");
+                if (varGovde == null || !YikimKozmetik.ayniDoku(varGovde, govde)) {
+                    return null;
+                }
+                return var;
             }
         }
         catch (Throwable ignored) {

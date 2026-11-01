@@ -10,12 +10,16 @@
 
 import * as THREE from "three";
 import { Emote, Poz, SIFIR_POZ, poz as pozAl } from "./emote";
-import { pelerinHazirla, pelerinPaneli } from "./pelerin";
-import { PELERIN_DIS, type Dilim } from "./skin-bolgeler";
 
 const KS = 1 / 24; // piksel → dünya (oyuncu boyu 32px = 1.33 birim)
 
 interface Bölge { u: number; v: number; w: number; h: number; d: number; }
+
+/** Kozmetik paftası: pelerin ve elitranın ikisi de vanilla 64×32 atlasıdır. */
+const KOZ_G = 64;
+const KOZ_Y = 32;
+/** Elitra kanatlarının omuzdan dışa açılma açısı (radyan) — vanilla V duruşu. */
+const KANAT_ACISI = 0.08;
 
 /** BoxGeometry'nin bir yüzüne paftadan bölge eşler.
  *  `dikey` yalnızca alt (ny) yüzde gerekir: vanilla paftada alt yüz dikey aynalıdır. */
@@ -57,6 +61,133 @@ function kutuYap(b: Bölge, doku: THREE.Texture | null, saydam = false): THREE.M
         dokuAyarla(doku);
     }
     return new THREE.Mesh(geo, kutuMalzeme(doku, saydam));
+}
+
+/** Kozmetik kutusu UV'si: vanilla `ModelPart` cuboid düzeni, 64×32 atlas.
+ *
+ *  Pelerin texOffs(0,0) 10×16×1 · elitra texOffs(22,0) 10×20×2.
+ *  Yüz sırası: [px, nx, py, ny, pz, nz]. Alt yüz (ny) dikey aynalıdır —
+ *  vanilla paftada alt şerit ters durur. */
+function kozUV(
+    geo: THREE.BufferGeometry,
+    u: number,
+    v: number,
+    w: number,
+    h: number,
+    d: number,
+    disDisari = false,
+): void {
+    const uv = geo.attributes.uv as THREE.BufferAttribute;
+    const yaz = (yuz: number, x1: number, y1: number, x2: number, y2: number, dikey = false): void => {
+        const i = yuz * 4;
+        const ay1 = dikey ? y2 : y1;
+        const ay2 = dikey ? y1 : y2;
+        uv.setXY(i + 0, x1 / KOZ_G, 1 - ay1 / KOZ_Y);
+        uv.setXY(i + 1, x2 / KOZ_G, 1 - ay1 / KOZ_Y);
+        uv.setXY(i + 2, x1 / KOZ_G, 1 - ay2 / KOZ_Y);
+        uv.setXY(i + 3, x2 / KOZ_G, 1 - ay2 / KOZ_Y);
+    };
+    if (disDisari) {
+        // PELERİN / ELİTRA: (u+d, v+d) paneli oyunda GÖRÜNEN yüzdür — sırttan
+        // UZAKA bakan tarafa (nz) yazılır. Oyunda bu yüz arkadan göründüğü için
+        // dış panel oraya gelmeli; yan şeritler de panellerin yanına düşer.
+        yaz(0, u, v + d, u + d, v + d + h);                          // px (+x)
+        yaz(1, u + d + w, v + d, u + d + w + d, v + d + h);          // nx (−x)
+        yaz(2, u + d, v, u + d + w, v + d);                          // py (üst)
+        yaz(3, u + d + w, v, u + d + w + w, v + d, true);            // ny (alt)
+        yaz(4, u + d + w + d, v + d, u + d + w + d + w, v + d + h);  // pz (gövdeye bakan = iç)
+        yaz(5, u + d, v + d, u + d + w, v + d + h);                  // nz (dış = görünen)
+    } else {
+        yaz(0, u + d + w, v + d, u + d + w + d, v + d + h);          // px (+x)
+        yaz(1, u, v + d, u + d, v + d + h);                          // nx (−x)
+        yaz(2, u + d, v, u + d + w, v + d);                          // py (üst)
+        yaz(3, u + d + w, v, u + d + w + w, v + d, true);            // ny (alt, dikey ayna)
+        yaz(4, u + d, v + d, u + d + w, v + d + h);                  // pz (ön)
+        yaz(5, u + d + w + d, v + d, u + d + w + d + w, v + d + h);  // nz (arka)
+    }
+    uv.needsUpdate = true;
+}
+
+/** Görseli tam 64×32 paftaya oturt (HD dosyalar da doğru örneklenir). */
+function kozPaftasi(resim: CanvasImageSource & { width: number; height: number }): HTMLCanvasElement {
+    const t = document.createElement("canvas");
+    t.width = KOZ_G;
+    t.height = KOZ_Y;
+    const g = t.getContext("2d");
+    if (g) {
+        g.imageSmoothingEnabled = false;
+        g.drawImage(resim, 0, 0, KOZ_G, KOZ_Y);
+    }
+    return t;
+}
+
+/** 64×32 paftayı keskin (nearest) doku olarak sarar. */
+function atlasDoku(kaynak: CanvasImageSource): THREE.CanvasTexture {
+    const doku = new THREE.CanvasTexture(kaynak as HTMLCanvasElement);
+    dokuAyarla(doku);
+    doku.needsUpdate = true;
+    return doku;
+}
+
+/** Kutunun ALTI yüzüne piksel ızgarası ekler (3D çizim yardımı).
+ *  Izgara mesh'in çocuğudur; kutu dönerken onunla birlikte hareket eder. */
+function kutuIzgarasi(hedef: THREE.Mesh, w: number, h: number, d: number): void {
+    const hw = (w * KS) / 2;
+    const hh = (h * KS) / 2;
+    const hd = (d * KS) / 2;
+    const eps = 0.0015;
+    const malzeme = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.42,
+        depthWrite: false,
+    });
+    const cizgi = (noktalar: number[]): void => {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(noktalar, 3));
+        const l = new THREE.LineSegments(geo, malzeme);
+        l.renderOrder = 4;
+        hedef.add(l);
+    };
+    // Ön/arka (z sabit): x × y ızgarası
+    for (const z of [-hd - eps, hd + eps]) {
+        const n: number[] = [];
+        for (let i = 0; i <= w; i++) {
+            const x = -hw + i * KS;
+            n.push(x, -hh, z, x, hh, z);
+        }
+        for (let j = 0; j <= h; j++) {
+            const y = -hh + j * KS;
+            n.push(-hw, y, z, hw, y, z);
+        }
+        cizgi(n);
+    }
+    // Sol/sağ (x sabit): z × y ızgarası
+    for (const x of [-hw - eps, hw + eps]) {
+        const n: number[] = [];
+        for (let i = 0; i <= d; i++) {
+            const z = -hd + i * KS;
+            n.push(x, -hh, z, x, hh, z);
+        }
+        for (let j = 0; j <= h; j++) {
+            const y = -hh + j * KS;
+            n.push(x, y, -hd, x, y, hd);
+        }
+        cizgi(n);
+    }
+    // Üst/alt (y sabit): x × z ızgarası
+    for (const y of [-hh - eps, hh + eps]) {
+        const n: number[] = [];
+        for (let i = 0; i <= w; i++) {
+            const x = -hw + i * KS;
+            n.push(x, y, -hd, x, y, hd);
+        }
+        for (let j = 0; j <= d; j++) {
+            const z = -hd + j * KS;
+            n.push(-hw, y, z, hw, y, z);
+        }
+        cizgi(n);
+    }
 }
 
 /** Bükülebilir uzvun YARISINI üretir (dirsek / diz / bel bükülmesi).
@@ -117,11 +248,15 @@ export class Sahne {
     private kameraAci = 0;
     private kameraAciHedef = 0;
     private kameraYariCap = 2.75;
+    private kameraYariCapHedef = 2.75;
     private kameraY = 0.34;
     private surukleX: number | null = null;
     private isaretciBas: ((e: PointerEvent) => void) | null = null;
     private isaretciTasi: ((e: PointerEvent) => void) | null = null;
     private isaretciBirak: ((e: PointerEvent) => void) | null = null;
+    private tekerlek: ((e: WheelEvent) => void) | null = null;
+    private fareEngel: ((e: MouseEvent) => void) | null = null;
+    private baglamEngel: ((e: Event) => void) | null = null;
     private durum: "idle" | "emote" | "soft" = "idle";
     /** vitrin kartında göstermek için son oynanan emote adı */
     public sonOynananAd = "";
@@ -131,16 +266,23 @@ export class Sahne {
     private hiz = 1;
     private aktif: Emote | null = null;
     private tEmote = 0;
-    /** Pelerin: gövde üst yarısına (belUst) bağlı sarkan düzlem. */
+    /** Pelerin: gövde üst yarısına (belUst) bağlı sarkan KUTU (10×16×1). */
     private pelerinGrup: THREE.Group | null = null;
     private pelerinSarkac: THREE.Group | null = null;
     private pelerinDoku: THREE.Texture | null = null;
-    /** Pelerin paftasındaki tasarım paneli (64×32 atlas). */
-    private pelerinPanel: Dilim = PELERIN_DIS;
+    /** Pelerin/kanat yükleme sıra numarası — geç biten istek mesh kurmasın. */
+    private pelerinJeton = 0;
+    private kanatJeton = 0;
     private _bekleyenPelerin: { url: string } | null = null;
     /** Editör tuvallerinden gelen canlı doku. */
     private canliDoku: THREE.CanvasTexture | null = null;
-    /** Elitra kanatları (kozmetik önizleme): gövde arkasında iki düzlem. */
+    /** Son çizilen karenin zamanı — kare bütçesi (FPS sınırı) için. */
+    private sonCizimAt = 0;
+    /** Canlı tuval modu: editör tuvalleri modelin dokusunu sahiplenir. */
+    private canliMod = false;
+    /** En son beslenen pelerin tuvali — model sonradan kurulursa yeniden bağlanır. */
+    private _pelerinTuval: HTMLCanvasElement | null = null;
+    /** Elitra kanatları (kozmetik önizleme): gövde arkasında iki kutu. */
     private kanatGrup: THREE.Group | null = null;
     private kanatDoku: THREE.Texture | null = null;
     /** Kanatların son çizilen paftası — model yeniden kurulunca tekrar bağlanır. */
@@ -151,8 +293,20 @@ export class Sahne {
     /** Oyuncu gizle/göster: kozmetik mesh'leri dışındaki tüm parçalar. */
     private oyuncuMeshler: THREE.Mesh[] = [];
     private oyuncuGorunur = true;
-    /** 3D çizimde kamera sürüklemeyi kapatır (çizim olayları tuvali kullanır). */
+    /** 3D çizimde sol tuş boyamaya ayrılır; sağ tuşla döndürme açık kalır. */
     public etkilesimKapali = false;
+    /** Dikey yörünge (yukarıdan/aşağıdan bakış). */
+    private kameraEgim = 0;
+    private kameraEgimHedef = 0;
+    private surukleY: number | null = null;
+    /** Üst (overlay) katman görünürlüğü. */
+    private kaplamaGorunur = true;
+    /** Pelerin + elitra görünürlüğü (skin düzenleyicide aç/kapa). */
+    private kozmetikGorunur = true;
+    /** 3D çizimde piksel sınırlarını gösteren ızgara. */
+    private izgaraAcik = false;
+    /** Skin düzenleyicide modelin (gövde/kafa/kollar) üstünde piksel ızgarası. */
+    private modelIzgaraAcik = false;
 
     /** Sahneyi başlatır; yeniden çağrılırsa öncekini temizler. */
     /** Sahneyi boşalt: eski model, ışıklar ve kalan her şey.
@@ -180,6 +334,9 @@ export class Sahne {
     kur(canvas: HTMLCanvasElement): void {
         if (this.renderer) this.kapati();
         this.sahneTemizle();
+        // Yeni tuval = yeni sayfa: ızgara durumu sıfırlanır (önceki sayfadan taşınmaz).
+        this.izgaraAcik = false;
+        this.modelIzgaraAcik = false;
         this.canvas = canvas;
         try {
             this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
@@ -196,6 +353,8 @@ export class Sahne {
         this.scene.add(dolgu);
         this.camera.position.set(0, 0.34, 2.75);
         this.camera.lookAt(0, 0.02, 0);
+        this.kameraYariCap = 2.75;
+        this.kameraYariCapHedef = 2.75;
         this.yorungeKur(canvas);
         this.boyutla = () => {
             if (!this.renderer) return;
@@ -222,22 +381,33 @@ export class Sahne {
         canvas.style.cursor = "grab";
         canvas.style.touchAction = "pan-y";
         this.isaretciBas = (e: PointerEvent) => {
-            if (this.etkilesimKapali) return;
-            if (e.pointerType === "mouse" && e.button !== 0) return;
+            // Orta tuş ve sağ tuş HER ZAMAN döndürür (Döndür düğmesine gerek yok).
+            // 3D çizimde sol tuş fırçaya aittir; 2D önizlemede sol tuş da döndürür.
+            if (e.pointerType === "mouse") {
+                const sol = e.button === 0;
+                if (sol && this.etkilesimKapali) return;
+                if (!sol && e.button !== 1 && e.button !== 2) return;
+            }
             this.surukleX = e.clientX;
+            this.surukleY = e.clientY;
             canvas.style.cursor = "grabbing";
             try { canvas.setPointerCapture(e.pointerId); } catch { /* pencere kapanmış olabilir */ }
         };
         this.isaretciTasi = (e: PointerEvent) => {
             if (this.surukleX === null) return;
             const dx = e.clientX - this.surukleX;
+            const dy = e.clientY - (this.surukleY ?? e.clientY);
             this.surukleX = e.clientX;
-            // sağa sürükle → karakter sağa döner (kamera sola kayar)
+            this.surukleY = e.clientY;
+            // sağa sürükle → karakter etrafında dön (kamera sola kayar)
             this.kameraAciHedef -= dx * 0.008;
+            // yukarı/aşağı sürükle → yukarıdan/aşağıdan bakış
+            this.kameraEgimHedef = Math.max(-0.55, Math.min(0.95, this.kameraEgimHedef + dy * 0.006));
         };
         this.isaretciBirak = (e: PointerEvent) => {
             if (this.surukleX === null) return;
             this.surukleX = null;
+            this.surukleY = null;
             canvas.style.cursor = "grab";
             try { canvas.releasePointerCapture(e.pointerId); } catch { /* zaten bırakılmış */ }
         };
@@ -245,6 +415,32 @@ export class Sahne {
         canvas.addEventListener("pointermove", this.isaretciTasi);
         canvas.addEventListener("pointerup", this.isaretciBirak);
         canvas.addEventListener("pointercancel", this.isaretciBirak);
+        // ORTA/SAG TUS: tarayicinin "kaydirma imleci" (autoscroll) devreye
+        // girmesin. Aksi halde orta tusla dondururken sayfa kayiyor ve
+        // karakter duzgun donmuyordu. Chrome autoscroll'u mousedown'in
+        // varsayilan davranisiyla baslatir → mousedown + auxclick birlikte.
+        this.fareEngel = (e: MouseEvent): void => {
+            if (e.button === 1) e.preventDefault();
+        };
+        this.baglamEngel = (e: Event): void => e.preventDefault();
+        canvas.addEventListener("mousedown", this.fareEngel);
+        canvas.addEventListener("auxclick", this.fareEngel);
+        canvas.addEventListener("contextmenu", this.baglamEngel);
+        // ORTA/SAG TUS: tarayicinin "kaydirma imleci" (autoscroll) ve baglam
+        // menusu devreye girmesin. Aksi halde orta tusla dondururken sayfa
+        // kayiyor ve karakter duzgun donmuyordu. `mousedown` da yakalanir:
+        // Chrome autoscroll'u mousedown'in varsayilan davranisiyla baslatir.
+        this.fareEngel = (e: MouseEvent) => {
+            if (e.button === 1) {
+                e.preventDefault();
+            }
+        };
+        // Tekerlek: karaktere yaklaş / uzaklaş (sayfa kaymasın diye preventDefault).
+        this.tekerlek = (e: WheelEvent) => {
+            e.preventDefault();
+            this.zoomAyarla(this.kameraYariCapHedef * (e.deltaY > 0 ? 1.12 : 0.89));
+        };
+        canvas.addEventListener("wheel", this.tekerlek, { passive: false });
     }
 
     /** Yörünge dinleyicilerini bırakır (yeniden kurma / kapatma). */
@@ -262,15 +458,80 @@ export class Sahne {
         this.isaretciTasi = null;
         this.isaretciBirak = null;
         this.surukleX = null;
+        if (c && this.tekerlek) c.removeEventListener("wheel", this.tekerlek);
+        this.tekerlek = null;
+        if (c && this.fareEngel) {
+            c.removeEventListener("mousedown", this.fareEngel);
+            c.removeEventListener("auxclick", this.fareEngel);
+        }
+        this.fareEngel = null;
+        if (c && this.baglamEngel) c.removeEventListener("contextmenu", this.baglamEngel);
+        this.baglamEngel = null;
     }
 
-    /** Yörünge açısını yumuşatıp kamerayı yerleştirir. */
+    /** CSS ile boyut değişince renderer'ı yeniden ölçekle (mod geçişleri). */
+    boyutGuncelle(): void {
+        this.boyutla?.();
+    }
+
+    /** Kamera mesafesi — küçük değer = yakın (yakınlaştırılmış) görünüm. */
+    zoomAyarla(mesafe: number): void {
+        this.kameraYariCapHedef = Math.max(1.05, Math.min(5.5, mesafe));
+    }
+
+    /** Anlık kamera mesafesi. */
+    zoomAl(): number {
+        return this.kameraYariCapHedef;
+    }
+
+    /** Yörünge açısını yumuşatıp kamerayı yerleştirir (yatay + dikey). */
     private kameraGuncelle(dt: number): void {
         const f = Math.min(1, dt * 14);
         this.kameraAci += (this.kameraAciHedef - this.kameraAci) * f;
+        this.kameraEgim += (this.kameraEgimHedef - this.kameraEgim) * f;
+        this.kameraYariCap += (this.kameraYariCapHedef - this.kameraYariCap) * Math.min(1, dt * 10);
         const r = this.kameraYariCap;
-        this.camera.position.set(Math.sin(this.kameraAci) * r, this.kameraY, Math.cos(this.kameraAci) * r);
+        const yatay = Math.cos(this.kameraEgim) * r;
+        this.camera.position.set(
+            Math.sin(this.kameraAci) * yatay,
+            this.kameraY + Math.sin(this.kameraEgim) * r,
+            Math.cos(this.kameraAci) * yatay,
+        );
         this.camera.lookAt(0, 0.02, 0);
+    }
+
+    /** Bakış açısını ayarla: 0 = ön, π = arka, negatif/pozitif = yanlar. */
+    bakisaAyarla(aci: number, egim = 0): void {
+        this.kameraAciHedef = aci;
+        this.kameraEgimHedef = Math.max(-0.55, Math.min(0.95, egim));
+    }
+
+    /** Oyuncu parçasını göster/gizle (3D düzenlemede parça aç-kapa). */
+    parcaGoster(parca: "kafa" | "govde" | "kollar" | "bacaklar", acik: boolean): void {
+        const k = this.kemikler;
+        if (!k) return;
+        if (parca === "kafa") k.head.visible = acik;
+        else if (parca === "govde") k.body.visible = acik;
+        else if (parca === "kollar") {
+            k.armL.visible = acik;
+            k.armR.visible = acik;
+        } else {
+            k.legL.visible = acik;
+            k.legR.visible = acik;
+        }
+    }
+
+    /** Üst (overlay) katmanı göster/gizle. */
+    kaplamaGoster(acik: boolean): void {
+        this.kaplamaGorunur = acik;
+        for (const m of this.ustMeshler) m.visible = acik && this.oyuncuGorunur;
+    }
+
+    /** Kozmetikleri (pelerin + elitra) göster/gizle — skin düzenleyicide katman. */
+    kozmetikGoster(acik: boolean): void {
+        this.kozmetikGorunur = acik;
+        if (this.pelerinGrup) this.pelerinGrup.visible = acik;
+        if (this.kanatGrup) this.kanatGrup.visible = acik;
     }
 
     private _bekleyenSkin: { url: string; slim: boolean } | null = null;
@@ -306,6 +567,9 @@ export class Sahne {
 
     /** Skin yükler (asset-protocol/file URL); null ise düz manken. */
     async skin(skin: { url: string; slim: boolean } | null): Promise<void> {
+        // Canlı tuval (skin/kozmetik editörü) devraldıysa geç gelen skin yanıtı
+        // modeli ezmemeli — yoksa 3D çizimde yapılan boyama görünmez.
+        this.canliMod = false;
         let doku: THREE.Texture | null = null;
         if (skin?.url) {
             try {
@@ -328,58 +592,82 @@ export class Sahne {
                 }
             } catch { doku = null; }
         }
+        if (this.canliMod) return; // bu arada canlı tuval bağlandı → onu koru
         this._bekleyenSkin = skin; // edge: kur() çağrısından önce geldiyse kur After re-apply
         this.modelKur(doku, skin?.slim || false);
     }
 
-    /** Pelerin yükler (64×32 pafta, görünen yüz 1,1–11,17); null → pelerini kaldırır. */
+    /** Pelerin yükler (tam 64×32 vanilla paftası); null → pelerini kaldırır. */
     async pelerin(p: { url: string } | null): Promise<void> {
         this._bekleyenPelerin = p;
         this.pelerinTemizle();
+        this._pelerinTuval = null;
         if (!p?.url) return;
+        // SIRA KORUMASI: arka arkaya iki yükleme gelirse (önce Mojang pelerini,
+        // sonra özel kozmetik) geç biten istek ikinci bir pelerin mesh'i
+        // kuruyordu → üst üste binen iki pelerin. Yalnız SON istek kurar.
+        const jeton = ++this.pelerinJeton;
         try {
             const resim = await this.dokuResmi(p.url);
-            // 64×32 ızgarasına indir + desenin bulunduğu paneli seç.
-            const pafta = pelerinHazirla(resim);
-            this.pelerinPanel = pelerinPaneli(pafta);
-            const doku = new THREE.Texture(pafta);
-            dokuAyarla(doku);
-            doku.needsUpdate = true;
-            this.pelerinDoku = doku;
+            if (jeton !== this.pelerinJeton) return;
+            this.pelerinDoku = atlasDoku(kozPaftasi(resim));
             this.pelerinMeshKur();
         } catch { /* pelerin yüklenemedi — pelerinsiz devam */ }
     }
 
     /**
      * Pelerini doğrudan bir TUVALDEN besle (launcher önizlemesi).
-     * `pelerin(url)` ağdan görsel çeker; editör tuvalleri ise her fırça
-     * darbesinde tazelenir — bu yüzden ayrı yol.
+     * Aynı tuval her fırça darbesinde tazelenir → doku yeniden kurulmaz,
+     * yalnız `needsUpdate` işaretlenir (geometri yeniden inşa edilmez).
      */
     pelerinTuval(pafta: HTMLCanvasElement | null): void {
         this._bekleyenPelerin = null;
+        this._pelerinTuval = pafta;
+        if (!pafta) {
+            this.pelerinTemizle();
+            return;
+        }
+        if (this.pelerinDoku && (this.pelerinDoku as THREE.CanvasTexture).image === pafta) {
+            this.pelerinDoku.needsUpdate = true;
+            return;
+        }
         this.pelerinTemizle();
-        if (!pafta) return;
-        const doku = new THREE.CanvasTexture(pafta);
-        dokuAyarla(doku);
-        doku.needsUpdate = true;
-        this.pelerinDoku = doku;
-        this.pelerinPanel = PELERIN_DIS;
+        this.pelerinDoku = atlasDoku(pafta);
         this.pelerinMeshKur();
+    }
+
+    /** Elitrayı ağdan yükle (tam 64×32 vanilla paftası). */
+    async kanat(p: { url: string } | null): Promise<void> {
+        this._bekleyenKanat = null;
+        this.kanatTemizle();
+        if (!p?.url) return;
+        const jeton = ++this.kanatJeton;
+        try {
+            const resim = await this.dokuResmi(p.url);
+            if (jeton !== this.kanatJeton) return;
+            this.kanatDoku = atlasDoku(kozPaftasi(resim));
+            this.kanatMeshKur();
+        } catch { /* kanat yüklenemedi — kanatsız devam */ }
     }
 
     /** Kanatları (elitra paftası 64×32) tuvallerden besle; null → kanatları kaldırır. */
     kanatTuval(pafta: HTMLCanvasElement | null): void {
         this._bekleyenKanat = pafta;
+        if (!pafta) {
+            this.kanatTemizle();
+            return;
+        }
+        if (this.kanatDoku && (this.kanatDoku as THREE.CanvasTexture).image === pafta) {
+            this.kanatDoku.needsUpdate = true;
+            return;
+        }
         this.kanatTemizle();
-        if (!pafta) return;
-        const doku = new THREE.CanvasTexture(pafta);
-        dokuAyarla(doku);
-        doku.needsUpdate = true;
-        this.kanatDoku = doku;
+        this.kanatDoku = atlasDoku(pafta);
         this.kanatMeshKur();
     }
 
-    private kanatTemizle(): void {
+    /** Kanat mesh'lerini kaldırır — DOKUYA dokunmaz. */
+    private kanatMeshSil(): void {
         if (this.kanatGrup?.parent) this.kanatGrup.parent.remove(this.kanatGrup);
         this.kanatGrup?.traverse((o) => {
             const m = o as THREE.Mesh;
@@ -388,20 +676,24 @@ export class Sahne {
             mat?.dispose();
         });
         this.kanatGrup = null;
+    }
+
+    private kanatTemizle(): void {
+        this.kanatMeshSil();
         this.kanatDoku?.dispose();
         this.kanatDoku = null;
     }
 
-    /** Elitra kanatları: sırtın üstünden (omuz hizası) aşağı sarkan iki kanat.
+    /** Elitra kanatları — vanilla elitra gibi İKİ KUTU (10×20×2).
      *
-     *  Vanilla elitra 10×20 piksel kanat adası kullanır ve kanatlar üst kenardan
-     *  (omuzdan) bağlanır. Daha önce düzlemin MERKEZİ grupta duruyordu; bu yüzden
-     *  kanatların yarısı başın üstüne taşıyor ve önizleme bozuk görünüyordu.
-     *  Artık geometri, dönme noktası kanadın üst-iç köşesine gelecek şekilde
-     *  kaydırılıyor. */
+     *  Doku tam 64×32 atlasından okunur: her kanat vanilla `uv(22,0)` kutu
+     *  düzenini kullanır. Sağ kanat vanilyadaki gibi aynalanır (`scale.x = −1`),
+     *  bu yüzden iki kanat aynı atlas bölgelerini ayna olarak gösterir —
+     *  oyundaki görünümle birebir aynıdır. */
     private kanatMeshKur(): void {
         const belUst = this.bukulenler?.belUst;
         if (!belUst || !this.kanatDoku) return;
+        if (this.kanatGrup) this.kanatMeshSil(); // çift mesh imkânsız
         const mat = new THREE.MeshLambertMaterial({
             map: this.kanatDoku,
             transparent: true,
@@ -409,34 +701,77 @@ export class Sahne {
             side: THREE.DoubleSide,
         });
         const grup = new THREE.Group();
-        // belUst dünyada y=18 (bel); +4 → omuz hizası (22). Sırtın 2,1 px arkası.
-        grup.position.set(0, 4 * KS, -2.1 * KS);
+        // belUst dünyada y=18 (bel); +6 px = omuz/gövde üstü (24).
+        // Kanatlar sırtın TAMAMEN arkasında durur (z −5…−3): gövdeyi ve kolları
+        // kaplamaz, oyun içindeki gibi omuzdan aşağı sarkar.
+        grup.position.set(0, 6 * KS, -3 * KS);
         for (const yon of [-1, 1]) {
-            const geo = new THREE.PlaneGeometry(10 * KS, 20 * KS);
-            // Dönme noktası: kanadın ÜST-İÇ köşesi (gövdeye bağlandığı yer).
-            geo.translate(yon * 5 * KS, -10 * KS, 0);
-            const uv = geo.attributes.uv as THREE.BufferAttribute;
-            const u1 = 24 / 64;
-            const u2 = 34 / 64;
-            const vUst = 1 - 2 / 32;
-            const vAlt = 1 - 22 / 32;
-            uv.setXY(0, u1, vUst);
-            uv.setXY(1, u2, vUst);
-            uv.setXY(2, u1, vAlt);
-            uv.setXY(3, u2, vAlt);
-            uv.needsUpdate = true;
+            // Her kanat kendi omuz pivounda döner → üst kenar sabit kalır, alt uç
+            // dışa açılır (vanilla elitranın V duruşu, ters görünmez).
+            const eklem = new THREE.Group();
+            eklem.position.set(yon * 5 * KS, 0, 0);
+            const geo = new THREE.BoxGeometry(10 * KS, 20 * KS, 2 * KS);
+            kozUV(geo, 22, 0, 10, 20, 2, true);
             const kanat = new THREE.Mesh(geo, mat);
-            // Dışa açılma (±26°) + hafif aşağı eğim: oyun içi elitra silueti.
-            kanat.rotation.y = yon * 0.46;
-            kanat.rotation.z = -yon * 0.14;
-            kanat.rotation.x = -0.05;
-            grup.add(kanat);
+            // v0.5.7: kanat kutusu pivotun MERKEZINE oturur (eskiden +yon*5 ile
+            // dışa kaydırılmıştı → iki kanat arasında 10 px'lik kocaman boşluk
+            // kalıyor, kanatlar omuzların dışına taşıyordu). Artık iç kenarlar
+            // tam ortada birleşir: toplam genişlik 20 px = vanilla elitra.
+            kanat.position.set(0, -10 * KS, -KS);
+            if (yon < 0) kanat.scale.x = -1; // vanilla `right_wing` mirror
+            kutuIzgarasi(kanat, 10, 20, 2);
+            eklem.add(kanat);
+            eklem.rotation.z = yon * KANAT_ACISI;
+            eklem.rotation.y = yon * 0.07; // dış kenarlar hafif arkaya
+            eklem.rotation.x = 0.06;       // alt uç sırttan hafif ayrık
+            eklem.userData.yon = yon;
+            grup.add(eklem);
         }
+        grup.visible = this.kozmetikGorunur;
         belUst.add(grup);
         this.kanatGrup = grup;
+        this.izgaraYenile();
     }
 
-    private pelerinTemizle(): void {
+    /** 3D çizimde piksel sınırları: kutuların her yüzünde ince ızgara. */
+    izgaraGoster(acik: boolean, model = false): void {
+        this.izgaraAcik = acik;
+        this.modelIzgaraAcik = acik && model;
+        if (this.modelIzgaraAcik) this.modelIzgaralari();
+        this.izgaraYenile();
+    }
+
+    private izgaraYenile(): void {
+        for (const kok of [this.pelerinGrup, this.kanatGrup]) {
+            kok?.traverse((o) => {
+                if ((o as THREE.LineSegments).isLineSegments) o.visible = this.izgaraAcik;
+            });
+        }
+        for (const m of [...this.tabanMeshler, ...this.ustMeshler]) {
+            for (const c of m.children) {
+                if ((c as THREE.LineSegments).isLineSegments) c.visible = this.modelIzgaraAcik;
+            }
+        }
+    }
+
+    /** Modelin her kutusuna piksel ızgarası ekler ("matris karakterin üstünde").
+     *  Yalnız 3D düzenlemede açılır; mesh başına bir kez kurulur. */
+    private modelIzgaralari(): void {
+        for (const m of [...this.tabanMeshler, ...this.ustMeshler]) {
+            if (m.children.some((c) => (c as THREE.LineSegments).isLineSegments)) continue;
+            const p = (m.geometry as THREE.BoxGeometry).parameters as
+                | { width: number; height: number; depth: number }
+                | undefined;
+            if (!p) continue;
+            const w = Math.max(1, Math.round(p.width / KS));
+            const h = Math.max(1, Math.round(p.height / KS));
+            const d = Math.max(1, Math.round(p.depth / KS));
+            kutuIzgarasi(m, w, h, d);
+        }
+    }
+
+    /** Pelerin mesh'ini kaldırır — DOKUYA dokunmaz (yeni mesh aynı dokuyu kullanır). */
+    private pelerinMeshSil(): void {
         if (this.pelerinGrup?.parent) this.pelerinGrup.parent.remove(this.pelerinGrup);
         this.pelerinGrup?.traverse((o) => {
             const m = o as THREE.Mesh;
@@ -446,25 +781,22 @@ export class Sahne {
         });
         this.pelerinGrup = null;
         this.pelerinSarkac = null;
+    }
+
+    private pelerinTemizle(): void {
+        this.pelerinMeshSil();
         this.pelerinDoku?.dispose();
         this.pelerinDoku = null;
     }
 
+    /** Pelerin — vanilla `CapeFeatureRenderer` gibi 10×16×1 kutu (texOffs 0,0).
+     *  Düzlem yerine kutu olması üst/alt/yan yüzlerin de boyanabilmesini sağlar. */
     private pelerinMeshKur(): void {
         const belUst = this.bukulenler?.belUst;
         if (!belUst || !this.pelerinDoku) return;
-        const geo = new THREE.PlaneGeometry(10 * KS, 16 * KS);
-        // 64×32 pelerin paftası: tasarımı taşıyan panel (genelde (1,1)–(11,17)).
-        // Ayna almaması için düzlem arkaya dönük (rotation.y = π) ve u soldan sağa artar.
-        const uv = geo.attributes.uv as THREE.BufferAttribute;
-        const p = this.pelerinPanel;
-        const u1 = p.x / 64, u2 = (p.x + p.w) / 64;
-        const vUst = 1 - 1 / 32, vAlt = 1 - 17 / 32;
-        uv.setXY(0, u1, vUst);
-        uv.setXY(1, u2, vUst);
-        uv.setXY(2, u1, vAlt);
-        uv.setXY(3, u2, vAlt);
-        uv.needsUpdate = true;
+        if (this.pelerinGrup) this.pelerinMeshSil(); // çift mesh imkânsız
+        const geo = new THREE.BoxGeometry(10 * KS, 16 * KS, 1 * KS);
+        kozUV(geo, 0, 0, 10, 16, 1, true);
         const mat = new THREE.MeshLambertMaterial({
             map: this.pelerinDoku,
             transparent: true,
@@ -472,17 +804,18 @@ export class Sahne {
             side: THREE.DoubleSide,
         });
         const mesh = new THREE.Mesh(geo, mat);
-        // Düzlem -Z'ye baksın: arkadan bakan kamera dokuyu düz (aynasız) okur.
-        mesh.rotation.y = Math.PI;
         mesh.position.set(0, -8 * KS, 0);
+        kutuIzgarasi(mesh, 10, 16, 1);
 
         const sarkan = new THREE.Group();
         sarkan.position.set(0, 6 * KS, -2.5 * KS);
         sarkan.rotation.x = 0.06; // hafif dışa salınım (gövdeye doğru değil)
+        sarkan.visible = this.kozmetikGorunur;
         sarkan.add(mesh);
         belUst.add(sarkan);
         this.pelerinGrup = sarkan;
         this.pelerinSarkac = sarkan;
+        this.izgaraYenile();
     }
 
     /** Editör tuvalleri için canlı doku kurar (slim değişince model yeniden kurulur). */
@@ -490,6 +823,8 @@ export class Sahne {
         const doku = new THREE.CanvasTexture(kaynak);
         dokuAyarla(doku);
         doku.needsUpdate = true;
+        this.canliMod = true; // geç gelen skin yanıtları modeli artık ezemez
+        this._bekleyenSkin = null;
         this.canliDoku = doku;
         this.modelKur(doku, slim);
     }
@@ -497,37 +832,45 @@ export class Sahne {
     /** Tuvalde çizim yapıldıktan sonra dokuyu tazeler (yeniden kurmadan). */
     dokuTazele(): void {
         if (this.canliDoku) this.canliDoku.needsUpdate = true;
+        if (this.pelerinDoku) this.pelerinDoku.needsUpdate = true;
+        if (this.kanatDoku) this.kanatDoku.needsUpdate = true;
     }
 
     /** Oyuncu modelini gizle/göster — kozmetik (pelerin/kanat) görünür kalır. */
     oyuncuGoster(goster: boolean): void {
         this.oyuncuGorunur = goster;
-        for (const m of this.oyuncuMeshler) m.visible = goster;
+        for (const m of this.oyuncuMeshler) {
+            const ustMu = this.ustMeshler.includes(m);
+            m.visible = goster && (!ustMu || this.kaplamaGorunur);
+        }
     }
 
     /** 3D çizim (skin): tuval olayı → 64×64 atlas pikseli. */
-    atlasNoktasi(e: PointerEvent, katman: "taban" | "ust" = "taban"): { x: number; y: number } | null {
+    atlasNoktasi(e: PointerEvent, katman: "taban" | "ust" | "oto" = "taban"): { x: number; y: number } | null {
+        if (katman === "oto") {
+            // OTOMATİK: ışın hem taban hem overlay kutularına çarpıp EN YAKIN
+            // yüzeyi seçer. Böylece ceket/şapka üstüne tıklayınca doğrudan
+            // overlay bölgesine, çıplak deriye tıklayınca skine boyanır.
+            // (Eskiden varsayılan "taban"dı: kullanıcı Overlay'i açsa bile
+            // boya alttaki skine gidiyordu.)
+            return this.isin(e, [...this.tabanMeshler, ...this.ustMeshler], 64, 64);
+        }
         const hedef = katman === "ust" ? this.ustMeshler : this.tabanMeshler;
         return this.isin(e, hedef, 64, 64);
     }
 
-    /** 3D çizim (kozmetik): tasarım ızgarasındaki piksel (pelerin 10×16 · kanat 10×20). */
+    /** 3D çizim (kozmetik): doğrudan 64×32 atlas pikseli.
+     *
+     *  Model kutularının UV'si atlasa birebir eşlendiği için ışın sonucu
+     *  olduğu gibi kullanılır; ön/arka/yan/üst/alt bütün yüzler boyanabilir. */
     kozmetikNoktasi(e: PointerEvent, tur: "pelerin" | "kanat"): { x: number; y: number } | null {
         if (tur === "pelerin") {
             if (!this.pelerinGrup) return null;
-            const n = this.isin(e, this.pelerinGrup.children, 64, 32);
-            if (!n) return null;
-            const p = this.pelerinPanel;
-            const x = n.x - p.x;
-            const y = n.y - p.y;
-            return x < 0 || y < 0 || x >= p.w || y >= p.h ? null : { x, y };
+            return this.isin(e, [this.pelerinGrup], KOZ_G, KOZ_Y);
         }
         if (!this.kanatGrup) return null;
-        const n = this.isin(e, this.kanatGrup.children, 64, 32);
-        if (!n) return null;
-        const x = n.x - 24;
-        const y = n.y - 2;
-        return x < 0 || y < 0 || x >= 10 || y >= 20 ? null : { x, y };
+        // Kanatlar omuz pivot gruplarının içinde → özyinelemeli ışın gerekir.
+        return this.isin(e, [this.kanatGrup], KOZ_G, KOZ_Y);
     }
 
     /** Işın: tuval koordinatı → dokudaki piksel (gw×gh doku). */
@@ -542,7 +885,7 @@ export class Sahne {
         );
         const ray = new THREE.Raycaster();
         ray.setFromCamera(ndc, this.camera);
-        const kesisim = ray.intersectObjects(nesneler, false).find((h) => !!h.uv);
+        const kesisim = ray.intersectObjects(nesneler, true).find((h) => !!h.uv);
         if (!kesisim?.uv) return null;
         const x = Math.min(gw - 1, Math.max(0, Math.floor(kesisim.uv.x * gw)));
         const y = Math.min(gh - 1, Math.max(0, Math.floor((1 - kesisim.uv.y) * gh)));
@@ -701,9 +1044,16 @@ export class Sahne {
         this.scene.add(this.kok);
         if (!this.oyuncuGorunur) {
             for (const m of this.oyuncuMeshler) m.visible = false;
+        } else if (!this.kaplamaGorunur) {
+            for (const m of this.ustMeshler) m.visible = false;
         }
+        // Izgara açıksa yeni modelin kutularına da ekle (model yeniden kurulur).
+        if (this.modelIzgaraAcik) this.modelIzgaralari();
         // Bekleyen pelerini yeni modele bağla (kur()/skin() sonrası).
-        if (this._bekleyenPelerin) {
+        if (this._pelerinTuval && this.pelerinDoku) {
+            // Editor tuvali: doku hazır, yalnız mesh'i yeni gövdeye as.
+            this.pelerinMeshKur();
+        } else if (this._bekleyenPelerin) {
             if (this.pelerinDoku) this.pelerinMeshKur();
             else void this.pelerin(this._bekleyenPelerin);
         }
@@ -738,6 +1088,12 @@ export class Sahne {
             // ARKA PLANDA: launcher gizli/minimize iken render + animasyonu durdur
             // (GPU/CPU tasarrufu — görünür olunca kaldığı yerden devam eder)
             if (document.hidden) return;
+            // KARE BÜTÇESİ (v0.5.5): önizleme 45 FPS'e yeter; pencere odakta
+            // değilken (oyun önde) yalnız seyrek kare çizilir → GPU oyuna kalır.
+            const simdi = performance.now();
+            const aralik = document.hasFocus() ? 1000 / 45 : 1000 / 4;
+            if (simdi - this.sonCizimAt < aralik) return;
+            this.sonCizimAt = simdi;
             const dt = Math.min(0.05, this.saat.getDelta());
             this.zaman += dt;
             this.adimla(dt);
@@ -794,8 +1150,14 @@ export class Sahne {
     private kanatSalin(): void {
         const g = this.kanatGrup;
         if (!g) return;
-        g.rotation.x = -0.02 + Math.sin(this.zaman * 2.1) * 0.05;
-        g.position.y = 4 * KS + Math.sin(this.zaman * 2.1) * 0.35 * KS;
+        const ch = Math.sin(this.zaman * 2.1);
+        g.rotation.x = ch * 0.045;
+        g.position.y = 6 * KS + ch * 0.3 * KS;
+        // Kanatlar hafifçe açılıp kapanır (vanilla elitra "nefes"i).
+        for (const cocuk of g.children) {
+            const yon = (cocuk.userData.yon as number) ?? 1;
+            cocuk.rotation.z = yon * (KANAT_ACISI + Math.max(0, ch) * 0.035);
+        }
     }
 
     /** Pelerin salınımı: idle'da hafif, emote sırasında geniş. Pozitif açı = gövdeden dışa. */
@@ -899,6 +1261,7 @@ export class Sahne {
         this.kanatTemizle();
         this._bekleyenPelerin = null;
         this._bekleyenKanat = null;
+        this._pelerinTuval = null;
         this.canliDoku?.dispose();
         this.canliDoku = null;
         this.renderer?.dispose();

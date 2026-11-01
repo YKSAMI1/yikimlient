@@ -64,20 +64,58 @@ public abstract class PlayerBadgeMixin {
         return false;
     }
 
+    /**
+     * Oyuncunun HESAP adı (roster) — yoksa görünen ad. Rozet glifi UUID ile
+     * bulunamazsa bu isimle aranır: offline/proxy sunucuda ve launcher'ın
+     * Microsoft UUID'siyle yüklediği çizimlerde tek eşleşme yolu budur.
+     */
+    private static String yikim$oyuncuAdi(class_1297 e) {
+        try {
+            class_310 mc = class_310.method_1551();
+            if (mc.method_1562() != null) {
+                class_640 giris = mc.method_1562().method_2871(e.method_5667());
+                if (giris != null && giris.method_2966() != null) {
+                    String ad = giris.method_2966().name();
+                    if (ad != null && !ad.isEmpty()) {
+                        return ad;
+                    }
+                }
+            }
+            class_2561 gorunen = e.method_5797();
+            if (gorunen != null) {
+                String ad = gorunen.getString();
+                if (ad != null && !ad.isEmpty()) {
+                    return ad;
+                }
+            }
+        }
+        catch (Throwable ignored) {
+            // ad bulunamazsa UUID yolu tek başına çalışır
+        }
+        return null;
+    }
+
     @Inject(method = "method_62426", at = @At("RETURN"), cancellable = true, require = 0)
     private void yikim$kaynak(class_1297 e, CallbackInfoReturnable<class_2561> cir) {
         try {
             if (!(e instanceof class_742)) {
                 return;
             }
+            class_310 mc = class_310.method_1551();
+            // HIZLI KAPI (v1.20.2): isim etiketi her karede her varlık için
+            // çağrılır. Rozet listesi boşsa ve bu biz değilsek hiçbir iş
+            // yapmıyoruz — böylece string kurma / alt-alta inme maliyeti SIFIR.
+            if (mc.field_1724 != e && !YikimBadge.bilinenVarMi()) {
+                return;
+            }
+            if (mc.field_1724 != e && !PlayerBadgeMixin.yikim$taniniyor(e)) {
+                return;
+            }
             if (YikimBadge.kapsar(cir.getReturnValue())) {
                 return; // zaten rozetli — çift ön ek yok
             }
-            class_310 mc = class_310.method_1551();
-            if (mc.field_1724 == e || PlayerBadgeMixin.yikim$taniniyor(e)) {
-                kanitla();
-                cir.setReturnValue(YikimBadge.tag(cir.getReturnValue(), e.method_5667()));
-            }
+            kanitla();
+            cir.setReturnValue(YikimBadge.tag(cir.getReturnValue(), e.method_5667(), PlayerBadgeMixin.yikim$oyuncuAdi(e)));
         }
         catch (Throwable ignored) {
             // rozetin crash hakkı yok
@@ -98,13 +136,13 @@ public abstract class PlayerBadgeMixin {
                 class_2561 base = st.field_53337 != null ? st.field_53337 : e.method_5797();
                 if (base != null && !YikimBadge.kapsar(base)) {
                     kanitla();
-                    st.field_53337 = YikimBadge.tag(base, e.method_5667());
+                    st.field_53337 = YikimBadge.tag(base, e.method_5667(), PlayerBadgeMixin.yikim$oyuncuAdi(e));
                     if (st.field_53338 == null) {
                         st.field_53338 = new class_243(0.0, (double) e.method_5751() + 0.5, 0.0);
                     }
                 }
             }
-            else if (PlayerBadgeMixin.yikim$taniniyor(e)) {
+            else if (YikimBadge.bilinenVarMi() && PlayerBadgeMixin.yikim$taniniyor(e)) {
                 // v1.13.4: bazı sunucular/eklentiler görünen adı boş bırakıyor;
                 // eskiden burada `field_53337 != null` şartı yüzünden rozet hiç
                 // yazılmıyordu ("isim başında görünmüyor"). Artık ad yoksa
@@ -117,7 +155,7 @@ public abstract class PlayerBadgeMixin {
                 }
                 if (st.field_53337 != null && !YikimBadge.kapsar(st.field_53337)) {
                     kanitla();
-                    st.field_53337 = YikimBadge.tag(st.field_53337, e.method_5667());
+                    st.field_53337 = YikimBadge.tag(st.field_53337, e.method_5667(), PlayerBadgeMixin.yikim$oyuncuAdi(e));
                 }
             }
         }

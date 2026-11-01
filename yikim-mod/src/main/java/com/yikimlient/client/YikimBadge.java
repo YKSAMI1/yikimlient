@@ -27,10 +27,14 @@ public final class YikimBadge {
     /** Glif + boşluk ayrı bileşen: glif yalnız badge fontunda, boşluk default fontta. */
     private static final char VARSAYILAN_GLIF = '\uE000';
     private static final String BOSLUK = " ";
-    private static final Set<UUID> KNOWN = new HashSet<UUID>();
+    /** KİLİTSİZ OKUMA (v1.20.2): bu kümeler her karede her varlık için okunur.
+     *  `synchronized` yerine DEĞİŞMEZ kopyalar tutulur (yazma nadir, okuma sıcak
+     *  yol) → isim etiketi döngüsünde monitor beklemesi/çekişmesi yok. */
+    private static volatile Set<UUID> KNOWN = java.util.Collections.emptySet();
     /** v1.18: isimle eşleşme — proxy/offline modda UUID değişebiliyor.
      *  Presence aynı sunucudaki oyuncuların İSİMLERİNİ de verir ("pn"). */
-    private static final Set<String> KNOWN_ADLAR = new HashSet<String>();
+    private static volatile Set<String> KNOWN_ADLAR = java.util.Collections.emptySet();
+    private static final Object YAZMA_KILIDI = new Object();
     private static final AtomicBoolean LOGLANMADI = new AtomicBoolean(false);
 
     private YikimBadge() {
@@ -43,18 +47,19 @@ public final class YikimBadge {
         }
         Set<UUID> fresh = new HashSet<UUID>();
         parsePairs(json, fresh);
-        synchronized (KNOWN) {
+        synchronized (YAZMA_KILIDI) {
             // BİRLEŞTİR: el sıkışmadan öğrenilenler roster gelince kaybolmasın
-            KNOWN.addAll(fresh);
+            Set<UUID> yeni = new HashSet<UUID>(KNOWN);
+            yeni.addAll(fresh);
+            KNOWN = yeni;
         }
     }
 
     /** Dünya/sunucu değişti — taze liste gelene kadar sıfırla. */
     public static void clear() {
-        synchronized (KNOWN) {
-            KNOWN.clear();
-            KNOWN_ADLAR.clear();
-        }
+        KNOWN = java.util.Collections.emptySet();
+        KNOWN_ADLAR = java.util.Collections.emptySet();
+        METIN_ONBELLEK.clear();
     }
 
     /** Presence yanıtındaki "pn" haritası: uuid → isim. */
@@ -98,8 +103,10 @@ public final class YikimBadge {
         }
         String temiz = ad.trim().toLowerCase(java.util.Locale.ROOT);
         if (!temiz.isEmpty()) {
-            synchronized (KNOWN) {
-                KNOWN_ADLAR.add(temiz);
+            synchronized (YAZMA_KILIDI) {
+                Set<String> yeni = new HashSet<String>(KNOWN_ADLAR);
+                yeni.add(temiz);
+                KNOWN_ADLAR = yeni;
             }
         }
     }
@@ -108,10 +115,44 @@ public final class YikimBadge {
         if (ad == null || ad.isEmpty()) {
             return false;
         }
-        String temiz = ad.trim().toLowerCase(java.util.Locale.ROOT);
-        synchronized (KNOWN) {
-            return KNOWN_ADLAR.contains(temiz);
+        // KENDİ adım: sunucu proxy/offline modda UUID'yi değiştirse, presence
+        // hiç çalışmasa da rozet çıkar (kullanıcı isteği: "öncelik hep benim
+        // clientimde olmalı").
+        if (benimAdimMi(ad)) {
+            return true;
         }
+        // Çizimi İSİMLE elimizde olan oyuncu da rozetlidir (UUID tutmasa da).
+        if (YikimSlotlar.slotOfAd(ad) != 0) {
+            return true;
+        }
+        Set<String> adlar = KNOWN_ADLAR;
+        if (adlar.isEmpty()) {
+            return false;
+        }
+        return adlar.contains(ad.trim().toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /** Oturum adım (bir kez okunur, sonra önbellek). */
+    private static volatile String BENIM_AD;
+
+    public static boolean benimAdimMi(String ad) {
+        if (ad == null || ad.isEmpty()) {
+            return false;
+        }
+        String ben = BENIM_AD;
+        if (ben == null) {
+            try {
+                ben = class_310.method_1551().method_1548().method_1674();
+            }
+            catch (Throwable ignored) {
+                ben = null;
+            }
+            if (ben == null || ben.isEmpty()) {
+                return false;
+            }
+            BENIM_AD = ben;
+        }
+        return ben.equalsIgnoreCase(ad.trim());
     }
 
     /** Kendi hesabı daima rozetli; diğerleri roster listesinden. */
@@ -128,9 +169,12 @@ public final class YikimBadge {
         catch (Throwable ignored) {
             // client null olabilir — sadece KNOWN'a bak
         }
-        synchronized (KNOWN) {
-            return KNOWN.contains(id);
+        if (KNOWN.contains(id)) {
+            return true;
         }
+        // Çizimi elimizde olan oyuncu da rozetlidir: presence'tan çizim
+        // ("x"/"b") gelmişse roster'ı beklemeden rozet çıkar.
+        return YikimSlotlar.slotOf(id) != 0;
     }
 
     /**
@@ -142,9 +186,20 @@ public final class YikimBadge {
         if (id == null) {
             return false;
         }
-        synchronized (KNOWN) {
-            return KNOWN.add(id);
+        synchronized (YAZMA_KILIDI) {
+            if (KNOWN.contains(id)) {
+                return false;
+            }
+            Set<UUID> yeni = new HashSet<UUID>(KNOWN);
+            yeni.add(id);
+            KNOWN = yeni;
+            return true;
         }
+    }
+
+    /** Rozet listesinde kimse var mı? (bedava kontrol — isim etiketi sıcak yolu) */
+    public static boolean bilinenVarMi() {
+        return !KNOWN.isEmpty() || !KNOWN_ADLAR.isEmpty();
     }
 
     /** Metin zaten rozetli mi (idempotence — çift ön ek imkânsız).
@@ -157,7 +212,10 @@ public final class YikimBadge {
      * rozet çoktan eklenmiştir. */
     public static boolean kapsar(class_2561 ad) {
         try {
-            return ad != null && ad.getString().indexOf(VARSAYILAN_GLIF) >= 0;
+            if (ad == null) {
+                return false;
+            }
+            return ad.getString().indexOf(VARSAYILAN_GLIF) >= 0;
         }
         catch (Throwable ignored) {
             return false;
@@ -175,8 +233,24 @@ public final class YikimBadge {
      * oyuncunun çizimi SADECE kendi rozetinde görünür.
      */
     public static class_2561 tag(class_2561 name, java.util.UUID kim) {
+        return tag(name, kim, null);
+    }
+
+    /**
+     * v1.20.3 — İSİM YEDEĞİ: çizimler sunucuda çoğu zaman launcher'ın yüklediği
+     * UUID ile durur (Microsoft UUID'si). Offline/proxy sunucularda oyundaki
+     * entity UUID'si farklı olduğu için rozet standart Y'ye düşüyordu
+     * ("benim çizimim bende var, arkadaşımda Y görünüyor"). Slot UUID'de
+     * bulunamazsa oyuncunun ADIYLA aranır.
+     */
+    public static class_2561 tag(class_2561 name, java.util.UUID kim, String oyuncuAdi) {
         int slot = YikimSlotlar.slotOf(kim);
-        return tag(name, '\uE000', "yikimlient", slot == 0 ? "badge" : "badge_s" + slot);
+        if (slot == 0 && oyuncuAdi != null && !oyuncuAdi.isEmpty()) {
+            slot = YikimSlotlar.slotOfAd(oyuncuAdi);
+        }
+        // slot 0 = çizim yok → standart YIKIM logosu (piksel Y + şimşek).
+        // slot != 0 → oyuncunun KENDİ çizimi (yikimlient:badge_s<k>).
+        return tag(name, VARSAYILAN_GLIF, "yikimlient", slot == 0 ? "badge" : "badge_s" + slot);
     }
 
     public static class_2561 tag(class_2561 name, char glif) {
@@ -198,15 +272,25 @@ public final class YikimBadge {
                 // canlı kanıt: mixin zinciri çalışıyor mu? (sunucu bağımsız teşhis)
                 YikimClient.LOGGER.info("YIKIM rozet: glif metne ekleniyor (font: {}.{})", fontNs, fontYol);
             }
-            class_2583 glifStil = fontStil(fontNs, fontYol);
-            class_2583 normalStil = fontStil("minecraft", "default");
+            String imza = fontYol + "|" + name.getString();
+            class_2561 bekleyen = METIN_ONBELLEK.get(imza);
+            if (bekleyen != null) {
+                return bekleyen;
+            }
+            class_2583 glifStil = stil(fontNs, fontYol);
+            class_2583 normalStil = stil("minecraft", "default");
             // isim, açık default stilli bir sarmalın içine konur: kendi özel
             // stili (sunucu renkli isim vb.) korunur, fontu ise garanti default.
             class_2561 sarmal = class_2561.method_43470("")
                 .method_10862(normalStil).method_10852(name);
-            return class_2561.method_43470(String.valueOf(glif)).method_10862(glifStil)
+            class_2561 var = class_2561.method_43470(String.valueOf(glif)).method_10862(glifStil)
                 .method_10852(class_2561.method_43470(BOSLUK).method_10862(normalStil))
                 .method_10852(sarmal);
+            if (METIN_ONBELLEK.size() > 512) {
+                METIN_ONBELLEK.clear();
+            }
+            METIN_ONBELLEK.put(imza, var);
+            return var;
         }
         catch (Throwable problem) {
             return name;
@@ -216,6 +300,28 @@ public final class YikimBadge {
     private static class_2583 fontStil(String ns, String yol) {
         return class_2583.field_24360.method_27704(
             new class_11719.class_11721(class_2960.method_60655(ns, yol)));
+    }
+
+    // PERFORMANS: tag() isim etiketi render state'i icin her karede cagrilir.
+    // Olusan metin degismez -> (font + gorunen ad) anahtariyla saklanir; her
+    // karede Style/Text kurulumu ve GC baskisi olmaz.
+    private static final java.util.Map<String, class_2561> METIN_ONBELLEK =
+        new java.util.concurrent.ConcurrentHashMap<String, class_2561>();
+    private static final java.util.Map<String, class_2583> STIL_ONBELLEK =
+        new java.util.concurrent.ConcurrentHashMap<String, class_2583>();
+
+    private static class_2583 stil(String ns, String yol) {
+        String anahtar = ns + ":" + yol;
+        class_2583 var = STIL_ONBELLEK.get(anahtar);
+        if (var != null) {
+            return var;
+        }
+        var = fontStil(ns, yol);
+        if (STIL_ONBELLEK.size() > 64) {
+            STIL_ONBELLEK.clear();
+        }
+        STIL_ONBELLEK.put(anahtar, var);
+        return var;
     }
 
     private static void parsePairs(String json, Set<UUID> out) {

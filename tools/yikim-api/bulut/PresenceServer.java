@@ -60,7 +60,9 @@ public class PresenceServer {
     /// Herkes kullanabilir (ücretsiz); izin listesine bağlı DEĞİL.
     private static final Map<String, String> PELERINLER = new ConcurrentHashMap<>();
     private static final Map<String, String> KANATLAR = new ConcurrentHashMap<>();
-    private static final int MAX_KOZMETIK_B64 = 6144;
+    /// Artık kozmetik TAM 64×32 atlas olarak gönderilir (2048 piksel); detaylı
+  /// bir doku PNG'si küçük olsa da güvenli sınır yüksek tutulur.
+  private static final int MAX_KOZMETIK_B64 = 16384;
 
     /// sunucu adresi → (uuid → oyuncu bilgisi)
     private static final Map<String, Map<String, Oyuncu>> KAYIT = new ConcurrentHashMap<>();
@@ -397,7 +399,7 @@ public class PresenceServer {
             if (akran.equals(istekSahibi)) {
                 continue;
             }
-            String art = ROZETLER.get(akran);
+            String art = cizimBul(ROZETLER, akran);
             if (art == null) {
                 continue;
             }
@@ -416,13 +418,39 @@ public class PresenceServer {
         boolean ilk = true;
         for (String akran : ayniSunucu.keySet()) {
             if (akran.equals(istekSahibi)) continue;
-            String ham = PIXEL.get(akran);
+            String ham = cizimBul(PIXEL, akran);
             if (ham == null) continue;
             if (!ilk) json.append(',');
             ilk = false;
             json.append('"').append(akran).append("\":\"").append(ham).append('"');
         }
         return json.append('}').toString();
+    }
+
+    /**
+     * Oyuncunun çizimi: önce UUID ile, yoksa HESAP ADI ile.
+     *
+     * Neden: launcher çizimi Microsoft UUID'siyle yükler; offline/proxy
+     * sunucularda oyuncunun oyun içi UUID'si farklı olur → "benim çizimim
+     * bende var, arkadaşımda standart Y" durumu. İsim eşleşince çizim
+     * ARKADAŞIN gördüğü UUID anahtarıyla gönderilir; istemcide ek iş kalmaz.
+     */
+    private static String cizimBul(Map<String, String> kaynak, String akran) {
+        String dogrudan = kaynak.get(akran);
+        if (dogrudan != null) {
+            return dogrudan;
+        }
+        String ad = ISIMLER.get(akran);
+        if (ad == null || ad.isEmpty()) {
+            return null;
+        }
+        for (Map.Entry<String, String> e : kaynak.entrySet()) {
+            String kayitAd = ISIMLER.get(e.getKey());
+            if (kayitAd != null && kayitAd.equalsIgnoreCase(ad)) {
+                return e.getValue();
+            }
+        }
+        return null;
     }
 
     /// base64 çözülünce tam 256 bayt (64 piksel × RGBA) mı?

@@ -7,6 +7,7 @@
 import { currentAccount, fileSrc, icon, invoke, navigate, openLoginModal, openModal, toast } from "../main";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import { PikselPafta } from "../sahne/piksel-pafta";
+import { PELERIN_DIS, PELERIN_IC } from "../sahne/skin-bolgeler";
 import { pelerinHazirla, pelerinPaneli } from "../sahne/pelerin";
 import { KART_TUVAL_GENISLIK, KART_TUVAL_YUKSEKLIK, kartCiz } from "../sahne/skin-kart";
 import type { SkinHub, SkinKayit } from "../sahne/skin-tipleri";
@@ -25,6 +26,12 @@ let secili: Secim | null = null;
 let giyiliId: string | null = null;
 let mesgul = false;
 let sonPelerin: string | null = null;
+/** Kozmetikte ÖZEL pelerin takılıysa katalogda görsel gösterilmez: oyunda
+ *  Mojang pelerini özel pelerinin ALTINDA kalıyor, küçük resim yanıltıyor.
+ *  Kullanıcı isteği: "hangi pelerin seçilmiş olursa olsun görünmesin,
+ *  sadece TAKILI yazsın". */
+let ozelPelerinAktif = false;
+let kok: HTMLElement | null = null;
 
 const kacis = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
@@ -200,6 +207,7 @@ async function hubYukle(root: HTMLElement, hesapId: string, sahneKur: boolean): 
     if (sahneKur) sahneBaslat(root);
     else sahneSecimUygula(root);
     sahnePelerin();
+    void sahneOzelKozmetik();
     if (hub.cevrimdisi) toast("Çevrimdışısın — son bilinen skin gösteriliyor");
     else if (hub.hata) toast(hub.hata, "err");
   } catch (e) {
@@ -233,6 +241,7 @@ function kayitSecim(k: SkinKayit): Secim {
 
 function ciz(root: HTMLElement): void {
   if (!hub) return;
+  kok = root;
 
   // üst şerit
   const serit = root.querySelector("#sk-serit") as HTMLElement;
@@ -282,35 +291,7 @@ function ciz(root: HTMLElement): void {
     });
   }
 
-  // pelerinler
-  const pelerinler = root.querySelector("#sk-pelerin") as HTMLElement;
-  if (pelerinler) {
-    if (!hub.pelerinler.length) {
-      pelerinler.innerHTML = `<div class="skin-bos">Hesabında pelerin yok — Mojang pelerinleri etkinliklerden kazanılır.</div>`;
-    } else {
-      const aktif = hub.pelerinler.find((p) => p.aktif);
-      pelerinler.innerHTML =
-        hub.pelerinler
-          .map(
-            (p) => `
-        <button class="skin-pelerin ${p.aktif ? "aktif" : ""}" data-id="${kacis(p.id)}" title="${kacis(p.ad)}">
-          <canvas class="skin-pelerin-tuval" width="40" height="64" data-dosya="${kacis(p.dosya || "")}"></canvas>
-          <span class="skin-pelerin-ad">${kacis(p.ad)}</span>
-          ${p.aktif ? `<span class="skin-rozet aktif">TAKILI</span>` : ""}
-        </button>`,
-          )
-          .join("") +
-        (aktif
-          ? `<button class="skin-pelerin cikar" data-id="" title="Pelerini çıkar">
-               <span class="skin-pelerin-yok">✕</span><span class="skin-pelerin-ad">Pelerini çıkar</span>
-             </button>`
-          : "");
-      pelerinler.querySelectorAll<HTMLCanvasElement>(".skin-pelerin-tuval").forEach((c) => {
-        const yol = c.dataset.dosya;
-        if (yol) pelerinCiz(c, yol);
-      });
-    }
-  }
+  pelerinSeritCiz(root);
 
   // sahne alt bilgisi / butonlar
   const aktifAd = root.querySelector("#sk-aktif-ad") as HTMLElement;
@@ -345,6 +326,40 @@ function ciz(root: HTMLElement): void {
     } else if (sec && eski) {
       eski.textContent = giyiliId && k.dataset.id === giyiliId ? "GİYİLİ" : "SEÇİLİ";
     }
+  });
+}
+
+/** Pelerin şeridi — özel pelerin takılıyken küçük resim ÇİZİLMEZ. */
+function pelerinSeritCiz(root: HTMLElement): void {
+  if (!hub) return;
+  const pelerinler = root.querySelector("#sk-pelerin") as HTMLElement;
+  if (!pelerinler) return;
+  if (!hub.pelerinler.length) {
+    pelerinler.innerHTML = `<div class="skin-bos">Hesabında pelerin yok — Mojang pelerinleri etkinliklerden kazanılır.</div>`;
+    return;
+  }
+  const aktif = hub.pelerinler.find((p) => p.aktif);
+  // Not: özel (kozmetik) pelerin takılı olsa bile Mojang pelerinlerinin
+  // küçük resimleri ÇİZİLİR — kullanıcı isteği: "katalogda pelerin
+  // dokuları görünsün". Özel pelerin ayrımı kozmetik sayfasında yapılıyor.
+  pelerinler.innerHTML =
+    hub.pelerinler
+      .map((p) =>
+        `<button class="skin-pelerin ${p.aktif ? "aktif" : ""}" data-id="${kacis(p.id)}" title="${kacis(p.ad)}">
+           <canvas class="skin-pelerin-tuval" width="40" height="64" data-dosya="${kacis(p.dosya || "")}"></canvas>
+           <span class="skin-pelerin-ad">${kacis(p.ad)}</span>
+           ${p.aktif ? `<span class="skin-rozet aktif">TAKILI</span>` : ""}
+         </button>`,
+      )
+      .join("") +
+    (aktif
+      ? `<button class="skin-pelerin cikar" data-id="" title="Pelerini çıkar">
+           <span class="skin-pelerin-yok">✕</span><span class="skin-pelerin-ad">Pelerini çıkar</span>
+         </button>`
+      : "");
+  pelerinler.querySelectorAll<HTMLCanvasElement>(".skin-pelerin-tuval").forEach((c) => {
+    const yol = c.dataset.dosya;
+    if (yol) pelerinCiz(c, yol);
   });
 }
 
@@ -389,13 +404,68 @@ function sahneSecimUygula(root: HTMLElement): void {
   void sahne.skin({ url: fileSrc(secili.dosya), slim: secili.slim });
 }
 
+/** Mojang paftasında ARKADAN GÖRÜNEN yüz (12,1)'dir; 3B vitrin ise "dış" yüz
+ *  olarak (1,1) panelini çizer. Panel devredilmezse vitrin pelerinin iç
+ *  astarını (yani "arkasını") gösteriyordu. */
+async function mojangPelerinUrl(yol: string): Promise<string> {
+  const resim = await new Promise<HTMLImageElement>((coz, red) => {
+    const i = new Image();
+    i.onload = () => coz(i);
+    i.onerror = red;
+    i.src = fileSrc(yol);
+  });
+  const pafta = pelerinHazirla(resim);
+  const g = pafta.getContext("2d");
+  if (!g) return fileSrc(yol);
+  const dis = g.getImageData(PELERIN_DIS.x, PELERIN_DIS.y, PELERIN_DIS.w, PELERIN_DIS.h);
+  g.putImageData(dis, PELERIN_IC.x, PELERIN_IC.y);
+  return pafta.toDataURL("image/png");
+}
+
 function sahnePelerin(): void {
   if (!hub) return;
   const aktif = hub.pelerinler.find((p) => p.aktif && p.dosya);
   const yol = aktif?.dosya || null;
   if (yol === sonPelerin) return;
   sonPelerin = yol;
-  void sahneGetir().pelerin(yol ? { url: fileSrc(yol) } : null);
+  if (!yol) {
+    void sahneGetir().pelerin(null);
+    return;
+  }
+  const jeton = yol;
+  void mojangPelerinUrl(yol)
+    .then((url) => {
+      if (sonPelerin !== jeton) return; // bu arada başka pelerin seçildi
+      void sahneGetir().pelerin({ url });
+    })
+    .catch(() => {
+      if (sonPelerin === jeton) void sahneGetir().pelerin(null);
+    });
+}
+
+/** YIKIM kozmetiği: 3D vitrinde YALNIZ özel pelerin gösterilir (elitra takılmaz).
+ *  Özel pelerin varsa ve etkinse Mojang pelerini onu ezer — kullanıcı kendi
+ *  tasarımını görsün; pasife alınmışsa vitrin normal pelerinle kalır. */
+let sonOzelPelerin: string | null = null;
+async function sahneOzelKozmetik(): Promise<void> {
+  try {
+    const d = (await invoke("cmd_kozmetik_oku")) as {
+      pelerin_dosya: string | null;
+      pelerin_aktif?: boolean;
+    };
+    const yol = d.pelerin_aktif === false ? null : d.pelerin_dosya;
+    if (!!yol !== ozelPelerinAktif) {
+      ozelPelerinAktif = !!yol;
+      if (kok) pelerinSeritCiz(kok);
+    }
+    if (!yol || yol === sonOzelPelerin) return;
+    sonOzelPelerin = yol;
+    await sahneGetir().pelerin({ url: fileSrc(yol) });
+    // Pelerin sırtta: 3/4 arka bakış, görünür olsun.
+    sahneGetir().bakisaAyarla(2.5, 0.1);
+  } catch {
+    // kozmetik okunamazsa vitrin normal kalır
+  }
 }
 
 async function giy(root: HTMLElement, hesapId: string): Promise<void> {
@@ -452,6 +522,7 @@ async function yedekGeri(root: HTMLElement, hesapId: string): Promise<void> {
     mesgul = false;
     ciz(root);
     sahnePelerin();
+    void sahneOzelKozmetik();
   }
 }
 
@@ -463,6 +534,7 @@ async function pelerinTak(root: HTMLElement, hesapId: string, capeId: string | n
     hub = (await invoke("cmd_skin_pelerin", { id: hesapId, capeId })) as SkinHub;
     toast(capeId ? "Pelerin takıldı." : "Pelerin çıkarıldı.");
     sahnePelerin();
+    void sahneOzelKozmetik();
   } catch (e) {
     toast(String(e), "err");
   } finally {
@@ -595,6 +667,7 @@ async function editorAc(root: HTMLElement, hesapId: string): Promise<void> {
       sonPelerin = null; // yeni sahne pelerinsiz doğar; bilinen yol yeniden uygulanmalı
       sahneBaslat(root);
       sahnePelerin();
+    void sahneOzelKozmetik();
     },
   );
 }

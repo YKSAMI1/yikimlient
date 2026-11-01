@@ -747,8 +747,9 @@ function arayuzSurumIzle(): void {
       const simdi = await oku();
       if (simdi && simdi !== baslangic) window.location.reload();
     };
-    setTimeout(() => void kontrol(), 12_000);
-    setInterval(() => void kontrol(), 60_000);
+    // Yalnız açılışta: sıcak paket indirildiyse birkaç saniye içinde uygula.
+    // Sürekli yoklama YOK (internet/CPU tasarrufu) — istek yerel dosyaya gider.
+    for (const ms of [4_000, 12_000, 30_000, 60_000]) setTimeout(() => void kontrol(), ms);
   })();
 }
 

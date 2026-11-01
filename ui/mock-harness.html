@@ -79,8 +79,12 @@
         g.fillStyle = kenar; g.fillRect(px, 1, 10, 2); g.fillRect(px, 15, 10, 2);
         g.fillStyle = "#ffffff"; g.fillRect(px + 4, 4, 2, 10);
       }
-      panel(1);  // iç yüz
-      panel(12); // dış yüz (görünen)
+      panel(12); // DIŞ yüz — arkadan görünen (asıl tasarım)
+      // İç astar aynı desenin KARARTILMIŞ hâli: katalogda hangi panelin
+      // çizildiği bakınca anlaşılsın (arka panel çizilirse kart koyu çıkar).
+      g.globalAlpha = 0.35;
+      panel(1);
+      g.globalAlpha = 1;
       // 1 piksellik kenar şeritleri (gerçek Mojang paftasındaki gibi)
       g.fillStyle = kenar; g.fillRect(1, 0, 10, 1); g.fillRect(11, 0, 10, 1);
       g.fillStyle = renk; g.fillRect(0, 1, 1, 16); g.fillRect(11, 1, 1, 16);

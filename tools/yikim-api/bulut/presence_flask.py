@@ -141,11 +141,33 @@ def presence():
             liste[uuid] = [isim, simdi]
 
         return jsonify(p=[k for k in liste if k != uuid],
-                       b=_rozetler(uuid), izinler=IZINLER)
+                       b=_rozetler(uuid, liste), izinler=IZINLER)
 
 
-def _rozetler(istek_sahibi):
-    return {k: v for k, v in ROZETLER.items() if k != istek_sahibi}
+def _rozetler(istek_sahibi, ayni_sunucu=None):
+    """Aynı sunucudaki oyuncuların çizimleri.
+
+    Launcher çizimi Microsoft UUID'siyle yükler; offline/proxy sunucularda
+    oyun içi UUID farklı olur → çizim isimle eşleştirilip ARKADAŞIN gördüğü
+    UUID anahtarıyla gönderilir.
+    """
+    if not ayni_sunucu:
+        return {k: v for k, v in ROZETLER.items() if k != istek_sahibi}
+    cikti = {}
+    for akran in ayni_sunucu:
+        if akran == istek_sahibi:
+            continue
+        deger = ROZETLER.get(akran)
+        if deger is None:
+            ad = ISIMLER.get(akran)
+            if ad:
+                for k, v in ROZETLER.items():
+                    if str(ISIMLER.get(k, "")).lower() == ad.lower():
+                        deger = v
+                        break
+        if deger is not None:
+            cikti[akran] = deger
+    return cikti
 
 
 # PythonAnywhere WSGI bu ismi bekler

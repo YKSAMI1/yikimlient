@@ -331,11 +331,12 @@ pub fn cmd_delete_emote(adi: String) -> Result<bool, String> {
 
 // ---------- kozmetik (özel pelerin + elitra kanadı) ----------
 
-/// Özel pelerin ve/veya elitra kanadı tasarımını kaydet.
+/// Özel pelerin ve/veya elitra atlasını kaydet.
 ///
-/// `pelerin`: 160 renk (10×16), `kanat`: 200 renk (10×20) — her girdi
-/// "#rrggbb" ya da "" (saydam). `None` → o kozmetiğe dokunma.
-/// Tümü boş liste → kozmetik kaldırılır (dosya silinir, sunucudan düşer).
+/// `pelerin` / `kanat`: 2048 renk (64×32, satır satır) — her girdi "#rrggbb"
+/// ya da "" (saydam). `None` → o kozmetiğe dokunma. Tamamen boş liste →
+/// kozmetik kaldırılır (dosya silinir, sunucudan düşer); oyunda pelerin hiç
+/// görünmez, elitra ise normal Minecraft elitrası olur.
 /// Dosyalar tüm kurulumların `.yikim/pelerin.png` / `.yikim/elytra.png`
 /// yoluna yazılır → mod oyun açıkken bile bir sonraki kalp atışında uygular.
 #[tauri::command]
@@ -355,7 +356,7 @@ pub async fn cmd_kozmetik_kaydet(
 
     if let Some(liste) = pelerin.as_ref() {
         if var_mi(&pelerin) {
-            let png = crate::kozmetik::pelerin_png(liste)?;
+            let png = crate::kozmetik::atlas_png(liste)?;
             kurulum += crate::kozmetik::tum_kurulumlara_yaz("pelerin.png", &png);
             yuklenen_pelerin = Some(crate::kozmetik::b64(&png));
         } else {
@@ -365,7 +366,7 @@ pub async fn cmd_kozmetik_kaydet(
     }
     if let Some(liste) = kanat.as_ref() {
         if var_mi(&kanat) {
-            let png = crate::kozmetik::kanat_png(liste)?;
+            let png = crate::kozmetik::atlas_png(liste)?;
             kurulum += crate::kozmetik::tum_kurulumlara_yaz("elytra.png", &png);
             yuklenen_kanat = Some(crate::kozmetik::b64(&png));
         } else {
@@ -404,7 +405,7 @@ pub async fn cmd_kozmetik_kaydet(
     }))
 }
 
-/// Kayıtlı kozmetikleri oku + sahne önizlemesi için dosya yolları.
+/// Kayıtlı kozmetik atlaslarını oku + sahne önizlemesi için dosya yolları.
 #[tauri::command]
 pub fn cmd_kozmetik_oku() -> Result<serde_json::Value, String> {
     let pelerin_yol = crate::core::app_dir().join("pelerin.png");
@@ -414,6 +415,61 @@ pub fn cmd_kozmetik_oku() -> Result<serde_json::Value, String> {
         "kanat": crate::kozmetik::yerel_kanat(),
         "pelerin_dosya": pelerin_yol.is_file().then(|| pelerin_yol.to_string_lossy().to_string()),
         "kanat_dosya": kanat_yol.is_file().then(|| kanat_yol.to_string_lossy().to_string()),
+        "pelerin_aktif": crate::kozmetik::aktif("pelerin.png"),
+        "kanat_aktif": crate::kozmetik::aktif("elytra.png"),
+    }))
+}
+
+/// Özel pelerin / elitrayı oyunda etkinleştir ya da pasife al.
+///
+/// Pasifken kurulumlardaki dosya kaldırılır (oyunda vanilla pelerin/elitra
+/// görünür) ama ana kopya korunur — tekrar açınca aynı tasarım geri gelir.
+/// `None` → o kozmetiğe dokunma.
+#[tauri::command]
+pub async fn cmd_kozmetik_aktif(
+    pelerin: Option<bool>,
+    kanat: Option<bool>,
+) -> Result<serde_json::Value, String> {
+    if let Some(acik) = pelerin {
+        crate::kozmetik::aktif_ayarla("pelerin.png", acik)?;
+    }
+    if let Some(acik) = kanat {
+        crate::kozmetik::aktif_ayarla("elytra.png", acik)?;
+    }
+
+    // Sunucudaki kopya da güncellenir: pasifken boş gönderilir, diğer YIKIMLient
+    // oyuncuları vanilla görünümü görür.
+    let kc = match pelerin {
+        Some(true) => Some(crate::kozmetik::ana_b64("pelerin.png").unwrap_or_default()),
+        Some(false) => Some(String::new()),
+        None => None,
+    };
+    let ke = match kanat {
+        Some(true) => Some(crate::kozmetik::ana_b64("elytra.png").unwrap_or_default()),
+        Some(false) => Some(String::new()),
+        None => None,
+    };
+
+    let mut yuklendi = false;
+    let mut hata = String::new();
+    if kc.is_some() || ke.is_some() {
+        let cfg = YikimConfig::load_or_default();
+        let ucak = crate::kozmetik::ucak(&cfg);
+        match selected_account() {
+            Ok(hesap) => {
+                match crate::kozmetik::sunucuya_yukle(&hesap.uuid, &hesap.name, kc, ke, &ucak).await {
+                    Ok(()) => yuklendi = true,
+                    Err(e) => hata = e,
+                }
+            }
+            Err(_) => hata = "seçili hesap yok".into(),
+        }
+    }
+    Ok(serde_json::json!({
+        "pelerin_aktif": crate::kozmetik::aktif("pelerin.png"),
+        "kanat_aktif": crate::kozmetik::aktif("elytra.png"),
+        "yuklendi": yuklendi,
+        "hata": hata,
     }))
 }
 

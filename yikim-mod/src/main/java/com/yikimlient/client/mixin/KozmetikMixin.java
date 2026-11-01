@@ -25,6 +25,10 @@ public abstract class KozmetikMixin {
     @Inject(method = "method_52810", at = @At("RETURN"), cancellable = true, require = 0)
     private void yikim$kozmetik(CallbackInfoReturnable<Object> cir) {
         try {
+            // HIZLI KAPI: hiçbir kozmetik yoksa sıfır iş (her kare çağrılır).
+            if (!YikimKozmetik.etkinMi()) {
+                return;
+            }
             Object mevcut = cir.getReturnValue();
             if (mevcut == null) {
                 return;

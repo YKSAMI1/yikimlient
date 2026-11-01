@@ -1,7 +1,7 @@
 // SKIN EDİTÖRÜ — 64×64 piksel tuvali + canlı 3D önizleme.
 // Tam ekran panel olarak açılır; kaydetme kararı çağırana (skins.ts) bırakılır.
 
-import { icon, openModal, toast } from "../main";
+import { fileSrc, icon, invoke, openModal, toast } from "../main";
 import { sahneGetir } from "../sahne/karakter";
 import { PikselPafta, RGBA, eskiPaftayiGenislet } from "../sahne/piksel-pafta";
 import { BOLGELER, SkinBolge } from "../sahne/skin-bolgeler";
@@ -71,6 +71,7 @@ export function openSkinEditor(
         <div class="sk-tuval-sar" id="ske-sar">
           <canvas id="ske-tuval" width="${BOYUT * yakin}" height="${BOYUT * yakin}"></canvas>
           <canvas id="ske-izgara" width="${BOYUT * yakin}" height="${BOYUT * yakin}"></canvas>
+          <canvas id="ske-3d-tuval" hidden></canvas>
         </div>
         <div class="sk-edit-zum">
           ${[4, 8, 16].map((z) => `<button class="seg-btn ${z === yakin ? "aktif" : ""}" data-zum="${z}">${z}×</button>`).join("")}
@@ -81,9 +82,24 @@ export function openSkinEditor(
         <div class="sk-edit-3dbar">
           <button class="seg-btn" id="ske-3d" title="Doğrudan modelin üstüne çiz">${icon("box")} 3D Çiz</button>
           <span class="sk-edit-seg" id="ske-katman" hidden>
-            <button class="seg-btn aktif" data-kat="taban">Skin</button>
+            <button class="seg-btn aktif" data-kat="oto" title="Tıkladığın yüzeye boya (overlay açıksa overlay'e)">Otomatik</button>
+            <button class="seg-btn" data-kat="taban">Skin</button>
             <button class="seg-btn" data-kat="ust">Overlay</button>
           </span>
+          <button class="seg-btn" id="ske-izgara3d" title="Piksel ızgarasını karakterin üstünde göster">Izgara</button>
+          <span class="sk-zum3d" id="ske-zum3d" role="group" aria-label="Karakter yakınlaştırma">
+            <button class="seg-btn" data-zum3d="-1" title="Uzaklaş">−</button>
+            <button class="seg-btn" data-zum3d="1" title="Yakınlaş">+</button>
+            <button class="seg-btn" data-zum3d="0" title="Varsayılan mesafe">Sığdır</button>
+          </span>
+        </div>
+        <div class="sk-3d-parca" id="ske-parca" hidden>
+          <button class="seg-btn aktif" data-parca="kafa">Kafa</button>
+          <button class="seg-btn aktif" data-parca="govde">Gövde</button>
+          <button class="seg-btn aktif" data-parca="kollar">Kollar</button>
+          <button class="seg-btn aktif" data-parca="bacaklar">Bacaklar</button>
+          <button class="seg-btn aktif" data-parca="kaplama" title="Overlay katmanını göster/gizle (boyama katmanı soldaki Otomatik/Skin/Overlay seçimidir)">Overlay göster</button>
+          <button class="seg-btn aktif" data-parca="kozmetik" title="Pelerin ve elitra kanadı">Pelerin</button>
         </div>
         <div class="sk-edit-onizleme">
           <canvas id="ske-onizleme"></canvas>
@@ -149,6 +165,22 @@ export function openSkinEditor(
   const sahne = sahneGetir();
   sahne.kur(onizleme);
   sahne.tuvalDoku(kaynak, slim);
+
+  // YIKIM kozmetiği: vitrinde YALNIZ özel pelerin gösterilir (elitra takılmaz —
+  // pelerinle üst üste binince skin seçimi kötü görünüyordu).
+  void (async () => {
+    try {
+      const d = (await invoke("cmd_kozmetik_oku")) as {
+        pelerin_dosya: string | null;
+        pelerin_aktif?: boolean;
+      };
+      if (d.pelerin_dosya && d.pelerin_aktif !== false) {
+        await sahne.pelerin({ url: fileSrc(d.pelerin_dosya) });
+      }
+    } catch {
+      // kozmetik yoksa/okunamazsa düz skin önizlemesi
+    }
+  })();
 
   function yansit(): void {
     const img = new ImageData(new Uint8ClampedArray(pafta.veri), BOYUT, BOYUT);
@@ -324,32 +356,110 @@ export function openSkinEditor(
   // katmanında taban kutu, "Overlay" katmanında şapka/ceket/kolluk/pantolon
   // hedeflenir. Böylece overlay'in altındaki skin de boyanabilir.
   let cizim3d = false;
-  let katman3d: "taban" | "ust" = "taban";
+  // v0.5.7: varsayılan OTOMATİK. Tıklanan yüzey hangi katmansa oraya boyanır;
+  // "Overlay açıkken hâlâ skine çiziyor" şikâyeti bununla biter.
+  let katman3d: "taban" | "ust" | "oto" = "oto";
   let modeldeCiziyor = false;
+  /** Modelin üstündeki piksel ızgarası ("matris") — 3D çizimde varsayılan açık. */
+  let izgara3d = false;
   const katmanKutu = sarmal.querySelector<HTMLElement>("#ske-katman");
   const ucBoyutBtn = sarmal.querySelector<HTMLElement>("#ske-3d");
+  const izgaraBtn = sarmal.querySelector<HTMLElement>("#ske-izgara3d");
+  const parcaKutu = sarmal.querySelector<HTMLElement>("#ske-parca");
+  const buyukTuval = sarmal.querySelector<HTMLCanvasElement>("#ske-3d-tuval") as HTMLCanvasElement;
+  const onizlemeKutu = sarmal.querySelector<HTMLElement>(".sk-edit-onizleme");
+  const zoomKutu = sarmal.querySelector<HTMLElement>(".sk-edit-zum");
 
+  // Parça aç/kapa durumu — model yeniden kurulunca tekrar uygulanır.
+  const parcaDurum: Record<string, boolean> = {
+    kafa: true, govde: true, kollar: true, bacaklar: true, kaplama: true, kozmetik: true,
+  };
+  const parcalariUygula = (): void => {
+    sahne.parcaGoster("kafa", parcaDurum.kafa);
+    sahne.parcaGoster("govde", parcaDurum.govde);
+    sahne.parcaGoster("kollar", parcaDurum.kollar);
+    sahne.parcaGoster("bacaklar", parcaDurum.bacaklar);
+    sahne.kaplamaGoster(parcaDurum.kaplama);
+    sahne.kozmetikGoster(parcaDurum.kozmetik);
+  };
+
+  /** 3D modunda model BÜYÜK tuvalde (2D ızgaranın yerinde) gösterilir. */
   const cizim3dUygula = (acik: boolean): void => {
     cizim3d = acik;
     modeldeCiziyor = false;
     sahne.etkilesimKapali = acik;
-    onizleme.classList.toggle("cizim", acik);
+    // Izgara yalnız 3D düzenlemede açılır; 2D'ye dönünce model temiz kalır.
+    izgara3d = acik;
+    izgaraBtn?.classList.toggle("aktif", izgara3d);
+    tuval.hidden = acik;
+    izgara.hidden = acik;
+    buyukTuval.hidden = !acik;
+    if (onizlemeKutu) onizlemeKutu.hidden = acik;
+    if (parcaKutu) parcaKutu.hidden = !acik;
     if (katmanKutu) katmanKutu.hidden = !acik;
+    if (zoomKutu) zoomKutu.style.display = acik ? "none" : "";
     ucBoyutBtn?.classList.toggle("aktif", acik);
     if (ucBoyutBtn) ucBoyutBtn.innerHTML = `${icon("box")} ${acik ? "2D'ye dön" : "3D Çiz"}`;
-    uyari(acik ? "3D çizim açık: modelin üstüne tıkla/sürükle." : "");
+    // Sahne tek tuvalde çalişir: hedef tuvali değiştir.
+    requestAnimationFrame(() => {
+      if (acik) {
+        sahne.kur(buyukTuval);
+        sahne.bakisaAyarla(0.35, 0.04);
+        sahne.tuvalDoku(kaynak, slim);
+        parcalariUygula();
+        // Model kurulduktan SONRA: ızgara yeni mesh'lere eklenir.
+        sahne.izgaraGoster(izgara3d, true);
+        uyari("3D çizim: sol tık boya · orta/sağ tık döndür · tekerlek yakınlaş · Skin/Overlay katmanı ve parçalar üstteki düğmelerden aç/kapat.");
+      } else {
+        sahne.kur(onizleme);
+        sahne.tuvalDoku(kaynak, slim);
+        parcalariUygula();
+        sahne.izgaraGoster(false, true);
+        uyari("");
+      }
+    });
   };
   ucBoyutBtn?.addEventListener("click", () => cizim3dUygula(!cizim3d));
 
+  izgaraBtn?.addEventListener("click", () => {
+    izgara3d = !izgara3d;
+    izgaraBtn.classList.toggle("aktif", izgara3d);
+    sahne.izgaraGoster(izgara3d, true);
+    uyari(izgara3d
+      ? "Izgara açık — piksel sınırları karakterin üstünde görünür."
+      : "Izgara kapalı.");
+  });
+
+  // Yakınlaştırma: tekerlek zaten çalışır; burada keşfedilebilir düğmeler var.
+  sarmal.querySelectorAll<HTMLElement>("[data-zum3d]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const k = Number(b.dataset.zum3d);
+      if (k === 0) sahne.zoomAyarla(2.75);
+      else sahne.zoomAyarla(sahne.zoomAl() * (k < 0 ? 1.18 : 0.85));
+    });
+  });
+
+  sarmal.querySelectorAll<HTMLElement>("[data-parca]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const ad = b.dataset.parca as string;
+      parcaDurum[ad] = !parcaDurum[ad];
+      b.classList.toggle("aktif", parcaDurum[ad]);
+      parcalariUygula();
+    });
+  });
+
   sarmal.querySelectorAll<HTMLElement>("[data-kat]").forEach((b) => {
     b.addEventListener("click", () => {
-      katman3d = b.dataset.kat === "ust" ? "ust" : "taban";
+      const deger = b.dataset.kat;
+      katman3d = deger === "ust" ? "ust" : deger === "taban" ? "taban" : "oto";
       sarmal.querySelectorAll("[data-kat]").forEach((x) => x.classList.remove("aktif"));
       b.classList.add("aktif");
       uyari(
         katman3d === "ust"
           ? "Overlay seçili — şapka, ceket, kolluk ve pantolon üstüne çiziyorsun."
-          : "Skin (taban) seçili — overlay'in altındaki katmana çiziyorsun.",
+          : katman3d === "taban"
+            ? "Skin (taban) seçili — overlay'in altındaki katmana çiziyorsun."
+            : "Otomatik: hangi yüzeye tıklarsan oraya boyanır (ceket/şapka → overlay).",
       );
     });
   });
@@ -361,28 +471,29 @@ export function openSkinEditor(
     pafta.boya(n.x, n.y, boyaRengi(), kalinlik);
     yansit();
   };
-  onizleme.addEventListener("contextmenu", (e) => {
+  buyukTuval.addEventListener("contextmenu", (e) => {
     if (cizim3d) e.preventDefault();
   });
-  onizleme.addEventListener("pointerdown", (e) => {
+  buyukTuval.addEventListener("pointerdown", (e) => {
     if (!cizim3d) return;
+    // Sol tık boyar; sağ tık sahneye kalır → her eksende döndürme.
     if (e.pointerType === "mouse" && e.button !== 0) return;
     modeldeCiziyor = true;
     try {
-      onizleme.setPointerCapture(e.pointerId);
+      buyukTuval.setPointerCapture(e.pointerId);
     } catch {
       /* pencere kapanmış olabilir */
     }
     modelNokta(e, true);
   });
-  onizleme.addEventListener("pointermove", (e) => {
+  buyukTuval.addEventListener("pointermove", (e) => {
     if (cizim3d && modeldeCiziyor) modelNokta(e, false);
   });
   const modelBirak = (): void => {
     modeldeCiziyor = false;
   };
-  onizleme.addEventListener("pointerup", modelBirak);
-  onizleme.addEventListener("pointercancel", modelBirak);
+  buyukTuval.addEventListener("pointerup", modelBirak);
+  buyukTuval.addEventListener("pointercancel", modelBirak);
 
   sarmal.querySelector("#ske-bolgeler")?.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-bolge]");

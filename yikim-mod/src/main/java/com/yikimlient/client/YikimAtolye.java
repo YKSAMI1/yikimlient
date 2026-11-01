@@ -337,6 +337,29 @@ public final class YikimAtolye {
         // takas ediliyordu (turuncu kalp → MAVİ). Ham baytta takas YOK.
         final String px = base64Px();
         Thread t = new Thread(() -> {
+            // Ücretsiz bulut (Render) uykuya giriyor: ilk istek 5 sn'de
+            // yanıtsız kalabiliyordu ve çizim bir daha HİÇ yüklenmiyordu →
+            // arkadaş standart Y görüyordu. Birkaç kez, artan beklemeyle dene.
+            for (int deneme = 1; deneme <= 3; deneme++) {
+                if (yuklemeyiGonder(adAlani, px, base64Png, uuid)) {
+                    return;
+                }
+                try {
+                    Thread.sleep(2500L * deneme);
+                }
+                catch (InterruptedException kesildi) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+            YikimClient.LOGGER.warn("YIKIM atolye: rozet sunucuya yuklenemedi (3 deneme)");
+        }, "YIKIM-atolye");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /// Tek yükleme denemesi. Dönen: sunucu kabul etti mi.
+    private static boolean yuklemeyiGonder(String adAlani, String px, String base64Png, UUID uuid) {
             try {
                 String govde = base64Png == null
                     ? "{\"u\":\"" + uuid + "\"," + adAlani + "\"sil\":true}"
@@ -344,8 +367,8 @@ public final class YikimAtolye {
                         : "\"x\":\"" + px + "\",") + "\"png\":\"" + base64Png + "\"}";
                 byte[] bayt = govde.getBytes(StandardCharsets.UTF_8);
                 HttpURLConnection bag = (HttpURLConnection) new URL(ucak()).openConnection();
-                bag.setConnectTimeout(5000);
-                bag.setReadTimeout(5000);
+                bag.setConnectTimeout(8000);
+                bag.setReadTimeout(8000);
                 bag.setRequestMethod("POST");
                 bag.setDoOutput(true);
                 bag.setRequestProperty("Content-Type", "application/json; charset=utf-8");
@@ -353,15 +376,14 @@ public final class YikimAtolye {
                 try (OutputStream cikis = bag.getOutputStream()) {
                     cikis.write(bayt);
                 }
-                bag.getResponseCode();
+                int kod = bag.getResponseCode();
                 bag.disconnect();
+                return kod >= 200 && kod < 300;
             }
             catch (Throwable ignored) {
                 // sunucu yoksa yerel çizim yine de geçerli
+                return false;
             }
-        }, "YIKIM-atolye");
-        t.setDaemon(true);
-        t.start();
     }
 
     /// Presence yanıtından başkalarının rozetlerini al.
@@ -378,6 +400,11 @@ public final class YikimAtolye {
             if (json == null) {
                 return;
             }
+            // 0) UUID → hesap adı eşlemesi ("pn"). Çizim UUID'si ile oyundaki
+            //    oyuncunun UUID'si tutmadığında (offline/proxy sunucu, launcher
+            //    Microsoft UUID'siyle yüklemişse) rozet İSİMLE bulunur.
+            Map<UUID, String> adlar = new java.util.HashMap<UUID, String>();
+            anahtarDegerler(json, "pn", adlar);
             // 1) HAM RGBA ("x") — yeni istemciler; kanal takası imkânsız.
             Map<UUID, String> ham = new java.util.HashMap<UUID, String>();
             anahtarDegerler(json, "x", ham);
@@ -385,7 +412,7 @@ public final class YikimAtolye {
                 int[] piksel = pxdenOku(e.getValue());
                 if (piksel != null) {
                     UZAK.put(e.getKey(), e.getValue());
-                    YikimSlotlar.ata(e.getKey(), piksel);
+                    adlaBagla(YikimSlotlar.ata(e.getKey(), piksel), adlar.get(e.getKey()), piksel);
                 }
             }
             // 2) PNG ("b") — eski istemciden yüklenmiş çizimler. `x`i olan
@@ -403,12 +430,30 @@ public final class YikimAtolye {
                 int[] piksel = pngdenOku(e.getValue());
                 if (piksel != null) {
                     UZAK.put(e.getKey(), e.getValue());
-                    YikimSlotlar.ata(e.getKey(), piksel);
+                    adlaBagla(YikimSlotlar.ata(e.getKey(), piksel), adlar.get(e.getKey()), piksel);
                 }
             }
         }
         catch (Throwable ignored) {
             // asla patlamayalim
+        }
+    }
+
+    /// Çizimi isimle de bulunabilir yap. UUID slotu kurulduysa isim o slotun
+    /// takma adı olur; UUID tutmadıysa (slot 0) çizim isim anahtarıyla atanır.
+    private static void adlaBagla(int slot, String ad, int[] piksel) {
+        if (ad == null || ad.isEmpty()) {
+            return;
+        }
+        if (slot > 0) {
+            if (YikimSlotlar.slotOfAd(ad) == 0) {
+                YikimSlotlar.bagla(ad, slot);
+            }
+            return;
+        }
+        int isimSlotu = YikimSlotlar.ataAd(ad, piksel);
+        if (isimSlotu > 0) {
+            YikimClient.LOGGER.info("YIKIM rozet: uzak cizim isimle baglandi: {} (slot {})", ad, isimSlotu);
         }
     }
 

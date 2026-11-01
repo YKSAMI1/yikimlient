@@ -39,9 +39,10 @@ public final class YikimHud {
     public static void render(class_332 graphics, class_9779 delta) {
         class_310 client = class_310.method_1551();
         YikimConfig config = YikimConfig.get();
-        if (config.showDiagnostics || YikimAbTest.running()) {
-            YikimMetrics.frame(client.field_1687 == null ? 3 : (client.field_1755 != null ? 2 : (config.hudEnabled ? 0 : 1)));
-        }
+        // PERFORMANS ÖLÇÜMÜ (v1.20.3): dünya kareleri HER ZAMAN kaydedilir.
+        // Maliyet: bir nanoTime + birkaç dizi yazımı (~mikrosaniye altı) —
+        // karşılığında "dünyada FPS kaç, modun payı ne" sorusu logdan okunur.
+        YikimMetrics.frame(client.field_1687 == null ? 3 : (client.field_1755 != null ? 2 : (config.hudEnabled ? 0 : 1)));
         if (config.paused || YikimAbTest.hudOff()) {
             return;
         }

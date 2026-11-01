@@ -946,6 +946,21 @@ input.search-in.input, .search-in.input {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .skin-pelerin-yok { font-size: 22px; color: var(--text-faint); line-height: 44px; }
+/* Kaydet düğmesinin durumu: başarıda yeşil, hatada kırmızı — "basılı mı
+   kaydetti mi" belirsizliği kalksın. */
+.btn.tamam {
+  background: color-mix(in srgb, var(--success) 22%, transparent);
+  border-color: var(--success);
+  color: var(--success);
+  opacity: 1;
+}
+.btn.hata {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+  opacity: 1;
+}
+.btn.bekliyor { opacity: 0.75; }
 
 .skin-bos {
   grid-column: 1 / -1; font-size: 12px; line-height: 1.55; color: var(--text-faint);
@@ -1020,7 +1035,7 @@ input.search-in.input, .search-in.input {
   overflow-y: auto; min-height: 0;
 }
 .sk-edit-onizleme {
-  height: 190px; border: 1px solid var(--hairline); border-radius: var(--radius-sm);
+  height: 240px; border: 1px solid var(--hairline); border-radius: var(--radius-sm);
   background: radial-gradient(circle at 50% 35%, var(--bg3), var(--bg1));
   overflow: hidden;
 }
@@ -1103,21 +1118,27 @@ input.search-in.input, .search-in.input {
   color: var(--accent); border: 1px solid var(--accent-dim);
   border-radius: 999px; padding: 2px 7px; min-height: 16px;
 }
-.kz-govde { display: flex; gap: 14px; align-items: flex-start; }
+/* Boş rozet tıklanabilir bir daire gibi görünüyordu ("sağ üstte yuvarlak var,
+   tıklanmıyor") — içerik yoksa hiç çizilmez. */
+.kz-rozet:empty { display: none; }
+/* 64×32 atlas tuvali + vanilla UV bölge kılavuzu */
+.kz-tuval-sar { position: relative; width: 100%; }
 .kz-tuval {
+  display: block; width: 100%; height: auto; aspect-ratio: 2 / 1;
   border-radius: 6px; border: 1px solid var(--hairline-strong);
   image-rendering: pixelated; cursor: crosshair; touch-action: none;
-  flex-shrink: 0;
 }
-.kz-yan { display: flex; flex-direction: column; gap: 9px; min-width: 0; flex: 1; }
-.kz-onizleme { display: flex; flex-direction: column; gap: 4px; }
-.kz-onizleme span {
-  font-size: 9.5px; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-faint);
+.kz-rehber { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.kz-bolgeler { display: flex; flex-wrap: wrap; gap: 4px; }
+.kz-bolge-rozet {
+  font-size: 10px; padding: 2px 7px; border-radius: 999px; cursor: default;
+  border: 1px solid var(--hairline); background: var(--bg1); color: var(--text-faint);
 }
-.kz-onizleme canvas {
-  background: var(--bg4); border: 1px solid var(--hairline); border-radius: 6px;
-  image-rendering: pixelated; width: 100%; max-width: 160px;
-}
+.kz-bolge-rozet:hover { color: var(--text); border-color: var(--hairline-strong); }
+.kz-kart-ipucu { margin-left: 0; }
+.kz-zum { display: flex; align-items: center; gap: 4px; }
+.kz-zum-ipucu { font-size: 10px; color: var(--text-faint); margin-left: auto; }
+.kz-2d-don { border-color: var(--accent-dim); color: var(--accent); }
 .kz-araclar { display: flex; flex-wrap: wrap; gap: 4px; }
 .kz-renk {
   width: 18px; height: 18px; border-radius: 4px; cursor: pointer;
@@ -1163,14 +1184,59 @@ input.search-in.input, .search-in.input {
 .kz-cizim-arac { display: flex; flex-wrap: wrap; gap: 4px; }
 .kz-cizim-arac[hidden] { display: none; }
 .kz-cizim-arac .seg-btn svg { width: 12px; height: 12px; vertical-align: -2px; }
+.kz-3d-renk { display: inline-flex; align-items: center; gap: 6px; margin-left: 2px; }
+.kz-3d-renk input[type="color"] {
+  width: 26px; height: 22px; padding: 0; border: 1px solid var(--hairline-strong);
+  border-radius: 5px; background: var(--bg3); cursor: pointer;
+}
+.kz-3d-palet { display: flex; flex-wrap: wrap; gap: 3px; max-width: 260px; }
+.kz-3d-palet .kz-renk { width: 14px; height: 14px; border-radius: 3px; }
+/* Aktif/pasif anahtarları: özel pelerin ve elitra oyunda kullanılsın mı */
+/* "Oyunda görünüm" şeridi: iki anahtar tek yerde, net ve tıklanabilir. */
+.kz-aktif-satir {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  border: 1px solid var(--hairline); border-radius: 999px;
+  background: var(--bg2); padding: 4px 8px; margin: 6px 0 8px;
+}
+.kz-anahtar {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px;
+  color: var(--text-dim); cursor: pointer; padding: 2px 4px; border-radius: 999px;
+}
+.kz-anahtar:hover { color: var(--text); background: var(--bg3); }
+.kz-anahtar input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; margin: 0; }
+.kz-anahtar input:checked + span { color: var(--text); }
+.kz-anahtar span { user-select: none; }
+.kz-aktif-baslik {
+  font-size: 9.5px; letter-spacing: 0.9px; text-transform: uppercase;
+  color: var(--text-faint); padding: 0 2px 0 4px;
+}
 .kz-oniz3d.cizim canvas { cursor: crosshair; }
 .kz-kart.secili { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+/* 3D çizim: model büyük tuvalde, atlas kartları gizlenir ("2D'ye geç" döndürür) */
+.kozmetik-sayfa.cizim3d .kz-yerlesim { grid-template-columns: minmax(0, 1fr); }
+.kozmetik-sayfa.cizim3d .kz-izgara { display: none; }
+.kozmetik-sayfa.cizim3d .kz-oniz3d { position: static; }
+.kozmetik-sayfa.cizim3d .kz-oniz3d canvas { height: min(66vh, 560px); }
 .sk-edit-3dbar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; flex: 0 0 auto; }
 .sk-edit-onizleme { flex: 0 0 auto; }
 .sk-edit-3dbar .seg-btn { font-size: 11.5px; }
 .sk-edit-3dbar .ic svg { width: 12px; height: 12px; vertical-align: -2px; }
 .sk-edit-onizleme canvas.cizim { cursor: crosshair; }
 .sk-edit-3dipucu { font-size: 10.5px; color: var(--text-faint); }
+.sk-zum3d { display: inline-flex; gap: 3px; margin-left: auto; }
+.sk-zum3d .seg-btn { padding: 3px 7px; }
+
+/* Skin editörü 3D modu: model büyük tuvalde, parça aç-kapa çubukları */
+#ske-3d-tuval {
+  display: block; width: min(512px, 62vh); height: auto; aspect-ratio: 1 / 1;
+  background: radial-gradient(circle at 50% 35%, var(--bg3), var(--bg1));
+  cursor: grab; border: 1px solid var(--hairline); border-radius: var(--radius-sm);
+}
+#ske-tuval[hidden], #ske-izgara[hidden], #ske-3d-tuval[hidden], .sk-3d-parca[hidden] {
+  display: none !important;
+}
+.sk-3d-parca { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; justify-content: flex-end; }
+.sk-3d-parca .seg-btn { font-size: 11px; }
 @media (max-width: 1080px) {
   .kz-yerlesim { grid-template-columns: 1fr; }
   .kz-oniz3d { position: static; }

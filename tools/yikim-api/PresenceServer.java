@@ -60,7 +60,9 @@ public class PresenceServer {
     /// Herkes kullanabilir (ücretsiz); izin listesine bağlı DEĞİL.
     private static final Map<String, String> PELERINLER = new ConcurrentHashMap<>();
     private static final Map<String, String> KANATLAR = new ConcurrentHashMap<>();
-    private static final int MAX_KOZMETIK_B64 = 6144;
+    /// Artık kozmetik TAM 64×32 atlas olarak gönderilir (2048 piksel); detaylı
+  /// bir doku PNG'si küçük olsa da güvenli sınır yüksek tutulur.
+  private static final int MAX_KOZMETIK_B64 = 16384;
 
     /// sunucu adresi → (uuid → oyuncu bilgisi)
     private static final Map<String, Map<String, Oyuncu>> KAYIT = new ConcurrentHashMap<>();
