@@ -403,11 +403,9 @@ public final class YikimAtolye {
             // 0) UUID → hesap adı eşlemesi ("pn"). Çizim UUID'si ile oyundaki
             //    oyuncunun UUID'si tutmadığında (offline/proxy sunucu, launcher
             //    Microsoft UUID'siyle yüklemişse) rozet İSİMLE bulunur.
-            Map<UUID, String> adlar = new java.util.HashMap<UUID, String>();
-            anahtarDegerler(json, "pn", adlar);
+            Map<UUID, String> adlar = YikimJson.stringMap(json, "pn");
             // 1) HAM RGBA ("x") — yeni istemciler; kanal takası imkânsız.
-            Map<UUID, String> ham = new java.util.HashMap<UUID, String>();
-            anahtarDegerler(json, "x", ham);
+            Map<UUID, String> ham = YikimJson.stringMap(json, "x");
             for (java.util.Map.Entry<UUID, String> e : ham.entrySet()) {
                 int[] piksel = pxdenOku(e.getValue());
                 if (piksel != null) {
@@ -417,8 +415,7 @@ public final class YikimAtolye {
             }
             // 2) PNG ("b") — eski istemciden yüklenmiş çizimler. `x`i olan
             // oyuncular atlanır (aynı oyuncu iki yoldan da gelmesin).
-            Map<UUID, String> eski = new java.util.HashMap<UUID, String>();
-            anahtarDegerler(json, "b", eski);
+            Map<UUID, String> eski = YikimJson.stringMap(json, "b");
             for (java.util.Map.Entry<UUID, String> e : eski.entrySet()) {
                 if (e.getValue().length() > MAX_ART_BAYT) {
                     continue;
@@ -454,45 +451,6 @@ public final class YikimAtolye {
         int isimSlotu = YikimSlotlar.ataAd(ad, piksel);
         if (isimSlotu > 0) {
             YikimClient.LOGGER.info("YIKIM rozet: uzak cizim isimle baglandi: {} (slot {})", ad, isimSlotu);
-        }
-    }
-
-    /// `"alan":{"<uuid>":"<deger>", ...}` eşlemesini kütüphanesiz çıkar.
-    private static void anahtarDegerler(String json, String alan, Map<UUID, String> hedef) {
-        int b = json.indexOf("\"" + alan + "\"");
-        if (b < 0) {
-            return;
-        }
-        int i = json.indexOf('{', b);
-        if (i < 0) {
-            return;
-        }
-        while (i >= 0 && i < json.length() - 2) {
-            int t1 = json.indexOf('"', i + 1);
-            if (t1 < 0) {
-                return;
-            }
-            int t2 = json.indexOf('"', t1 + 1);
-            if (t2 < 0) {
-                return;
-            }
-            String anahtar = json.substring(t1 + 1, t2);
-            if (anahtar.length() != 36) {
-                i = json.indexOf('{', t2 + 1);
-                continue;
-            }
-            int d1 = json.indexOf('"', t2 + 1);
-            int d2 = d1 < 0 ? -1 : json.indexOf('"', d1 + 1);
-            if (d2 < 0) {
-                return;
-            }
-            try {
-                hedef.put(UUID.fromString(anahtar), json.substring(d1 + 1, d2));
-            }
-            catch (IllegalArgumentException bozuk) {
-                // atla
-            }
-            i = json.indexOf('{', d2 + 1);
         }
     }
 
