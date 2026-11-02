@@ -18,8 +18,10 @@ interface Bölge { u: number; v: number; w: number; h: number; d: number; }
 /** Kozmetik paftası: pelerin ve elitranın ikisi de vanilla 64×32 atlasıdır. */
 const KOZ_G = 64;
 const KOZ_Y = 32;
-/** Elitra kanatlarının omuzdan dışa açılma açısı (radyan) — vanilla V duruşu. */
-const KANAT_ACISI = 0.08;
+/** Vanilla elitra duruşu (class_563 / ElytraEntityModel): her iki kanat
+ *  +15° pitch (alt uç sırttan ayrılır) ve ∓15° roll (alt uçlar dışa açılır). */
+const KANAT_PITCH = 0.2617994;
+const KANAT_ROLL = 0.2617994;
 
 /** BoxGeometry'nin bir yüzüne paftadan bölge eşler.
  *  `dikey` yalnızca alt (ny) yüzde gerekir: vanilla paftada alt yüz dikey aynalıdır. */
@@ -678,12 +680,21 @@ export class Sahne {
         this.kanatDoku = null;
     }
 
-    /** Elitra kanatları — vanilla elitra gibi İKİ KUTU (10×20×2).
+    /** Elitra kanatları — vanilla `ElytraEntityModel` (class_563) geometrisi.
      *
-     *  Doku tam 64×32 atlasından okunur: her kanat vanilla `uv(22,0)` kutu
-     *  düzenini kullanır. Sağ kanat vanilyadaki gibi aynalanır (`scale.x = −1`),
-     *  bu yüzden iki kanat aynı atlas bölgelerini ayna olarak gösterir —
-     *  oyundaki görünümle birebir aynıdır. */
+     *  Vanilla iki kanadı da 10×20×2 kutudan kurar ama kutu, pivotun DIŞINA
+     *  değil İÇİNE uzanır: `left_wing` pivot +5, kutu `addBox(-10,0,0,...)`;
+     *  `right_wing` pivot −5, kutu `addBox(0,0,0,...)` + `mirror()`. Yani iki
+     *  kanat da sırtın TAMAMINI (−5…+5) kaplar ve ortada üst üste biner —
+     *  yan yana iki ayrı 10 px'lik panel değildir.
+     *
+     *  Duruş da vanilyadan: pitch +15° (alt uç sırttan ayrılır), roll ∓15°
+     *  (sol +, sağ −; alt uçlar dışa açılır → üstte daralan A silueti).
+     *  Vanilla renderer modeli +2 px geri kaydırır (translate 0.125 blok),
+     *  bu yüzden kutu z −4…−2 aralığında, gövde sırtının (−2) hemen arkasında.
+     *
+     *  Doku tam 64×32 atlasından: her kanat vanilla `uv(22,0)` düzenini
+     *  kullanır; sağ kanat `mirror()` gibi aynalanır (`scale.x = −1`). */
     private kanatMeshKur(): void {
         const belUst = this.bukulenler?.belUst;
         if (!belUst || !this.kanatDoku) return;
@@ -695,29 +706,25 @@ export class Sahne {
             side: THREE.DoubleSide,
         });
         const grup = new THREE.Group();
-        // belUst dünyada y=18 (bel); +6 px = omuz/gövde üstü (24).
-        // Kanatlar sırtın TAMAMEN arkasında durur (z −5…−3): gövdeyi ve kolları
-        // kaplamaz, oyun içindeki gibi omuzdan aşağı sarkar.
-        grup.position.set(0, 6 * KS, -3 * KS);
-        for (const yon of [-1, 1]) {
-            // Her kanat kendi omuz pivounda döner → üst kenar sabit kalır, alt uç
-            // dışa açılır (vanilla elitranın V duruşu, ters görünmez).
+        // belUst dünyada y=18 (bel); +6 px = omuz (24). Vanilla +2 px geri
+        // kaydırma: kutu z −4…−2, dış yüz gövde sırtının 2 px arkasında.
+        grup.position.set(0, 6 * KS, -2 * KS);
+        for (const yon of [1, -1]) {
+            // yon +1 = oyuncunun solu (left_wing, pivot +5), −1 = sağı.
             const eklem = new THREE.Group();
             eklem.position.set(yon * 5 * KS, 0, 0);
+            eklem.rotation.order = "ZYX"; // vanilla rotateZYX = Rz·Ry·Rx
             const geo = new THREE.BoxGeometry(10 * KS, 20 * KS, 2 * KS);
             kozUV(geo, 22, 0, 10, 20, 2);
             const kanat = new THREE.Mesh(geo, mat);
-            // v0.5.7: kanat kutusu pivotun MERKEZINE oturur (eskiden +yon*5 ile
-            // dışa kaydırılmıştı → iki kanat arasında 10 px'lik kocaman boşluk
-            // kalıyor, kanatlar omuzların dışına taşıyordu). Artık iç kenarlar
-            // tam ortada birleşir: toplam genişlik 20 px = vanilla elitra.
-            kanat.position.set(0, -10 * KS, -KS);
-            if (yon < 0) kanat.scale.x = -1; // vanilla `right_wing` mirror
+            // Kutu pivotun İÇ tarafına 10 px uzanır (vanilla addBox −10 / 0).
+            kanat.position.set(-yon * 5 * KS, -10 * KS, -KS);
+            if (yon < 0) kanat.scale.x = -1; // vanilla `right_wing` mirror()
             kutuIzgarasi(kanat, 10, 20, 2);
             eklem.add(kanat);
-            eklem.rotation.z = yon * KANAT_ACISI;
-            eklem.rotation.y = yon * 0.07; // dış kenarlar hafif arkaya
-            eklem.rotation.x = 0.06;       // alt uç sırttan hafif ayrık
+            eklem.rotation.x = KANAT_PITCH;
+            eklem.rotation.y = 0;
+            eklem.rotation.z = yon * KANAT_ROLL;
             eklem.userData.yon = yon;
             grup.add(eklem);
         }
@@ -1148,9 +1155,10 @@ export class Sahne {
         g.rotation.x = ch * 0.045;
         g.position.y = 6 * KS + ch * 0.3 * KS;
         // Kanatlar hafifçe açılıp kapanır (vanilla elitra "nefes"i).
+        // Taban açı vanilla roll'u (±15°); çırpınma onun üstüne eklenir.
         for (const cocuk of g.children) {
             const yon = (cocuk.userData.yon as number) ?? 1;
-            cocuk.rotation.z = yon * (KANAT_ACISI + Math.max(0, ch) * 0.035);
+            cocuk.rotation.z = yon * (KANAT_ROLL + Math.max(0, ch) * 0.035);
         }
     }
 
