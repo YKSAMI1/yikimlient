@@ -67,7 +67,14 @@ function kutuYap(b: Bölge, doku: THREE.Texture | null, saydam = false): THREE.M
  *
  *  Pelerin texOffs(0,0) 10×16×1 · elitra texOffs(22,0) 10×20×2.
  *  Yüz sırası: [px, nx, py, ny, pz, nz]. Alt yüz (ny) dikey aynalıdır —
- *  vanilla paftada alt şerit ters durur. */
+ *  vanilla paftada alt şerit ters durur.
+ *
+ *  GÖRÜNEN yüz = `(u+2d+w, v+d)` paneli (kutunun ARKASI, nz). Kanıt: gerçek
+ *  vanilla elitra dokusunda desen yalnız bu panelde (36,2) durur; `(u+d,v+d)`
+ *  paneli (24,2) tamamen saydamdır. Oyunda arkadan görünen yüz bu yüzden nz.
+ *  v0.6.3: burada eskiden ön/arka panelleri TAKAS eden `disDisari` dalı vardı;
+ *  önizleme oyunun tersini gösteriyordu (kullanıcı: "launcherde ters, oyunda
+ *  düzgün"). Artık vanilla `ModelPart.Cube` düzeni birebir kullanılır. */
 function kozUV(
     geo: THREE.BufferGeometry,
     u: number,
@@ -75,7 +82,6 @@ function kozUV(
     w: number,
     h: number,
     d: number,
-    disDisari = false,
 ): void {
     const uv = geo.attributes.uv as THREE.BufferAttribute;
     const yaz = (yuz: number, x1: number, y1: number, x2: number, y2: number, dikey = false): void => {
@@ -87,24 +93,12 @@ function kozUV(
         uv.setXY(i + 2, x1 / KOZ_G, 1 - ay2 / KOZ_Y);
         uv.setXY(i + 3, x2 / KOZ_G, 1 - ay2 / KOZ_Y);
     };
-    if (disDisari) {
-        // PELERİN / ELİTRA: (u+d, v+d) paneli oyunda GÖRÜNEN yüzdür — sırttan
-        // UZAKA bakan tarafa (nz) yazılır. Oyunda bu yüz arkadan göründüğü için
-        // dış panel oraya gelmeli; yan şeritler de panellerin yanına düşer.
-        yaz(0, u, v + d, u + d, v + d + h);                          // px (+x)
-        yaz(1, u + d + w, v + d, u + d + w + d, v + d + h);          // nx (−x)
-        yaz(2, u + d, v, u + d + w, v + d);                          // py (üst)
-        yaz(3, u + d + w, v, u + d + w + w, v + d, true);            // ny (alt)
-        yaz(4, u + d + w + d, v + d, u + d + w + d + w, v + d + h);  // pz (gövdeye bakan = iç)
-        yaz(5, u + d, v + d, u + d + w, v + d + h);                  // nz (dış = görünen)
-    } else {
-        yaz(0, u + d + w, v + d, u + d + w + d, v + d + h);          // px (+x)
-        yaz(1, u, v + d, u + d, v + d + h);                          // nx (−x)
-        yaz(2, u + d, v, u + d + w, v + d);                          // py (üst)
-        yaz(3, u + d + w, v, u + d + w + w, v + d, true);            // ny (alt, dikey ayna)
-        yaz(4, u + d, v + d, u + d + w, v + d + h);                  // pz (ön)
-        yaz(5, u + d + w + d, v + d, u + d + w + d + w, v + d + h);  // nz (arka)
-    }
+    yaz(0, u + d + w, v + d, u + d + w + d, v + d + h);          // px (+x, karakterin solu)
+    yaz(1, u, v + d, u + d, v + d + h);                          // nx (−x, karakterin sağı)
+    yaz(2, u + d, v, u + d + w, v + d);                          // py (üst)
+    yaz(3, u + d + w, v, u + d + w + w, v + d, true);            // ny (alt, dikey ayna)
+    yaz(4, u + d, v + d, u + d + w, v + d + h);                  // pz (+z, gövdeye bakan = iç)
+    yaz(5, u + d + w + d, v + d, u + d + w + d + w, v + d + h);  // nz (−z, dış = görünen)
     uv.needsUpdate = true;
 }
 
@@ -711,7 +705,7 @@ export class Sahne {
             const eklem = new THREE.Group();
             eklem.position.set(yon * 5 * KS, 0, 0);
             const geo = new THREE.BoxGeometry(10 * KS, 20 * KS, 2 * KS);
-            kozUV(geo, 22, 0, 10, 20, 2, true);
+            kozUV(geo, 22, 0, 10, 20, 2);
             const kanat = new THREE.Mesh(geo, mat);
             // v0.5.7: kanat kutusu pivotun MERKEZINE oturur (eskiden +yon*5 ile
             // dışa kaydırılmıştı → iki kanat arasında 10 px'lik kocaman boşluk
@@ -796,7 +790,7 @@ export class Sahne {
         if (!belUst || !this.pelerinDoku) return;
         if (this.pelerinGrup) this.pelerinMeshSil(); // çift mesh imkânsız
         const geo = new THREE.BoxGeometry(10 * KS, 16 * KS, 1 * KS);
-        kozUV(geo, 0, 0, 10, 16, 1, true);
+        kozUV(geo, 0, 0, 10, 16, 1);
         const mat = new THREE.MeshLambertMaterial({
             map: this.pelerinDoku,
             transparent: true,

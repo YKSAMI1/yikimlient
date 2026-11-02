@@ -16,6 +16,7 @@ import {
   ATLAS_PIKSEL,
   ELITRA_BOLGELERI,
   KOZ_G,
+  KOZ_KUTU,
   KOZ_Y,
   KozBolge,
   PELERIN_BOLGELERI,
@@ -871,26 +872,27 @@ function karsiYuzuAynala(p: Piksel[], ana: KozBolge, karsi: KozBolge): void {
  *  görünüyordu. Elytrada şeritler 2 piksel (kalınlık 2), pelerinde 1. */
 function kenarlariDoldur(p: Piksel[], tur: Tur): void {
   const dis = disBolge(tur);
-  const d = tur === "pelerin" ? 1 : 2; // kutu kalınlığı
-  const u = dis.x - d;
-  const v = dis.y - d;
+  const k = KOZ_KUTU[tur];
+  const { u, v, d } = k;
   const oku = (x: number, y: number): Piksel => p[y * KOZ_G + x] ?? "";
-  // sol / sağ yan şeritler (tasarımın ilk ve son sütunu)
+  // "Dış" panel artık ARKADAN GÖRÜNEN yüz (u+2d+w, v+d). Bu yüzün sol sütunu
+  // karakterin SOL yanına, sağ sütunu SAĞ yanına denk gelir — ön panelin
+  // tersine (orada sol sütun sağ yana gider).
   for (let y = 0; y < dis.h; y++) {
     const sol = oku(dis.x, dis.y + y);
     const sag = oku(dis.x + dis.w - 1, dis.y + y);
     for (let i = 0; i < d; i++) {
-      yaz(p, u + i, v + d + y, sol);
-      yaz(p, u + d + dis.w + i, v + d + y, sag);
+      yaz(p, u + d + k.w + i, v + d + y, sol); // sol yan şerit
+      yaz(p, u + i, v + d + y, sag);           // sağ yan şerit
     }
   }
-  // üst / alt şeritler (tasarımın ilk ve son satırı)
+  // üst / alt şeritler (dış panelin ilk ve son satırı)
   for (let x = 0; x < dis.w; x++) {
     const ust = oku(dis.x + x, dis.y);
     const alt = oku(dis.x + x, dis.y + dis.h - 1);
     for (let i = 0; i < d; i++) {
       yaz(p, u + d + x, v + i, ust);
-      yaz(p, u + d + dis.w + x, v + i, alt);
+      yaz(p, u + d + k.w + x, v + i, alt);
     }
   }
 }

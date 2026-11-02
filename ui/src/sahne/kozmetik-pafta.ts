@@ -7,15 +7,17 @@
 // Bölge yerleşimi oyunun kendi modellerinden çıkarıldı (ModelPart cuboid UV):
 //
 //   PELERİN  texOffs(0,0) 10×16×1        ELİTRA  texOffs(22,0) 10×20×2
-//   dış   (1,1) 10×16                    dış yüz (24,2) 10×20
-//   iç    (12,1) 10×16                   iç yüz  (36,2) 10×20
-//
-//   "Dış" = oyunda ARKADAN GÖRÜNEN yüz; tasarım oraya çizilir. "İç" gövdeye
-//   bakar. Doğrulama: eski launcher exe'si tasarımı (1,1)'e yazıp (12,1)'e
-//   AYNALI kopyalıyor ve oyunda düzgün görünüyordu → görünen yüz (1,1).
-//   yanlar (0,1) / (11,1) 1×16           yanlar  (22,2) / (34,2) 2×20
+//   dış   (12,1) 10×16                   dış yüz (36,2) 10×20
+//   iç    (1,1)  10×16                   iç yüz  (24,2) 10×20
+//   yanlar (11,1) / (0,1) 1×16           yanlar  (34,2) / (22,2) 2×20
 //   üst   (1,0) 10×1                     üst     (24,0) 10×2
 //   alt   (11,0) 10×1                    alt     (34,0) 10×2
+//
+//   "Dış" = oyunda ARKADAN GÖRÜNEN yüz. Cuboid UV düzeninde bu panel
+//   `(u+2d+w, v+d)`; gövdeye bakan iç astar ise `(u+d, v+d)`.
+//   Kanıt: gerçek vanilla elitra dokusunda desen yalnız (36,2) panelinde
+//   durur (173 opak piksel); (24,2) tamamen saydamdır. Oyunda arkadan
+//   görünen yüz bu yüzden (36,2); pelerinde karşılığı (12,1).
 //
 // `ui/src/sahne/karakter.ts` içindeki `kozUV` aynı formülü kullanır; ikisi
 // ayrışırsa önizleme oyundan farklı görünür.
@@ -25,6 +27,20 @@ export type Piksel = string;
 export const KOZ_G = 64;
 export const KOZ_Y = 32;
 export const ATLAS_PIKSEL = KOZ_G * KOZ_Y;
+
+/** Vanilla kutu geometrisi: texOffs (u,v), boyut (w,h) ve kalınlık (d). */
+export interface KozKutu {
+  u: number;
+  v: number;
+  w: number;
+  h: number;
+  d: number;
+}
+
+export const KOZ_KUTU: Record<"pelerin" | "kanat", KozKutu> = {
+  pelerin: { u: 0, v: 0, w: 10, h: 16, d: 1 },
+  kanat: { u: 22, v: 0, w: 10, h: 20, d: 2 },
+};
 
 /** Atlas üzerindeki bir yüz — etiket ve vurgu için. */
 export interface KozBolge {
@@ -38,25 +54,26 @@ export interface KozBolge {
 
 /** Pelerin yüzleri (vanilla `class_9950` cuboid uv(0,0)).
  *
- *  DİKKAT: `(1,1)` paneli pelerinin GÖVDEYE BAKAN yüzüdür (iç astar),
- *  `(12,1)` paneli ise oyunda ARKADAN GÖRÜNEN yüzdür — tasarım oraya gider.
- *  (Ters bağlanınca desen pelerinin önünde/ters tarafında kalıyordu.) */
+ *  `(12,1)` paneli oyunda ARKADAN GÖRÜNEN yüzdür — tasarım oraya gider.
+ *  `(1,1)` paneli gövdeye bakan iç astardır. (v0.6.3: bu iki panel daha önce
+ *  ters etiketlenmişti; launcher önizlemesi oyunun aynası gibi görünüyordu.) */
 export const PELERIN_BOLGELERI: KozBolge[] = [
-  { id: "p-dis", ad: "Dış (görünen)", x: 1, y: 1, w: 10, h: 16 },
-  { id: "p-ic", ad: "İç (astar)", x: 12, y: 1, w: 10, h: 16 },
-  { id: "p-sol", ad: "Sol yan", x: 0, y: 1, w: 1, h: 16 },
-  { id: "p-sag", ad: "Sağ yan", x: 11, y: 1, w: 1, h: 16 },
+  { id: "p-dis", ad: "Dış (görünen)", x: 12, y: 1, w: 10, h: 16 },
+  { id: "p-ic", ad: "İç (astar)", x: 1, y: 1, w: 10, h: 16 },
+  { id: "p-sol", ad: "Sol yan", x: 11, y: 1, w: 1, h: 16 },
+  { id: "p-sag", ad: "Sağ yan", x: 0, y: 1, w: 1, h: 16 },
   { id: "p-ust", ad: "Üst", x: 1, y: 0, w: 10, h: 1 },
   { id: "p-alt", ad: "Alt", x: 11, y: 0, w: 10, h: 1 },
 ];
 
 /** Elitra yüzleri (vanilla `class_563.method_31994` cuboid uv(22,0)).
- *  Sağ kanat oyunda aynalanır → iki kanat da AYNI atlas bölgelerini gösterir. */
+ *  Sağ kanat oyunda aynalanır → iki kanat da AYNI atlas bölgelerini gösterir.
+ *  Görünen yüz `(36,2)`; `(24,2)` gövdeye bakan iç yüzdür. */
 export const ELITRA_BOLGELERI: KozBolge[] = [
-  { id: "e-dis", ad: "Dış (görünen)", x: 24, y: 2, w: 10, h: 20 },
-  { id: "e-ic", ad: "İç", x: 36, y: 2, w: 10, h: 20 },
-  { id: "e-sol", ad: "Sol yan", x: 22, y: 2, w: 2, h: 20 },
-  { id: "e-sag", ad: "Sağ yan", x: 34, y: 2, w: 2, h: 20 },
+  { id: "e-dis", ad: "Dış (görünen)", x: 36, y: 2, w: 10, h: 20 },
+  { id: "e-ic", ad: "İç", x: 24, y: 2, w: 10, h: 20 },
+  { id: "e-sol", ad: "Sol yan", x: 34, y: 2, w: 2, h: 20 },
+  { id: "e-sag", ad: "Sağ yan", x: 22, y: 2, w: 2, h: 20 },
   { id: "e-ust", ad: "Üst", x: 24, y: 0, w: 10, h: 2 },
   { id: "e-alt", ad: "Alt", x: 34, y: 0, w: 10, h: 2 },
 ];
