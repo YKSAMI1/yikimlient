@@ -37,6 +37,14 @@ function optimizeVideos(root: HTMLElement): void {
   videos.forEach((v) => obs.observe(v));
 }
 
+/** Ağ çağrısı süresinde dönmezse null döner — arayüz spinner'da kilitlenmesin. */
+function zamanAsimi<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    p.catch(() => null),
+    new Promise<null>((coz) => setTimeout(() => coz(null), ms)),
+  ]);
+}
+
 export function renderInstances(root: HTMLElement): void {
   // "Kurulumu Yönet" gibi dış bağlantılarla gelindiyse hedefi al
   if (nav.param && state.instances.find((i) => i.id === nav.param)) {
@@ -361,20 +369,11 @@ async function tabMods(content: HTMLElement, inst: any): Promise<void> {
   content.innerHTML = `<div class="spinner" style="margin:40px auto"></div>`;
   let mods: any[] = [];
   try { mods = await invoke("cmd_list_mods", { instanceId: inst.id }); } catch { /* yok */ }
-  // Mod logoları: Modrinth'ten paralel çözümle (bulunamayanlar sessizce emoji kalır)
+  // Logolar ve güncellemeler Modrinth'ten gelir (ağ). Bunlar beklenirken liste
+  // ÇİZİLMEZSE sekme internet yavaşken sonsuza kadar spinner gibi görünüyordu:
+  // liste hemen çizilir, bu bilgiler geldikçe tazelenir ve her çağrı zaman aşımına bağlı.
   let icons: Record<string, string> = {};
-  if (mods.length) {
-    try { icons = await invoke("cmd_resolve_mod_icons", { filenames: mods.map((m) => m.filename) }); } catch { /* yok */ }
-  }
-  // Güncellemeler: Modrinth'e jar hash'i sorulur; yeni sürümü olanlara
-  // "Güncelle" düğmesi çıkar (tek tık: indir + eskiyi sil).
   let updates: Record<string, any> = {};
-  if (mods.length) {
-    try {
-      const list: any[] = await invoke("cmd_check_mod_updates", { instanceId: inst.id });
-      updates = Object.fromEntries(list.map((u: any) => [u.filename, u]));
-    } catch { /* internet yok / sunucu kapalı — sessiz */ }
-  }
   // ÖNEMLİ: filtre değişince SADECE liste yeniden çizilir; toolbar (arama kutusu)
   // DOM'da kalır — her tuşta kutu yeniden kurulursa yazma sırası bozuluyor (ters yazma).
   content.innerHTML = `
@@ -456,6 +455,29 @@ async function tabMods(content: HTMLElement, inst: any): Promise<void> {
     navigate("explore", inst.id);
   });
   render("");
+
+  // Liste çoktan ekranda. Şimdi logolar + güncellemeler arka planda gelir.
+  if (!mods.length) return;
+  const filtre = (): string =>
+    (content.querySelector("#mod-search") as HTMLInputElement | null)?.value ?? "";
+  void (async () => {
+    const logo = await zamanAsimi(
+      invoke("cmd_resolve_mod_icons", { filenames: mods.map((m) => m.filename) }) as Promise<Record<string, string>>,
+      8000,
+    );
+    if (logo && Object.keys(logo).length) {
+      icons = logo;
+      render(filtre());
+    }
+    const guncel = await zamanAsimi(
+      invoke("cmd_check_mod_updates", { instanceId: inst.id }) as Promise<any[]>,
+      15000,
+    );
+    if (guncel) {
+      updates = Object.fromEntries(guncel.map((u: any) => [u.filename, u]));
+      render(filtre());
+    }
+  })();
 }
 
 // ---------- Java & Args sekmesi ----------

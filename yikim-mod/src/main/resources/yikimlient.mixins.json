@@ -11,7 +11,8 @@
                    "PlayerBadgeMixin",
                    "TabBadgeMixin",
                    "YikimFontStokMixin",
-                   "YikimFontCtxSahasi"
+                   "YikimFontCtxSahasi",
+                   "BaslikEkraniMixin"
                ],
     "injectors":  {
                       "defaultRequire":  0

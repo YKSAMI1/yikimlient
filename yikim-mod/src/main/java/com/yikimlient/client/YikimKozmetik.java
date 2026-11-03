@@ -39,6 +39,20 @@ public final class YikimKozmetik {
     private static final java.util.Set<String> BASARISIZ = ConcurrentHashMap.newKeySet();
 
     /** Yerel dosyaların son okunan hâli (sunucuya yalnız değişince gönderilir). */
+    /// v1.25: HD doku sunucuya PARÇA PARÇA gider (tek istek 192 KB ile sınırlı).
+    /// Parçalar tamamlanınca doku yayına girer; yarım doku görünmez.
+    private static final int PARCA_BOY = 45000;
+    /// Bu uzunluğun altındaki doku normal presence gövdesine sığar.
+    private static final int TEK_PARCA_ESIK = 18000;
+    /// Sunucunun kabul ettiği en büyük base64; üstündeyse 64×32 kopya gönderilir.
+    private static final int SUNUCU_SINIR = 690_000;
+
+    /// Sırası bekleyen HD dokular (parçalı gönderim).
+    private static volatile String bekleyenPelerin = "";
+    private static volatile String bekleyenKanat = "";
+    private static volatile String gonderilenPelerin = "";
+    private static volatile String gonderilenKanat = "";
+
     private static volatile String sonPelerinB64 = "";
     private static volatile String sonKanatB64 = "";
 
@@ -54,6 +68,10 @@ public final class YikimKozmetik {
     private static long sonKontrol;
     private static volatile String pelerinYerel = "";
     private static volatile String kanatYerel = "";
+    /// Sunucuya gönderilecek 64x32 kopya (HD fotoğraf kozmetiklerinde launcher
+    /// `pelerin.kucuk.png` yazar; presence gövdesi ~32 KB ile sınırlı).
+    private static volatile String pelerinKucuk = "";
+    private static volatile String kanatKucuk = "";
 
     private static synchronized void dosyalariTazele() {
         long simdi = System.currentTimeMillis();
@@ -63,6 +81,8 @@ public final class YikimKozmetik {
         YikimKozmetik.sonKontrol = simdi;
         YikimKozmetik.pelerinYerel = YikimKozmetik.disktenOku("pelerin.png");
         YikimKozmetik.kanatYerel = YikimKozmetik.disktenOku("elytra.png");
+        YikimKozmetik.pelerinKucuk = YikimKozmetik.kucukDosya("pelerin.kucuk.png", YikimKozmetik.pelerinYerel);
+        YikimKozmetik.kanatKucuk = YikimKozmetik.kucukDosya("elytra.kucuk.png", YikimKozmetik.kanatYerel);
     }
 
     private static String disktenOku(String ad) {
@@ -80,6 +100,23 @@ public final class YikimKozmetik {
         catch (Throwable ignored) {
             return "";
         }
+    }
+
+    /// 64x32 kopya varsa onu, yoksa tam dosyayı döndür.
+    private static String kucukDosya(String ad, String tam) {
+        try {
+            Path f = YikimKozmetik.stateDir().resolve(ad);
+            if (Files.isRegularFile(f)) {
+                byte[] png = Files.readAllBytes(f);
+                if (png.length > 8) {
+                    return Base64.getEncoder().encodeToString(png);
+                }
+            }
+        }
+        catch (Throwable ignored) {
+            // kopya okunamazsa tam dosya kullanılır
+        }
+        return tam;
     }
 
     private static String dosyaB64(String ad) {
@@ -102,17 +139,164 @@ public final class YikimKozmetik {
     public static synchronized String govdeEk() {
         YikimKozmetik.dosyalariTazele();
         StringBuilder ek = new StringBuilder();
+        // Değişiklik TAM dosyadan anlaşılır; gönderilen ise 64x32 kopyadır
+        // (HD doku sunucu gövde sınırına sığmaz, diğer oyuncular küçüğünü görür).
         String pelerin = YikimKozmetik.pelerinYerel;
         if (!pelerin.equals(YikimKozmetik.sonPelerinB64)) {
             YikimKozmetik.sonPelerinB64 = pelerin;
-            ek.append(",\"kc\":\"").append(pelerin).append('"');
+            if (pelerin.length() <= YikimKozmetik.TEK_PARCA_ESIK) {
+                ek.append(",\"kc\":\"").append(pelerin).append('"');
+            }
+            else {
+                // HD: parçalı yükleme kuyruğuna al (parçalar bitince yayına girer)
+                YikimKozmetik.bekleyenPelerin = pelerin;
+            }
         }
         String kanat = YikimKozmetik.kanatYerel;
         if (!kanat.equals(YikimKozmetik.sonKanatB64)) {
             YikimKozmetik.sonKanatB64 = kanat;
-            ek.append(",\"ke\":\"").append(kanat).append('"');
+            if (kanat.length() <= YikimKozmetik.TEK_PARCA_ESIK) {
+                ek.append(",\"ke\":\"").append(kanat).append('"');
+            }
+            else {
+                YikimKozmetik.bekleyenKanat = kanat;
+            }
         }
         return ek.toString();
+    }
+
+    /// İstemcinin elindeki doku sürümleri: "uuid:<hash>:<uzunluk>;..."
+    ///
+    /// Sunucu aynı sürümü biliyorsa dokuyu GÖNDERMEZ → kalp atışı başına
+    /// yüzlerce KB indirmek yerine yalnız değişen doku iner.
+    public static String bildiklerim() {
+        StringBuilder sb = new StringBuilder();
+        YikimKozmetik.surumEkle(sb, YikimKozmetik.UZAK_PELERIN);
+        YikimKozmetik.surumEkle(sb, YikimKozmetik.UZAK_KANAT);
+        return sb.toString();
+    }
+
+    /// Presence gövdesine eklenecek "ob" alanı (boşsa hiçbir şey eklenmez).
+    public static String bildiklerimEk() {
+        String b = YikimKozmetik.bildiklerim();
+        return b.isEmpty() ? "" : ",\"ob\":\"" + b + "\"";
+    }
+
+    private static void surumEkle(StringBuilder sb, Map<UUID, String> kaynak) {
+        for (Map.Entry<UUID, String> e : kaynak.entrySet()) {
+            String b64 = e.getValue();
+            if (b64 == null || b64.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(';');
+            }
+            sb.append(e.getKey()).append(':')
+                .append(Integer.toHexString(b64.hashCode())).append(':').append(b64.length());
+        }
+    }
+
+    /// Bekleyen HD dokuları parça parça gönder (presence iş parçacığından).
+    ///
+    /// Parçalar paralel gider (4 iş parçacığı) → 1024×512 doku ~1 sn'de yüklenir.
+    /// Doku yalnız TÜM parçalar ulaştığında yayına girer.
+    public static void parcalariGonder(String ucak, String uuid) {
+        String p = YikimKozmetik.bekleyenPelerin;
+        if (!p.isEmpty() && !p.equals(YikimKozmetik.gonderilenPelerin)) {
+            String veri = p;
+            if (veri.length() > YikimKozmetik.SUNUCU_SINIR) {
+                // Sunucu sınırını aşan doku: 64×32 kopya (yoksa gönderilmez)
+                veri = YikimKozmetik.kucukDosya("pelerin.kucuk.png", "");
+            }
+            if (YikimKozmetik.parcaliGonder(ucak, uuid, "kc", veri)) {
+                YikimKozmetik.gonderilenPelerin = p;
+                YikimKozmetik.bekleyenPelerin = "";
+            }
+        }
+        String k = YikimKozmetik.bekleyenKanat;
+        if (!k.isEmpty() && !k.equals(YikimKozmetik.gonderilenKanat)) {
+            String veri = k;
+            if (veri.length() > YikimKozmetik.SUNUCU_SINIR) {
+                veri = YikimKozmetik.kucukDosya("elytra.kucuk.png", "");
+            }
+            if (YikimKozmetik.parcaliGonder(ucak, uuid, "ke", veri)) {
+                YikimKozmetik.gonderilenKanat = k;
+                YikimKozmetik.bekleyenKanat = "";
+            }
+        }
+    }
+
+    /// Bir dokuyu parçalara bölüp gönder. Hepsi tuttuysa true.
+    private static boolean parcaliGonder(String ucak, String uuid, String hedef, String b64) {
+        if (b64 == null || b64.isEmpty()) {
+            return false;
+        }
+        if (b64.length() > YikimKozmetik.SUNUCU_SINIR) {
+            return false;
+        }
+        int toplam = (b64.length() + YikimKozmetik.PARCA_BOY - 1) / YikimKozmetik.PARCA_BOY;
+        if (toplam < 1 || toplam > 64) {
+            return false;
+        }
+        String kid = Integer.toHexString(b64.hashCode()) + "-" + b64.length();
+        java.util.concurrent.atomic.AtomicInteger basarisiz =
+            new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.ExecutorService havuz =
+            java.util.concurrent.Executors.newFixedThreadPool(4);
+        try {
+            for (int i = 0; i < toplam; i++) {
+                final int parca = i;
+                havuz.execute(() -> {
+                    int bas = parca * YikimKozmetik.PARCA_BOY;
+                    int son = Math.min(b64.length(), bas + YikimKozmetik.PARCA_BOY);
+                    String parcaVeri = b64.substring(bas, son);
+                    String govde = "{\"v\":1,\"u\":\"" + uuid + "\",\"kp\":\"" + hedef
+                        + "\",\"ki\":" + parca + ",\"kn\":" + toplam + ",\"kid\":\"" + kid
+                        + "\",\"kv\":\"" + parcaVeri + "\"}";
+                    if (!YikimKozmetik.gonder(ucak, govde)) {
+                        basarisiz.incrementAndGet();
+                    }
+                });
+            }
+            havuz.shutdown();
+            if (!havuz.awaitTermination(12L, java.util.concurrent.TimeUnit.SECONDS)) {
+                havuz.shutdownNow();
+                return false;
+            }
+        }
+        catch (Throwable hata) {
+            havuz.shutdownNow();
+            return false;
+        }
+        return basarisiz.get() == 0;
+    }
+
+    /// Tek POST (parça yükleme için). 200 dönerse true.
+    private static boolean gonder(String ucak, String govde) {
+        java.net.HttpURLConnection bag = null;
+        try {
+            byte[] bayt = govde.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            bag = (java.net.HttpURLConnection) new java.net.URL(ucak).openConnection();
+            bag.setConnectTimeout(6000);
+            bag.setReadTimeout(8000);
+            bag.setRequestMethod("POST");
+            bag.setDoOutput(true);
+            bag.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            bag.setFixedLengthStreamingMode(bayt.length);
+            try (java.io.OutputStream cikis = bag.getOutputStream()) {
+                cikis.write(bayt);
+            }
+            int kod = bag.getResponseCode();
+            return kod == 200;
+        }
+        catch (Throwable hata) {
+            return false;
+        }
+        finally {
+            if (bag != null) {
+                bag.disconnect();
+            }
+        }
     }
 
     /** Yanıttaki `"kc":{...}` / `"ke":{...}` haritalarını ayrıştır. */
@@ -185,7 +369,8 @@ public final class YikimKozmetik {
     public static class_2960 pelerin(UUID id) {
         try {
             String b64;
-            if (YikimKozmetik.kendim(id)) {
+            boolean kendi = YikimKozmetik.kendim(id);
+            if (kendi) {
                 // KENDİ oyuncu: launcher'ın yazdığı yerel dosya. Dosya yoksa
                 // (launcher bu kuruluma yazamadı / oyun klasörü farklı)
                 // presence sunucusundaki KENDİ tasarımımıza düşeriz —
@@ -199,7 +384,13 @@ public final class YikimKozmetik {
             else {
                 b64 = YikimKozmetik.UZAK_PELERIN.get(id);
             }
-            return YikimKozmetik.doku("pelerin-" + id, b64);
+            class_2960 d = YikimKozmetik.doku("pelerin-" + id, b64);
+            if (d == null && kendi) {
+                // HD dosya kurulamadıysa 64×32 kopyayla devam: pelerin kaybolmaz.
+                d = YikimKozmetik.doku("pelerin-k-" + id,
+                    YikimKozmetik.kucukDosya("pelerin.kucuk.png", ""));
+            }
+            return d;
         }
         catch (Throwable ignored) {
             return null;
@@ -210,7 +401,8 @@ public final class YikimKozmetik {
     public static class_2960 kanat(UUID id) {
         try {
             String b64;
-            if (YikimKozmetik.kendim(id)) {
+            boolean kendi = YikimKozmetik.kendim(id);
+            if (kendi) {
                 b64 = YikimKozmetik.dosyaB64("elytra.png");
                 if (b64 == null || b64.isEmpty()) {
                     b64 = YikimKozmetik.UZAK_KANAT.get(id);
@@ -219,7 +411,12 @@ public final class YikimKozmetik {
             else {
                 b64 = YikimKozmetik.UZAK_KANAT.get(id);
             }
-            return YikimKozmetik.doku("kanat-" + id, b64);
+            class_2960 d = YikimKozmetik.doku("kanat-" + id, b64);
+            if (d == null && kendi) {
+                d = YikimKozmetik.doku("kanat-k-" + id,
+                    YikimKozmetik.kucukDosya("elytra.kucuk.png", ""));
+            }
+            return d;
         }
         catch (Throwable ignored) {
             return null;
@@ -269,8 +466,12 @@ public final class YikimKozmetik {
             YikimKozmetik.DOKULAR.put(imza, id);
             return id;
         }
-        catch (Throwable ignored) {
+        catch (Throwable e) {
+            // Sessiz kalmak teşhisi imkânsız kılıyordu: ilk hatayı günlüğe yaz.
             YikimKozmetik.BASARISIZ.add(imza);
+            if (YikimKozmetik.BASARISIZ.size() < 4) {
+                com.yikimlient.client.YikimLog.warn("kozmetik doku kurulamadi (" + anahtar + "): " + e);
+            }
             return null;
         }
     }

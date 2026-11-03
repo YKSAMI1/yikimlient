@@ -94,6 +94,7 @@ pub fn run() {
             commands::cmd_pick_emote,
             commands::cmd_kozmetik_kaydet,
             commands::cmd_kozmetik_oku,
+            commands::cmd_kozmetik_fotograf,
             commands::cmd_kozmetik_aktif,
             commands::cmd_rozet_ciz,
             commands::cmd_rozet_oku,

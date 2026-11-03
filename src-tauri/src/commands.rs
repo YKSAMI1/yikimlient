@@ -420,6 +420,75 @@ pub fn cmd_kozmetik_oku() -> Result<serde_json::Value, String> {
     }))
 }
 
+/// HD FOTOĞRAF kozmetiği: PNG'yi olduğu gibi yazar (64×32 zorunluluğu yok).
+///
+/// Editörde fotoğraftan üretilen pafta 64×32'nin tam katıdır; mod dokuyu kendi
+/// çözünürlüğünde yükler. Presence sunucusu ~32 KB gövde sınırı koyduğu için
+/// diğer oyunculara 64×32 küçültülmüş kopya gider (yerelde HD kalır).
+#[tauri::command]
+pub async fn cmd_kozmetik_fotograf(
+    tur: String,
+    png: String,
+    duz: Option<bool>,
+) -> Result<serde_json::Value, String> {
+    let _duz = duz.unwrap_or(false);
+    let ad = match tur.as_str() {
+        "pelerin" => "pelerin.png",
+        "kanat" | "elitra" => "elytra.png",
+        _ => return Err("bilinmeyen kozmetik türü".into()),
+    };
+    let ham = crate::kozmetik::png_coz(&png)?;
+    // "Düz dikdörtgen" gibi saydam alan bırakan paftalarda fotoğraf varsayılan
+    // dokunun ÜZERİNE maske olarak biner (boş kalan yerlerde vanilla görünür).
+    let veri = if ad == "elytra.png" {
+        crate::kozmetik::elytra_maskele(&ham).unwrap_or(ham)
+    } else {
+        ham
+    };
+    let (genislik, yukseklik) = crate::kozmetik::png_boyut(&veri).ok_or("görsel okunamadı")?;
+    if genislik < crate::kozmetik::DOKU_G || yukseklik < crate::kozmetik::DOKU_Y {
+        return Err("görsel en az 64×32 olmalı".into());
+    }
+    let kurulum = crate::kozmetik::tum_kurulumlara_yaz(ad, &veri);
+    // 64×32 kopya: mod bunu presence sunucusuna gönderir (gövde sınırı).
+    crate::kozmetik::kucuk_yaz(ad, &veri);
+
+    let cfg = YikimConfig::load_or_default();
+    let ucak = crate::kozmetik::ucak(&cfg);
+    let kucuk = crate::kozmetik::kucuk_png_b64(&veri).unwrap_or_default();
+    let mut yuklendi = false;
+    let mut hata = String::new();
+    match selected_account() {
+        Ok(hesap) => {
+            let (pelerin, kanat) = if ad == "pelerin.png" {
+                (Some(kucuk), None)
+            } else {
+                (None, Some(kucuk))
+            };
+            match crate::kozmetik::sunucuya_yukle(
+                &hesap.uuid,
+                &hesap.name,
+                pelerin,
+                kanat,
+                &ucak,
+            )
+            .await
+            {
+                Ok(()) => yuklendi = true,
+                Err(e) => hata = e,
+            }
+        }
+        Err(_) => hata = "seçili hesap yok".into(),
+    }
+    Ok(serde_json::json!({
+        "kurulum": kurulum,
+        "yuklendi": yuklendi,
+        "hata": hata,
+        "genislik": genislik,
+        "yukseklik": yukseklik,
+    }))
+}
+
 /// Özel pelerin / elitrayı oyunda etkinleştir ya da pasife al.
 ///
 /// Pasifken kurulumlardaki dosya kaldırılır (oyunda vanilla pelerin/elitra

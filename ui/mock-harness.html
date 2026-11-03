@@ -182,12 +182,26 @@
       sys: { total_ram_mb: 16384, cores: 8 },
     };
     var calls = [];
+    // Fotoğraf modu sayfa yenilenince de sürsün (gerçekte diskteki PNG gibi).
+    var foto = {
+      pelerin: sessionStorage.getItem("mock-foto-pelerin"),
+      kanat: sessionStorage.getItem("mock-foto-kanat"),
+    };
     function invoke(cmd, args) {
       calls.push(cmd);
       args = args || {};
       if (cmd === "cmd_get_state") return Promise.resolve(JSON.parse(JSON.stringify(state)));
       if (cmd === "cmd_save_settings") { Object.assign(state.config, args.config || {}); return Promise.resolve(true); }
       if (cmd === "cmd_list_news") return Promise.resolve([]);
+      // Modlar sekmesi: liste yerel; logo/güncelleme çağrıları AĞI taklit edip
+      // hiç dönmez — liste yine de hemen görünmeli (spinner'da kilitlenmemeli).
+      if (cmd === "cmd_list_mods") return Promise.resolve([
+        { filename: "sodium-0.6.0.jar", enabled: true, size: 1123456, modified: Date.now() },
+        { filename: "iris-1.8.0.jar", enabled: false, size: 2234567, modified: Date.now() },
+        { filename: "yikimlient-1.22.1.jar", enabled: true, size: 334567, modified: Date.now() },
+      ]);
+      if (cmd === "cmd_resolve_mod_icons") return new Promise(function () {});
+      if (cmd === "cmd_check_mod_updates") return new Promise(function () {});
       if (cmd === "cmd_list_emotes") return Promise.resolve([
         { adi: "yerlesik-mambo-donus.json", baslik: "Mambo Dönüş", yerlesik: true, icerik: "{}" },
         { adi: "yerlesik-yaslanma.json", baslik: "Yaslanma", yerlesik: true, icerik: "{}" },
@@ -195,8 +209,28 @@
         { adi: "kendi-dans.json", baslik: "Kendi Dansım", yerlesik: false, icerik: "{}" },
       ]);
       if (cmd === "cmd_rozet_oku") return Promise.resolve({ pikseller: null });
-      if (cmd === "cmd_kozmetik_oku") return Promise.resolve({ pelerin: null, kanat: null, pelerin_dosya: null, kanat_dosya: null });
-      if (cmd === "cmd_kozmetik_kaydet") return Promise.resolve({ kurulum: 2, yuklendi: true, hata: "" });
+      // HD fotoğraf kozmetiği: yüklenen PNG'yi data URL olarak tut, "oku"
+      // komutu da onu dosya yolu gibi döndürsün (fotoğraf modu testi).
+      if (cmd === "cmd_kozmetik_fotograf") {
+        foto[String(args.tur)] = "data:image/png;base64," + String(args.png);
+        try { sessionStorage.setItem("mock-foto-" + String(args.tur), foto[String(args.tur)]); } catch (e) {}
+        return Promise.resolve({ kurulum: 2, yuklendi: true, hata: "", genislik: 640, yukseklik: 320 });
+      }
+      if (cmd === "cmd_kozmetik_oku") {
+        var kozCevap = { pelerin: null, kanat: null, pelerin_dosya: foto.pelerin, kanat_dosya: foto.kanat };
+        // Test: HD algılama gecikirse "Kaydet"e erken basma senaryosu.
+        if (sessionStorage.getItem("mock-yavas-oku") === "1") {
+          return new Promise(function (res) { setTimeout(function () { res(kozCevap); }, 1500); });
+        }
+        return Promise.resolve(kozCevap);
+      }
+      if (cmd === "cmd_kozmetik_kaydet") {
+        window.__MOCK_KOZ__ = window.__MOCK_KOZ__ || [];
+        window.__MOCK_KOZ__.push({ tur: args, bos: Object.keys(args || {}).map(function (k) {
+          return Array.isArray(args[k]) && !args[k].some(function (p) { return String(p).trim(); });
+        }) });
+        return Promise.resolve({ kurulum: 2, yuklendi: true, hata: "" });
+      }
       if (cmd === "cmd_rozet_ciz") return Promise.resolve({ kurulum: 2, yuklendi: true });
       if (cmd === "cmd_rozet_izinler") return Promise.resolve({ yuklendi: true });
       if (cmd === "cmd_add_offline_account") {

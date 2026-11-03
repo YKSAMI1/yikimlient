@@ -40,6 +40,9 @@ const folder = `<svg ${A}><path d="M3.5 7.5v10a1.5 1.5 0 0 0 1.5 1.5h13.6a1.5 1.
 /** lucide "trash" — çöp kutusu */
 const trash = `<svg ${A}><path d="M4 7h16M9.5 4h5M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"/><path d="M10 11v6M14 11v6"/></svg>`;
 
+/** lucide "eraser" — silgi (çöp kutusuyla karışmasın) */
+const eraser = `<svg ${A}><path d="m7 20.5-3.8-3.8a2 2 0 0 1 0-2.8l9.4-9.4a2 2 0 0 1 2.8 0l4.8 4.8a2 2 0 0 1 0 2.8l-8.4 8.4z"/><path d="M21.5 20.5H8.5"/><path d="m5.5 11.5 8.5 8.5"/></svg>`;
+
 /** lucide "copy" — çift kare */
 const copy = `<svg ${A}><rect x="9" y="9" width="11.5" height="11.5" rx="2"/><path d="M5.5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5v1"/></svg>`;
 
@@ -117,7 +120,7 @@ const lock = `<svg ${A}><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><p
 
 export const ICONS: Record<string, string> = {
   home, grid, compass, news, gear, plus, search, play, image, folder,
-  trash, copy, back, check, user, puzzle, box, cpu, args, term, chart,
+  trash, eraser, copy, back, check, user, puzzle, box, cpu, args, term, chart,
   dl, mug, globe, sparkle, file, info, clock, stop,
   shirt, brush, bucket, picker, undo, redo, lock,
 };

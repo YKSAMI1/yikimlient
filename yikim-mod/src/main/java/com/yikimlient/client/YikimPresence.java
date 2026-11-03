@@ -298,9 +298,13 @@ public final class YikimPresence {
                 isim = mc.field_1724.method_5797() != null
                     ? mc.field_1724.method_5797().getString() : "oyuncu";
             }
+            // HD dokular tek istek sığmadığı için ÖNCE parça parça yüklenir
+            // (birkaç yüz ms); tamamlanan doku sunucuda hemen yayına girer.
+            YikimKozmetik.parcalariGonder(ucak(), uuid);
             // kozmetik (pelerin/elitra) yalnız DEĞİŞTİYSE gövdeye eklenir
             String govde = "{\"v\":1,\"s\":\"" + kac(anahtar) + "\",\"u\":\"" + uuid
-                + "\",\"n\":\"" + kac(isim) + "\"" + YikimKozmetik.govdeEk() + "}";
+                + "\",\"n\":\"" + kac(isim) + "\""
+                + YikimKozmetik.bildiklerimEk() + YikimKozmetik.govdeEk() + "}";
             byte[] bayt = govde.getBytes(StandardCharsets.UTF_8);
             HttpURLConnection bag = (HttpURLConnection) new URL(ucak()).openConnection();
             bag.setConnectTimeout(5000);

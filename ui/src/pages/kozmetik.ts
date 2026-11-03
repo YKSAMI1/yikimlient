@@ -69,6 +69,48 @@ let cizimSilgi = false;
 /** 3D çizimde "Döndür" modu: sol tık boyamaz, karakteri döndürür. */
 let dondurmeModu = false;
 let oyuncuGizli = false;
+/** 3D çizimde piksel matrisi (ızgara) görünür mü — düğmeyle aç/kapa. */
+let matrisAcik = true;
+
+/** 2D araç: kalem · silgi · kova (doldur) · damla (renk al). */
+type KzArac = "kalem" | "silgi" | "kova" | "damla";
+let arac: KzArac = "kalem";
+/** Atlas yakınlaştırması: 1 doku pikseli kaç ekran pikseli. */
+const KZ_YUMLAR = [4, 8, 12, 16];
+let kzyum = 8;
+/** Son kullanılan renkler (yeni başta) — tüm sayfalarda ortak. */
+const SON_RENK_ANAHTAR = "yikim:renk:son";
+const GERI_SINIR = 40;
+const gecmis: Record<Tur, string[][]> = { pelerin: [], kanat: [] };
+const gelecek: Record<Tur, string[][]> = { pelerin: [], kanat: [] };
+let sonRenkler: string[] = sonRenkleriOku();
+
+function sonRenkleriOku(): string[] {
+  try {
+    const ham = localStorage.getItem(SON_RENK_ANAHTAR);
+    const d = ham ? (JSON.parse(ham) as unknown) : null;
+    return Array.isArray(d) ? d.filter((x) => typeof x === "string").slice(0, 12) : [];
+  } catch {
+    return [];
+  }
+}
+
+function sonRengeEkle(c: string): void {
+  const kucuk = c.toLowerCase();
+  if (sonRenkler[0]?.toLowerCase() === kucuk) return;
+  sonRenkler = [c, ...sonRenkler.filter((x) => x.toLowerCase() !== kucuk)].slice(0, 12);
+  try {
+    localStorage.setItem(SON_RENK_ANAHTAR, JSON.stringify(sonRenkler));
+  } catch {
+    /* kota dolu — bu oturumda bellekte kalır */
+  }
+}
+
+/** "#RRGGBB" ya da "RRGGBB" → "#rrggbb"; geçersizse null. */
+function hexGecerli(ham: string): string | null {
+  const t = `#${ham.trim().replace(/^#+/, "")}`;
+  return /^#[0-9a-fA-F]{6}$/.test(t) ? t.toLowerCase() : null;
+}
 /** Varsayılan bakış: kozmetikler sırtta olduğu için arkadan 3/4. */
 let arkadan = true;
 /** 3D sahneye verilen kalıcı tuvaller (kimlik korunur → doku yeniden kurulmaz). */
@@ -88,6 +130,7 @@ const bolgeler = (tur: Tur): KozBolge[] => (tur === "pelerin" ? PELERIN_BOLGELER
 
 export function renderKozmetik(root: HTMLElement): void {
   sahneKapat();
+  kozKok = root;
   pelerin = bosAtlas();
   kanat = elitraSablonu();
   pelerinKayitli = false;
@@ -95,10 +138,23 @@ export function renderKozmetik(root: HTMLElement): void {
   secili = "pelerin";
   renk = "#ff8a3d";
   silgi = false;
+  arac = "kalem";
+  gecmis.pelerin.length = 0;
+  gecmis.kanat.length = 0;
+  gelecek.pelerin.length = 0;
+  gelecek.kanat.length = 0;
   cizimde = false;
   cizimSilgi = false;
   oyuncuGizli = false;
   arkadan = true;
+  // HD durumu ÖNCEKİ ziyaretten taşınmasın; `yukle` diskteki dosyadan
+  // yeniden belirler. Silme isteği de her açılışta sıfırdır.
+  fotografModu.pelerin = false;
+  fotografModu.kanat = false;
+  fotografYol.pelerin = null;
+  fotografYol.kanat = null;
+  silmeIstegi.pelerin = false;
+  silmeIstegi.kanat = false;
   pelerinOnizleme = null;
   kanatOnizleme = null;
   vurgular.clear();
@@ -117,15 +173,23 @@ function iskelet(): string {
         </div>
       </div>
 
+      <div class="kz-sekmeler" role="tablist" aria-label="Düzenlenecek kozmetik">
+        <button class="kz-sekme aktif" data-secim="pelerin" role="tab">
+          ${icon("shirt")} <span>Pelerin</span>
+          <em class="kz-sekme-durum" id="kz-pelerin-sekme-durum"></em>
+        </button>
+        <button class="kz-sekme" data-secim="kanat" role="tab">
+          ${icon("sparkle")} <span>Elitra</span>
+          <em class="kz-sekme-durum" id="kz-kanat-sekme-durum"></em>
+        </button>
+        <div class="kz-sekme-sag" id="kz-sekme-ipucu">Atlasta ya da 3D modelin üstünde çiz</div>
+      </div>
+
       <div class="kz-yerlesim">
         <aside class="kz-oniz3d" id="kz-oniz3d">
           <div class="kz-oniz3d-ust">
             <span>${icon("user")} Karakterde görünüm</span>
             <button class="btn ghost sm" id="kz-yon" title="Ön / arka bakış">Önden gör</button>
-          </div>
-          <div class="kz-secim" id="kz-secim" role="group" aria-label="Önizlenecek kozmetik">
-            <button class="seg-btn aktif" data-secim="pelerin" title="Yalnız pelerini göster">Pelerin</button>
-            <button class="seg-btn" data-secim="kanat" title="Yalnız elitrayı göster">Elitra</button>
           </div>
           <canvas id="kz-sahne"></canvas>
           <div class="kz-zum" id="kz-zum">
@@ -146,20 +210,35 @@ function iskelet(): string {
             </label>
           </div>
           <div class="kz-cizim-arac" id="kz-cizim-arac" hidden>
-            <button class="seg-btn aktif" id="kz-3d-kalem">${icon("brush")} Kalem</button>
-            <button class="seg-btn" id="kz-3d-silgi">${icon("trash")} Silgi</button>
-            <button class="seg-btn" id="kz-3d-dondur" title="Sol tıkla karakteri döndür (boyama kapalı)">${icon("undo")} Döndür</button>
-            <button class="seg-btn" id="kz-3d-oyuncu">${icon("user")} Oyuncuyu gizle</button>
-            <button class="seg-btn kz-2d-don" id="kz-3d-2d" title="2D atlas tuvaline dön">${icon("image")} 2D'ye geç</button>
-            <span class="kz-3d-renk">
-              <input type="color" id="kz-3d-renk" value="#ff8a3d" title="Fırça rengi" />
-              <span class="kz-3d-palet" id="kz-3d-palet"></span>
-            </span>
+            <div class="kz-cizim-satir">
+              <span class="kz-etiket">Araç</span>
+              <span class="seg-grup">
+                <button class="seg-btn aktif" id="kz-3d-kalem" title="Modelin üstüne boya">${icon("brush")} Kalem</button>
+                <button class="seg-btn" id="kz-3d-silgi" title="Modelin üstünde sil">${icon("eraser")} Silgi</button>
+                <button class="seg-btn" id="kz-3d-dondur" title="Sol tıkla karakteri döndür (boyama kapalı)">${icon("undo")} Döndür</button>
+              </span>
+              <span class="kz-etiket">Görünüm</span>
+              <span class="seg-grup">
+                <button class="seg-btn aktif" id="kz-3d-matris" title="Piksel matrisini (ızgara) aç/kapat">${icon("grid")} Matris</button>
+                <button class="seg-btn" id="kz-3d-oyuncu" title="Karakter gövdesini göster/gizle">${icon("user")} Oyuncuyu gizle</button>
+              </span>
+              <button class="btn ghost sm kz-2d-don" id="kz-3d-2d" title="2D atlas tuvaline dön">${icon("image")} 2D'ye geç</button>
+            </div>
+            <div class="kz-cizim-satir">
+              <span class="kz-etiket">Fırça rengi</span>
+              <span class="kz-3d-renk">
+                <input type="color" id="kz-3d-renk" value="#ff8a3d" title="Fırça rengi" />
+                <code class="kz-renk-kod" id="kz-3d-renk-kod">#FF8A3D</code>
+                <span class="kz-3d-palet" id="kz-3d-palet"></span>
+              </span>
+            </div>
+            <p class="kz-ipucu kz-cizim-ipucu">Kalem: sol tık boyar · Silgi: siler · Döndür: sol tık çevirir ·
+              Ctrl+Z geri · Ctrl+Shift+Z ileri</p>
           </div>
           <p class="kz-ipucu kz-oniz3d-alt" id="kz-sahne-alt">Sürükle: döndür · Tekerlek: yakınlaş</p>
         </aside>
 
-        <div class="kz-izgara">
+        <div class="kz-kartlar" id="kz-kartlar">
           ${kart("pelerin", "Pelerin", "shirt", "Pelerin", "Ön, arka, yanlar, üst ve alt — altı yüz de ayrı çizilir.")}
           ${kart("kanat", "Elitra", "sparkle", "Elitra", "Sol/sağ kanat oyunda aynadır: aynı atlası aynalı gösterir.")}
         </div>
@@ -172,35 +251,89 @@ function iskelet(): string {
 }
 
 function kart(tur: Tur, baslik: string, simge: string, alan: string, ipucu: string): string {
+  const yumlar = KZ_YUMLAR.map(
+    (z) => `<button class="seg-btn ${z === kzyum ? "aktif" : ""}" data-kzyum="${z}" title="${z}× yakınlaştır">${z}×</button>`,
+  ).join("");
   return `
     <section class="kz-kart" id="kz-${tur}-kart" data-tur="${tur}">
       <div class="kz-kart-ust">
         <h3>${icon(simge)} ${baslik}</h3>
         <span class="kz-rozet" id="kz-${tur}-durum"></span>
       </div>
-      <div class="kz-tuval-sar" id="kz-${tur}-sar">
-        <canvas class="kz-tuval" id="kz-${tur}-tuval" width="${KOZ_G}" height="${KOZ_Y}"
-          aria-label="${alan} atlası — 64×32 piksel"></canvas>
-        <canvas class="kz-rehber" id="kz-${tur}-rehber"
-          width="${KOZ_G * REHBER_OLC}" height="${KOZ_Y * REHBER_OLC}"></canvas>
+
+      <div class="kz-calisma">
+        <div class="kz-tuval-kolon">
+          <div class="kz-tuval-kaydir">
+            <div class="kz-tuval-sar" id="kz-${tur}-sar">
+              <canvas class="kz-tuval" id="kz-${tur}-tuval" width="${KOZ_G}" height="${KOZ_Y}"
+                aria-label="${alan} atlası — 64×32 piksel"></canvas>
+              <canvas class="kz-rehber" id="kz-${tur}-rehber"
+                width="${KOZ_G * REHBER_OLC}" height="${KOZ_Y * REHBER_OLC}"></canvas>
+            </div>
+          </div>
+          <div class="kz-tuval-alt">
+            <span class="kz-etiket">Yakınlaştır</span>
+            <span class="seg-grup">${yumlar}</span>
+            <span class="kz-ipucu kz-kart-ipucu">${ipucu}</span>
+          </div>
+          <div class="kz-bolgeler" id="kz-${tur}-bolgeler"></div>
+        </div>
+
+        <div class="kz-arac-panel">
+          <div class="kz-arac-grup" id="kz-${tur}-araclar" role="group" aria-label="Araçlar">
+            <button class="kz-arac-btn aktif" data-kzarac="kalem" title="Kalem">${icon("brush")}</button>
+            <button class="kz-arac-btn" data-kzarac="silgi" title="Silgi (çizerek siler)">${icon("eraser")}</button>
+            <button class="kz-arac-btn" data-kzarac="kova" title="Kova — bitişik aynı renk alanını doldur">${icon("bucket")}</button>
+            <button class="kz-arac-btn" data-kzarac="damla" title="Damlalık — tuvallin rengini al">${icon("picker")}</button>
+            <span class="kz-arac-ayrac"></span>
+            <button class="kz-arac-btn" id="kz-${tur}-geri" title="Geri al">${icon("undo")}</button>
+            <button class="kz-arac-btn" id="kz-${tur}-ileri" title="İleri al">${icon("redo")}</button>
+          </div>
+
+          <div class="kz-blok">
+            <div class="kz-blok-ust">
+              <span class="kz-etiket">Renk</span>
+              <code class="kz-renk-kod" id="kz-${tur}-renk-kod">#FF8A3D</code>
+            </div>
+            <div class="kz-renk-sec">
+              <input type="color" id="kz-${tur}-renk" value="#ff8a3d" title="Renk seç" />
+              <input class="input kz-hex" id="kz-${tur}-hex" value="#FF8A3D" maxlength="7"
+                spellcheck="false" aria-label="Renk kodu (hex)" />
+            </div>
+          </div>
+
+          <div class="kz-blok">
+            <span class="kz-etiket">Son kullandıkların</span>
+            <div class="kz-son-renkler" id="kz-${tur}-son"></div>
+          </div>
+
+          <div class="kz-blok">
+            <span class="kz-etiket">Hazır palet</span>
+            <div class="kz-araclar" id="kz-${tur}-palet"></div>
+          </div>
+        </div>
       </div>
-      <div class="kz-bolgeler" id="kz-${tur}-bolgeler"></div>
-      <div class="kz-araclar" id="kz-${tur}-palet"></div>
-      <div class="kz-renk-satir">
-        <label for="kz-${tur}-renk">Renk</label>
-        <input type="color" id="kz-${tur}-renk" value="#ff8a3d" />
-        <button class="btn" id="kz-${tur}-sil" title="Silgi (çizerek siler)">${icon("trash")} Silgi</button>
-        <button class="btn" id="kz-${tur}-temizle" title="Atlasın tamamını temizle">${icon("trash")} Temizle</button>
+
+      <div class="kz-foto" id="kz-${tur}-foto" hidden>
+        <canvas class="kz-foto-img" id="kz-${tur}-foto-img" aria-label="Yüklenen fotoğraf"></canvas>
+        <div class="kz-foto-metin">
+          <b>Fotoğraf modu</b>
+          <p>Bu kozmetik yüklediğin fotoğraftan oluşturuldu ve <b>fotoğrafın kendi kalitesinde</b> görünür.
+             Fotoğrafın üzerine çizim yapılamaz — yeni bir fotoğraf yüklediğinde eskisinin yerine geçer.</p>
+          <p class="kz-foto-ipucu">Farklı bir bölümü kullanmak istersen tekrar <b>Fotoğraf / Pafta</b> ile yükle.</p>
+        </div>
       </div>
+
       <div class="kz-alt">
         <button class="btn" id="kz-${tur}-3d" data-ciz3d="${tur}"
           title="Doğrudan 3D modelin her yüzüne boya">${icon("box")} 3D Çiz</button>
         <label class="btn" for="kz-${tur}-dosya" title="Düz fotoğraf ya da hazır 64×32 pafta">${icon("image")} Fotoğraf / Pafta</label>
         <input type="file" id="kz-${tur}-dosya" accept="image/*" style="display:none" />
+        <span class="kz-alt-bos"></span>
+        <button class="btn" id="kz-${tur}-temizle" title="Atlasın tamamını temizle">${icon("trash")} Temizle</button>
+        <button class="btn danger" id="kz-${tur}-kaldir" title="Kayıtlı kozmetiği kaldır">Kaldır</button>
         <button class="btn primary" id="kz-${tur}-kaydet">${icon("check")} Kaydet</button>
-        <button class="btn" id="kz-${tur}-kaldir">Kaldır</button>
       </div>
-      <p class="kz-ipucu kz-kart-ipucu">${ipucu}</p>
     </section>`;
 }
 
@@ -271,6 +404,8 @@ async function yukle(root: HTMLElement): Promise<void> {
   if (kanatAnahtar) {
     kanatAnahtar.checked = durum.kanat_aktif ?? aktifOku("kanat") ?? !!durum.kanat_dosya;
   }
+  // Diskteki dosya 64×32'den büyükse o kozmetik FOTOĞRAF modundadır.
+  fotografDurumlari(root, durum);
 }
 
 /** 3D karakter sahnesi: oyuncunun kendi skini üstünde kozmetik önizlemesi. */
@@ -339,14 +474,35 @@ function onizlemeTazele(): void {
 /** Seçili kozmetiği sahneye besle; diğerini KALDIR (üst üste binmesin). */
 function secimiUygula(root: HTMLElement): void {
   const sahne = sahneGetir();
-  sahne.pelerinTuval(secili === "pelerin" ? pelerinOnizleme : null);
-  sahne.kanatTuval(secili === "kanat" ? kanatOnizleme : null);
+  // Fotoğraf modunda doku piksel tuvalinden değil, diskteki HD PNG'den gelir.
+  if (secili === "pelerin") {
+    sahne.kanatTuval(null);
+    if (fotografModu.pelerin && fotografYol.pelerin) {
+      sahne.pelerinTuval(null);
+      void sahne.pelerin({ url: fileSrc(fotografYol.pelerin) });
+    } else {
+      sahne.pelerinTuval(pelerinOnizleme);
+    }
+  } else {
+    sahne.pelerinTuval(null);
+    if (fotografModu.kanat && fotografYol.kanat) {
+      sahne.kanatTuval(null);
+      void sahne.kanat({ url: fileSrc(fotografYol.kanat) });
+    } else {
+      sahne.kanatTuval(kanatOnizleme);
+    }
+  }
 
   root.querySelectorAll<HTMLElement>("[data-secim]").forEach((b) => {
     b.classList.toggle("aktif", b.dataset.secim === secili);
+    b.setAttribute("aria-selected", b.dataset.secim === secili ? "true" : "false");
   });
   for (const tur of TURLER) {
-    root.querySelector(`#kz-${tur}-kart`)?.classList.toggle("secili", secili === tur);
+    const k = root.querySelector<HTMLElement>(`#kz-${tur}-kart`);
+    if (!k) continue;
+    // Tek çalışma alanı: yalnız seçili kozmetik görünür.
+    k.hidden = secili !== tur;
+    k.classList.toggle("secili", secili === tur);
   }
   root.querySelectorAll<HTMLElement>("[data-ciz3d]").forEach((b) => {
     const buTur = b.dataset.ciz3d === secili;
@@ -357,6 +513,8 @@ function secimiUygula(root: HTMLElement): void {
 
 /** 2D tuval + kılavuz + 3D dokusunu birlikte tazele. */
 function tazele(root: HTMLElement, tur: Tur): void {
+  // Atlas yeniden dolduysa "sil" isteği geçersizdir (Temizle'den sonra boyama).
+  if (!atlasBosMu(hedef(tur))) silmeIstegi[tur] = false;
   const tuval = root.querySelector<HTMLCanvasElement>(`#kz-${tur}-tuval`);
   if (tuval) atlasTuvalGuncelle(tuval, hedef(tur));
   rehberTazele(root, tur);
@@ -365,10 +523,14 @@ function tazele(root: HTMLElement, tur: Tur): void {
 }
 
 function rozetGuncelle(root: HTMLElement, tur: Tur): void {
-  const d = root.querySelector<HTMLElement>(`#kz-${tur}-durum`);
-  if (!d) return;
+  // Fotoğraf (HD) modunda tasarım piksel atlasında değil diskteki dosyada →
+  // rozet boş görünüp "silindi" izlenimi vermesin.
+  const dolu = fotografModu[tur] || !atlasBosMu(hedef(tur));
   const kayitli = tur === "pelerin" ? pelerinKayitli : kanatKayitli;
-  d.textContent = kayitli && !atlasBosMu(hedef(tur)) ? "KAYITLI" : "";
+  const durum = root.querySelector<HTMLElement>(`#kz-${tur}-durum`);
+  if (durum) durum.textContent = kayitli && dolu ? "KAYITLI" : "";
+  const sekme = root.querySelector<HTMLElement>(`#kz-${tur}-sekme-durum`);
+  if (sekme) sekme.textContent = kayitli && dolu ? "kayıtlı" : "";
 }
 
 // ---------------------------------------------------------------- 2D atlas
@@ -471,29 +633,42 @@ function paletDoldur(kutu: HTMLElement, root: HTMLElement): void {
   });
 }
 
-/** Renk seçimi: silgiyi kapatır, iki kartın göstergesini eşitler. */
-function renkAyarla(root: HTMLElement, c: string, silgiKapat = true): void {
-  renk = c;
-  if (silgiKapat) silgi = false;
+/** Renk seçimi: kalemi geri getirir; hex kutusu, kod etiketi, palet ve
+ *  "son kullandıkların" göstergelerini eşitler. */
+function renkAyarla(root: HTMLElement, c: string, kalemKapat = true): void {
+  const gecerli = hexGecerli(c) ?? renk;
+  renk = gecerli;
+  if (kalemKapat) {
+    silgi = false;
+    arac = "kalem";
+    sonRengeEkle(gecerli);
+  }
+  const ayni = (a: string | undefined): boolean => (a ?? "").toLowerCase() === gecerli.toLowerCase();
   for (const tur of TURLER) {
     const girdi = root.querySelector<HTMLInputElement>(`#kz-${tur}-renk`);
-    if (girdi) girdi.value = c;
+    if (girdi) girdi.value = gecerli;
+    const hex = root.querySelector<HTMLInputElement>(`#kz-${tur}-hex`);
+    if (hex) hex.value = gecerli.toUpperCase();
+    const kod = root.querySelector<HTMLElement>(`#kz-${tur}-renk-kod`);
+    if (kod) kod.textContent = gecerli.toUpperCase();
     root.querySelectorAll<HTMLElement>(`#kz-${tur}-palet .kz-renk`).forEach((b) => {
-      b.classList.toggle("aktif", (b.dataset.renk ?? "").toLowerCase() === c.toLowerCase());
+      b.classList.toggle("aktif", ayni(b.dataset.renk));
     });
-    root.querySelector(`#kz-${tur}-sil`)?.classList.toggle("aktif", silgi);
+    root.querySelectorAll<HTMLElement>(`#kz-${tur}-son .kz-renk`).forEach((b) => {
+      b.classList.toggle("aktif", ayni(b.dataset.renk));
+    });
   }
   // 3D çizim araç çubuğu: renk seçmek kalemi geri getirir.
   const ucRenk = root.querySelector<HTMLInputElement>("#kz-3d-renk");
-  if (ucRenk) ucRenk.value = c;
+  if (ucRenk) ucRenk.value = gecerli;
+  const ucKod = root.querySelector<HTMLElement>("#kz-3d-renk-kod");
+  if (ucKod) ucKod.textContent = gecerli.toUpperCase();
   root.querySelectorAll<HTMLElement>("#kz-3d-palet .kz-renk").forEach((b) => {
-    b.classList.toggle("aktif", (b.dataset.renk ?? "").toLowerCase() === c.toLowerCase());
+    b.classList.toggle("aktif", ayni(b.dataset.renk));
   });
-  if (silgiKapat && cizimde) {
-    cizimSilgi = false;
-    root.querySelector("#kz-3d-kalem")?.classList.add("aktif");
-    root.querySelector("#kz-3d-silgi")?.classList.remove("aktif");
-  }
+  if (kalemKapat && cizimde) cizimSilgi = false;
+  aracDugmeleri(root);
+  sonRenklerCiz(root);
 }
 
 function duzenle(root: HTMLElement, tur: Tur): void {
@@ -504,15 +679,37 @@ function duzenle(root: HTMLElement, tur: Tur): void {
   rehberTazele(root, tur);
   rozetGuncelle(root, tur);
   bolgeRozetleri(root, tur);
+  sonRenklerCiz(root);
+  zoomUygula(root);
+  aracDugmeleri(root);
   if (tur === "pelerin") renkAyarla(root, renk, false);
 
   let ciziyor = false;
   let sonX = -1;
   let sonY = -1;
 
-  const uygula = (x: number, y: number): void => {
+  /** Bir vuruşun başında tam kopya — geri al bununla çalışır. */
+  const gecmiseYaz = (): void => {
+    gecmis[tur].push(hedef(tur).slice());
+    if (gecmis[tur].length > GERI_SINIR) gecmis[tur].shift();
+    gelecek[tur].length = 0;
+  };
+
+  const uygula = (x: number, y: number, ilk: boolean): void => {
     const p = hedef(tur);
-    const deger = silgi ? "" : renk;
+    if (arac === "damla") {
+      const v = p[y * KOZ_G + x];
+      if (v) renkAyarla(root, v, true);
+      return;
+    }
+    if (arac === "kova") {
+      if (!ilk) return; // kova sürüklemede tekrar doldurmaz
+      gecmiseYaz();
+      kovaDoldur(p, x, y, renk);
+      tazele(root, tur);
+      return;
+    }
+    const deger = arac === "silgi" ? "" : renk;
     if (sonX >= 0 && sonY >= 0) cizgiBoya(p, sonX, sonY, x, y, deger);
     else p[y * KOZ_G + x] = deger;
     sonX = x;
@@ -532,10 +729,12 @@ function duzenle(root: HTMLElement, tur: Tur): void {
     try {
       tuval.setPointerCapture(e.pointerId);
     } catch {
-      /* pencere kapanmış olabilir */
+      /* pencere kapanmis olabilir */
     }
     const n = pikselXY(e, tuval);
-    if (n) uygula(n.x, n.y);
+    if (!n) return;
+    if (arac !== "damla") gecmiseYaz();
+    uygula(n.x, n.y, true);
   });
   tuval.addEventListener("pointermove", (e) => {
     const n = pikselXY(e, tuval);
@@ -545,7 +744,7 @@ function duzenle(root: HTMLElement, tur: Tur): void {
       rehberTazele(root, tur);
     }
     if (!n || !ciziyor) return;
-    uygula(n.x, n.y);
+    uygula(n.x, n.y, false);
   });
   const birak = (): void => {
     ciziyor = false;
@@ -562,20 +761,43 @@ function duzenle(root: HTMLElement, tur: Tur): void {
     }
   });
 
-  root.querySelector<HTMLInputElement>(`#kz-${tur}-renk`)?.addEventListener("input", (e) => {
-    const hedefRenk = (e.target as HTMLInputElement).value;
-    renkAyarla(root, hedefRenk);
+  // Araç düğmeleri
+  root.querySelectorAll<HTMLElement>(`#kz-${tur}-araclar [data-kzarac]`).forEach((b) => {
+    b.addEventListener("click", () => aracSec(root, (b.dataset.kzarac as KzArac) ?? "kalem"));
   });
 
-  root.querySelector(`#kz-${tur}-sil`)?.addEventListener("click", () => {
-    silgi = !silgi;
-    renkAyarla(root, renk, false);
-    toast(silgi ? "Silgi açık — çizerek silersin." : "Kalem açık.");
+  // Geri / ileri
+  root.querySelector(`#kz-${tur}-geri`)?.addEventListener("click", () => geriAl(root, tur));
+  root.querySelector(`#kz-${tur}-ileri`)?.addEventListener("click", () => ileriAl(root, tur));
+
+  // Serbest renk seçici
+  root.querySelector<HTMLInputElement>(`#kz-${tur}-renk`)?.addEventListener("input", (e) => {
+    renkAyarla(root, (e.target as HTMLInputElement).value);
+  });
+
+  // Hex kutusu: yazarken değil, bitirince (Enter / odak çıkışı) uygula.
+  const hex = root.querySelector<HTMLInputElement>(`#kz-${tur}-hex`);
+  const hexUygula = (): void => {
+    if (!hex) return;
+    const g = hexGecerli(hex.value);
+    if (g) renkAyarla(root, g);
+    else hex.value = renk.toUpperCase();
+  };
+  hex?.addEventListener("change", hexUygula);
+  hex?.addEventListener("blur", hexUygula);
+  hex?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      hexUygula();
+    }
   });
 
   root.querySelector(`#kz-${tur}-temizle`)?.addEventListener("click", () => {
+    gecmiseYaz();
     const p = hedef(tur);
     for (let i = 0; i < p.length; i++) p[i] = "";
+    // "Temizle + Kaydet" bilinçli silmedir; kaydet() bunu ancak bu bayrakla yapar.
+    silmeIstegi[tur] = true;
     tazele(root, tur);
     toast(`${tur === "pelerin" ? "Pelerin" : "Elitra"} tuvali temizlendi — kaydetmezsen oyun değişmez.`);
   });
@@ -595,8 +817,16 @@ function duzenle(root: HTMLElement, tur: Tur): void {
 
   root.querySelector(`#kz-${tur}-kaydet`)?.addEventListener("click", () => void kaydet(root, tur));
   root.querySelector(`#kz-${tur}-kaldir`)?.addEventListener("click", () => {
+    if (fotografModu[tur]) {
+      fotografModu[tur] = false;
+      fotografYol[tur] = null;
+      fotografGorunum(root, tur);
+    }
+    gecmiseYaz();
     const p = hedef(tur);
     for (let i = 0; i < p.length; i++) p[i] = "";
+    // "Kaldır" açık silme isteğidir: dosya + sunucu kaydı silinir.
+    silmeIstegi[tur] = true;
     tazele(root, tur);
     void kaydet(root, tur);
   });
@@ -607,6 +837,103 @@ function duzenle(root: HTMLElement, tur: Tur): void {
     if (f) void fotograftan(root, tur, f);
     dosya.value = "";
   });
+}
+
+// ---------------------------------------------------------------- araçlar
+
+/** Aracı seç (kalem/silgi/kova/damlalık) ve tüm düğmeleri eşitle. */
+function aracSec(root: HTMLElement, yeni: KzArac): void {
+  arac = yeni;
+  silgi = yeni === "silgi";
+  aracDugmeleri(root);
+  if (yeni === "damla") toast("Damlalık: tuvallin bir pikseline tıkla, rengi alır.");
+  else if (yeni === "kova") toast("Kova: bitişik aynı renk alanını seçili renkle doldurur.");
+}
+
+function aracDugmeleri(root: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>("[data-kzarac]").forEach((b) => {
+    b.classList.toggle("aktif", b.dataset.kzarac === arac);
+  });
+  // 3D araç çubuğu aynı aracı izler (kalem / silgi).
+  root.querySelector("#kz-3d-kalem")?.classList.toggle("aktif", cizimde && arac !== "silgi");
+  root.querySelector("#kz-3d-silgi")?.classList.toggle("aktif", cizimde && arac === "silgi");
+}
+
+/** Bitişik aynı renkli alanı doldur (4 komşu). */
+function kovaDoldur(p: Piksel[], x: number, y: number, deger: string): void {
+  const hedefRenk = p[y * KOZ_G + x] ?? "";
+  if (hedefRenk === deger) return;
+  const yigin: number[] = [y * KOZ_G + x];
+  while (yigin.length) {
+    const i = yigin.pop() as number;
+    if ((p[i] ?? "") !== hedefRenk) continue;
+    p[i] = deger;
+    const px = i % KOZ_G;
+    const py = Math.floor(i / KOZ_G);
+    if (px > 0) yigin.push(i - 1);
+    if (px < KOZ_G - 1) yigin.push(i + 1);
+    if (py > 0) yigin.push(i - KOZ_G);
+    if (py < KOZ_Y - 1) yigin.push(i + KOZ_G);
+  }
+}
+
+function geriAl(root: HTMLElement, tur: Tur): void {
+  const onceki = gecmis[tur].pop();
+  if (!onceki) {
+    toast("Geri alınacak adım yok.");
+    return;
+  }
+  gelecek[tur].push(hedef(tur).slice());
+  hedef(tur).splice(0, hedef(tur).length, ...onceki);
+  tazele(root, tur);
+}
+
+function ileriAl(root: HTMLElement, tur: Tur): void {
+  const sonraki = gelecek[tur].pop();
+  if (!sonraki) {
+    toast("İleri alınacak adım yok.");
+    return;
+  }
+  gecmis[tur].push(hedef(tur).slice());
+  hedef(tur).splice(0, hedef(tur).length, ...sonraki);
+  tazele(root, tur);
+}
+
+/** Atlas yakınlaştırmasını uygula (canvas CSS ölçüsü; dokusu 64×32 kalır). */
+function zoomUygula(root: HTMLElement): void {
+  for (const tur of TURLER) {
+    const tuval = root.querySelector<HTMLCanvasElement>(`#kz-${tur}-tuval`);
+    const rehber = root.querySelector<HTMLCanvasElement>(`#kz-${tur}-rehber`);
+    const g = `${KOZ_G * kzyum}px`;
+    const y = `${KOZ_Y * kzyum}px`;
+    if (tuval) {
+      tuval.style.width = g;
+      tuval.style.height = y;
+    }
+    if (rehber) {
+      rehber.style.width = g;
+      rehber.style.height = y;
+    }
+  }
+  root.querySelectorAll<HTMLElement>("[data-kzyum]").forEach((b) => {
+    b.classList.toggle("aktif", Number(b.dataset.kzyum) === kzyum);
+  });
+}
+
+/** "Son kullandıkların" şeridini iki kartta da tazele. */
+function sonRenklerCiz(root: HTMLElement): void {
+  for (const tur of TURLER) {
+    const kutu = root.querySelector<HTMLElement>(`#kz-${tur}-son`);
+    if (!kutu) continue;
+    kutu.innerHTML = sonRenkler.length
+      ? sonRenkler
+          .map((r) => `<button class="kz-renk" data-renk="${r}" style="background:${r}" title="${r}" aria-label="${r}"></button>`)
+          .join("")
+      : `<span class="kz-bos-not">Henüz renk kullanmadın — bir renk seç, burada birikir.</span>`;
+    kutu.querySelectorAll<HTMLButtonElement>(".kz-renk").forEach((b) => {
+      b.addEventListener("click", () => renkAyarla(root, b.dataset.renk ?? "#ffffff"));
+    });
+  }
 }
 
 /** Atlas bölgelerini listeleyen rozetler (üst/alt şeritleri de görünür kılar). */
@@ -638,8 +965,12 @@ function cizimModu(root: HTMLElement, acik: boolean, tur?: Tur): void {
   if (!acik) dondurmeModu = false;
   const sahne = sahneGetir();
   sahne.etkilesimKapali = acik && !dondurmeModu;
-  sahne.izgaraGoster(acik);
+  sahne.izgaraGoster(acik && matrisAcik);
+  // 3D çizimde elitra kanatları iki yana açık → ikinci kanada da rahat
+  // boyanır. Karakterin kendi parçaları ayrılmaz (üstte aç/kapa düğmeleri var).
+  sahne.kanatAyrik(acik);
   sahne.oyuncuGoster(!oyuncuGizli);
+  root.querySelector("#kz-3d-matris")?.classList.toggle("aktif", acik && matrisAcik);
   root.querySelector("#kz-sayfa")?.classList.toggle("cizim3d", acik);
   root.querySelector("#kz-oniz3d")?.classList.toggle("cizim", acik);
   const arac = root.querySelector<HTMLElement>("#kz-cizim-arac");
@@ -686,6 +1017,12 @@ function cizimDinleyicileri(root: HTMLElement): void {
       /* eski exe: aşağıdaki dosya yedeği yolu devreye girer */
     }
     if (!acik) {
+      // ESKİ LAUNCHER: etkinleştirme komutu yok. Piksel tasarımı dosyayı
+      // boşaltarak kapatmak güvenli (localStorage yedeği var). HD fotoğrafta
+      // ise dosyayı silmek geri dönüşsüzdür → hiç dokunma, kullanıcıyı uyar.
+      if (fotografModu[tur]) {
+        throw new Error("Bu launcher sürümü HD fotoğrafı kapatmayı desteklemiyor — launcher'ı güncelle.");
+      }
       await kozKaydet(tur, bosAtlas());
       return;
     }
@@ -754,6 +1091,24 @@ function cizimDinleyicileri(root: HTMLElement): void {
     });
   });
 
+  // Atlas yakınlaştırması (4×–16×): doku 64×32 kalır, sadece ekranda büyür.
+  root.querySelectorAll<HTMLElement>("[data-kzyum]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const z = Number(b.dataset.kzyum);
+      if (!z) return;
+      kzyum = z;
+      zoomUygula(root);
+    });
+  });
+
+  // Piksel matrisi (ızgara) aç/kapa — 3D çizimde her kozmetik için geçerli.
+  root.querySelector("#kz-3d-matris")?.addEventListener("click", () => {
+    matrisAcik = !matrisAcik;
+    root.querySelector("#kz-3d-matris")?.classList.toggle("aktif", matrisAcik);
+    sahne.izgaraGoster(matrisAcik);
+    toast(matrisAcik ? "Matris açık — piksel sınırları görünür." : "Matris kapalı.");
+  });
+
   // 3D araç çubuğu renk seçicisi (palet + serbest renk).
   root.querySelector<HTMLInputElement>("#kz-3d-renk")?.addEventListener("input", (e) => {
     renkAyarla(root, (e.target as HTMLInputElement).value);
@@ -795,6 +1150,8 @@ function cizimDinleyicileri(root: HTMLElement): void {
   root.querySelector("#kz-3d-kalem")?.addEventListener("click", () => {
     cizimSilgi = false;
     dondurmeModu = false;
+    arac = "kalem";
+    silgi = false;
     sahne.etkilesimKapali = cizimde;
     root.querySelector("#kz-3d-kalem")?.classList.add("aktif");
     root.querySelector("#kz-3d-silgi")?.classList.remove("aktif");
@@ -803,6 +1160,8 @@ function cizimDinleyicileri(root: HTMLElement): void {
   root.querySelector("#kz-3d-silgi")?.addEventListener("click", () => {
     cizimSilgi = true;
     dondurmeModu = false;
+    arac = "silgi";
+    silgi = true;
     sahne.etkilesimKapali = cizimde;
     root.querySelector("#kz-3d-silgi")?.classList.add("aktif");
     root.querySelector("#kz-3d-kalem")?.classList.remove("aktif");
@@ -972,82 +1331,740 @@ function aktifYazYerel(tur: Tur, acik: boolean): void {
   }
 }
 
-async function fotograftan(root: HTMLElement, tur: Tur, f: File): Promise<void> {
-  try {
-    const url = URL.createObjectURL(f);
-    const resim = await new Promise<HTMLImageElement>((cozum, red) => {
-      const i = new Image();
-      i.onload = () => cozum(i);
-      i.onerror = () => red(new Error("görsel okunamadı"));
-      i.src = url;
-    });
-    URL.revokeObjectURL(url);
+// ---------------------------------------------------------------- fotoğraf (HD)
+//
+// Fotoğraf artık 10×16'ya sıkıştırılmıyor: hedef oranında bir ÇERÇEVE seçtirilir
+// (sitede profil fotoğrafı seçer gibi) ve sonuç, fotoğrafın kendi
+// çözünürlüğünde bir doku olarak üretilir.
+//
+// Doku boyutu 64×32 ızgarasının TAM KATIDIR (64N×32N). Vanilla UV'ler bu
+// ızgaraya göre normalize olduğu için oyun ve mod HD dokuyu aynı şekilde
+// örter — ekstra dönüşüm gerekmez.
+//
+// Fotoğraftan gelen kozmetik "fotoğraf modu"dur: üzerine çizim yapılamaz
+// (pikseller fotoğraftan gelir), yalnız yenisini yükleyebilir ya da
+// kaldırabilirsin. Elle çizilen 64×32 kozmetikler eskisi gibi düzenlenir.
 
-    // HAZIR PAFTA: 2:1 oranlı her görsel vanilla 64×32 atlasıdır.
-    const oran = resim.width / Math.max(1, resim.height);
-    const paftaMi = Math.abs(oran - 2) < 0.02 && resim.height >= 32;
-    if (paftaMi) {
-      const ara = document.createElement("canvas");
-      ara.width = KOZ_G;
-      ara.height = KOZ_Y;
-      const g = ara.getContext("2d", { willReadFrequently: true });
-      if (!g) throw new Error("tuval yok");
-      g.imageSmoothingEnabled = false;
-      g.drawImage(resim, 0, 0, KOZ_G, KOZ_Y);
-      const yeni = atlasOku(g);
-      if (atlasBosMu(yeni)) throw new Error("pafta boş görünüyor");
-      const p = hedef(tur);
-      for (let i = 0; i < ATLAS_PIKSEL; i++) p[i] = yeni[i];
-      tazele(root, tur);
-      toast("Pafta okundu — 64×32 atlas yüklendi.");
+/** Fotoğraftan üretilmiş kozmetik mi? (çizim devre dışı) */
+const fotografModu: Record<Tur, boolean> = { pelerin: false, kanat: false };
+/** Fotoğraf modundaki kozmetiğin diskteki PNG yolu. */
+const fotografYol: Record<Tur, string | null> = { pelerin: null, kanat: null };
+/**
+ * Açık silme isteği ("Kaldır" ya da "Temizle + Kaydet").
+ *
+ * `false` iken boş atlas gönderilmez: diskte kayıtlı bir dosya varsa o dosya
+ * KORUNUR. Böylece HD fotoğraf modu henüz algılanmadan "Kaydet"e basmak ya da
+ * sayfa yeniden açılırken boş atlas yakalamak pelerini/elitrayı silmiyor.
+ */
+const silmeIstegi: Record<Tur, boolean> = { pelerin: false, kanat: false };
+
+/** Dosyayı <img> olarak aç; hata olursa toast + null. */
+function resimAc(f: File): Promise<HTMLImageElement | null> {
+  return new Promise((coz) => {
+    const url = URL.createObjectURL(f);
+    const i = new Image();
+    i.onload = () => {
+      URL.revokeObjectURL(url);
+      coz(i);
+    };
+    i.onerror = () => {
+      URL.revokeObjectURL(url);
+      toast("Görsel okunamadı", "err");
+      coz(null);
+    };
+    i.src = url;
+  });
+}
+
+/** Kaynak bölgeyi hedef boyuta indir.
+ *
+ *  `yumusak` açıkken KADEMELİ küçültme yapılır: 2000 piksel genişlikteki bir
+ *  fotoğrafı tek adımda küçültmek kenarları testereye çeviriyordu. Yarıya
+ *  indirerek (mipmap mantığı) sonuç çok daha temiz çıkıyor.
+ *  `yumusak` kapalıyken komşu-piksel (nearest) kullanılır — pixel-art için. */
+function ornekle(
+  resim: HTMLImageElement,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number,
+  w: number,
+  h: number,
+  yumusak: boolean,
+): HTMLCanvasElement {
+  const hedefTuval = document.createElement("canvas");
+  hedefTuval.width = Math.max(1, Math.round(w));
+  hedefTuval.height = Math.max(1, Math.round(h));
+  const g = hedefTuval.getContext("2d", { willReadFrequently: true });
+  if (!g) throw new Error("tuval yok");
+  g.imageSmoothingEnabled = yumusak;
+  g.imageSmoothingQuality = "high";
+  if (!yumusak) {
+    g.drawImage(resim, sx, sy, sw, sh, 0, 0, hedefTuval.width, hedefTuval.height);
+    return hedefTuval;
+  }
+  let kaynak: HTMLImageElement | HTMLCanvasElement = resim;
+  let kx = sx;
+  let ky = sy;
+  let kw = sw;
+  let kh = sh;
+  let gw = Math.round(sw);
+  let gh = Math.round(sh);
+  while (gw > hedefTuval.width * 2 && gh > hedefTuval.height * 2) {
+    gw = Math.max(hedefTuval.width, Math.round(gw / 2));
+    gh = Math.max(hedefTuval.height, Math.round(gh / 2));
+    const ara = document.createElement("canvas");
+    ara.width = gw;
+    ara.height = gh;
+    const ag = ara.getContext("2d");
+    if (!ag) break;
+    ag.imageSmoothingEnabled = true;
+    ag.imageSmoothingQuality = "high";
+    ag.drawImage(kaynak, kx, ky, kw, kh, 0, 0, gw, gh);
+    kaynak = ara;
+    kx = 0;
+    ky = 0;
+    kw = gw;
+    kh = gh;
+  }
+  g.drawImage(kaynak, kx, ky, kw, kh, 0, 0, hedefTuval.width, hedefTuval.height);
+  return hedefTuval;
+}
+
+/** Seçim çerçevesinin resim koordinatlarındaki hâli. */
+interface KirpSecim {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Fotoğraftan HD pafta üret (64N×32N).
+ *
+ *  `duz` false → vanilla yerleşim: dış yüz + iç astar aynası + yan/üst/alt
+ *  şeritleri. `duz` true → yalnız seçilen dikdörtgen (diğer yüzler boş). */
+function hdPafta(
+  resim: HTMLImageElement,
+  sec: KirpSecim,
+  tur: Tur,
+  duz: boolean,
+  hd: boolean,
+): HTMLCanvasElement {
+  const ana = disBolge(tur);
+  const ic = icBolge(tur);
+  const k = KOZ_KUTU[tur];
+  // HD açık: seçimin genişliğine göre 1..16 kat doku. Kapalı: 64×32 (piksel).
+  const N = hd ? Math.max(1, Math.min(16, Math.round(sec.w / ana.w))) : 1;
+  const t = document.createElement("canvas");
+  t.width = KOZ_G * N;
+  t.height = KOZ_Y * N;
+  const g = t.getContext("2d", { willReadFrequently: true });
+  if (!g) throw new Error("tuval yok");
+
+  const dx = ana.x * N;
+  const dy = ana.y * N;
+  const dw = ana.w * N;
+  const dh = ana.h * N;
+  g.imageSmoothingEnabled = false;
+  // HD açık → yumuşak (kaliteli) ölçekleme; kapalı → keskin piksel örnekleme.
+  const kaynak = ornekle(resim, sec.x, sec.y, sec.w, sec.h, dw, dh, hd);
+  // PELERİN: oyun görünen yüzü (nz) YATAY AYNALAYARAK örer → doku şimdiden
+  // aynalanır, oyunda düz görünür. (Elitrada böyle bir ayna yok.)
+  if (tur === "pelerin") {
+    g.save();
+    g.translate(dx + dw, dy);
+    g.scale(-1, 1);
+    g.drawImage(kaynak, 0, 0);
+    g.restore();
+  } else {
+    g.drawImage(kaynak, dx, dy);
+  }
+  if (duz) return t;
+
+  // İç astar: dış yüzün yatay aynası (gövdeye bakan yüz).
+  g.save();
+  g.translate(ic.x * N + dw, ic.y * N);
+  g.scale(-1, 1);
+  g.drawImage(t, dx, dy, dw, dh, 0, 0, dw, dh);
+  g.restore();
+
+  const s = N; // şerit kalınlığı (1 taban pikseli)
+  // Yan şeritler: dış yüzün sol ve sağ sütunu.
+  g.drawImage(t, dx, dy, s, dh, (k.u + k.d + k.w) * N, (k.v + k.d) * N, k.d * N, dh);
+  g.drawImage(t, dx + dw - s, dy, s, dh, k.u * N, (k.v + k.d) * N, k.d * N, dh);
+  // Üst/alt şeritler: dış yüzün ilk ve son satırı.
+  g.drawImage(t, dx, dy, dw, s, (k.u + k.d) * N, k.v * N, dw, k.d * N);
+  g.drawImage(t, dx, dy + dh - s, dw, s, (k.u + k.d + k.w) * N, k.v * N, dw, k.d * N);
+  return t;
+}
+
+/** Tuvali base64 PNG'ye çevir (Tauri komutuna verilecek). */
+function tuvalB64(t: HTMLCanvasElement): Promise<string> {
+  return new Promise((coz, red) => {
+    t.toBlob((b) => {
+      if (!b) {
+        red(new Error("PNG üretilemedi"));
+        return;
+      }
+      const o = new FileReader();
+      o.onload = () => coz(String(o.result).split(",")[1] ?? "");
+      o.onerror = () => red(new Error("PNG okunamadı"));
+      o.readAsDataURL(b);
+    }, "image/png");
+  });
+}
+
+/** Fotoğraf modunu ekranda uygula: çizim alanını gizle, fotoğrafı göster. */
+function fotografGorunum(root: HTMLElement, tur: Tur): void {
+  const acik = fotografModu[tur];
+  const kart = root.querySelector<HTMLElement>(`#kz-${tur}-kart`);
+  if (!kart) return;
+  kart.classList.toggle("foto", acik);
+  const calisma = kart.querySelector<HTMLElement>(".kz-calisma");
+  if (calisma) calisma.hidden = acik;
+  const blok = root.querySelector<HTMLElement>(`#kz-${tur}-foto`);
+  if (blok) blok.hidden = !acik;
+  // Küçük önizleme: HD atlasın YALNIZ oyunda görünen yüzü kırpılıp çizilir
+  // (tüm atlas yerine gerçek fotoğraf görünsün).
+  const on = root.querySelector<HTMLCanvasElement>(`#kz-${tur}-foto-img`);
+  const yol = fotografYol[tur];
+  if (on && yol) {
+    const img = new Image();
+    img.onload = () => {
+      const N = Math.max(1, Math.round(img.naturalWidth / KOZ_G));
+      const b = disBolge(tur);
+      on.width = b.w * 12;
+      on.height = b.h * 12;
+      const g = on.getContext("2d");
+      if (!g) return;
+      g.clearRect(0, 0, on.width, on.height);
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = "high";
+      if (tur === "pelerin") {
+        // Doku oyunun aynası için ters yazıldı → önizlemede geri çevrilir.
+        g.save();
+        g.translate(on.width, 0);
+        g.scale(-1, 1);
+      }
+      g.drawImage(img, b.x * N, b.y * N, b.w * N, b.h * N, 0, 0, on.width, on.height);
+      if (tur === "pelerin") g.restore();
+    };
+    img.src = fileSrc(yol);
+  } else if (on) {
+    on.getContext("2d")?.clearRect(0, 0, on.width, on.height);
+  }
+  for (const secici of ["#kz-" + tur + "-3d", "#kz-" + tur + "-temizle", "#kz-" + tur + "-kaydet"]) {
+    const b = root.querySelector<HTMLButtonElement>(secici);
+    if (b) b.hidden = acik;
+  }
+  const rozet = root.querySelector<HTMLElement>(`#kz-${tur}-durum`);
+  if (rozet) rozet.textContent = acik ? "fotoğraf (HD)" : "";
+  if (secili === tur) secimiUygula(root);
+}
+
+/** Sayfa açılırken: kayıtlı dosya 64×32'den büyükse fotoğraf modu. */
+function fotografDurumlari(root: HTMLElement, durum: KozmetikDurum): void {
+  const kontrol = (tur: Tur, yol: string | null | undefined, liste: string[] | null | undefined): void => {
+    // 64×32 atlas okunabildiyse dosya piksel tasarımıdır → fotoğraf modu YOK.
+    if (Array.isArray(liste) && liste.length === ATLAS_PIKSEL) {
+      fotografModu[tur] = false;
+      fotografYol[tur] = null;
+      fotografGorunum(root, tur);
       return;
     }
-
-    // DÜZ FOTOĞRAF: ana yüze sığdır, kalan yüzleri türet.
-    const p = hedef(tur);
-    const ana = disBolge(tur);
-    const ara = document.createElement("canvas");
-    ara.width = ana.w;
-    ara.height = ana.h;
-    const g = ara.getContext("2d", { willReadFrequently: true });
-    if (!g) throw new Error("tuval yok");
-    const oranHedef = ana.w / ana.h;
-    let kw = resim.width;
-    let kh = kw / oranHedef;
-    if (kh > resim.height) {
-      kh = resim.height;
-      kw = kh * oranHedef;
+    if (!yol) {
+      fotografModu[tur] = false;
+      fotografYol[tur] = null;
+      fotografGorunum(root, tur);
+      return;
     }
-    const kx = (resim.width - kw) / 2;
-    const ky = (resim.height - kh) / 2;
-    g.drawImage(resim, kx, ky, kw, kh, 0, 0, ana.w, ana.h);
-    const veri = g.getImageData(0, 0, ana.w, ana.h).data;
-    for (let y = 0; y < ana.h; y++) {
-      for (let x = 0; x < ana.w; x++) {
-        const i = y * ana.w + x;
-        const a = veri[i * 4 + 3];
-        yaz(p, ana.x + x, ana.y + y, a < 24 ? "" : `#${hexKisa(veri[i * 4])}${hexKisa(veri[i * 4 + 1])}${hexKisa(veri[i * 4 + 2])}`);
+    // Atlas yok ama dosya var → HD fotoğraf. Bunu GÖRSEL YÜKLENMESİNİ BEKLEMEDEN
+    // uygula: aksi hâlde ilk birkaç yüz milisaniyede "Kaydet" görünür kalıyor ve
+    // boş atlas gönderip dosyayı siliyordu ("kaydete bastım pelerin silindi").
+    fotografModu[tur] = true;
+    fotografYol[tur] = String(yol);
+    fotografGorunum(root, tur);
+    // Boyutu doğrula: dosya gerçekten büyük mü? Hata olsa bile KORUMA sürer.
+    const dosya = String(yol);
+    const img = new Image();
+    img.onload = () => {
+      if (fotografYol[tur] !== dosya) return; // bu arada başka dosya seçildi
+      const hd = img.naturalWidth > KOZ_G || img.naturalHeight > KOZ_Y;
+      fotografModu[tur] = hd;
+      fotografYol[tur] = hd ? dosya : null;
+      fotografGorunum(root, tur);
+    };
+    img.onerror = () => {
+      // Dosya diskte duruyor ama webview okuyamadı: silme yolunu AÇMA.
+      if (fotografYol[tur] === dosya) fotografModu[tur] = true;
+    };
+    img.src = fileSrc(dosya);
+  };
+  kontrol("pelerin", durum.pelerin_dosya, durum.pelerin);
+  kontrol("kanat", durum.kanat_dosya, durum.kanat);
+}
+
+/** Fotoğrafı HD paftaya çevirip kaydet. */
+async function fotografUygula(
+  root: HTMLElement,
+  tur: Tur,
+  resim: HTMLImageElement,
+  sec: KirpSecim,
+  duz: boolean,
+  hd: boolean,
+): Promise<void> {
+  silmeIstegi[tur] = false;
+  const pafta = hdPafta(resim, sec, tur, duz, hd);
+  const b64 = await tuvalB64(pafta);
+  let sonuc: { kurulum: number; yuklendi: boolean; hata: string; genislik: number; yukseklik: number };
+  try {
+    sonuc = (await invoke("cmd_kozmetik_fotograf", { tur, png: b64, duz })) as typeof sonuc;
+  } catch (e) {
+    // ESKİ LAUNCHER (exe güncellenmemiş): HD komutu yok → 64×32'ye indirip
+    // normal piksel kaydına düş. Böylece özellik bozuk görünmez.
+    const kucuk = document.createElement("canvas");
+    kucuk.width = KOZ_G;
+    kucuk.height = KOZ_Y;
+    const kg = kucuk.getContext("2d", { willReadFrequently: true });
+    if (!kg) throw e;
+    kg.imageSmoothingEnabled = true;
+    kg.imageSmoothingQuality = "high";
+    kg.drawImage(pafta, 0, 0, KOZ_G, KOZ_Y);
+    const yeni = atlasOku(kg);
+    const p0 = hedef(tur);
+    gecmis[tur].push(p0.slice());
+    if (gecmis[tur].length > GERI_SINIR) gecmis[tur].shift();
+    gelecek[tur].length = 0;
+    for (let i = 0; i < ATLAS_PIKSEL; i++) p0[i] = yeni[i];
+    tazele(root, tur);
+    await kaydet(root, tur);
+    toast("Launcher eski sürümde — fotoğraf 64×32 olarak kaydedildi. HD için launcher'ı güncelle.", "err");
+    return;
+  }
+  // Elle çizim verisi artık geçersiz: fotoğraf modu tamamen dosyadan gelir.
+  const p = hedef(tur);
+  for (let i = 0; i < p.length; i++) p[i] = "";
+  localStorage.removeItem(`yikim:kozmetik:${tur}:yedek`);
+  fotografModu[tur] = true;
+  fotografYol[tur] = tur === "pelerin" ? "pelerin.png" : "elytra.png";
+  // Dosyanın gerçek yolu launcher'ın uygulama klasöründe; taze veriyle al.
+  try {
+    const guncel = (await invoke("cmd_kozmetik_oku")) as KozmetikDurum;
+    const yol = tur === "pelerin" ? guncel.pelerin_dosya : guncel.kanat_dosya;
+    if (yol) fotografYol[tur] = String(yol);
+  } catch {
+    /* yol alınamazsa sahne zaten yeniden çizilmez */
+  }
+  if (tur === "pelerin") pelerinKayitli = true;
+  else kanatKayitli = true;
+
+  if (!hd) {
+    // HD KAPALI = eski davranış: fotoğraf 64×32 piksel dokusuna iner ve
+    // üzerine yeniden çizilebilir (fotoğraf modu kapanır).
+    const kg = pafta.getContext("2d", { willReadFrequently: true });
+    if (kg) {
+      const yeni = atlasOku(kg);
+      const p2 = hedef(tur);
+      gecmis[tur].push(p2.slice());
+      if (gecmis[tur].length > GERI_SINIR) gecmis[tur].shift();
+      gelecek[tur].length = 0;
+      for (let i = 0; i < ATLAS_PIKSEL; i++) p2[i] = yeni[i];
+      // ELİTRA: vanilya kanat silüetinin dışı SAYDAM kalmalı. Kırpma önizlemesi
+      // (ve HD kaydındaki `elytra_maskele`) bu maskeyi uyguluyor; 64×32 piksel
+      // yolunda unutulunca oyunda köşeler dolu dikdörtgen olarak görünüyor,
+      // önizleme ise kanat biçimini gösteriyordu → WYSIWYG bozuluyordu.
+      if (tur === "kanat") {
+        for (let i = 0; i < ATLAS_PIKSEL; i++) {
+          if (!ELITRA_SABLON[i]) p2[i] = "";
+        }
       }
     }
-    // Kenarlar: yan şeritler + üst/alt şeritler tasarımın kenar pikseliyle
-    // devam ettirilir. Oyunda bu şeritler görünür; boş kalınca pelerinin/
-    // elitranın yanı ve ALT tarafı delik görünüyordu.
-    kenarlariDoldur(p, tur);
-    // Fotoğraf DIŞ (oyunda görünen) yüze oturur; iç astara aynası yazılır.
-    karsiYuzuAynala(p, ana, icBolge(tur));
+    fotografModu[tur] = false;
+    fotografYol[tur] = null;
     tazele(root, tur);
-    toast("Fotoğraf atlasa indirgendi — istersen fırçayla düzeltebilirsin.");
+    fotografGorunum(root, tur);
+    await kaydet(root, tur);
+    return;
+  }
+
+  tazele(root, tur);
+  fotografGorunum(root, tur);
+  const ek = sonuc.yuklendi ? "" : " (sunucuya yüklenemedi; yalnız sende görünür)";
+  toast(`Fotoğraf ${sonuc.genislik}×${sonuc.yukseklik} HD doku olarak kaydedildi${ek}`);
+}
+
+/** Kırpma penceresi: fotoğrafın üzerine hedef oranlı bir çerçeve koyar. */
+function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): void {
+  root.querySelector("#kz-kirp")?.remove();
+  const ana = disBolge(tur);
+  const oran = ana.w / ana.h; // genişlik / yükseklik
+  const turAd = tur === "pelerin" ? "Pelerin" : "Elitra";
+  let duz = false;
+  // "HD görünüm" varsayılan AÇIK: fotoğraf yumuşak/HD ölçeklenir.
+  // Kapatılırsa eski keskin (pixel-art) örnekleme kullanılır.
+  let hd = true;
+
+  const kat = document.createElement("div");
+  kat.className = "kz-kirp";
+  kat.id = "kz-kirp";
+  kat.innerHTML = `
+    <div class="kz-kirp-kart" role="dialog" aria-modal="true" aria-label="Fotoğrafı yerleştir">
+      <div class="kz-kirp-bas">
+        <div class="kz-kirp-basla">
+          <b>${turAd} fotoğrafı</b>
+          <span>Çerçeveyi sürükle · köşeden boyutlandır · tekerlekle yakınlaştır</span>
+        </div>
+        <button class="btn ghost sm" id="kz-kirp-kapat" title="Kapat (Esc)">${icon("close")}</button>
+      </div>
+      <div class="kz-kirp-govde">
+        <canvas id="kz-kirp-c"></canvas>
+        <div class="kz-kirp-yan">
+          <span class="kz-etiket">Oyunda görünecek</span>
+          <canvas id="kz-kirp-on" width="${ana.w}" height="${ana.h}"></canvas>
+          <p class="kz-kirp-not" id="kz-kirp-boyut">—</p>
+          <span class="kz-etiket">Şekil</span>
+          <div class="kz-kirp-mod" id="kz-kirp-mod">
+            <button class="seg-btn aktif" data-mod="normal">${turAd} şekli</button>
+            <button class="seg-btn" data-mod="duz">Düz dikdörtgen</button>
+          </div>
+          <p class="kz-kirp-not" id="kz-kirp-mod-not"></p>
+          <span class="kz-etiket">Kalite</span>
+          <label class="kz-kirp-piksel"><input type="checkbox" id="kz-kirp-piksel" checked /> HD görünüm</label>
+          <p class="kz-kirp-not">İşaretliyken fotoğraf HD dokusu olarak kaydedilir. Kapatırsan 64×32 piksel dokusuna iner ve üzerine yeniden çizebilirsin.</p>
+        </div>
+      </div>
+      <div class="kz-kirp-alt">
+        <span class="kz-kirp-bilgi" id="kz-kirp-bilgi"></span>
+        <button class="btn" id="kz-kirp-iptal">İptal</button>
+        <button class="btn primary" id="kz-kirp-uygula">${icon("check")} Uygula</button>
+      </div>
+    </div>`;
+  root.appendChild(kat);
+
+  const tuval = kat.querySelector<HTMLCanvasElement>("#kz-kirp-c")!;
+  const onIzleme = kat.querySelector<HTMLCanvasElement>("#kz-kirp-on")!;
+  const bilgi = kat.querySelector<HTMLElement>("#kz-kirp-bilgi");
+  const boyutNot = kat.querySelector<HTMLElement>("#kz-kirp-boyut");
+  const modNot = kat.querySelector<HTMLElement>("#kz-kirp-mod-not");
+
+  const olcek = Math.min(620 / resim.width, 420 / resim.height, 1);
+  tuval.width = Math.max(60, Math.round(resim.width * olcek));
+  tuval.height = Math.max(60, Math.round(resim.height * olcek));
+  const ekran = tuval.width / resim.width; // resim pikseli → tuval pikseli
+  const g = tuval.getContext("2d");
+  if (!g) throw new Error("tuval yok");
+
+  const baslangic = (): KirpSecim => {
+    let h = resim.height;
+    let w = h * oran;
+    if (w > resim.width) {
+      w = resim.width;
+      h = w / oran;
+    }
+    return { x: (resim.width - w) / 2, y: (resim.height - h) / 2, w, h };
+  };
+  let sec: KirpSecim = baslangic();
+
+  const sinirla = (s: KirpSecim): KirpSecim => {
+    const enAz = Math.max(4, resim.width / 60);
+    let w = Math.min(Math.max(s.w, enAz), resim.width);
+    let h = w / oran;
+    if (h > resim.height) {
+      h = resim.height;
+      w = h * oran;
+    }
+    return {
+      x: Math.min(Math.max(s.x, 0), Math.max(0, resim.width - w)),
+      y: Math.min(Math.max(s.y, 0), Math.max(0, resim.height - h)),
+      w,
+      h,
+    };
+  };
+  sec = sinirla(sec);
+
+  const ciz = (): void => {
+    g.clearRect(0, 0, tuval.width, tuval.height);
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = "high";
+    g.drawImage(resim, 0, 0, tuval.width, tuval.height);
+    const kx = sec.x * ekran;
+    const ky = sec.y * ekran;
+    const kw = sec.w * ekran;
+    const kh = sec.h * ekran;
+    g.fillStyle = "rgba(6,8,12,0.66)";
+    g.fillRect(0, 0, tuval.width, ky);
+    g.fillRect(0, ky + kh, tuval.width, Math.max(0, tuval.height - ky - kh));
+    g.fillRect(0, ky, kx, kh);
+    g.fillRect(kx + kw, ky, Math.max(0, tuval.width - kx - kw), kh);
+    g.strokeStyle = "rgba(255,255,255,0.30)";
+    g.lineWidth = 1;
+    for (let i = 1; i < 3; i++) {
+      g.beginPath();
+      g.moveTo(kx + (kw * i) / 3, ky);
+      g.lineTo(kx + (kw * i) / 3, ky + kh);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(kx, ky + (kh * i) / 3);
+      g.lineTo(kx + kw, ky + (kh * i) / 3);
+      g.stroke();
+    }
+    g.strokeStyle = "#ff8a3d";
+    g.lineWidth = 2;
+    g.strokeRect(kx + 1, ky + 1, Math.max(1, kw - 2), Math.max(1, kh - 2));
+    g.fillStyle = "#ff8a3d";
+    g.fillRect(kx + kw - 8, ky + kh - 8, 8, 8);
+
+    // "Oyunda görünecek" = KAYDEDİLECEK dokunun oyunda görünen yüzü (WYSIWYG):
+    // atlas hdPafta() ile birebir üretilir, elitrada vanilla siluet maskesi
+    // uygulanır, pelerinde oyunun aynası geri çevrilir. Böylece önizleme ile
+    // kaydettikten sonraki görünüm aynı olur.
+    const pafta = hdPafta(resim, sec, tur, duz, hd);
+    const kN = pafta.width / KOZ_G;
+    const yuz = disBolge(tur);
+    const pw = yuz.w * kN;
+    const ph = yuz.h * kN;
+    const ara = document.createElement("canvas");
+    ara.width = pw;
+    ara.height = ph;
+    const ag = ara.getContext("2d", { willReadFrequently: true });
+    // HD: önizleme dokuyu 1:1 kullanır → oyundaki yumuşak görünüm.
+    // Piksel: her doku pikseli 11 ekran pikseli (CSS genişliği 110px) → keskin.
+    const onG = hd ? pw : yuz.w * 11;
+    const onY = hd ? ph : yuz.h * 11;
+    onIzleme.width = onG;
+    onIzleme.height = onY;
+    const og = onIzleme.getContext("2d");
+    if (ag && og) {
+      ag.imageSmoothingEnabled = false;
+      ag.drawImage(pafta, yuz.x * kN, yuz.y * kN, pw, ph, 0, 0, pw, ph);
+      if (tur === "kanat") {
+        // Vanilla elitra saydamlığı: oyunda boş kalan piksel önizlemede de boş.
+        const veri = ag.getImageData(0, 0, pw, ph);
+        for (let y = 0; y < ph; y++) {
+          for (let x = 0; x < pw; x++) {
+            const ix = yuz.x + Math.floor(x / kN);
+            const iy = yuz.y + Math.floor(y / kN);
+            if (!ELITRA_SABLON[iy * KOZ_G + ix]) veri.data[(y * pw + x) * 4 + 3] = 0;
+          }
+        }
+        ag.putImageData(veri, 0, 0);
+      }
+      og.clearRect(0, 0, onG, onY);
+      og.imageSmoothingEnabled = false;
+      if (tur === "pelerin") {
+        // Doku oyunun aynası için ters yazılır → önizleme oyun görünümüne çevirir.
+        og.save();
+        og.translate(onG, 0);
+        og.scale(-1, 1);
+      }
+      og.drawImage(ara, 0, 0, onG, onY);
+      if (tur === "pelerin") og.restore();
+    }
+    // Tarayıcı ölçeklemesi: HD'de yumuşak (oyun gibi), pikselde keskin.
+    onIzleme.style.imageRendering = hd ? "auto" : "pixelated";
+    const N = kN;
+    if (boyutNot) boyutNot.textContent = `Doku: ${KOZ_G * N}×${KOZ_Y * N} (kumaş ${ana.w * N}×${ana.h * N})`;
+    if (bilgi) bilgi.textContent = `${Math.round(sec.w)}×${Math.round(sec.h)} px seçim`;
+  };
+
+  const konum = (e: PointerEvent): { x: number; y: number } => {
+    const r = tuval.getBoundingClientRect();
+    return {
+      x: (((e.clientX - r.left) / Math.max(1, r.width)) * tuval.width) / ekran,
+      y: (((e.clientY - r.top) / Math.max(1, r.height)) * tuval.height) / ekran,
+    };
+  };
+
+  let tut: { tip: "tasi" | "boyut"; px: number; py: number; sec: KirpSecim } | null = null;
+  tuval.addEventListener("pointerdown", (e) => {
+    const p = konum(e);
+    const esik = 14 / ekran;
+    const kose = Math.hypot(p.x - (sec.x + sec.w), p.y - (sec.y + sec.h)) < esik;
+    tut = { tip: kose ? "boyut" : "tasi", px: p.x, py: p.y, sec: { ...sec } };
+    tuval.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  tuval.addEventListener("pointermove", (e) => {
+    if (!tut) return;
+    const p = konum(e);
+    const dx = p.x - tut.px;
+    const dy = p.y - tut.py;
+    if (tut.tip === "tasi") {
+      sec = sinirla({ x: tut.sec.x + dx, y: tut.sec.y + dy, w: tut.sec.w, h: tut.sec.h });
+    } else {
+      const w = Math.max(tut.sec.w + Math.max(dx, dy * oran), 4);
+      sec = sinirla({ x: tut.sec.x, y: tut.sec.y, w, h: w / oran });
+    }
+    ciz();
+  });
+  const birak = (): void => {
+    tut = null;
+  };
+  tuval.addEventListener("pointerup", birak);
+  tuval.addEventListener("pointercancel", birak);
+  tuval.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      const f = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+      const mx = sec.x + sec.w / 2;
+      const my = sec.y + sec.h / 2;
+      const w = sec.w * f;
+      sec = sinirla({ x: mx - w / 2, y: my - (w / oran) / 2, w, h: w / oran });
+      ciz();
+    },
+    { passive: false },
+  );
+
+  const modNotu = (): void => {
+    if (!modNot) return;
+    modNot.textContent = duz
+      ? "Sadece seçtiğin dikdörtgen yazılır. İç astar, yanlar ve alt şerit BOŞ kalır."
+      : "Desen kumaşın tamamına oturur: iç astar aynası ve yan/üst/alt şeritler otomatik tamamlanır.";
+  };
+  modNotu();
+
+  kat.querySelectorAll<HTMLElement>("[data-mod]").forEach((b) => {
+    b.addEventListener("click", () => {
+      duz = b.dataset.mod === "duz";
+      kat.querySelectorAll("[data-mod]").forEach((x) => x.classList.toggle("aktif", x === b));
+      modNotu();
+    });
+  });
+  kat.querySelector<HTMLInputElement>("#kz-kirp-piksel")?.addEventListener("change", (e) => {
+    hd = (e.target as HTMLInputElement).checked;
+    ciz();
+  });
+
+  const kapat = (): void => {
+    document.removeEventListener("keydown", tus);
+    kat.remove();
+  };
+  const tus = (e: KeyboardEvent): void => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      kapat();
+    }
+  };
+  document.addEventListener("keydown", tus);
+
+  const uygulaBtn = kat.querySelector<HTMLButtonElement>("#kz-kirp-uygula");
+  uygulaBtn?.addEventListener("click", () => {
+    if (uygulaBtn.disabled) return;
+    uygulaBtn.disabled = true;
+    uygulaBtn.textContent = "Kaydediliyor…";
+    void fotografUygula(root, tur, resim, { ...sec }, duz, hd)
+      .then(() => kapat())
+      .catch((e) => {
+        uygulaBtn.disabled = false;
+        uygulaBtn.innerHTML = `${icon("check")} Uygula`;
+        toast(String(e), "err");
+      });
+  });
+
+  kat.querySelector("#kz-kirp-kapat")?.addEventListener("click", kapat);
+  kat.querySelector("#kz-kirp-iptal")?.addEventListener("click", kapat);
+  kat.addEventListener("pointerdown", (e) => {
+    if (e.target === kat) kapat();
+  });
+
+  ciz();
+}
+
+/** Hazır 64×32 pafta: olduğu gibi atlasa yazılır (kırpma sorulmaz). */
+function paftaUygula(root: HTMLElement, tur: Tur, resim: HTMLImageElement): void {
+  const ara = document.createElement("canvas");
+  ara.width = KOZ_G;
+  ara.height = KOZ_Y;
+  const g = ara.getContext("2d", { willReadFrequently: true });
+  if (!g) throw new Error("tuval yok");
+  g.imageSmoothingEnabled = false;
+  g.drawImage(resim, 0, 0, KOZ_G, KOZ_Y);
+  const yeni = atlasOku(g);
+  if (atlasBosMu(yeni)) throw new Error("pafta boş görünüyor");
+  const p = hedef(tur);
+  gecmis[tur].push(p.slice());
+  if (gecmis[tur].length > GERI_SINIR) gecmis[tur].shift();
+  gelecek[tur].length = 0;
+  for (let i = 0; i < ATLAS_PIKSEL; i++) p[i] = yeni[i];
+  fotografModu[tur] = false;
+  fotografYol[tur] = null;
+  silmeIstegi[tur] = false;
+  tazele(root, tur);
+  fotografGorunum(root, tur);
+  toast("Pafta okundu — 64×32 atlas yüklendi.");
+}
+
+/** Fotoğraf seçildi: pafta ise doğrudan, değilse kırpma penceresiyle. */
+async function fotograftan(root: HTMLElement, tur: Tur, f: File): Promise<void> {
+  try {
+    const resim = await resimAc(f);
+    if (!resim) return;
+    // HAZIR PAFTA: 2:1 oranlı her görsel vanilla 64×32 atlasıdır.
+    const oran = resim.width / Math.max(1, resim.height);
+    const paftaMi = Math.abs(oran - 2) < 0.02 && resim.height >= 32 && resim.height <= 128;
+    if (paftaMi) {
+      paftaUygula(root, tur, resim);
+      return;
+    }
+    kirpPenceresi(root, tur, resim);
   } catch (e) {
     toast(String(e), "err");
   }
 }
 
-// ---------------------------------------------------------------- kayıt
+/** Boş atlas göndermeden önce diskte kayıtlı bir tasarım var mı? Varsa geri yükle.
+ *
+ *  "Kaydet" tek başına ASLA silmez: silme yalnız "Kaldır" ya da
+ *  "Temizle + Kaydet" (silmeIstegi) ile olur. HD dosya diskte dururken boş
+ *  atlas yollamak dosyayı ve sunucu kaydını siliyordu. */
+async function disktekiTasarimiKoru(root: HTMLElement, tur: Tur): Promise<boolean> {
+  let durum: KozmetikDurum;
+  try {
+    durum = (await invoke("cmd_kozmetik_oku")) as KozmetikDurum;
+  } catch {
+    return false;
+  }
+  const yol = tur === "pelerin" ? durum.pelerin_dosya : durum.kanat_dosya;
+  if (!yol) return false;
+  const liste = tur === "pelerin" ? durum.pelerin : durum.kanat;
+  if (Array.isArray(liste) && liste.length === ATLAS_PIKSEL && !atlasBosMu(liste)) {
+    // 64×32 piksel dosyası: editörü diskteki tasarımla doldur.
+    const p = hedef(tur);
+    for (let i = 0; i < ATLAS_PIKSEL; i++) p[i] = liste[i] ?? "";
+    fotografModu[tur] = false;
+    fotografYol[tur] = null;
+  } else {
+    // HD (ya da 64×32 dışı) dosya: fotoğraf moduna dön, dosyaya dokunma.
+    fotografModu[tur] = true;
+    fotografYol[tur] = String(yol);
+  }
+  if (tur === "pelerin") pelerinKayitli = true;
+  else kanatKayitli = true;
+  tazele(root, tur);
+  fotografGorunum(root, tur);
+  return true;
+}
 
 async function kaydet(root: HTMLElement, tur: Tur): Promise<void> {
   const p = hedef(tur);
   const dolu = !atlasBosMu(p);
   const ad = tur === "pelerin" ? "Pelerin" : "Elitra";
+  // HD FOTOĞRAF MODU: piksel atlası bilerek boştur (tasarım diskteki HD
+  // dosyada). Boş atlas göndermek dosyayı VE sunucudaki kaydı siler —
+  // "kaydete bastım pelerin silindi" hatası buydu. Fotoğraf zaten
+  // "Uygula" anında kaydedildi; burada hiçbir şey silinmez.
+  if (fotografModu[tur]) {
+    toast(`${ad} HD fotoğraf olarak kayıtlı. Değiştirmek için yeni fotoğraf yükle.`);
+    return;
+  }
+  // Boş atlas + kayıtlı dosya: kullanıcı yalnızca "Kaydet"e bastı → SİLME.
+  if (!dolu && !silmeIstegi[tur]) {
+    const korundu = await disktekiTasarimiKoru(root, tur);
+    if (korundu) toast(`${ad} diskte kayıtlı — silmek için "Kaldır"ı kullan.`);
+    else toast(`Kaydedilecek bir ${ad.toLocaleLowerCase("tr")} tasarımı yok.`);
+    return;
+  }
   const btn = root.querySelector<HTMLButtonElement>(`#kz-${tur}-kaydet`);
   const eskiIcerik = btn ? btn.innerHTML : "";
   // Jeton: art arda kayıtta eski zamanlayıcı yeni durumu ezmesin.
@@ -1073,6 +2090,7 @@ async function kaydet(root: HTMLElement, tur: Tur): Promise<void> {
   durum("Kaydediliyor…", "bekliyor");
   try {
     const sonuc = await kozKaydet(tur, p.slice());
+    silmeIstegi[tur] = false;
     // Tasarımın localStorage kopyası: sayfadan çıkıp gelince (ya da exe
     // dosyayı okuyamazsa) çizim aynen geri gelir.
     try {
@@ -1098,3 +2116,26 @@ async function kaydet(root: HTMLElement, tur: Tur): Promise<void> {
     toast(String(e), "err");
   }
 }
+
+// ---------------------------------------------------------------- kısayollar
+
+/** Kozmetik sayfası açıkken etkin kök (klavye kısayolu bunu kullanır). */
+let kozKok: HTMLElement | null = null;
+
+/** Ctrl+Z geri · Ctrl+Shift+Z ya da Ctrl+Y ileri. 2D ve 3D çizimde de çalışır. */
+function kozKisayol(e: KeyboardEvent): void {
+  if (!kozKok || !kozKok.isConnected) return;
+  const h = e.target as HTMLElement | null;
+  if (h && (h.tagName === "INPUT" || h.tagName === "TEXTAREA" || h.isContentEditable)) return;
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  const tus = e.key.toLowerCase();
+  if (tus === "z" && !e.shiftKey) {
+    e.preventDefault();
+    geriAl(kozKok, secili);
+  } else if ((tus === "z" && e.shiftKey) || tus === "y") {
+    e.preventDefault();
+    ileriAl(kozKok, secili);
+  }
+}
+
+window.addEventListener("keydown", kozKisayol);

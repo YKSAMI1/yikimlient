@@ -137,6 +137,13 @@ pub fn yerel_kanat() -> Option<Vec<String>> {
 
 /// PNG'yi ana kopyaya + tüm kurulumların `.yikim/` klasörüne yaz.
 pub fn tum_kurulumlara_yaz(ad: &str, png: &[u8]) -> usize {
+    // Elle çizilen 64×32 atlas: eski HD fotoğrafın küçük kopyası silinir,
+    // yoksa mod presence'a eski fotoğrafı göndermeye devam ederdi.
+    if let Some((g, y)) = png_boyut(png) {
+        if g <= DOKU_G && y <= DOKU_Y {
+            kucuk_sil(ad);
+        }
+    }
     let mut sayi = 0usize;
     if std::fs::write(ana_yol(ad), png).is_ok() {
         sayi += 1;
@@ -166,6 +173,7 @@ fn kurulumlara_yaz(ad: &str, png: &[u8]) -> usize {
 
 /// Yalnız kurulum kopyalarını sil — ana kopya (düzenlenebilir tasarım) kalır.
 pub fn kurulumlardan_sil(ad: &str) -> usize {
+    kucuk_sil(ad);
     let mut sayi = 0usize;
     for inst in crate::instances::list() {
         if std::fs::remove_file(kurulum_yolu(&inst, ad)).is_ok() {
@@ -191,6 +199,13 @@ pub fn aktif_ayarla(ad: &str, acik: bool) -> Result<(), String> {
         let _ = std::fs::remove_file(kapali_yol(ad));
         if let Ok(png) = std::fs::read(ana_yol(ad)) {
             kurulumlara_yaz(ad, &png);
+            // küçük (sunucu) kopya da geri gelsin — yoksa diğer oyuncular
+            // dokuyu kaybederdi
+            if let Ok(kucuk) = std::fs::read(ana_yol(&kucuk_ad(ad))) {
+                for inst in crate::instances::list() {
+                    let _ = std::fs::write(kurulum_yolu(&inst, &kucuk_ad(ad)), &kucuk);
+                }
+            }
         }
     } else {
         std::fs::write(kapali_yol(ad), b"").map_err(|e| format!("işaret yazılamadı: {e}"))?;
@@ -204,8 +219,189 @@ pub fn ana_b64(ad: &str) -> Option<String> {
     std::fs::read(ana_yol(ad)).ok().map(|png| b64(&png))
 }
 
+// ---------------------------------------------------------------- HD fotoğraf
+//
+// Fotoğraftan gelen kozmetikler 64×32 ile sınırlı değil: dosya olduğu gibi
+// yazılır (64×32'nin tam katı olacak şekilde üretilir). Mod dokuyu kendi
+// çözünürlüğünde yükler, UV'ler 64×32 ızgarasına göre normalize olduğu için
+// oyunda da aynı şekilde örtünür.
+
+/// Base64 PNG'yi çöz.
+pub fn png_coz(metin: &str) -> Result<Vec<u8>, String> {
+    base64::engine::general_purpose::STANDARD
+        .decode(metin.trim().as_bytes())
+        .map_err(|e| format!("görsel çözülemedi: {e}"))
+}
+
+/// PNG boyutu (genişlik, yükseklik).
+pub fn png_boyut(png: &[u8]) -> Option<(u32, u32)> {
+    let img = image::load_from_memory(png).ok()?;
+    Some((img.width(), img.height()))
+}
+
+/// Sunucuya gönderilecek KÜÇÜK (64×32) sürüm.
+///
+/// Presence sunucusu istek gövdesini ~32 KB ile sınırlıyor; HD görsel oraya
+/// sığmaz. Bu yüzden diğer oyunculara 64×32 kopya gider, HD sürüm yerelde ve
+/// aynı makinede çalışan oyunda kullanılır.
+pub fn kucuk_png_b64(png: &[u8]) -> Option<String> {
+    let img = image::load_from_memory(png).ok()?;
+    let kucuk = img
+        .resize_exact(DOKU_G, DOKU_Y, image::imageops::FilterType::Lanczos3)
+        .to_rgba8();
+    let mut cikti: Vec<u8> = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut cikti)
+        .write_image(kucuk.as_raw(), DOKU_G, DOKU_Y, image::ExtendedColorType::Rgba8)
+        .ok()?;
+    Some(b64(&cikti))
+}
+
+/// Vanilla varsayılan doku (elytra/pelerin) — oyun jar'ından okunur.
+///
+/// Kullanıcının "düz dikdörtgen" seçiminde fotoğraf varsayılan dokunun
+/// ÜZERİNE maske gibi biner: fotoğrafın saydam kaldığı yerlerde varsayılan
+/// doku görünür, boş kalan yerler boş kalır.
+fn vanilla_doku(kanat: bool) -> Option<image::RgbaImage> {
+    let girisler: &[&str] = if kanat {
+        &[
+            // 1.21.5+ eski "equipment/wings" yoluna tasindi
+            "assets/minecraft/textures/entity/equipment/wings/elytra.png",
+            "assets/minecraft/textures/entity/elytra.png",
+            "assets/minecraft/textures/entity/elytra/elytra.png",
+        ]
+    } else {
+        &[
+            "assets/minecraft/textures/entity/cape/cape.png",
+            "assets/minecraft/textures/entity/cape.png",
+        ]
+    };
+    let dizin = crate::core::versions_dir();
+    let oku = std::fs::read_dir(&dizin).ok()?;
+    for kayit in oku.flatten() {
+        let yol = kayit.path();
+        let ad = yol.file_name()?.to_string_lossy().to_string();
+        let jar = yol.join(format!("{ad}.jar"));
+        if !jar.is_file() {
+            continue;
+        }
+        let Ok(dosya) = std::fs::File::open(&jar) else {
+            continue;
+        };
+        let Ok(mut arsiv) = zip::ZipArchive::new(dosya) else {
+            continue;
+        };
+        for giris in girisler {
+            let Ok(mut parca) = arsiv.by_name(giris) else {
+                continue;
+            };
+            let mut bayt: Vec<u8> = Vec::new();
+            if std::io::Read::read_to_end(&mut parca, &mut bayt).is_err() {
+                continue;
+            }
+            if let Ok(gorsel) = image::load_from_memory(&bayt) {
+                return Some(gorsel.to_rgba8());
+            }
+        }
+    }
+    None
+}
+
+/// "Düz dikrörtgen" elitra: fotoğrafı VANILLA kanat silüetine maskele.
+///
+/// Varsayılan elitra dokusunun (oyun jar'ından okunur) saydam pikselleri
+/// saydam kalır — yani köşeler boş, kanat şekli korunur. Fotoğraf, kendi dolu
+/// alanından kanadın sınırlayıcı kutusuna gerilerek yerleştirilir.
+///
+/// Vanilla doku bulunamazsa `None` (fotoğraf olduğu gibi kalır).
+pub fn elytra_maskele(png: &[u8]) -> Option<Vec<u8>> {
+    let foto = image::load_from_memory(png).ok()?.to_rgba8();
+    let taban = vanilla_doku(true)?;
+    let (g, y) = (foto.width(), foto.height());
+    let (tg, ty) = (taban.width(), taban.height());
+    if g < tg || y < ty {
+        return None;
+    }
+    // Fotoğraf atlasın tamamına (64×32 ızgarasına) yerleşmiş durumda; burada
+    // YALNIZ saydamlık kırpılır: vanilla elitranın boş bıraktığı her piksel
+    // saydam olur, dolu yerlerde fotoğraf kendi kalitesinde kalır. Böylece
+    // "şekil" seçimi fotoğrafı esnetmeden gerçek kanat silüetini verir.
+    let mut cikti = foto;
+    for py in 0..y {
+        let vy = (py * ty / y).min(ty - 1);
+        for px in 0..g {
+            let vx = (px * tg / g).min(tg - 1);
+            if taban.get_pixel(vx, vy)[3] == 0 {
+                cikti.get_pixel_mut(px, py)[3] = 0;
+            }
+        }
+    }
+    let mut veri: Vec<u8> = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut veri)
+        .write_image(cikti.as_raw(), g, y, image::ExtendedColorType::Rgba8)
+        .ok()?;
+    Some(veri)
+}
+
+/// HD dokunun yanına yazılan 64×32 kopyanın dosya adı.
+fn kucuk_ad(ad: &str) -> String {
+    match ad {
+        "pelerin.png" => "pelerin.kucuk.png".to_string(),
+        "elytra.png" => "elytra.kucuk.png".to_string(),
+        _ => format!("{ad}.kucuk.png"),
+    }
+}
+
+/// PNG'yi 64×32'ye indir (PNG olarak).
+pub fn kucuk_png(png: &[u8]) -> Option<Vec<u8>> {
+    let img = image::load_from_memory(png).ok()?;
+    if img.width() <= DOKU_G && img.height() <= DOKU_Y {
+        return Some(png.to_vec());
+    }
+    let kucuk = img
+        .resize_exact(DOKU_G, DOKU_Y, image::imageops::FilterType::Lanczos3)
+        .to_rgba8();
+    let mut cikti: Vec<u8> = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut cikti)
+        .write_image(kucuk.as_raw(), DOKU_G, DOKU_Y, image::ExtendedColorType::Rgba8)
+        .ok()?;
+    Some(cikti)
+}
+
+/// 64×32 kopyayı ana klasöre + tüm kurulumlara yaz.
+///
+/// Mod, presence sunucusuna (gövde ~32 KB sınırı) bu küçük dosyayı gönderir;
+/// oyunda ise HD dosyayı kullanır. Böylece diğer oyuncular da bir doku görür.
+pub fn kucuk_yaz(ad: &str, png: &[u8]) -> usize {
+    let Some(kucuk) = kucuk_png(png) else {
+        return 0;
+    };
+    let mut sayi = 0usize;
+    if std::fs::write(ana_yol(&kucuk_ad(ad)), &kucuk).is_ok() {
+        sayi += 1;
+    }
+    for inst in crate::instances::list() {
+        let dir = inst.dir().join(".yikim");
+        if std::fs::create_dir_all(&dir).is_err() {
+            continue;
+        }
+        if std::fs::write(kurulum_yolu(&inst, &kucuk_ad(ad)), &kucuk).is_ok() {
+            sayi += 1;
+        }
+    }
+    sayi
+}
+
+/// 64×32 kopyayı sil (ana klasör + kurulumlar).
+pub fn kucuk_sil(ad: &str) {
+    let _ = std::fs::remove_file(ana_yol(&kucuk_ad(ad)));
+    for inst in crate::instances::list() {
+        let _ = std::fs::remove_file(kurulum_yolu(&inst, &kucuk_ad(ad)));
+    }
+}
+
 /// Ana kopyayı ve tüm kurulumlardaki dosyayı sil.
 pub fn tum_kurulumlardan_sil(ad: &str) -> usize {
+    kucuk_sil(ad);
     let mut sayi = 0usize;
     // Kozmetik tamamen kaldırılırken "kapalı" işareti de silinir.
     let _ = std::fs::remove_file(kapali_yol(ad));
@@ -307,5 +503,33 @@ mod testler {
         assert_eq!(geri[(2 * DOKU_G + 24) as usize], "#46515d");
         assert_eq!(geri[(20 * DOKU_G + 36) as usize], "#77889a");
         assert_eq!(geri[(0 * DOKU_G + 0) as usize], "");
+    }
+}
+
+#[cfg(test)]
+mod maske_testleri {
+    use image::ImageEncoder;
+    // "Duz dikdortgen" elitra maskesi: kanat silueti korunur, koseler bos kalir.
+    #[test]
+    fn elytra_silueti_korunur() {
+        let mut foto = image::RgbaImage::new(640, 320);
+        for y in 20..210u32 {
+            for x in 360..460u32 {
+                foto.put_pixel(x, y, image::Rgba([200, 60, 20, 255]));
+            }
+        }
+        let mut ham: Vec<u8> = Vec::new();
+        image::codecs::png::PngEncoder::new(&mut ham)
+            .write_image(foto.as_raw(), 640, 320, image::ExtendedColorType::Rgba8)
+            .unwrap();
+        let Some(cikti) = super::elytra_maskele(&ham) else {
+            eprintln!("vanilla elytra dokusu bulunamadi - test atlandi");
+            return;
+        };
+        let maske = image::load_from_memory(&cikti).unwrap().to_rgba8();
+        assert_eq!(maske.dimensions(), (640, 320));
+        assert_eq!(maske.get_pixel(10, 10)[3], 0, "bos alan bos kalmali");
+        let dolu = maske.pixels().filter(|p| p[3] > 0).count();
+        assert!(dolu > 500, "kanat dokusu olusmali, dolu={dolu}");
     }
 }

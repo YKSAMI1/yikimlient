@@ -31,6 +31,7 @@ import net.minecraft.class_327;
 import net.minecraft.class_332;
 import net.minecraft.class_4185;
 import net.minecraft.class_437;
+import net.minecraft.class_442;
 
 public final class YikimMainMenu {
     private static final String[] TIPS = new String[]{"Sa\u011f Shift: YIKIM men\u00fcs\u00fc  \u2022  Sa\u011f Ctrl: HUD a\u00e7/kapa", "HUD \u00f6\u011felerini panelden ya da ekrandan s\u00fcr\u00fckleyip ta\u015f\u0131yabilirsin.", "Sol Alt: yak\u0131nla\u015ft\u0131r (bas\u0131l\u0131 tut)  \u2022  Sa\u011f Alt: profil de\u011fi\u015ftir.", "Modlar sekmesinden mod aray\u0131p kurabilirsin; kurulum oyun kapan\u0131nca yap\u0131l\u0131r.", "Panel a\u00e7\u0131kken Tab sekmeleri, tekerlek listeyi kayd\u0131r\u0131r.", "Profil se\u00e7imin ba\u015flat\u0131c\u0131ya bildirilir; iki taraf birbirinin ayar\u0131n\u0131 ezmez."};
@@ -39,6 +40,8 @@ public final class YikimMainMenu {
     private final List<Button> buttons = new ArrayList<Button>();
     private final Runnable chipBackdrop;
     private final Runnable chipHud;
+    /** Vanilla ba\u015fl\u0131k ekran\u0131na ge\u00e7i\u015f (tercih kal\u0131c\u0131: menu.yikim=false). */
+    private final Runnable chipVanilla;
     private final List<Hit> hits = new ArrayList<Hit>();
     private final List<class_4185> modButtons;
     private int hitCount;
@@ -91,6 +94,13 @@ public final class YikimMainMenu {
             config.hudEnabled = !config.hudEnabled;
             config.save();
             YikimMetrics.notify("HUD " + (config.hudEnabled ? "a\u00e7\u0131k" : "kapal\u0131"));
+        };
+        this.chipVanilla = () -> {
+            YikimConfig config = YikimConfig.get();
+            config.customMainMenu = false;
+            config.save();
+            YikimMetrics.notify("Ana men\u00fc: Minecraft \u2014 sa\u011f \u00fcstteki YIKIMLient d\u00fc\u011fmesiyle geri d\u00f6nebilirsin");
+            class_310.method_1551().method_1507(new class_442());
         };
     }
 
@@ -240,10 +250,10 @@ public final class YikimMainMenu {
     }
 
     private void drawChips(class_332 graphics, class_327 font, int y, int width, int mouseX, int mouseY) {
-        int chipWidth = (width - 4) / 2;
-        String[] labels = new String[]{"Arka plan: " + YikimBackdrop.sessionLabel(), YikimConfig.get().hudEnabled ? "HUD a\u00e7\u0131k" : "HUD kapal\u0131"};
-        int[] icons = new int[]{9, 3};
-        Runnable[] actions = new Runnable[]{this.chipBackdrop, this.chipHud};
+        int chipWidth = (width - 8) / 3;
+        String[] labels = new String[]{"Arka plan: " + YikimBackdrop.sessionLabel(), YikimConfig.get().hudEnabled ? "HUD a\u00e7\u0131k" : "HUD kapal\u0131", "Vanilla men\u00fc"};
+        int[] icons = new int[]{9, 3, 8};
+        Runnable[] actions = new Runnable[]{this.chipBackdrop, this.chipHud, this.chipVanilla};
         for (int index = 0; index < labels.length; ++index) {
             int x;
             boolean hovered = YikimDraw.inside(mouseX, mouseY, x = this.columnX + index * (chipWidth + 4), y, chipWidth, 16);

@@ -643,13 +643,19 @@ public final class YikimPanel {
             this.rebuild();
         }));
         this.rows.add(new SectionRow(this, "Men\u00fc"));
-        this.rows.add(new ToggleRow("YIKIM ana men\u00fcs\u00fc", "Kapat\u0131rsan vanilla ba\u015fl\u0131k ekran\u0131 g\u00f6r\u00fcn\u00fcr.", () -> YikimConfig.get().customMainMenu, value -> {
+        this.rows.add(new ToggleRow("YIKIM ana men\u00fcs\u00fc", "Kapat\u0131nca oyunun kendi ba\u015fl\u0131k ekran\u0131 a\u00e7\u0131l\u0131r; sa\u011f \u00fcstteki YIKIMLient d\u00fc\u011fmesiyle geri d\u00f6n\u00fcl\u00fcr.", () -> YikimConfig.get().customMainMenu, value -> {
             YikimConfig current = YikimConfig.get();
             current.customMainMenu = value;
             current.save();
-            YikimMetrics.notify(value != false ? "Ana men\u00fc: YIKIM (sonraki a\u00e7\u0131l\u0131\u015fta)" : "Ana men\u00fc: vanilla (sonraki a\u00e7\u0131l\u0131\u015fta)");
+            if (!value) {
+                // ANINDA ge\u00e7i\u015f: tercih kaydedildi ve oyunun kendi ba\u015fl\u0131k ekran\u0131 a\u00e7\u0131l\u0131yor.
+                YikimMetrics.notify("Ana men\u00fc: Minecraft \u2014 geri d\u00f6nmek i\u00e7in sa\u011f \u00fcstteki YIKIMLient d\u00fc\u011fmesi");
+                YikimPanel.close();
+                return;
+            }
+            YikimMetrics.notify("Ana men\u00fc: YIKIMLient");
         }));
-        this.rows.add(new TextRow(this, "Men\u00fc takas\u0131 bir sonraki a\u00e7\u0131l\u0131\u015fta ge\u00e7erli olur.", -9539974));
+        this.rows.add(new TextRow(this, "De\u011fi\u015fiklik hemen uygulan\u0131r ve kaydedilir.", -9539974));
         this.rows.add(new ValueRow(this, "Y\u00fckl\u00fc mod", () -> this.cacheModsCount, -723722));
         this.rows.add(new ValueRow(this, "Oturum", () -> this.cacheSession, -6645082));
     }

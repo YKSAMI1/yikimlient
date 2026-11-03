@@ -22,6 +22,9 @@ const KOZ_Y = 32;
  *  +15° pitch (alt uç sırttan ayrılır) ve ∓15° roll (alt uçlar dışa açılır). */
 const KANAT_PITCH = 0.2617994;
 const KANAT_ROLL = 0.2617994;
+/** 3D çizimde her kanadın pivotunu dışa kaydırma (px): sağ kanat sağa, sol kanat
+ *  sola — iki plaka arasında ~8 px boşluk kalır, ikisi de rahat boyanır. */
+const KANAT_AYRIK = 9;
 
 /** BoxGeometry'nin bir yüzüne paftadan bölge eşler.
  *  `dikey` yalnızca alt (ny) yüzde gerekir: vanilla paftada alt yüz dikey aynalıdır. */
@@ -106,21 +109,33 @@ function kozUV(
 
 /** Görseli tam 64×32 paftaya oturt (HD dosyalar da doğru örneklenir). */
 function kozPaftasi(resim: CanvasImageSource & { width: number; height: number }): HTMLCanvasElement {
+    // HD FOTOĞRAF: 64×32'den büyük görseller olduğu gibi (kendi çözünürlüğünde)
+    // tutulur. Doku yerleşimi 64×32 ızgarasının tam katı olduğu için UV'ler
+    // değişmez; oyun da bu yüzden HD pelerini/elitrayı aynı şekilde örter.
+    const genis = Math.max(KOZ_G, Math.round(resim.width));
+    const yuksek = Math.max(KOZ_Y, Math.round(resim.height));
     const t = document.createElement("canvas");
-    t.width = KOZ_G;
-    t.height = KOZ_Y;
+    t.width = genis;
+    t.height = yuksek;
     const g = t.getContext("2d");
     if (g) {
-        g.imageSmoothingEnabled = false;
-        g.drawImage(resim, 0, 0, KOZ_G, KOZ_Y);
+        g.imageSmoothingEnabled = genis !== KOZ_G || yuksek !== KOZ_Y;
+        g.imageSmoothingQuality = "high";
+        g.drawImage(resim, 0, 0, genis, yuksek);
     }
     return t;
 }
 
 /** 64×32 paftayı keskin (nearest) doku olarak sarar. */
-function atlasDoku(kaynak: CanvasImageSource): THREE.CanvasTexture {
+function atlasDoku(kaynak: CanvasImageSource, yumusak = false): THREE.CanvasTexture {
     const doku = new THREE.CanvasTexture(kaynak as HTMLCanvasElement);
     dokuAyarla(doku);
+    if (yumusak) {
+        // HD fotoğraf: pikseller ekranda küçültülürken titremesin (mipmap).
+        doku.magFilter = THREE.LinearFilter;
+        doku.minFilter = THREE.LinearMipmapLinearFilter;
+        doku.generateMipmaps = true;
+    }
     doku.needsUpdate = true;
     return doku;
 }
@@ -281,6 +296,8 @@ export class Sahne {
     /** Elitra kanatları (kozmetik önizleme): gövde arkasında iki kutu. */
     private kanatGrup: THREE.Group | null = null;
     private kanatDoku: THREE.Texture | null = null;
+    /** 3D çizimde kanatlar iki yana açık mı (üst üste binmeden boyamak için). */
+    private kanatAyrikAcik = false;
     /** Kanatların son çizilen paftası — model yeniden kurulunca tekrar bağlanır. */
     private _bekleyenKanat: HTMLCanvasElement | null = null;
     /** 3D çizim ışın hedefleri: taban katman ve üst (overlay) katman mesh'leri. */
@@ -606,7 +623,8 @@ export class Sahne {
         try {
             const resim = await this.dokuResmi(p.url);
             if (jeton !== this.pelerinJeton) return;
-            this.pelerinDoku = atlasDoku(kozPaftasi(resim));
+            const pafta = kozPaftasi(resim);
+            this.pelerinDoku = atlasDoku(pafta, pafta.width > KOZ_G || pafta.height > KOZ_Y);
             this.pelerinMeshKur();
         } catch { /* pelerin yüklenemedi — pelerinsiz devam */ }
     }
@@ -641,7 +659,8 @@ export class Sahne {
         try {
             const resim = await this.dokuResmi(p.url);
             if (jeton !== this.kanatJeton) return;
-            this.kanatDoku = atlasDoku(kozPaftasi(resim));
+            const kpafta = kozPaftasi(resim);
+            this.kanatDoku = atlasDoku(kpafta, kpafta.width > KOZ_G || kpafta.height > KOZ_Y);
             this.kanatMeshKur();
         } catch { /* kanat yüklenemedi — kanatsız devam */ }
     }
@@ -731,7 +750,28 @@ export class Sahne {
         grup.visible = this.kozmetikGorunur;
         belUst.add(grup);
         this.kanatGrup = grup;
+        this.kanatAyrikUygula(); // 3D çizimde kanatlar ayrık kalsın
         this.izgaraYenile();
+    }
+
+    /**
+     * Elitra kanatlarını iki yana aç. Vanilla `ElytraEntityModel` her kanadı
+     * sırtın TAMAMINI kaplayacak şekilde kurar (ortada üst üste biner); 3D
+     * çizimde ikinci kanadın yüzleri seçilemiyordu. Ayrık modda pivotlar
+     * dışa kayar → iki panel arasında boşluk kalır, ikisi de boyanabilir.
+     */
+    kanatAyrik(acik: boolean): void {
+        if (this.kanatAyrikAcik === acik) return;
+        this.kanatAyrikAcik = acik;
+        this.kanatAyrikUygula();
+    }
+
+    private kanatAyrikUygula(): void {
+        if (!this.kanatGrup) return;
+        for (const eklem of this.kanatGrup.children) {
+            const yon = (eklem.userData.yon as number) || 1;
+            eklem.position.x = yon * (5 + (this.kanatAyrikAcik ? KANAT_AYRIK : 0)) * KS;
+        }
     }
 
     /** 3D çizimde piksel sınırları: kutuların her yüzünde ince ızgara. */
@@ -798,6 +838,16 @@ export class Sahne {
         if (this.pelerinGrup) this.pelerinMeshSil(); // çift mesh imkânsız
         const geo = new THREE.BoxGeometry(10 * KS, 16 * KS, 1 * KS);
         kozUV(geo, 0, 0, 10, 16, 1);
+        // Oyunda pelerinin GÖRÜNEN yüzü (nz) yatay aynalanır; atlas da o ayna
+        // için ters yazıldığı için önizleme de aynı aynayı uygular.
+        const puv = geo.attributes.uv as THREE.BufferAttribute;
+        for (const k of [20, 22]) {
+            const x1 = puv.getX(k);
+            const x2 = puv.getX(k + 1);
+            puv.setX(k, x2);
+            puv.setX(k + 1, x1);
+        }
+        puv.needsUpdate = true;
         const mat = new THREE.MeshLambertMaterial({
             map: this.pelerinDoku,
             transparent: true,

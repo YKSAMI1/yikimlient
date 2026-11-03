@@ -79,73 +79,90 @@ export function openSkinEditor(
         </div>
       </section>
       <aside class="sk-edit-sag">
-        <div class="sk-edit-3dbar">
-          <button class="seg-btn" id="ske-3d" title="Doğrudan modelin üstüne çiz">${icon("box")} 3D Çiz</button>
-          <span class="sk-edit-seg" id="ske-katman" hidden>
-            <button class="seg-btn aktif" data-kat="oto" title="Tıkladığın yüzeye boya (overlay açıksa overlay'e)">Otomatik</button>
-            <button class="seg-btn" data-kat="taban">Skin</button>
-            <button class="seg-btn" data-kat="ust">Overlay</button>
-          </span>
-          <button class="seg-btn" id="ske-izgara3d" title="Piksel ızgarasını karakterin üstünde göster">Izgara</button>
-          <span class="sk-zum3d" id="ske-zum3d" role="group" aria-label="Karakter yakınlaştırma">
-            <button class="seg-btn" data-zum3d="-1" title="Uzaklaş">−</button>
-            <button class="seg-btn" data-zum3d="1" title="Yakınlaş">+</button>
-            <button class="seg-btn" data-zum3d="0" title="Varsayılan mesafe">Sığdır</button>
-          </span>
-        </div>
-        <div class="sk-3d-parca" id="ske-parca" hidden>
-          <button class="seg-btn aktif" data-parca="kafa">Kafa</button>
-          <button class="seg-btn aktif" data-parca="govde">Gövde</button>
-          <button class="seg-btn aktif" data-parca="kollar">Kollar</button>
-          <button class="seg-btn aktif" data-parca="bacaklar">Bacaklar</button>
-          <button class="seg-btn aktif" data-parca="kaplama" title="Overlay katmanını göster/gizle (boyama katmanı soldaki Otomatik/Skin/Overlay seçimidir)">Overlay göster</button>
-          <button class="seg-btn aktif" data-parca="kozmetik" title="Pelerin ve elitra kanadı">Pelerin</button>
-        </div>
-        <div class="sk-edit-onizleme">
-          <canvas id="ske-onizleme"></canvas>
-        </div>
-        <div class="sk-arac-cubugu">
-          <button class="sk-arac aktif" data-arac="kalem" title="Kalem">${icon("brush")}</button>
-          <button class="sk-arac" data-arac="silgi" title="Silgi">${icon("trash")}</button>
-          <button class="sk-arac" data-arac="kova" title="Kova">${icon("bucket")}</button>
-          <button class="sk-arac" data-arac="damla" title="Damlacık">${icon("picker")}</button>
-          <span class="sk-arac-ayrac"></span>
-          <button class="sk-arac" id="ske-geri-al" title="Geri Al">${icon("undo")}</button>
-          <button class="sk-arac" id="ske-ileri-al" title="İleri Al">${icon("redo")}</button>
-        </div>
-        <div class="sk-renk-satir">
-          <input type="color" id="ske-renk" value="#ff5a28" aria-label="Renk" />
-          <input class="input" id="ske-renk-hex" value="#ff5a28" maxlength="7" spellcheck="false" />
-          <div class="sk-kalinlik">
-            ${[1, 2, 4].map((k) => `<button class="seg-btn ${k === 1 ? "aktif" : ""}" data-kalinlik="${k}">${k}</button>`).join("")}
+        <div class="sk-blok">
+          <div class="sk-blok-baslik">${icon("box")} 3D çizim</div>
+          <div class="sk-edit-3dbar">
+            <button class="seg-btn" id="ske-3d" title="Doğrudan modelin üstüne çiz">${icon("box")} 3D Çiz</button>
+            <button class="seg-btn" id="ske-izgara3d" title="Piksel matrisini (ızgara) karakterin üstünde göster">Matris</button>
+            <span class="sk-zum3d" id="ske-zum3d" role="group" aria-label="Karakter yakınlaştırma">
+              <button class="seg-btn" data-zum3d="-1" title="Uzaklaş">−</button>
+              <button class="seg-btn" data-zum3d="1" title="Yakınlaş">+</button>
+              <button class="seg-btn" data-zum3d="0" title="Varsayılan mesafe">Sığdır</button>
+            </span>
+          </div>
+          <p class="sk-etiket sk-3d-ipucu" id="ske-3d-ipucu">Overlay açık — boyama overlay katmanına gider.</p>
+          <div class="sk-3d-parca" id="ske-parca" hidden>
+            <button class="seg-btn aktif" data-parca="kafa">Kafa</button>
+            <button class="seg-btn aktif" data-parca="govde">Gövde</button>
+            <button class="seg-btn aktif" data-parca="kollar">Kollar</button>
+            <button class="seg-btn aktif" data-parca="bacaklar">Bacaklar</button>
+            <button class="seg-btn aktif" data-parca="kaplama" title="Overlay katmanını göster/gizle — açıkken 3D boyama overlay'e, kapalıyken skin yüzeyine gider">Overlay</button>
+            <button class="seg-btn aktif" data-parca="kozmetik" title="Pelerin ve elitra kanadı">Pelerin</button>
+          </div>
+          <div class="sk-edit-onizleme">
+            <canvas id="ske-onizleme"></canvas>
           </div>
         </div>
-        <div class="sk-palet" id="ske-palet">
-          ${PALET.map((c) => `<button class="sk-palet-renk" data-renk="${c}" style="--c:${c}" title="${c}"></button>`).join("")}
-        </div>
-        <div class="sk-bolgeler">
-          <div class="sk-bolgeler-ust">
-            <b>Bölgeler</b>
-            <label class="sk-onay"><input type="checkbox" id="ske-sadece" /> sadece bu parça</label>
-          </div>
-          <div class="sk-bolge-liste" id="ske-bolgeler">
-            ${["taban", "ust"].map((kat) => `
-              <div class="sk-bolge-grup">
-                <span>${kat === "taban" ? "Taban katman" : "Üst katman"}</span>
-                ${BOLGELER.filter((b) => b.katman === kat)
-                  .map((b) => `<button class="sk-bolge" data-bolge="${b.id}">${b.ad}</button>`)
-                  .join("")}
-              </div>`).join("")}
+
+        <div class="sk-blok">
+          <div class="sk-blok-baslik">${icon("brush")} Araçlar</div>
+          <div class="sk-arac-cubugu">
+            <button class="sk-arac aktif" data-arac="kalem" title="Kalem">${icon("brush")}</button>
+            <button class="sk-arac" data-arac="silgi" title="Silgi">${icon("eraser")}</button>
+            <button class="sk-arac" data-arac="kova" title="Kova — bitişik aynı renk alanını doldur">${icon("bucket")}</button>
+            <button class="sk-arac" data-arac="damla" title="Damlalık — tuvalden renk al">${icon("picker")}</button>
+            <span class="sk-arac-ayrac"></span>
+            <button class="sk-arac" id="ske-geri-al" title="Geri Al">${icon("undo")}</button>
+            <button class="sk-arac" id="ske-ileri-al" title="İleri Al">${icon("redo")}</button>
+            <div class="sk-kalinlik">
+              ${[1, 2, 4].map((k) => `<button class="seg-btn ${k === 1 ? "aktif" : ""}" data-kalinlik="${k}" title="${k} piksel kalınlık">${k}</button>`).join("")}
+            </div>
           </div>
         </div>
-        <div class="sk-edit-kayit">
-          <label class="sk-edit-etiket">Skin adı</label>
-          <input class="input" id="ske-ad" value="${kacis(ad)}" maxlength="48" />
-          <div class="sk-edit-kayit-btn">
-            <button class="btn" id="ske-kitaplik">${icon("folder")} Sadece Kitaplığa Kaydet</button>
-            <button class="btn primary" id="ske-giy">${icon("check")} Kaydet ve Giy</button>
+
+        <div class="sk-blok">
+          <div class="sk-blok-baslik">${icon("sparkle")} Renk</div>
+          <div class="sk-renk-satir">
+            <input type="color" id="ske-renk" value="#ff5a28" aria-label="Renk" />
+            <input class="input" id="ske-renk-hex" value="#ff5a28" maxlength="7" spellcheck="false" aria-label="Renk kodu (hex)" />
           </div>
-          <div class="sk-edit-uyari" id="ske-uyari"></div>
+          <span class="sk-etiket">Son kullandıkların</span>
+          <div class="kz-son-renkler" id="ske-son"></div>
+          <span class="sk-etiket">Hazır palet</span>
+          <div class="sk-palet" id="ske-palet">
+            ${PALET.map((c) => `<button class="sk-palet-renk" data-renk="${c}" style="--c:${c}" title="${c}"></button>`).join("")}
+          </div>
+        </div>
+
+        <div class="sk-blok">
+          <div class="sk-bolgeler">
+            <div class="sk-bolgeler-ust">
+              <b>Bölgeler</b>
+              <label class="sk-onay"><input type="checkbox" id="ske-sadece" /> sadece bu parça</label>
+            </div>
+            <div class="sk-bolge-liste" id="ske-bolgeler">
+              ${["taban", "ust"].map((kat) => `
+                <div class="sk-bolge-grup">
+                  <span>${kat === "taban" ? "Taban katman" : "Üst katman"}</span>
+                  ${BOLGELER.filter((b) => b.katman === kat)
+                    .map((b) => `<button class="sk-bolge" data-bolge="${b.id}">${b.ad}</button>`)
+                    .join("")}
+                </div>`).join("")}
+            </div>
+          </div>
+        </div>
+
+        <div class="sk-blok">
+          <div class="sk-blok-baslik">${icon("check")} Kaydet</div>
+          <div class="sk-edit-kayit">
+            <label class="sk-edit-etiket">Skin adı</label>
+            <input class="input" id="ske-ad" value="${kacis(ad)}" maxlength="48" />
+            <div class="sk-edit-kayit-btn">
+              <button class="btn" id="ske-kitaplik">${icon("folder")} Sadece Kitaplığa Kaydet</button>
+              <button class="btn primary" id="ske-giy">${icon("check")} Kaydet ve Giy</button>
+            </div>
+            <div class="sk-edit-uyari" id="ske-uyari"></div>
+          </div>
         </div>
       </aside>
     </div>
@@ -259,7 +276,7 @@ export function openSkinEditor(
     tuval.setPointerCapture(e.pointerId);
     if (arac === "damla") {
       renk = pafta.damla(x, y);
-      renkAyarla(renk);
+      renkAyarla(renk, true);
       return;
     }
     pafta.katmanBasla();
@@ -291,7 +308,41 @@ export function openSkinEditor(
   tuval.addEventListener("pointerup", bitir);
   tuval.addEventListener("pointercancel", bitir);
 
-  function renkAyarla(c: RGBA): void {
+  // Son kullanılan renkler — kozmetik atölyesiyle ortak liste (kalıcı).
+  const SON_ANAHTAR = "yikim:renk:son";
+  function sonListe(): string[] {
+    try {
+      const v = JSON.parse(localStorage.getItem(SON_ANAHTAR) || "[]") as unknown;
+      return Array.isArray(v)
+        ? v.filter((x): x is string => typeof x === "string" && /^#[0-9a-fA-F]{6}$/.test(x)).slice(0, 12)
+        : [];
+    } catch {
+      return [];
+    }
+  }
+  function sonCiz(aktif?: string): void {
+    const kutu = sarmal.querySelector<HTMLElement>("#ske-son");
+    if (!kutu) return;
+    kutu.innerHTML =
+      sonListe()
+        .map(
+          (r) =>
+            `<button class="kz-renk${r.toLowerCase() === aktif?.toLowerCase() ? " aktif" : ""}" data-renk="${r}" style="background:${r}" title="${r}" aria-label="${r}"></button>`,
+        )
+        .join("") || `<span class="sk-ipucu-kucuk">Henüz renk yok — paletten seç.</span>`;
+  }
+  function sonEkle(hex: string): void {
+    const h = hex.toLowerCase();
+    const l = [h, ...sonListe().filter((x) => x.toLowerCase() !== h)].slice(0, 12);
+    try {
+      localStorage.setItem(SON_ANAHTAR, JSON.stringify(l));
+    } catch {
+      /* depolama kapalı */
+    }
+    sonCiz(h);
+  }
+
+  function renkAyarla(c: RGBA, kaydet = false): void {
     renk = c;
     const hex = rgbaHex(c);
     (sarmal.querySelector("#ske-renk") as HTMLInputElement).value = hex;
@@ -299,19 +350,29 @@ export function openSkinEditor(
     sarmal.querySelectorAll<HTMLElement>(".sk-palet-renk").forEach((b) => {
       b.classList.toggle("aktif", b.dataset.renk?.toLowerCase() === hex.toLowerCase());
     });
+    sonCiz(hex);
+    if (kaydet) sonEkle(hex);
   }
 
   (sarmal.querySelector("#ske-renk") as HTMLInputElement).addEventListener("input", (e) => {
     renkAyarla(hexRgba((e.target as HTMLInputElement).value));
   });
+  (sarmal.querySelector("#ske-renk") as HTMLInputElement).addEventListener("change", () => {
+    sonEkle(rgbaHex(renk));
+  });
   (sarmal.querySelector("#ske-renk-hex") as HTMLInputElement).addEventListener("change", (e) => {
     const v = (e.target as HTMLInputElement).value.trim();
-    if (/^#[0-9a-fA-F]{6}$/.test(v)) renkAyarla(hexRgba(v));
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) renkAyarla(hexRgba(v), true);
   });
   sarmal.querySelector("#ske-palet")?.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>(".sk-palet-renk");
     if (!b?.dataset.renk) return;
-    renkAyarla(hexRgba(b.dataset.renk));
+    renkAyarla(hexRgba(b.dataset.renk), true);
+  });
+  sarmal.querySelector("#ske-son")?.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>(".kz-renk");
+    if (!b?.dataset.renk) return;
+    renkAyarla(hexRgba(b.dataset.renk), true);
   });
 
   sarmal.querySelectorAll<HTMLElement>(".sk-arac[data-arac]").forEach((b) => {
@@ -356,13 +417,13 @@ export function openSkinEditor(
   // katmanında taban kutu, "Overlay" katmanında şapka/ceket/kolluk/pantolon
   // hedeflenir. Böylece overlay'in altındaki skin de boyanabilir.
   let cizim3d = false;
-  // v0.5.7: varsayılan OTOMATİK. Tıklanan yüzey hangi katmansa oraya boyanır;
-  // "Overlay açıkken hâlâ skine çiziyor" şikâyeti bununla biter.
-  let katman3d: "taban" | "ust" | "oto" = "oto";
+  // Boyama katmanı ayrı bir seçim değil: OVERLAY görünürse overlay katmanına,
+  // kapalıysa skin (taban) yüzeyine boyanır.
+  let katman3d: "taban" | "ust" = "ust";
+
   let modeldeCiziyor = false;
   /** Modelin üstündeki piksel ızgarası ("matris") — 3D çizimde varsayılan açık. */
   let izgara3d = false;
-  const katmanKutu = sarmal.querySelector<HTMLElement>("#ske-katman");
   const ucBoyutBtn = sarmal.querySelector<HTMLElement>("#ske-3d");
   const izgaraBtn = sarmal.querySelector<HTMLElement>("#ske-izgara3d");
   const parcaKutu = sarmal.querySelector<HTMLElement>("#ske-parca");
@@ -381,6 +442,13 @@ export function openSkinEditor(
     sahne.parcaGoster("bacaklar", parcaDurum.bacaklar);
     sahne.kaplamaGoster(parcaDurum.kaplama);
     sahne.kozmetikGoster(parcaDurum.kozmetik);
+    katman3d = parcaDurum.kaplama ? "ust" : "taban";
+    const ipucu = sarmal.querySelector<HTMLElement>("#ske-3d-ipucu");
+    if (ipucu) {
+      ipucu.textContent = parcaDurum.kaplama
+        ? "Overlay açık — boyama overlay katmanına gider."
+        : "Overlay kapalı — boyama skin (taban) yüzeyine gider.";
+    }
   };
 
   /** 3D modunda model BÜYÜK tuvalde (2D ızgaranın yerinde) gösterilir. */
@@ -396,7 +464,6 @@ export function openSkinEditor(
     buyukTuval.hidden = !acik;
     if (onizlemeKutu) onizlemeKutu.hidden = acik;
     if (parcaKutu) parcaKutu.hidden = !acik;
-    if (katmanKutu) katmanKutu.hidden = !acik;
     if (zoomKutu) zoomKutu.style.display = acik ? "none" : "";
     ucBoyutBtn?.classList.toggle("aktif", acik);
     if (ucBoyutBtn) ucBoyutBtn.innerHTML = `${icon("box")} ${acik ? "2D'ye dön" : "3D Çiz"}`;
@@ -445,22 +512,6 @@ export function openSkinEditor(
       parcaDurum[ad] = !parcaDurum[ad];
       b.classList.toggle("aktif", parcaDurum[ad]);
       parcalariUygula();
-    });
-  });
-
-  sarmal.querySelectorAll<HTMLElement>("[data-kat]").forEach((b) => {
-    b.addEventListener("click", () => {
-      const deger = b.dataset.kat;
-      katman3d = deger === "ust" ? "ust" : deger === "taban" ? "taban" : "oto";
-      sarmal.querySelectorAll("[data-kat]").forEach((x) => x.classList.remove("aktif"));
-      b.classList.add("aktif");
-      uyari(
-        katman3d === "ust"
-          ? "Overlay seçili — şapka, ceket, kolluk ve pantolon üstüne çiziyorsun."
-          : katman3d === "taban"
-            ? "Skin (taban) seçili — overlay'in altındaki katmana çiziyorsun."
-            : "Otomatik: hangi yüzeye tıklarsan oraya boyanır (ceket/şapka → overlay).",
-      );
     });
   });
 
