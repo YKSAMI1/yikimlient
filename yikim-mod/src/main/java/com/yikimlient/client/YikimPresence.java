@@ -298,13 +298,14 @@ public final class YikimPresence {
                 isim = mc.field_1724.method_5797() != null
                     ? mc.field_1724.method_5797().getString() : "oyuncu";
             }
-            // HD dokular tek istek sığmadığı için ÖNCE parça parça yüklenir
-            // (birkaç yüz ms); tamamlanan doku sunucuda hemen yayına girer.
-            YikimKozmetik.parcalariGonder(ucak(), uuid);
-            // kozmetik (pelerin/elitra) yalnız DEĞİŞTİYSE gövdeye eklenir
+            // HD dokular tek istek sığmadığı için AYRI iş parçacığında parça parça
+            // yüklenir (kalp atışını bekletmez); tamamlanınca sunucuda yayına girer.
+            // v1.26: gövde ÖNCE kurulur (yeni doku kuyruğa burada girer), sonra
+            // yükleme başlatılır — eskiden ters sıra yüzünden ilk tur boşa gidiyordu.
             String govde = "{\"v\":1,\"s\":\"" + kac(anahtar) + "\",\"u\":\"" + uuid
                 + "\",\"n\":\"" + kac(isim) + "\""
                 + YikimKozmetik.bildiklerimEk() + YikimKozmetik.govdeEk() + "}";
+            YikimKozmetik.yuklemeyiBaslat(ucak(), uuid);
             byte[] bayt = govde.getBytes(StandardCharsets.UTF_8);
             HttpURLConnection bag = (HttpURLConnection) new URL(ucak()).openConnection();
             bag.setConnectTimeout(5000);

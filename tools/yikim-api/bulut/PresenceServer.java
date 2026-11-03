@@ -54,7 +54,7 @@ public class PresenceServer {
     private static final int MAX_PLAYERS = 200;
     private static final int MAX_ROZET_B64 = 4096;
     /** protokol sürümü — GET yanıtında görünür, dağıtım doğrulaması için */
-    private static final int SURUM = 5;
+    private static final int SURUM = 6;
 
     /// KOZMETİKLER (v4): uuid → base64 PNG doku (64×32).
     ///   PELERINLER: "kc" — özel pelerin dokusu
@@ -68,10 +68,18 @@ public class PresenceServer {
   private static final int MAX_KOZMETIK_B64 = 700_000;
   /// Bir aktarımda en fazla kaç parça (kötüye kullanım koruması).
   private static final int PARCA_SAYISI_MAX = 64;
+  /// v6: tek parçanın base64 üst sınırı (gövde sınırı 196.608; istemci 90.000 yollar).
+  private static final int PARCA_BOY_MAX = 160_000;
+  /// v6: yarım kalan parça aktarımları bu süreden sonra bellekten atılır.
+  private static final long PARCA_TTL_MS = 120_000L;
 
     /// v5: sürmekte olan parçalı yüklemeler.
     /// anahtar: "uuid|kc|kid" → parça dizisi (eksik parça null).
     private static final Map<String, String[]> PARCALAR = new ConcurrentHashMap<>();
+    /// v6: parça aktarımının son dokunulma zamanı (bellek sızıntısını önler).
+    private static final Map<String, Long> PARCA_ZAMAN = new ConcurrentHashMap<>();
+    /// v6: parça dizisi işlemleri TEK kilit altında (paralel istek yarışı).
+    private static final Object PARCA_KILIT = new Object();
     /// v5: dokunun sürümü ("<hash>:<uzunluk>") — istemci önbelleği bununla eşleşir.
     private static final Map<String, String> PELERIN_SURUM = new ConcurrentHashMap<>();
     private static final Map<String, String> KANAT_SURUM = new ConcurrentHashMap<>();
@@ -386,6 +394,12 @@ public class PresenceServer {
         } catch (Throwable yoksay) { /* yok say */ }
     }
 
+    /// v6: bir oyuncunun sunucuda kayıtlı doku sürümü ("" = kayıt yok).
+    private static String surumYaz(Map<String, String> surumler, String uuid) {
+        String s = surumler.get(uuid);
+        return s == null ? "" : s;
+    }
+
     /// Aynı sunucudaki oyuncuların İSİMLERİ {"uuid":"isim"}.
     ///
     /// Neden: rozet eşleşmesi yalnız UUID ile yapıldığında, proxy/offline
@@ -455,8 +469,15 @@ public class PresenceServer {
         return sonuc;
     }
 
-    /// v5: parça alımı. Son parça gelince doku birleştirilip yayına girer
+    /// v5/v6: parça alımı. Son parça gelince doku birleştirilip yayına girer
     /// (yarım doku asla görünmez).
+    ///
+    /// v6 KÖK NEDEN DÜZELTMESİ: eskiden `ki == 0` her geldiğinde diziyi
+    /// SIFIRLIYORDU. İstemci parçaları PARALEL gönderdiği için 0. parça
+    /// diğerlerinden SONRA işlendiğinde onları siliyor, doku hiç
+    /// tamamlanmıyordu → "HD pelerin arkadaşımda hiç görünmüyor".
+    /// Artık aynı kid + aynı parça sayısı için dizi KORUNUR; yeni dizi yalnız
+    /// gerçekten yeni bir aktarımda (kayıt yok / parça sayısı değişti) kurulur.
     private static void parcaAl(HttpExchange degis, String uuid, String govde, String hedef)
             throws IOException {
         if (!"kc".equals(hedef) && !"ke".equals(hedef)) {
@@ -468,56 +489,77 @@ public class PresenceServer {
         Integer ki = sayi(govde, "ki");
         Integer kn = sayi(govde, "kn");
         if (kid == null || kid.length() > 96 || kv == null || ki == null || kn == null
+            || kv.length() > PARCA_BOY_MAX
             || kn < 1 || kn > PARCA_SAYISI_MAX || ki < 0 || ki >= kn) {
             cevap(degis, 400, "{\"p\":[]}");
             return;
         }
         String anahtar = uuid + "|" + hedef + "|" + kid;
-        String[] parcalar = PARCALAR.get(anahtar);
-        if (parcalar == null || parcalar.length != kn || ki == 0) {
-            parcalar = new String[kn];
-            PARCALAR.put(anahtar, parcalar);
-        }
-        parcalar[ki] = kv;
-        int dolu = 0;
-        for (String p : parcalar) {
-            if (p != null) dolu++;
-        }
-        if (dolu < kn) {
-            cevap(degis, 200, "{\"p\":[],\"parca\":" + dolu + ",\"toplam\":" + kn + "}");
-            return;
-        }
-        StringBuilder tam = new StringBuilder(kv.length() * kn);
-        for (String p : parcalar) {
-            tam.append(p);
-        }
-        PARCALAR.remove(anahtar);
-        String b64 = tam.toString();
-        if (b64.length() > MAX_KOZMETIK_B64) {
-            cevap(degis, 413, "{\"p\":[],\"hata\":\"doku-cok-buyuk\"}");
-            return;
-        }
-        if (b64.isEmpty()) {
-            if ("kc".equals(hedef)) {
-                PELERINLER.remove(uuid);
-                PELERIN_SURUM.remove(uuid);
+        synchronized (PARCA_KILIT) {
+            parcaZamanlariniTemizle();
+            String[] parcalar = PARCALAR.get(anahtar);
+            if (parcalar == null || parcalar.length != kn) {
+                parcalar = new String[kn];
+                PARCALAR.put(anahtar, parcalar);
+            }
+            PARCA_ZAMAN.put(anahtar, System.currentTimeMillis());
+            parcalar[ki] = kv;
+            int dolu = 0;
+            long toplamBoy = 0L;
+            for (String p : parcalar) {
+                if (p != null) {
+                    dolu++;
+                    toplamBoy += p.length();
+                }
+            }
+            if (dolu < kn) {
+                cevap(degis, 200, "{\"p\":[],\"parca\":" + dolu + ",\"toplam\":" + kn + "}");
+                return;
+            }
+            PARCALAR.remove(anahtar);
+            PARCA_ZAMAN.remove(anahtar);
+            if (toplamBoy > MAX_KOZMETIK_B64) {
+                cevap(degis, 413, "{\"p\":[],\"hata\":\"doku-cok-buyuk\"}");
+                return;
+            }
+            StringBuilder tam = new StringBuilder((int) toplamBoy);
+            for (String p : parcalar) {
+                tam.append(p);
+            }
+            String b64 = tam.toString();
+            if (b64.isEmpty()) {
+                if ("kc".equals(hedef)) {
+                    PELERINLER.remove(uuid);
+                    PELERIN_SURUM.remove(uuid);
+                }
+                else {
+                    KANATLAR.remove(uuid);
+                    KANAT_SURUM.remove(uuid);
+                }
+            }
+            else if ("kc".equals(hedef)) {
+                PELERINLER.put(uuid, b64);
+                PELERIN_SURUM.put(uuid, dokuSurumu(b64));
             }
             else {
-                KANATLAR.remove(uuid);
-                KANAT_SURUM.remove(uuid);
+                KANATLAR.put(uuid, b64);
+                KANAT_SURUM.put(uuid, dokuSurumu(b64));
+            }
+            kozmetikleriKaydet();
+            String surum = b64.isEmpty() ? "" : dokuSurumu(b64);
+            cevap(degis, 200, "{\"p\":[],\"tamam\":1,\"surum\":\"" + surum + "\"}");
+        }
+    }
+
+    /// v6: yarım kalan (istemci vazgeçmiş) parça dizilerini bellekten at.
+    private static void parcaZamanlariniTemizle() {
+        long simdi = System.currentTimeMillis();
+        for (Map.Entry<String, Long> e : PARCA_ZAMAN.entrySet()) {
+            if (simdi - e.getValue() > PARCA_TTL_MS) {
+                PARCALAR.remove(e.getKey());
+                PARCA_ZAMAN.remove(e.getKey());
             }
         }
-        else if ("kc".equals(hedef)) {
-            PELERINLER.put(uuid, b64);
-            PELERIN_SURUM.put(uuid, dokuSurumu(b64));
-        }
-        else {
-            KANATLAR.put(uuid, b64);
-            KANAT_SURUM.put(uuid, dokuSurumu(b64));
-        }
-        kozmetikleriKaydet();
-        String surum = b64.isEmpty() ? "" : dokuSurumu(b64);
-        cevap(degis, 200, "{\"p\":[],\"tamam\":1,\"surum\":\"" + surum + "\"}");
     }
 
     /// "ad":12 biçimindeki tam sayı alanı.
@@ -774,6 +816,11 @@ public class PresenceServer {
                 .append(",\"kc\":").append(kozmetikYaz(PELERINLER, PELERIN_SURUM, bilinen, uuid, liste))
                 .append(",\"ke\":").append(kozmetikYaz(KANATLAR, KANAT_SURUM, bilinen, uuid, liste))
                 .append(",\"pn\":").append(isimlerYaz(uuid, liste))
+                // v6: İSTEK SAHİBİNİN sunucuda kayıtlı doku sürümleri. İstemci
+                // bunu kendi dosyasıyla karşılaştırır; sunucu yeniden başlayıp
+                // dokuyu unuttuysa kendiliğinden yeniden yükler.
+                .append(",\"sv\":{\"kc\":\"").append(surumYaz(PELERIN_SURUM, uuid))
+                .append("\",\"ke\":\"").append(surumYaz(KANAT_SURUM, uuid)).append("\"}")
                 .append(",\"izinler\":").append(izinlerYaz()).append('}');
             cevap(degis, 200, json.toString());
         }
