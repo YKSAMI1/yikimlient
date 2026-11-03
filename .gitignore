@@ -21,3 +21,7 @@ yayin/
 
 # ajan sohbet disa aktarimlari (yerel arsiv, repoya girmez)
 .cloud-attachments/
+
+# gelistirme ekran goruntuleri ve yerel API verisi (repoya girmez)
+ss-*.png
+tools/yikim-api/bulut/kozmetikler.json

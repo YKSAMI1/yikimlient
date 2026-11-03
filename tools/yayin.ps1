@@ -20,27 +20,44 @@ powershell -ExecutionPolicy Bypass -File (Join-Path $kok "yikim-mod\araclar\derl
 $jarKaynak = "$kok\yikim-mod\derleme\yikimlient-$MV+1.21.11.jar"
 if (-not (Test-Path $jarKaynak)) { Write-Host "MOD DERLEME BASARISIZ"; exit 1 }
 Copy-Item $jarKaynak "$kok\src-tauri\resources\mods\yikimlient-$MV+1.21.11.jar" -Force
-# eski mod jarlarini resources'tan temizle (1.12.* olanlar haric degil - HEPSI)
-Get-ChildItem "$kok\src-tauri\resources\mods" -Filter "yikimlient-*.jar" | Where-Object { $_.Name -ne "yikimlient-$MV+1.21.11.jar" -and $_.Name -match "1\.12\." } | Remove-Item -Force
+# eski mod jarlarini resources'tan temizle (yeni jar haric HEPSI)
+# v0.7.2 vakasi: burada yalnizca 1.12.* temizleniyordu, 1.22.1 jar kalip manifest
+# ona isaret ediyordu - installer icine ESKI mod giriyordu.
+Get-ChildItem "$kok\src-tauri\resources\mods" -Filter "yikimlient-*.jar" | Where-Object { $_.Name -ne "yikimlient-$MV+1.21.11.jar" } | Remove-Item -Force
 $manifest = Get-Content "$kok\src-tauri\resources\mods\manifest.json" -Raw
 $manifest = $manifest -replace '"modVersion":\s*"[^"]+"', ('"modVersion": "' + $MV + '"')
-$manifest = $manifest -replace 'yikimlient-1\.12\.\d+\+1\.21\.11\.jar', "yikimlient-$MV+1.21.11.jar"
+$manifest = $manifest -replace '"file":\s*"yikimlient-[^"]+\.jar"', ('"file": "yikimlient-' + $MV + '+1.21.11.jar"')
 # manifest'te dosya yerine modVersion'a bakan kismi garantiye al
 Set-Content "$kok\src-tauri\resources\mods\manifest.json" $manifest -NoNewline
 
 Write-Host "[2/7] commit + push (tag bunun sonrasinda)"
 git add -A
 git commit -q -m "v$V yayin: mod $MV (keskin rozet UV) installer icine yerlesir; hatta mod derleme kalici adim"
-git push -q origin main 2>&1 | Select-Object -Last 1
+# ONEMLI: depoda 'main' ADLI BIR TAG var. Ciplak 'git push origin main' bu yuzden
+# tag'i push edip branch'i ATLIYORDU; gh release create tag'i uzaktaki eski commit'e
+# koyuyordu (v0.7.2 vakasi: Linux assetleri 0.6.0 adiyla cikti). Ref'i acikca yaz.
+git push origin refs/heads/main:refs/heads/main 2>&1 | Select-Object -Last 1
+if ($LASTEXITCODE -ne 0) { Write-Host "PUSH BASARISIZ"; exit 1 }
+$yerelHead = (git rev-parse HEAD).Trim()
+$uzakHead = ((git ls-remote origin refs/heads/main) -split "\s+")[0]
+if ($uzakHead -ne $yerelHead) { Write-Host "PUSH DOGRULANAMADI (uzak $uzakHead / yerel $yerelHead)"; exit 1 }
+Write-Host "      uzak main = $yerelHead"
 
 Write-Host "[3/7] WINDOWS derleme + imza (resources: mod $MV)"
 $env:TAURI_SIGNING_PRIVATE_KEY = (Join-Path $kok "tools\updater-private.key")
+# Ayni surumun eski installer'i kalirsa basarisiz derleme sessizce eski exe ile
+# devam ederdi - once sil, sonra varligini kontrol et.
+Remove-Item "$nsis\YIKIMLient_${V}_x64-setup.exe", "$nsis\YIKIMLient_${V}_x64-setup.exe.sig" -Force -ErrorAction SilentlyContinue
 npm run dist 2>&1 | ForEach-Object { $_.ToString() } | Select-Object -Last 2
 if (-not (Test-Path "$nsis\YIKIMLient_${V}_x64-setup.exe")) { Write-Host "WINDOWS DERLEME HATASI"; exit 1 }
+if (-not (Test-Path "$nsis\YIKIMLient_${V}_x64-setup.exe.sig")) { Write-Host "WINDOWS IMZA YOK"; exit 1 }
 
 Write-Host "[4/7] release + tag (guncel HEAD)"
 if ($Notlar -eq "") { $Notlar = "Mod ${MV}: sicak guncelleme kanali gomulu - bundan sonra mod guncellemeleri exe derlemesi olmadan dakikalar icinde dagitilir." }
-gh release create "v$V" --title "YIKIMLient v$V" --notes $Notlar 2>&1 | ForEach-Object { $_.ToString() } | Select-Object -First 2
+gh release create "v$V" --title "YIKIMLient v$V" --target $yerelHead --notes $Notlar 2>&1 | ForEach-Object { $_.ToString() } | Select-Object -First 2
+$tagSha = (gh api "repos/YKSAMI1/yikimlient/git/ref/tags/v$V" --jq '.object.sha').Trim()
+if ($tagSha -ne $yerelHead) { Write-Host "TAG YANLIS COMMIT'TE (tag $tagSha / beklenen $yerelHead)"; exit 1 }
+Write-Host "      tag v$V = $tagSha"
 gh release upload "v$V" "$nsis\YIKIMLient_${V}_x64-setup.exe" "$nsis\YIKIMLient_${V}_x64-setup.exe.sig" --clobber 2>&1 | Select-Object -First 1
 
 Write-Host "[5/7] tag CI bekle (linux)"
