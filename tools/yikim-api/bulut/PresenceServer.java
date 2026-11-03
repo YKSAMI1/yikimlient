@@ -48,11 +48,13 @@ public class PresenceServer {
 
     private static final long TTL_MS = 90_000L;
     // v4: gövdeye kozmetik (pelerin/elitra, iki adet ~3-6 KB base64) sığmalı
-    private static final int MAX_BODY = 32768;
+    // v5: HD kozmetik dokuları parça parça yüklenir (her istek ~48 KB metin);
+    // tek istekte gelen doku da kabul edilir (192 KB gövde sınırı içinde).
+    private static final int MAX_BODY = 196608;
     private static final int MAX_PLAYERS = 200;
     private static final int MAX_ROZET_B64 = 4096;
     /** protokol sürümü — GET yanıtında görünür, dağıtım doğrulaması için */
-    private static final int SURUM = 4;
+    private static final int SURUM = 5;
 
     /// KOZMETİKLER (v4): uuid → base64 PNG doku (64×32).
     ///   PELERINLER: "kc" — özel pelerin dokusu
@@ -62,7 +64,22 @@ public class PresenceServer {
     private static final Map<String, String> KANATLAR = new ConcurrentHashMap<>();
     /// Artık kozmetik TAM 64×32 atlas olarak gönderilir (2048 piksel); detaylı
   /// bir doku PNG'si küçük olsa da güvenli sınır yüksek tutulur.
-  private static final int MAX_KOZMETIK_B64 = 16384;
+  // v5: HD doku (1024x512'e kadar PNG) base64 olarak ~700 KB olabilir.
+  private static final int MAX_KOZMETIK_B64 = 700_000;
+  /// Bir aktarımda en fazla kaç parça (kötüye kullanım koruması).
+  private static final int PARCA_SAYISI_MAX = 64;
+
+    /// v5: sürmekte olan parçalı yüklemeler.
+    /// anahtar: "uuid|kc|kid" → parça dizisi (eksik parça null).
+    private static final Map<String, String[]> PARCALAR = new ConcurrentHashMap<>();
+    /// v5: dokunun sürümü ("<hash>:<uzunluk>") — istemci önbelleği bununla eşleşir.
+    private static final Map<String, String> PELERIN_SURUM = new ConcurrentHashMap<>();
+    private static final Map<String, String> KANAT_SURUM = new ConcurrentHashMap<>();
+
+    /// Doku sürümü: istemci de aynı formülü hesaplar (Java String.hashCode).
+    private static String dokuSurumu(String b64) {
+        return Integer.toHexString(b64.hashCode()) + ":" + b64.length();
+    }
 
     /// sunucu adresi → (uuid → oyuncu bilgisi)
     private static final Map<String, Map<String, Oyuncu>> KAYIT = new ConcurrentHashMap<>();
@@ -109,7 +126,8 @@ public class PresenceServer {
         kozmetikleriYukle();
         HttpServer sunucu = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
         sunucu.createContext("/presence", PresenceServer::isle);
-        sunucu.setExecutor(Executors.newFixedThreadPool(2));
+        // v5: parça yükleme paralel gelir — 2 iş parçacığı tıkanıyordu.
+        sunucu.setExecutor(Executors.newFixedThreadPool(8));
         sunucu.start();
         System.out.println("[YIKIM presence] v" + SURUM + " calisiyor: http://0.0.0.0:" + port + "/presence");
         System.out.println("[YIKIM presence] launcher config'ine su adresi yaz: http://VDS_IP:" + port + "/presence");
@@ -297,6 +315,14 @@ public class PresenceServer {
 
     /// Kozmetikleri diske yaz: {"<uuid>":{"kc":"<b64>","ke":"<b64>"}, ...}
     private static void kozmetikleriKaydet() {
+        // HD dokularla dosya çok şişebilir; 8 MB üstünde diske yazma atlanır
+        // (ücretsiz katmanda zaten kalıcı disk yok, bellek yeterli).
+        int boyut = 0;
+        for (String v : PELERINLER.values()) boyut += v.length();
+        for (String v : KANATLAR.values()) boyut += v.length();
+        if (boyut > 8_000_000) {
+            return;
+        }
         StringBuilder json = new StringBuilder("{");
         boolean ilk = true;
         Set<String> hepsi = new HashSet<>(PELERINLER.keySet());
@@ -342,8 +368,14 @@ public class PresenceServer {
                 }
                 String p = alan(json, son, "kc");
                 String k = alan(json, son, "ke");
-                if (p != null && p.length() <= MAX_KOZMETIK_B64) PELERINLER.put(uuid, p);
-                if (k != null && k.length() <= MAX_KOZMETIK_B64) KANATLAR.put(uuid, k);
+                if (p != null && p.length() <= MAX_KOZMETIK_B64) {
+                    PELERINLER.put(uuid, p);
+                    PELERIN_SURUM.put(uuid, dokuSurumu(p));
+                }
+                if (k != null && k.length() <= MAX_KOZMETIK_B64) {
+                    KANATLAR.put(uuid, k);
+                    KANAT_SURUM.put(uuid, dokuSurumu(k));
+                }
                 int kapanis = json.indexOf('}', son);
                 i = kapanis < 0 ? son + 1 : kapanis + 1;
             }
@@ -376,19 +408,136 @@ public class PresenceServer {
     }
 
     /// Aynı sunucudaki oyuncuların kozmetikleri {"uuid":"<b64>"}.
-    private static String kozmetikYaz(Map<String, String> kaynak, String istekSahibi,
+    ///
+    /// v5 — BANT GENİŞLİĞİ: istemci "ob" alanında elindeki doku sürümlerini
+    /// bildirir (`uuid:sürüm;uuid:sürüm`). Sürüm aynıysa doku GÖNDERİLMEZ
+    /// (istemcideki kopya geçerli). İstemcinin bildiği ama artık olmayan
+    /// dokular boş dizgeyle gönderilir → istemci siler.
+    private static String kozmetikYaz(Map<String, String> kaynak, Map<String, String> surumler,
+                                      Map<String, String> bilinen, String istekSahibi,
                                       Map<String, Oyuncu> ayniSunucu) {
         StringBuilder json = new StringBuilder("{");
         boolean ilk = true;
+        Set<String> yazilan = new HashSet<>();
         for (String akran : ayniSunucu.keySet()) {
             if (akran.equals(istekSahibi)) continue;
             String doku = kaynak.get(akran);
             if (doku == null) continue;
+            String surum = surumler.get(akran);
+            if (surum != null && surum.equals(bilinen.get(akran))) continue; // istemcide var
             if (!ilk) json.append(',');
             ilk = false;
+            yazilan.add(akran);
             json.append('"').append(akran).append("\":\"").append(doku).append('"');
         }
+        for (String bilinenUuid : bilinen.keySet()) {
+            if (bilinenUuid.equals(istekSahibi) || yazilan.contains(bilinenUuid)) continue;
+            if (kaynak.containsKey(bilinenUuid)) continue; // sürüm değişmedi
+            if (!ilk) json.append(',');
+            ilk = false;
+            json.append('"').append(bilinenUuid).append("\":\"\"");
+        }
         return json.append('}').toString();
+    }
+
+    /// İstemcinin elindeki doku sürümleri ("ob":"uuid:sürüm;uuid:sürüm").
+    private static Map<String, String> bildiklerim(String govde) {
+        Map<String, String> sonuc = new java.util.HashMap<>();
+        String ham = hamAlan(govde, "ob");
+        if (ham == null || ham.isEmpty()) return sonuc;
+        for (String parca : ham.split(";")) {
+            int i = parca.indexOf(':');
+            if (i <= 0) continue;
+            String id = parca.substring(0, i).trim();
+            if (!uuidGuvenli(id)) continue;
+            sonuc.put(id, parca.substring(i + 1).trim());
+        }
+        return sonuc;
+    }
+
+    /// v5: parça alımı. Son parça gelince doku birleştirilip yayına girer
+    /// (yarım doku asla görünmez).
+    private static void parcaAl(HttpExchange degis, String uuid, String govde, String hedef)
+            throws IOException {
+        if (!"kc".equals(hedef) && !"ke".equals(hedef)) {
+            cevap(degis, 400, "{\"p\":[]}");
+            return;
+        }
+        String kid = alan(govde, "kid");
+        String kv = hamAlan(govde, "kv");
+        Integer ki = sayi(govde, "ki");
+        Integer kn = sayi(govde, "kn");
+        if (kid == null || kid.length() > 96 || kv == null || ki == null || kn == null
+            || kn < 1 || kn > PARCA_SAYISI_MAX || ki < 0 || ki >= kn) {
+            cevap(degis, 400, "{\"p\":[]}");
+            return;
+        }
+        String anahtar = uuid + "|" + hedef + "|" + kid;
+        String[] parcalar = PARCALAR.get(anahtar);
+        if (parcalar == null || parcalar.length != kn || ki == 0) {
+            parcalar = new String[kn];
+            PARCALAR.put(anahtar, parcalar);
+        }
+        parcalar[ki] = kv;
+        int dolu = 0;
+        for (String p : parcalar) {
+            if (p != null) dolu++;
+        }
+        if (dolu < kn) {
+            cevap(degis, 200, "{\"p\":[],\"parca\":" + dolu + ",\"toplam\":" + kn + "}");
+            return;
+        }
+        StringBuilder tam = new StringBuilder(kv.length() * kn);
+        for (String p : parcalar) {
+            tam.append(p);
+        }
+        PARCALAR.remove(anahtar);
+        String b64 = tam.toString();
+        if (b64.length() > MAX_KOZMETIK_B64) {
+            cevap(degis, 413, "{\"p\":[],\"hata\":\"doku-cok-buyuk\"}");
+            return;
+        }
+        if (b64.isEmpty()) {
+            if ("kc".equals(hedef)) {
+                PELERINLER.remove(uuid);
+                PELERIN_SURUM.remove(uuid);
+            }
+            else {
+                KANATLAR.remove(uuid);
+                KANAT_SURUM.remove(uuid);
+            }
+        }
+        else if ("kc".equals(hedef)) {
+            PELERINLER.put(uuid, b64);
+            PELERIN_SURUM.put(uuid, dokuSurumu(b64));
+        }
+        else {
+            KANATLAR.put(uuid, b64);
+            KANAT_SURUM.put(uuid, dokuSurumu(b64));
+        }
+        kozmetikleriKaydet();
+        String surum = b64.isEmpty() ? "" : dokuSurumu(b64);
+        cevap(degis, 200, "{\"p\":[],\"tamam\":1,\"surum\":\"" + surum + "\"}");
+    }
+
+    /// "ad":12 biçimindeki tam sayı alanı.
+    private static Integer sayi(String govde, String ad) {
+        String igne = "\"" + ad + "\"";
+        int i = govde.indexOf(igne);
+        if (i < 0) return null;
+        int ikiNokta = govde.indexOf(':', i + igne.length());
+        if (ikiNokta < 0) return null;
+        int j = ikiNokta + 1;
+        while (j < govde.length() && (govde.charAt(j) == ' ' || govde.charAt(j) == '"')) j++;
+        int bas = j;
+        while (j < govde.length() && Character.isDigit(govde.charAt(j))) j++;
+        if (j == bas) return null;
+        try {
+            return Integer.valueOf(govde.substring(bas, j));
+        }
+        catch (NumberFormatException yok) {
+            return null;
+        }
     }
 
     /// Aynı sunucudaki oyuncuların çizimleri {"uuid":"<b64>"} — başka sunucular SIZMAZ.
@@ -491,6 +640,13 @@ public class PresenceServer {
             String isim = alan(govde, "n");
             String png = alan(govde, "png");
 
+            // --- v5: HD doku parçası (gövde sınırına takılmasın diye) ---
+            String parcaHedef = alan(govde, "kp");
+            if (parcaHedef != null) {
+                parcaAl(degis, uuid, govde, parcaHedef);
+                return;
+            }
+
             // --- izin listesi değişimi UUID'DEN ÖNCE işlenir (v1.12.6): admin
             // paneli izinleri u/n OLMADAN yollar; eski sürüm bunu 400 ile
             // kovduğu için izin kaydı HİÇ çalışmıyordu.
@@ -522,13 +678,25 @@ public class PresenceServer {
             String kanat = hamAlan(govde, "ke");
             boolean kozmetikDegisti = false;
             if (pelerin != null && pelerin.length() <= MAX_KOZMETIK_B64) {
-                if (pelerin.isEmpty()) PELERINLER.remove(uuid);
-                else PELERINLER.put(uuid, pelerin);
+                if (pelerin.isEmpty()) {
+                    PELERINLER.remove(uuid);
+                    PELERIN_SURUM.remove(uuid);
+                }
+                else {
+                    PELERINLER.put(uuid, pelerin);
+                    PELERIN_SURUM.put(uuid, dokuSurumu(pelerin));
+                }
                 kozmetikDegisti = true;
             }
             if (kanat != null && kanat.length() <= MAX_KOZMETIK_B64) {
-                if (kanat.isEmpty()) KANATLAR.remove(uuid);
-                else KANATLAR.put(uuid, kanat);
+                if (kanat.isEmpty()) {
+                    KANATLAR.remove(uuid);
+                    KANAT_SURUM.remove(uuid);
+                }
+                else {
+                    KANATLAR.put(uuid, kanat);
+                    KANAT_SURUM.put(uuid, dokuSurumu(kanat));
+                }
                 kozmetikDegisti = true;
             }
             if (kozmetikDegisti) {
@@ -600,10 +768,11 @@ public class PresenceServer {
                 ilk = false;
                 json.append('"').append(e.getKey()).append('"');
             }
+            Map<String, String> bilinen = bildiklerim(govde);
             json.append("],\"b\":").append(rozetlerYaz(uuid, liste))
                 .append(",\"x\":").append(pixelYaz(uuid, liste))
-                .append(",\"kc\":").append(kozmetikYaz(PELERINLER, uuid, liste))
-                .append(",\"ke\":").append(kozmetikYaz(KANATLAR, uuid, liste))
+                .append(",\"kc\":").append(kozmetikYaz(PELERINLER, PELERIN_SURUM, bilinen, uuid, liste))
+                .append(",\"ke\":").append(kozmetikYaz(KANATLAR, KANAT_SURUM, bilinen, uuid, liste))
                 .append(",\"pn\":").append(isimlerYaz(uuid, liste))
                 .append(",\"izinler\":").append(izinlerYaz()).append('}');
             cevap(degis, 200, json.toString());
