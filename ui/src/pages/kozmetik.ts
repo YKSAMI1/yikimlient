@@ -1484,7 +1484,7 @@ function hdPafta(
     if (ig) {
       ig.imageSmoothingEnabled = !hd;
       ig.translate(dw / 2, dh / 2);
-      ig.rotate((don * Math.PI) / 2);
+      ig.rotate((don * Math.PI) / 180);
       ig.scale(ayna ? -1 : 1, 1);
       ig.drawImage(kirpilmis, -dw / 2, -dh / 2);
       kaynak = t;
@@ -1733,7 +1733,7 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
   let hd = true;
   // AYNA (yatay ters) ve DÖNDÜRME (90° adımlar) — çerçevenin İÇİNDE uygulanır.
   let ayna = false;
-  let don = 0; // 0=0°, 1=90°, 2=180°, 3=270° (saat yönü)
+  let don = 0; // derece — fareyle serbest döndürme tutamacından gelir
 
   const kat = document.createElement("div");
   kat.className = "kz-kirp";
@@ -1743,7 +1743,7 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
       <div class="kz-kirp-bas">
         <div class="kz-kirp-basla">
           <b>${turAd} fotoğrafı</b>
-          <span>Çerçeveyi sürükle · köşeden boyutlandır · tekerlekle yakınlaştır</span>
+          <span>Çerçeveyi sürükle · köşeden boyutlandır · tekerlekle yakınlaştır · üstteki tutamaçla döndür</span>
         </div>
         <button class="btn ghost sm" id="kz-kirp-kapat" title="Kapat (Esc)">${icon("close")}</button>
       </div>
@@ -1762,9 +1762,9 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
           <span class="kz-etiket">Ayarlama</span>
           <div class="kz-kirp-mod" id="kz-kirp-ayar">
             <button class="seg-btn" id="kz-kirp-ayna" title="Fotoğrafı yatay olarak ters çevir">Ayna</button>
-            <button class="seg-btn" id="kz-kirp-don" title="Fotoğrafı 90° döndür">90° döndür</button>
+            <button class="seg-btn" id="kz-kirp-don" title="Döndürmeyi sıfırla">0°</button>
           </div>
-          <p class="kz-kirp-not" id="kz-kirp-ayar-not">Döndürünce fotoğrafın dışında kalan yerler pelerinde SİYAH, elitrada SAYDAM kalır.</p>
+          <p class="kz-kirp-not" id="kz-kirp-ayar-not">Çerçevenin üstündeki yuvarlak tutamacı fareyle çevirerek istediğin açıya getir. Fotoğrafın dışında kalan yerler pelerinde SİYAH, elitrada SAYDAM kalır.</p>
           <span class="kz-etiket">Kalite</span>
           <label class="kz-kirp-piksel"><input type="checkbox" id="kz-kirp-piksel" checked /> HD görünüm</label>
           <p class="kz-kirp-not">İşaretliyken fotoğraf HD dokusu olarak kaydedilir. Kapatırsan 64×32 piksel dokusuna iner ve üzerine yeniden çizebilirsin.</p>
@@ -1819,6 +1819,15 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
   };
   sec = sinirla(sec);
 
+  /** Döndürme tutamacının tuval pikselindeki yeri (çizim + vuruş testi). */
+  const tutamacKonum = (): { x: number; y: number } => {
+    const kx = sec.x * ekran;
+    const ky = sec.y * ekran;
+    const kw = sec.w * ekran;
+    const ust = ky - 26;
+    return { x: kx + kw / 2, y: ust < 14 ? ky + 24 : ust };
+  };
+
   const ciz = (): void => {
     g.clearRect(0, 0, tuval.width, tuval.height);
     g.imageSmoothingEnabled = true;
@@ -1850,6 +1859,29 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
     g.strokeRect(kx + 1, ky + 1, Math.max(1, kw - 2), Math.max(1, kh - 2));
     g.fillStyle = "#ff8a3d";
     g.fillRect(kx + kw - 8, ky + kh - 8, 8, 8);
+
+    // DÖNDÜRME TUTAMACI: çerçevenin üst ortasında yuvarlak; fareyle çevrilir.
+    // Çerçeve üst kenara yapışıksa tutamaç tuvalin İÇİNE alınır (yoksa
+    // ekran dışında kalıp tutulamıyordu).
+    const th = tutamacKonum();
+    const hx = th.x;
+    const hy = th.y;
+    g.strokeStyle = "#ff8a3d";
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(hx, ky);
+    g.lineTo(hx, hy + 9);
+    g.stroke();
+    g.beginPath();
+    g.arc(hx, hy, 9, 0, Math.PI * 2);
+    g.fillStyle = "#12161e";
+    g.fill();
+    g.stroke();
+    g.fillStyle = "#ff8a3d";
+    g.font = "bold 11px sans-serif";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText("↻", hx, hy + 1);
 
     // "Oyunda görünecek" = KAYDEDİLECEK dokunun oyunda görünen yüzü (WYSIWYG):
     // atlas hdPafta() ile birebir üretilir, elitrada vanilla siluet maskesi
@@ -1912,12 +1944,31 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
     };
   };
 
-  let tut: { tip: "tasi" | "boyut"; px: number; py: number; sec: KirpSecim } | null = null;
+  let tut: {
+    tip: "tasi" | "boyut" | "don";
+    px: number;
+    py: number;
+    sec: KirpSecim;
+    aci?: number;
+    don?: number;
+  } | null = null;
   tuval.addEventListener("pointerdown", (e) => {
     const p = konum(e);
     const esik = 14 / ekran;
-    const kose = Math.hypot(p.x - (sec.x + sec.w), p.y - (sec.y + sec.h)) < esik;
-    tut = { tip: kose ? "boyut" : "tasi", px: p.x, py: p.y, sec: { ...sec } };
+    // Tutamaç ekran pikselinde çiziliyor; vuruş testini tuval pikselinde yap.
+    const th = tutamacKonum();
+    const hx = th.x;
+    const hy = th.y;
+    const bx = (((e.clientX - tuval.getBoundingClientRect().left) / Math.max(1, tuval.getBoundingClientRect().width)) * tuval.width);
+    const by = (((e.clientY - tuval.getBoundingClientRect().top) / Math.max(1, tuval.getBoundingClientRect().height)) * tuval.height);
+    const merkez = { x: sec.x + sec.w / 2, y: sec.y + sec.h / 2 };
+    const aci = (Math.atan2(p.y - merkez.y, p.x - merkez.x) * 180) / Math.PI;
+    if (Math.hypot(bx - hx, by - hy) <= 14) {
+      tut = { tip: "don", px: p.x, py: p.y, sec: { ...sec }, aci, don };
+    } else {
+      const kose = Math.hypot(p.x - (sec.x + sec.w), p.y - (sec.y + sec.h)) < esik;
+      tut = { tip: kose ? "boyut" : "tasi", px: p.x, py: p.y, sec: { ...sec } };
+    }
     tuval.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
@@ -1926,7 +1977,16 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
     const p = konum(e);
     const dx = p.x - tut.px;
     const dy = p.y - tut.py;
-    if (tut.tip === "tasi") {
+    if (tut.tip === "don") {
+      const merkez = { x: sec.x + sec.w / 2, y: sec.y + sec.h / 2 };
+      const aci = (Math.atan2(p.y - merkez.y, p.x - merkez.x) * 180) / Math.PI;
+      // Shift basılıyken 15°'ye yapış.
+      let yeni = (tut.don ?? 0) + (aci - (tut.aci ?? aci));
+      yeni = ((yeni % 360) + 360) % 360;
+      if (e.shiftKey) yeni = Math.round(yeni / 15) * 15;
+      don = yeni;
+      ayarNotu();
+    } else if (tut.tip === "tasi") {
       sec = sinirla({ x: tut.sec.x + dx, y: tut.sec.y + dy, w: tut.sec.w, h: tut.sec.h });
     } else {
       const w = Math.max(tut.sec.w + Math.max(dx, dy * oran), 4);
@@ -1970,12 +2030,17 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
   });
   const ayarNotu = (): void => {
     const n = kat.querySelector<HTMLElement>("#kz-kirp-ayar-not");
+    const b = kat.querySelector<HTMLElement>("#kz-kirp-don");
+    const aci = Math.round(don);
+    if (b) {
+      b.textContent = `${aci}°`;
+      b.classList.toggle("aktif", aci !== 0);
+    }
     if (!n) return;
-    if (don === 0 && !ayna) {
-      n.textContent = "Döndürünce fotoğrafın dışında kalan yerler pelerinde SİYAH, elitrada SAYDAM kalır.";
+    if (aci === 0 && !ayna) {
+      n.textContent = "Çerçevenin üstündeki yuvarlak tutamacı fareyle çevirerek istediğin açıya getir. Fotoğrafın dışında kalan yerler pelerinde SİYAH, elitrada SAYDAM kalır.";
     } else {
-      const d = don * 90;
-      n.textContent = `${d ? d + "° döndürüldü" : ""}${don && ayna ? " · " : ""}${ayna ? "aynalandı" : ""} — boş kalan yerler pelerinde SİYAH, elitrada SAYDAM.`;
+      n.textContent = `${aci ? aci + "° döndürüldü" : ""}${aci && ayna ? " · " : ""}${ayna ? "aynalandı" : ""} — boş kalan yerler pelerinde SİYAH, elitrada SAYDAM.`;
     }
   };
   kat.querySelector<HTMLElement>("#kz-kirp-ayna")?.addEventListener("click", (e) => {
@@ -1985,9 +2050,9 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
     ciz();
   });
   kat.querySelector<HTMLElement>("#kz-kirp-don")?.addEventListener("click", (e) => {
-    don = (don + 1) % 4;
-    (e.currentTarget as HTMLElement).classList.toggle("aktif", don !== 0);
-    (e.currentTarget as HTMLElement).textContent = don === 0 ? "90° döndür" : `${don * 90}° döndür`;
+    don = 0;
+    (e.currentTarget as HTMLElement).classList.remove("aktif");
+    (e.currentTarget as HTMLElement).textContent = "0°";
     ayarNotu();
     ciz();
   });
