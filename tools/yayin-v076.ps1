@@ -68,5 +68,8 @@ gh release upload "v$V" "$nsis\latest.json" --clobber 2>&1 | Select-Object -Firs
 Write-Host "[7/7] dogrulama"
 $u = Invoke-RestMethod "https://github.com/YKSAMI1/yikimlient/releases/latest/download/latest.json"
 Write-Host "surum: $($u.version)"
-foreach ($p in $u.platforms.PSObject.Properties.Name) { Write-Host "$p imza uzunluk: $($u.platforms.$p.signature.Length)" }
+foreach ($p in $u.platforms.PSObject.Properties.Name) { Write-Host "$p imza uzunluk: $($u.platforms.$p.signature.Length)" }
+$anahtarlar = $u.platforms.PSObject.Properties.Name
+if ($anahtarlar -notcontains "windows-x86_64") { Write-Host "HATA: manifestte windows-x86_64 YOK - updater win kullanicisini guncelleyemez"; exit 1 }
+if ($anahtarlar -notcontains "linux-x86_64") { Write-Host "UYARI: linux-x86_64 yok" }
 Write-Host "asset sayisi: $((gh api repos/YKSAMI1/yikimlient/releases/tags/v$V --jq '.assets | length'))"
