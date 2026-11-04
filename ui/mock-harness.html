@@ -182,6 +182,28 @@
       sys: { total_ram_mb: 16384, cores: 8 },
     };
     var calls = [];
+    // KATALOG MOCK: 2 pelerin + 1 elitra (tuvallerden PNG üretilir)
+    var kozKayitlar = null;
+    var kozAktif = { pelerin: null, kanat: null };
+    function kozPng(renk) {
+      var c = document.createElement("canvas");
+      c.width = 64; c.height = 32;
+      var g = c.getContext("2d");
+      g.fillStyle = renk; g.fillRect(0, 0, 64, 32);
+      g.fillStyle = "#ffffff"; g.fillRect(1, 1, 10, 10);
+      return c.toDataURL("image/png");
+    }
+    function kozKur() {
+      if (kozKayitlar) return kozKayitlar;
+      kozKayitlar = [
+        { id: "pelerin-1", ad: "Pelerin 1", tur: "pelerin", hd: false, genislik: 64, yukseklik: 32, tarih: 3, dosya: kozPng("#2b8cff") },
+        { id: "pelerin-2", ad: "Pelerin 2", tur: "pelerin", hd: true, genislik: 512, yukseklik: 256, tarih: 2, dosya: kozPng("#ff4d6d") },
+        { id: "kanat-1", ad: "Elitra 1", tur: "kanat", hd: false, genislik: 64, yukseklik: 32, tarih: 1, dosya: kozPng("#3ddc97") }
+      ];
+      kozAktif.pelerin = "pelerin-1";
+      return kozKayitlar;
+    }
+
     // Fotoğraf modu sayfa yenilenince de sürsün (gerçekte diskteki PNG gibi).
     var foto = {
       pelerin: sessionStorage.getItem("mock-foto-pelerin"),
@@ -256,6 +278,22 @@
           })(),
         });
       }
+      // YIKIM kozmetik kataloğu (Skin Merkezi: "Pelerinlerim"/"Elitralarım")
+      if (cmd === "cmd_kozm_katalog") {
+        return Promise.resolve({ kayitlar: kozKur(), aktif: { pelerin: kozAktif.pelerin, kanat: kozAktif.kanat } });
+      }
+      if (cmd === "cmd_kozm_sec") {
+        var kozTur = String(args.tur);
+        kozAktif[kozTur] = args.id ? String(args.id) : null;
+        return Promise.resolve({ aktif: { pelerin: kozAktif.pelerin, kanat: kozAktif.kanat }, yuklendi: true, hata: "" });
+      }
+      if (cmd === "cmd_kozm_sil") {
+        kozKayitlar = kozKur().filter(function (k) { return k.id !== String(args.id); });
+        if (kozAktif.pelerin === args.id) kozAktif.pelerin = null;
+        if (kozAktif.kanat === args.id) kozAktif.kanat = null;
+        return Promise.resolve({ kayitlar: kozKayitlar, aktif: { pelerin: kozAktif.pelerin, kanat: kozAktif.kanat } });
+      }
+
       if (cmd === "cmd_skin_hub") return Promise.resolve(hub());
       if (cmd === "cmd_skin_giy") {
         var url = veriUrl(args.veri);

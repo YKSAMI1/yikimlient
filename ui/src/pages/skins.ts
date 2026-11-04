@@ -33,6 +33,23 @@ let sonPelerin: string | null = null;
 let ozelPelerinAktif = false;
 let kok: HTMLElement | null = null;
 
+/** YIKIM kozmetik kataloğu (çoklu pelerin/elitra). */
+interface KozKayit {
+  id: string;
+  ad: string;
+  tur: string;
+  hd: boolean;
+  genislik: number;
+  yukseklik: number;
+  tarih: number;
+  dosya: string;
+}
+interface KozKatalog {
+  kayitlar: KozKayit[];
+  aktif: { pelerin: string | null; kanat: string | null };
+}
+let koz: KozKatalog | null = null;
+
 const kacis = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 
@@ -42,6 +59,7 @@ export function renderSkins(root: HTMLElement): void {
   secili = null;
   giyiliId = null;
   sonPelerin = null;
+  koz = null;
   const acc = currentAccount();
   if (!acc || acc.kind !== "microsoft") {
     kapiCiz(root);
@@ -122,6 +140,14 @@ function iskelet(ad: string): string {
             <div class="skin-bolum-ust"><h3>Pelerinlerin</h3></div>
             <div id="sk-pelerin" class="skin-pelerin-serit"></div>
           </div>
+          <div class="skin-bolum">
+            <div class="skin-bolum-ust"><h3>YIKIM Pelerinlerim</h3><span id="sk-koz-adet" class="skin-adet"></span></div>
+            <div id="sk-koz-pelerin" class="skin-pelerin-serit"></div>
+          </div>
+          <div class="skin-bolum">
+            <div class="skin-bolum-ust"><h3>YIKIM Elitralarım</h3><span id="sk-koz-kanat-adet" class="skin-adet"></span></div>
+            <div id="sk-koz-kanat" class="skin-pelerin-serit"></div>
+          </div>
         </aside>
       </div>
     </div>`;
@@ -192,6 +218,23 @@ function baglantilar(root: HTMLElement, hesapId: string): void {
     void pelerinTak(root, hesapId, id);
   });
 
+  // YIKIM kataloğu: karta tıkla → giy + karakter arkaya döner.
+  const kozTik = (secici: string, tur: "pelerin" | "kanat") => {
+    root.querySelector(secici)?.addEventListener("click", (e) => {
+      const hedef = e.target as HTMLElement;
+      const kart = hedef.closest<HTMLElement>(".skin-pelerin");
+      if (!kart) return;
+      if (hedef.closest(".koz-sil")) {
+        e.stopPropagation();
+        void kozSil(root, tur, kart.dataset.id || "", kart.dataset.ad || "Kayıt");
+        return;
+      }
+      void kozSec(root, tur, kart.dataset.id || null);
+    });
+  };
+  kozTik("#sk-koz-pelerin", "pelerin");
+  kozTik("#sk-koz-kanat", "kanat");
+
   root.querySelector("#sk-serit")?.addEventListener("click", (e) => {
     if (!(e.target as HTMLElement).closest("#sk-yenile")) return;
     void hubYukle(root, hesapId, false);
@@ -207,7 +250,7 @@ async function hubYukle(root: HTMLElement, hesapId: string, sahneKur: boolean): 
     if (sahneKur) sahneBaslat(root);
     else sahneSecimUygula(root);
     sahnePelerin();
-    void sahneOzelKozmetik();
+    void kozYukle(root).then(() => sahneKozmetik(false));
     if (hub.cevrimdisi) toast("Çevrimdışısın — son bilinen skin gösteriliyor");
     else if (hub.hata) toast(hub.hata, "err");
   } catch (e) {
@@ -292,6 +335,7 @@ function ciz(root: HTMLElement): void {
   }
 
   pelerinSeritCiz(root);
+  kozCiz(root);
 
   // sahne alt bilgisi / butonlar
   const aktifAd = root.querySelector("#sk-aktif-ad") as HTMLElement;
@@ -443,28 +487,142 @@ function sahnePelerin(): void {
     });
 }
 
-/** YIKIM kozmetiği: 3D vitrinde YALNIZ özel pelerin gösterilir (elitra takılmaz).
- *  Özel pelerin varsa ve etkinse Mojang pelerini onu ezer — kullanıcı kendi
- *  tasarımını görsün; pasife alınmışsa vitrin normal pelerinle kalır. */
-let sonOzelPelerin: string | null = null;
-async function sahneOzelKozmetik(): Promise<void> {
+/** KATALOG: kayıtlı pelerin/elitralar + hangisi giyili. */
+async function kozYukle(root: HTMLElement): Promise<void> {
   try {
-    const d = (await invoke("cmd_kozmetik_oku")) as {
-      pelerin_dosya: string | null;
-      pelerin_aktif?: boolean;
-    };
-    const yol = d.pelerin_aktif === false ? null : d.pelerin_dosya;
-    if (!!yol !== ozelPelerinAktif) {
-      ozelPelerinAktif = !!yol;
-      if (kok) pelerinSeritCiz(kok);
-    }
-    if (!yol || yol === sonOzelPelerin) return;
-    sonOzelPelerin = yol;
-    await sahneGetir().pelerin({ url: fileSrc(yol) });
-    // Pelerin sırtta: 3/4 arka bakış, görünür olsun.
-    sahneGetir().bakisaAyarla(2.5, 0.1);
+    koz = (await invoke("cmd_kozm_katalog")) as KozKatalog;
   } catch {
-    // kozmetik okunamazsa vitrin normal kalır
+    koz = { kayitlar: [], aktif: { pelerin: null, kanat: null } };
+  }
+  kozCiz(root);
+}
+
+/** İki YIKIM şeridi: pelerinler ve elitralar (her biri ayrı seçilir). */
+function kozCiz(root: HTMLElement): void {
+  if (!koz) return;
+  const cizim = (kapsayici: string, tur: "pelerin" | "kanat") => {
+    const el = root.querySelector(kapsayici) as HTMLElement | null;
+    if (!el) return;
+    const liste = koz!.kayitlar.filter((k) => k.tur === tur);
+    const aktifId = koz!.aktif[tur];
+    if (!liste.length) {
+      const ad = tur === "pelerin" ? "Pelerin" : "Elitra";
+      el.innerHTML = `<div class="skin-bos">${ad} kaydı yok — <b>Kozmetik</b> sayfasında fotoğraftan oluştur, burada birikir.</div>`;
+      return;
+    }
+    el.innerHTML =
+      liste
+        .map(
+          (k) => `
+        <button class="skin-pelerin ${k.id === aktifId ? "aktif" : ""}" data-id="${kacis(k.id)}" data-ad="${kacis(k.ad)}" title="${kacis(k.ad)}${k.hd ? " · HD" : ""}">
+          <canvas class="skin-pelerin-tuval" width="40" height="64" data-dosya="${kacis(k.dosya)}"></canvas>
+          <span class="skin-pelerin-ad">${kacis(k.ad)}</span>
+          <span class="skin-sil koz-sil" title="Kaydı sil">${icon("trash")}</span>
+          ${k.id === aktifId ? `<span class="skin-rozet aktif">TAKILI</span>` : ""}
+        </button>`,
+        )
+        .join("") +
+      (aktifId
+        ? `<button class="skin-pelerin cikar" data-id="" title="YIKIM kozmetiğini kapat">
+             <span class="skin-pelerin-yok">✕</span><span class="skin-pelerin-ad">Kapat</span>
+           </button>`
+        : "");
+    el.querySelectorAll<HTMLCanvasElement>(".skin-pelerin-tuval").forEach((c) => {
+      const yol = c.dataset.dosya;
+      if (yol) pelerinCiz(c, yol);
+    });
+  };
+  cizim("#sk-koz-pelerin", "pelerin");
+  cizim("#sk-koz-kanat", "kanat");
+  const adetP = root.querySelector("#sk-koz-adet") as HTMLElement | null;
+  if (adetP) {
+    const n = koz.kayitlar.filter((k) => k.tur === "pelerin").length;
+    adetP.textContent = n ? `${n} kayıt` : "";
+  }
+  const adetK = root.querySelector("#sk-koz-kanat-adet") as HTMLElement | null;
+  if (adetK) {
+    const n = koz.kayitlar.filter((k) => k.tur === "kanat").length;
+    adetK.textContent = n ? `${n} kayıt` : "";
+  }
+}
+
+/** Vitrinde YIKIM kozmetiğini göster: elitra varsa kanatlar örter, yoksa
+ *  pelerin; ikisi de yoksa Mojang pelerini kalır. `arka` → karakter döner. */
+async function sahneKozmetik(arka: boolean): Promise<void> {
+  const sahne = sahneGetir();
+  const pelerin = koz?.kayitlar.find((k) => k.id === koz?.aktif.pelerin && k.dosya) || null;
+  const kanat = koz?.kayitlar.find((k) => k.id === koz?.aktif.kanat && k.dosya) || null;
+  try {
+    if (kanat) {
+      await sahne.pelerin(null);
+      await sahne.kanat({ url: fileSrc(kanat.dosya) });
+    } else {
+      await sahne.kanat(null);
+      if (pelerin) {
+        await sahne.pelerin({ url: fileSrc(pelerin.dosya) });
+      } else {
+        // YIKIM pelerini kapatıldı → Mojang pelerini YENİDEN uygulanmalı;
+        // `sahnePelerin` aynı yolu "zaten yüklü" sanıp atlardı.
+        sonPelerin = null;
+        sahnePelerin();
+      }
+    }
+    if (arka && (pelerin || kanat)) sahne.bakisaAyarla(2.5, 0.1);
+  } catch {
+    // kozmetik yüklenemezse vitrin olduğu gibi kalır
+  }
+}
+
+/** Katalogdan kayıt giy (id null → o türü kapat). */
+async function kozSec(root: HTMLElement, tur: "pelerin" | "kanat", id: string | null): Promise<void> {
+  if (mesgul || !koz) return;
+  mesgul = true;
+  try {
+    const sonuc = (await invoke("cmd_kozm_sec", { tur, id })) as {
+      aktif: KozKatalog["aktif"];
+      yuklendi: boolean;
+      hata: string;
+    };
+    koz.aktif = sonuc.aktif;
+    const kayit = koz.kayitlar.find((k) => k.id === id);
+    if (id) {
+      toast(`${kayit?.ad || "Kozmetik"} takıldı — oyunda görünecek.`);
+      if (sonuc.hata) toast(`Diğer oyunculara yüklenemedi: ${sonuc.hata}`, "err");
+    } else {
+      toast("YIKIM kozmetiği kapatıldı — vanilla görünüm.");
+    }
+    await sahneKozmetik(true);
+  } catch (e) {
+    toast(String(e), "err");
+  } finally {
+    mesgul = false;
+    ciz(root);
+  }
+}
+
+/** Katalog kaydını sil (dosyası da gider; oyunda takılıysa vanilla'ya döner). */
+async function kozSil(root: HTMLElement, tur: "pelerin" | "kanat", id: string, ad: string): Promise<void> {
+  if (mesgul || !id) return;
+  const onay = await onaySor(
+    "Kaydı sil",
+    `<b>${kacis(ad)}</b> katalogdan silinsin mi? Bu işlem geri alınamaz.`,
+    "Sil",
+  );
+  if (!onay) return;
+  mesgul = true;
+  try {
+    const sonuc = (await invoke("cmd_kozm_sil", { tur, id })) as { kayitlar: KozKayit[]; aktif: KozKatalog["aktif"] };
+    if (koz) {
+      koz.kayitlar = sonuc.kayitlar;
+      koz.aktif = sonuc.aktif;
+    }
+    toast("Kayıt silindi.");
+    await sahneKozmetik(false);
+  } catch (e) {
+    toast(String(e), "err");
+  } finally {
+    mesgul = false;
+    ciz(root);
   }
 }
 
@@ -522,7 +680,7 @@ async function yedekGeri(root: HTMLElement, hesapId: string): Promise<void> {
     mesgul = false;
     ciz(root);
     sahnePelerin();
-    void sahneOzelKozmetik();
+    void sahneKozmetik(false);
   }
 }
 
@@ -534,7 +692,7 @@ async function pelerinTak(root: HTMLElement, hesapId: string, capeId: string | n
     hub = (await invoke("cmd_skin_pelerin", { id: hesapId, capeId })) as SkinHub;
     toast(capeId ? "Pelerin takıldı." : "Pelerin çıkarıldı.");
     sahnePelerin();
-    void sahneOzelKozmetik();
+    void sahneKozmetik(false);
   } catch (e) {
     toast(String(e), "err");
   } finally {
@@ -667,7 +825,7 @@ async function editorAc(root: HTMLElement, hesapId: string): Promise<void> {
       sonPelerin = null; // yeni sahne pelerinsiz doğar; bilinen yol yeniden uygulanmalı
       sahneBaslat(root);
       sahnePelerin();
-    void sahneOzelKozmetik();
+    void sahneKozmetik(false);
     },
   );
 }

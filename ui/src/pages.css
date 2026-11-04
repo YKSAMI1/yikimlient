@@ -946,6 +946,8 @@ input.search-in.input, .search-in.input {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .skin-pelerin-yok { font-size: 22px; color: var(--text-faint); line-height: 44px; }
+.skin-pelerin:hover .skin-sil { opacity: 1; }
+.skin-pelerin .skin-rozet { position: absolute; top: 4px; right: 4px; font-size: 8.5px; padding: 1px 4px; }
 /* Kaydet düğmesinin durumu: başarıda yeşil, hatada kırmızı — "basılı mı
    kaydetti mi" belirsizliği kalksın. */
 .btn.tamam {

@@ -9,6 +9,7 @@ pub mod emote_binary;
 pub mod game_options;
 pub mod instances;
 pub mod kozmetik;
+pub mod kozmetik_katalog;
 pub mod launcher;
 pub mod modpacks;
 pub mod repos;
@@ -97,6 +98,10 @@ pub fn run() {
             commands::cmd_kozmetik_oku,
             commands::cmd_kozmetik_fotograf,
             commands::cmd_kozmetik_aktif,
+            commands::cmd_kozm_katalog,
+            commands::cmd_kozm_sec,
+            commands::cmd_kozm_sil,
+            commands::cmd_kozm_ad,
             commands::cmd_rozet_ciz,
             commands::cmd_rozet_oku,
             commands::cmd_rozet_yetki,

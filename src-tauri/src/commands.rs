@@ -358,9 +358,14 @@ pub async fn cmd_kozmetik_kaydet(
         if var_mi(&pelerin) {
             let png = crate::kozmetik::atlas_png(liste)?;
             kurulum += crate::kozmetik::tum_kurulumlara_yaz("pelerin.png", &png);
+            let _ = crate::kozmetik_katalog::ekle_veya_guncelle(
+                crate::kozmetik_katalog::PELERIN,
+                &png,
+            );
             yuklenen_pelerin = Some(crate::kozmetik::b64(&png));
         } else {
             crate::kozmetik::tum_kurulumlardan_sil("pelerin.png");
+            crate::kozmetik_katalog::aktif_yaz(crate::kozmetik_katalog::PELERIN, None);
             yuklenen_pelerin = Some(String::new());
         }
     }
@@ -368,9 +373,14 @@ pub async fn cmd_kozmetik_kaydet(
         if var_mi(&kanat) {
             let png = crate::kozmetik::atlas_png(liste)?;
             kurulum += crate::kozmetik::tum_kurulumlara_yaz("elytra.png", &png);
+            let _ = crate::kozmetik_katalog::ekle_veya_guncelle(
+                crate::kozmetik_katalog::KANAT,
+                &png,
+            );
             yuklenen_kanat = Some(crate::kozmetik::b64(&png));
         } else {
             crate::kozmetik::tum_kurulumlardan_sil("elytra.png");
+            crate::kozmetik_katalog::aktif_yaz(crate::kozmetik_katalog::KANAT, None);
             yuklenen_kanat = Some(String::new());
         }
     }
@@ -403,6 +413,16 @@ pub async fn cmd_kozmetik_kaydet(
         "yuklendi": yuklendi,
         "hata": hata,
     }))
+}
+
+/// Kozmetik sayfasındaki aç/kapa düğmesi katalogdaki "TAKILI" rozetiyle
+/// çelişmesin: kapatınca aktif kayıt silinir, açınca en son kayıt geri takılır.
+fn kozmetik_aktif_esle(tur: &str, acik: bool) {
+    if acik {
+        crate::kozmetik_katalog::aktif_yoksa_son(tur);
+    } else {
+        crate::kozmetik_katalog::aktif_yaz(tur, None);
+    }
 }
 
 /// Kayıtlı kozmetik atlaslarını oku + sahne önizlemesi için dosya yolları.
@@ -452,6 +472,14 @@ pub async fn cmd_kozmetik_fotograf(
     let kurulum = crate::kozmetik::tum_kurulumlara_yaz(ad, &veri);
     // 64×32 kopya: mod bunu presence sunucusuna gönderir (gövde sınırı).
     crate::kozmetik::kucuk_yaz(ad, &veri);
+    // KATALOG: her yüklenen fotoğraf AYRI bir kayıt olur (Skin Merkezi'nde
+    // liste hâlinde seçilebilsin). Taslak adlar "Pelerin 3" gibi otomatik.
+    let koz_tur = if ad == "pelerin.png" {
+        crate::kozmetik_katalog::PELERIN
+    } else {
+        crate::kozmetik_katalog::KANAT
+    };
+    let _ = crate::kozmetik_katalog::ekle(koz_tur, "", &veri);
 
     let cfg = YikimConfig::load_or_default();
     let ucak = crate::kozmetik::ucak(&cfg);
@@ -501,9 +529,11 @@ pub async fn cmd_kozmetik_aktif(
 ) -> Result<serde_json::Value, String> {
     if let Some(acik) = pelerin {
         crate::kozmetik::aktif_ayarla("pelerin.png", acik)?;
+        kozmetik_aktif_esle(crate::kozmetik_katalog::PELERIN, acik);
     }
     if let Some(acik) = kanat {
         crate::kozmetik::aktif_ayarla("elytra.png", acik)?;
+        kozmetik_aktif_esle(crate::kozmetik_katalog::KANAT, acik);
     }
 
     // Sunucudaki kopya da güncellenir: pasifken boş gönderilir, diğer YIKIMLient
@@ -540,6 +570,92 @@ pub async fn cmd_kozmetik_aktif(
         "yuklendi": yuklendi,
         "hata": hata,
     }))
+}
+
+// ---------- kozmetik kataloğu (çoklu pelerin/elitra) ----------
+
+/// Kayıtlı pelerin/elitralar + hangisinin giyili olduğu.
+#[tauri::command]
+pub fn cmd_kozm_katalog() -> Result<serde_json::Value, String> {
+    crate::kozmetik_katalog::ilk_aktar();
+    Ok(serde_json::json!({
+        "kayitlar": crate::kozmetik_katalog::liste(),
+        "aktif": crate::kozmetik_katalog::aktifler(),
+    }))
+}
+
+/// Katalogdan bir kaydı giy. `id` boş/None → o türün YIKIM kozmetiği kapanır
+/// (oyunda vanilla/Mojang görünümü kalır; Mojang pelerini SEÇİLİ kalır).
+#[tauri::command]
+pub async fn cmd_kozm_sec(tur: String, id: Option<String>) -> Result<serde_json::Value, String> {
+    if !crate::kozmetik_katalog::gecerli_tur(&tur) {
+        return Err("bilinmeyen kozmetik türü".into());
+    }
+    let dosya = if tur == crate::kozmetik_katalog::PELERIN {
+        "pelerin.png"
+    } else {
+        "elytra.png"
+    };
+    let secili = id.as_deref().map(str::trim).filter(|s| !s.is_empty());
+
+    let mut kucuk = String::new();
+    match secili {
+        Some(kid) => {
+            let png = crate::kozmetik_katalog::icerik(&tur, kid).ok_or("kayıt bulunamadı")?;
+            // Önce "kapalı" işaretini kaldır, sonra yaz (tum_kurulumlara_yaz
+            // pasifken kurulumlara yazmıyor).
+            crate::kozmetik::aktif_ayarla(dosya, true)?;
+            crate::kozmetik::tum_kurulumlara_yaz(dosya, &png);
+            crate::kozmetik::kucuk_yaz(dosya, &png);
+            crate::kozmetik_katalog::aktif_yaz(&tur, Some(kid));
+            kucuk = crate::kozmetik::kucuk_png_b64(&png).unwrap_or_default();
+        }
+        None => {
+            crate::kozmetik::aktif_ayarla(dosya, false)?;
+            crate::kozmetik_katalog::aktif_yaz(&tur, None);
+        }
+    }
+
+    // Diğer YIKIMLient oyuncuları da görsün (boş = kaldır).
+    let cfg = YikimConfig::load_or_default();
+    let ucak = crate::kozmetik::ucak(&cfg);
+    let mut yuklendi = false;
+    let mut hata = String::new();
+    if let Ok(hesap) = selected_account() {
+        let (p, k) = if tur == crate::kozmetik_katalog::PELERIN {
+            (Some(kucuk.clone()), None)
+        } else {
+            (None, Some(kucuk.clone()))
+        };
+        match crate::kozmetik::sunucuya_yukle(&hesap.uuid, &hesap.name, p, k, &ucak).await {
+            Ok(()) => yuklendi = true,
+            Err(e) => hata = e,
+        }
+    } else {
+        hata = "seçili hesap yok".into();
+    }
+    Ok(serde_json::json!({
+        "aktif": crate::kozmetik_katalog::aktifler(),
+        "yuklendi": yuklendi,
+        "hata": hata,
+    }))
+}
+
+/// Katalogdan kayıt sil (dosyasıyla birlikte).
+#[tauri::command]
+pub fn cmd_kozm_sil(tur: String, id: String) -> Result<serde_json::Value, String> {
+    crate::kozmetik_katalog::sil(&tur, &id)?;
+    Ok(serde_json::json!({
+        "kayitlar": crate::kozmetik_katalog::liste(),
+        "aktif": crate::kozmetik_katalog::aktifler(),
+    }))
+}
+
+/// Katalog kaydını yeniden adlandır.
+#[tauri::command]
+pub fn cmd_kozm_ad(tur: String, id: String, ad: String) -> Result<serde_json::Value, String> {
+    crate::kozmetik_katalog::ad_ver(&tur, &id, &ad)?;
+    Ok(serde_json::json!({ "kayitlar": crate::kozmetik_katalog::liste() }))
 }
 
 // ---------- rozet (isim başı logosu) ----------
