@@ -27,6 +27,9 @@ pub const DISCORD_APP_ID: &str = "1560649366899920926";
 /// Tek kalıcı IPC bağlantısı — launcher yaşamı boyunca aynı soket kullanılır.
 static CLIENT: Mutex<Option<IpcClient>> = Mutex::new(None);
 
+/// En son istenen presence (süpervizör bunu yeniden uygular).
+static ISTEK: Mutex<Option<Istek>> = Mutex::new(None);
+
 fn app_id() -> String {
     std::env::var("YIKIM_DISCORD_APP_ID")
         .ok()
@@ -61,13 +64,51 @@ impl IpcSocket {
 
     #[cfg(unix)]
     fn connect() -> Option<Self> {
-        let tmp = std::env::var("XDG_RUNTIME_DIR")
-            .or_else(|_| std::env::var("TMPDIR"))
-            .unwrap_or_else(|_| "/tmp".into());
-        for i in 0..10 {
-            let path = format!("{tmp}/discord-ipc-{i}");
-            if let Ok(s) = std::os::unix::net::UnixStream::connect(&path) {
-                return Some(Self::Unix(s));
+        // Linux'ta Discord her zaman aynı yerde değil:
+        //   native  → $XDG_RUNTIME_DIR/discord-ipc-N
+        //   flatpak → $XDG_RUNTIME_DIR/app/com.discordapp.Discord/discord-ipc-N
+        //   snap    → $XDG_RUNTIME_DIR/snap.discord/discord-ipc-N
+        //   vesktop → $XDG_RUNTIME_DIR/app/dev.vencord.Vesktop/discord-ipc-N
+        // Ayrıca XDG_RUNTIME_DIR boşsa /run/user/<uid> ve /tmp denenir.
+        let mut kokler: Vec<String> = Vec::new();
+        for anahtar in ["XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"] {
+            if let Ok(v) = std::env::var(anahtar) {
+                if !v.is_empty() && !kokler.contains(&v) {
+                    kokler.push(v);
+                }
+            }
+        }
+        // uid'yi güvenilir biçimde al: /proc/self (Linux) → libc yok, std ile.
+        if let Ok(uid) = std::fs::read_to_string("/proc/self/loginuid") {
+            let uid = uid.trim();
+            if !uid.is_empty() && uid != "4294967295" {
+                kokler.push(format!("/run/user/{uid}"));
+            }
+        }
+        kokler.push("/tmp".into());
+        kokler.push("/var/run".into());
+        let alt = [
+            "",
+            "app/com.discordapp.Discord",
+            "app/com.discordapp.DiscordCanary",
+            "app/dev.vencord.Vesktop",
+            "snap.discord",
+            "snap.discord-canary",
+            ".flatpak/com.discordapp.Discord",
+            "flatpak/com.discordapp.Discord",
+        ];
+        for kok in &kokler {
+            for d in alt.iter() {
+                for i in 0..10 {
+                    let path = if d.is_empty() {
+                        format!("{kok}/discord-ipc-{i}")
+                    } else {
+                        format!("{kok}/{d}/discord-ipc-{i}")
+                    };
+                    if let Ok(s) = std::os::unix::net::UnixStream::connect(&path) {
+                        return Some(Self::Unix(s));
+                    }
+                }
             }
         }
         None
@@ -112,6 +153,18 @@ impl IpcSocket {
 struct IpcClient {
     socket: IpcSocket,
     /// Son SET_ACTIVITY pid'i — clear bunu kullanır.
+    pid: u32,
+    /// Presence sayacının başlangıcı — yeniden gönderimde SIFIRLANMAZ.
+    started_at: i64,
+    /// Son başarılı gönderim — sağlık kontrolü için.
+    son_gonderim: std::time::Instant,
+}
+
+/// İstenen presence — Discord sonradan açılırsa bunu yeniden uygularız.
+#[derive(Clone)]
+struct Istek {
+    details: String,
+    state: String,
     pid: u32,
 }
 
@@ -159,49 +212,120 @@ fn activity_json(details: &str, state: &str, _with_assets: bool, started_at: i64
 /// Presence'i günceller (arka planda). `pid` = etkinliğin ait olduğu SÜREÇ.
 /// Oyun açıkken javaw'un PID'i verilir → Discord klip/algılama Minecraft'ı
 /// yakalar; launcher açıkken launcher'ın kendi PID'i.
+/// İstenen presence'i saklar ve hemen uygulamayı dener (arka planda).
 pub fn set_presence(details: &str, state: &str, pid: u32) {
     if !crate::config::YikimConfig::load_or_default().discord_rpc {
         return;
     }
-    let details = details.to_string();
-    let state = state.to_string();
+    let istek = Istek {
+        details: details.to_string(),
+        state: state.to_string(),
+        pid,
+    };
+    if let Ok(mut i) = ISTEK.lock() {
+        *i = Some(istek.clone());
+    }
+    basla();
     std::thread::spawn(move || {
         let mut guard = match CLIENT.lock() {
             Ok(g) => g,
             Err(_) => return,
         };
-        // bağlantı yoksa kur; kurulamıyorsa sessizce geç
-        if guard.is_none() {
-            let app = app_id();
-            match ipc_connect(&app) {
-                Some(socket) => {
-                    yikim_log("Discord RPC: bağlandı (özel IPC)".into());
-                    *guard = Some(IpcClient { socket, pid });
-                }
-                None => {
-                    yikim_log("Discord RPC: Discord'a bağlanılamadı (masaüstü uygulaması açık mı?)".into());
-                    return;
-                }
+        uygula(&mut guard, &istek);
+    });
+}
+
+/// Bağlantıyı (gerekirse) kurar ve verilen presence'i gönderir.
+fn uygula(guard: &mut Option<IpcClient>, istek: &Istek) -> bool {
+    if guard.is_none() {
+        match ipc_connect(&app_id()) {
+            Some(socket) => {
+                yikim_log("Discord RPC: bağlandı (özel IPC)".into());
+                *guard = Some(IpcClient {
+                    socket,
+                    pid: istek.pid,
+                    started_at: chrono::Utc::now().timestamp_millis(),
+                    son_gonderim: std::time::Instant::now(),
+                });
             }
+            None => return false,
         }
-        let started_at = chrono::Utc::now().timestamp_millis();
-        let Some(client) = guard.as_mut() else { return };
-        client.pid = pid;
-        // önce logo ile dene; uygulama assets'i yüklü değilse logosuz gönder
-        let act = activity_json(&details, &state, true, started_at);
-        let ok = ipc_set_activity(&mut client.socket, pid, Some(&act));
-        if !ok {
-            let plain = activity_json(&details, &state, false, started_at);
-            if ipc_set_activity(&mut client.socket, pid, Some(&plain)) {
-                yikim_log("Discord RPC: presence güncellendi (logosuz)".into());
-                return;
+    }
+    let Some(client) = guard.as_mut() else {
+        return false;
+    };
+    client.pid = istek.pid;
+    let act = activity_json(&istek.details, &istek.state, true, client.started_at);
+    if ipc_set_activity(&mut client.socket, istek.pid, Some(&act)) {
+        client.son_gonderim = std::time::Instant::now();
+        return true;
+    }
+    let plain = activity_json(&istek.details, &istek.state, false, client.started_at);
+    if ipc_set_activity(&mut client.socket, istek.pid, Some(&plain)) {
+        client.son_gonderim = std::time::Instant::now();
+        yikim_log("Discord RPC: presence güncellendi (logosuz)".into());
+        return true;
+    }
+    // iki deneme de başarısız → soketi at, sonraki denemede yeniden bağlanır
+    *guard = None;
+    yikim_log("Discord RPC: presence reddedildi — bağlantı sıfırlandı".into());
+    false
+}
+
+static SURUCU: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Presence süpervizörü — TEK KEZ başlar.
+///
+/// NİYE: önceden bağlantı yalnızca durum değişince (oyun aç/kapa) deneniyordu.
+/// Discord launcher'dan SONRA açılırsa (özellikle Linux'ta yaygın) presence
+/// hiç görünmüyordu ve tekrar denenmiyordu. Süpervizör 15 sn'de bir:
+///   · istek yoksa hiçbir şey yapmaz,
+///   · bağlantı yoksa yeniden bağlanır,
+///   · bağlantı varsa 45 sn'de bir "canlı mı" diye aynı presence'i tazeler,
+///   · ayar kapatıldıysa presence'i temizler.
+/// Böylece "launcher açıksa her işletim sisteminde gözükür" garanti edilir.
+pub fn basla() {
+    if SURUCU.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(|| loop {
+        std::thread::sleep(std::time::Duration::from_secs(15));
+        let istek = match ISTEK.lock() {
+            Ok(i) => i.clone(),
+            Err(_) => continue,
+        };
+        let acik = crate::config::YikimConfig::load_or_default().discord_rpc;
+        let mut guard = match CLIENT.lock() {
+            Ok(g) => g,
+            Err(_) => continue,
+        };
+        if !acik {
+            if let Some(client) = guard.as_mut() {
+                let pid = client.pid;
+                ipc_set_activity(&mut client.socket, pid, None);
             }
-            // iki deneme de başarısız → soketi at, sonraki çağrıda yeniden bağlanır
             *guard = None;
-            yikim_log("Discord RPC: presence reddedildi — bağlantı sıfırlandı".into());
-            return;
+            continue;
         }
-        yikim_log("Discord RPC: presence güncellendi".into());
+        // Ayar açık ama hiç presence istenmemiş (RPC kapalıyken başlatıldı,
+        // sonra açıldı) → launcher presence'ini kendimiz kur.
+        let istek = match istek {
+            Some(i) => i,
+            None => {
+                drop(guard);
+                launcher_presence();
+                continue;
+            }
+        };
+        match guard.as_ref() {
+            None => {
+                uygula(&mut guard, &istek);
+            }
+            Some(c) if c.son_gonderim.elapsed().as_secs() >= 45 => {
+                uygula(&mut guard, &istek);
+            }
+            Some(_) => {}
+        }
     });
 }
 

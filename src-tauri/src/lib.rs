@@ -246,6 +246,7 @@ pub fn run() {
             // Oyun içi katalog isteklerini yanıtlayan arka plan izleyicisi
             commands::spawn_catalog_watcher(app.handle().clone());
             // Discord presence: launcher açık → "YIKIMLient açık" (yerel IPC, internet yok)
+            discord_rpc::basla();
             discord_rpc::launcher_presence();
             if let Some(win) = app.get_webview_window("main") {
                 #[cfg(target_os = "windows")]

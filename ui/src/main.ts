@@ -448,7 +448,8 @@ export function openLoginModal(onSuccess?: () => void): void {
     if (name.length < 3) return toast("İsim en az 3 karakter olmalı", "err");
     try {
       await invoke("cmd_add_offline_account", { name });
-      await refreshState();
+      // rerender=true: açık sayfa (ör. Ayarlar hesap listesi) ANINDA tazelenir.
+      await refreshState(true);
       renderUserCard();
       toast(`Hoş geldin, ${name}!`);
       close();
@@ -465,7 +466,8 @@ export function openLoginModal(onSuccess?: () => void): void {
     status.innerHTML = `<span class="spinner"></span> Microsoft oturum penceresi açılıyor…`;
     try {
       const acc = await invoke("cmd_ms_login_begin");
-      await refreshState();
+      // rerender=true: açık sayfa (ör. Ayarlar hesap listesi) ANINDA tazelenir.
+      await refreshState(true);
       renderUserCard();
       toast(`Hoş geldin, ${acc.name}!`);
       close();
