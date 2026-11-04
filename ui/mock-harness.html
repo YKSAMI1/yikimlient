@@ -185,20 +185,29 @@
     // KATALOG MOCK: 2 pelerin + 1 elitra (tuvallerden PNG üretilir)
     var kozKayitlar = null;
     var kozAktif = { pelerin: null, kanat: null };
-    function kozPng(renk) {
+    // Gerçek dosyalar gibi: yalnız GÖRÜNEN yüz paneli dolu, gerisi saydam.
+    function kozPng(tur, renk, hd) {
+      var N = hd ? 8 : 1;
       var c = document.createElement("canvas");
-      c.width = 64; c.height = 32;
+      c.width = 64 * N; c.height = 32 * N;
       var g = c.getContext("2d");
-      g.fillStyle = renk; g.fillRect(0, 0, 64, 32);
-      g.fillStyle = "#ffffff"; g.fillRect(1, 1, 10, 10);
+      var b = tur === "pelerin" ? { x: 12, y: 1, w: 10, h: 16 } : { x: 36, y: 2, w: 10, h: 20 };
+      g.fillStyle = renk;
+      g.fillRect(b.x * N, b.y * N, b.w * N, b.h * N);
+      // HD'de ince detay (mozaik değil yumuşak görünmeli), pikselde 1 px şerit.
+      g.fillStyle = "#ffffff";
+      for (var i = 0; i < 6; i++) {
+        var y = (b.y + 2 + i * (b.h - 4) / 6) * N;
+        g.fillRect(b.x * N, y, b.w * N, Math.max(1, N / 2));
+      }
       return c.toDataURL("image/png");
     }
     function kozKur() {
       if (kozKayitlar) return kozKayitlar;
       kozKayitlar = [
-        { id: "pelerin-1", ad: "Pelerin 1", tur: "pelerin", hd: false, genislik: 64, yukseklik: 32, tarih: 3, dosya: kozPng("#2b8cff") },
-        { id: "pelerin-2", ad: "Pelerin 2", tur: "pelerin", hd: true, genislik: 512, yukseklik: 256, tarih: 2, dosya: kozPng("#ff4d6d") },
-        { id: "kanat-1", ad: "Elitra 1", tur: "kanat", hd: false, genislik: 64, yukseklik: 32, tarih: 1, dosya: kozPng("#3ddc97") }
+        { id: "pelerin-1", ad: "Pelerin 1", tur: "pelerin", hd: false, genislik: 64, yukseklik: 32, tarih: 3, dosya: kozPng("pelerin", "#2b8cff", false) },
+        { id: "pelerin-2", ad: "Pelerin 2", tur: "pelerin", hd: true, genislik: 512, yukseklik: 256, tarih: 2, dosya: kozPng("pelerin", "#ff4d6d", true) },
+        { id: "kanat-1", ad: "Elitra 1", tur: "kanat", hd: false, genislik: 64, yukseklik: 32, tarih: 1, dosya: kozPng("kanat", "#3ddc97", false) }
       ];
       kozAktif.pelerin = "pelerin-1";
       return kozKayitlar;

@@ -9,6 +9,7 @@ import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import { PikselPafta } from "../sahne/piksel-pafta";
 import { PELERIN_DIS, PELERIN_IC } from "../sahne/skin-bolgeler";
 import { pelerinHazirla, pelerinPaneli } from "../sahne/pelerin";
+import { KOZ_G, KOZ_Y, disBolge } from "../sahne/kozmetik-pafta";
 import { KART_TUVAL_GENISLIK, KART_TUVAL_YUKSEKLIK, kartCiz } from "../sahne/skin-kart";
 import type { SkinHub, SkinKayit } from "../sahne/skin-tipleri";
 import { openSkinEditor } from "./skins-editor";
@@ -529,7 +530,7 @@ function kozCiz(root: HTMLElement): void {
         : "");
     el.querySelectorAll<HTMLCanvasElement>(".skin-pelerin-tuval").forEach((c) => {
       const yol = c.dataset.dosya;
-      if (yol) pelerinCiz(c, yol);
+      if (yol) pelerinCiz(c, yol, tur);
     });
   };
   cizim("#sk-koz-pelerin", "pelerin");
@@ -889,17 +890,61 @@ function kartKarakterCiz(canvas: HTMLCanvasElement, yol: string, slim: boolean):
   img.src = fileSrc(yol);
 }
 
-function pelerinCiz(canvas: HTMLCanvasElement, yol: string): void {
+/** Katalog küçük resmi: kozmetiğin oyunda GÖRÜNEN yüzünü çizer.
+ *
+ *  - Piksel tasarım (64×32) → keskin (nearest), 40×64 tuval.
+ *  - HD fotoğraf → yumuşak küçültme ve 4× tuval çözünürlüğü; tuvalin
+ *    `image-rendering` değeri `auto` olur. CSS `.skin-pelerin-tuval` kuralı
+ *    `pixelated` olduğu için HD pelerin kartta mozaik gibi görünüyordu.
+ *  - `tur === "kanat"` → elitra paneli (36,2 10×20) çizilir. Eskiden pelerin
+ *    paneli (12,1) kesildiği için elitra kartları BOŞ görünüyordu.
+ */
+function pelerinCiz(canvas: HTMLCanvasElement, yol: string, tur: "pelerin" | "kanat" = "pelerin"): void {
   const img = new Image();
   img.onload = () => {
     const g = canvas.getContext("2d");
     if (!g) return;
-    g.imageSmoothingEnabled = false;
+    const gw = img.naturalWidth || KOZ_G;
+    const gh = img.naturalHeight || KOZ_Y;
+    const hd = gw > KOZ_G || gh > KOZ_Y;
+    // Pelerinde hangi panelin dolu olduğu 64×32 probuyla bulunur (eski
+    // tasarımlar iç astara çizmiş olabilir); elitrada panel sabittir.
+    let b: { x: number; y: number; w: number; h: number } = disBolge(tur);
+    if (tur === "pelerin") {
+      const prob = document.createElement("canvas");
+      prob.width = KOZ_G;
+      prob.height = KOZ_Y;
+      const pg = prob.getContext("2d", { willReadFrequently: true });
+      if (pg) {
+        pg.imageSmoothingEnabled = false;
+        pg.drawImage(img, 0, 0, KOZ_G, KOZ_Y);
+        b = pelerinPaneli(prob);
+      }
+    }
+    // HD'de tuval 4× çözünürlükte tutulur (kart genişliği ~64 px) → detay korunur.
+    canvas.width = hd ? 160 : 40;
+    canvas.height = hd ? 256 : 64;
+    canvas.style.imageRendering = hd ? "auto" : "pixelated";
+    g.imageSmoothingEnabled = hd;
+    g.imageSmoothingQuality = "high";
     g.clearRect(0, 0, canvas.width, canvas.height);
-    // Pelerin 64×32: tasarım paneli (desen hangi panelde varsa) tam boy çizilir.
-    const pafta = pelerinHazirla(img);
-    const p = pelerinPaneli(pafta);
-    g.drawImage(pafta, p.x, p.y, p.w, p.h, 0, 0, canvas.width, canvas.height);
+    // En-boy korunur: pelerin paneli 10×16, elitra paneli 10×20.
+    const olcek = Math.min(canvas.width / b.w, canvas.height / b.h);
+    const dw = b.w * olcek;
+    const dh = b.h * olcek;
+    const ax = gw / KOZ_G;
+    const ay = gh / KOZ_Y;
+    g.drawImage(
+      img,
+      b.x * ax,
+      b.y * ay,
+      b.w * ax,
+      b.h * ay,
+      (canvas.width - dw) / 2,
+      (canvas.height - dh) / 2,
+      dw,
+      dh,
+    );
   };
   img.src = fileSrc(yol);
 }
