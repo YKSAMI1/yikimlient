@@ -3,6 +3,7 @@ pub mod commands;
 pub mod config;
 pub mod core;
 pub mod curtain;
+pub mod bellek;
 pub mod discord_rpc;
 pub mod emote_binary;
 pub mod game_options;
@@ -248,11 +249,22 @@ pub fn run() {
             // Discord presence: launcher açık → "YIKIMLient açık" (yerel IPC, internet yok)
             discord_rpc::basla();
             discord_rpc::launcher_presence();
+            // BELLEK: pencere odakta değilken çalışma kümelerini otomatik boşalt
+            // (Mem Reduct'ın yaptığı iş, kullanıcı bir şey yapmadan).
+            bellek::basla();
             if let Some(win) = app.get_webview_window("main") {
                 #[cfg(target_os = "windows")]
                 {
                     // Windows 11 Mica efekti — desteklenmiyorsa sessizce geç
                     let _ = window_vibrancy::apply_mica(&win, None);
+                }
+                {
+                    // Odak olayı → bellek boşaltma zamanlaması.
+                    win.on_window_event(|olay| {
+                        if let tauri::WindowEvent::Focused(odakta) = olay {
+                            bellek::odak_ayarla(*odakta);
+                        }
+                    });
                 }
                 let _ = win.show();
             }
