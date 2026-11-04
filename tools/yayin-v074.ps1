@@ -1,18 +1,22 @@
-﻿# YIKIMLient v0.7.3 - Discord RPC her OS'te garanti + aninda arayuz tazeleme
+﻿# YIKIMLient v0.7.4 - Discord RPC her OS'te garanti + aninda arayuz tazeleme
 # + kozmetik (HD kaydetme silme hatasi, elitra maskesi, WYSIWYG onizleme).
 $ErrorActionPreference = 'Continue'
 $kok = Split-Path -Parent $PSScriptRoot
 $nsis = Join-Path $kok "src-tauri\target\release\bundle\nsis"
 $anahtar = [System.IO.File]::ReadAllText((Join-Path $kok "tools\updater-private.key")).Trim()
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
-$V = "0.7.3"
+$V = "0.7.4"
 Set-Location $kok
 
-$not = "Discord Rich Presence artik her isletim sisteminde launcher acikken gorunur (Linux flatpak/snap soketleri + Discord sonradan acilirsa otomatik yeniden baglanma). Hesap ekleyince arayuz aninda guncellenir. Kozmetik: HD fotograf kayitliyken Kaydet pelerini/elitrayi silmiyor, elitra vanilla kanat siluetine maskeleniyor, kirpma onizlemesi kaydedilenle birebir ayni."
+$not = "Discord Rich Presence artik her isletim sisteminde launcher acikken gorunur (Linux flatpak/snap soketleri, Discord sonradan acilirsa otomatik yeniden baglanma). Hesap ekleyince arayuz aninda guncellenir. Kozmetik: HD fotograf kayitliyken Kaydet pelerini/elitrayi silmiyor, elitra vanilla kanat siluetine maskeleniyor, kirpma onizlemesi kaydedilenle birebir ayni."
+
+Write-Host "[0/7] guvenlik: tag/release zaten var mi?"
+$var = gh release view "v$V" 2>&1
+if ($LASTEXITCODE -eq 0) { Write-Host "HATA: v$V release zaten var - surum numarasini artir"; exit 1 }
 
 Write-Host "[1/7] commit + push (tag dogru HEAD'den alinsin)"
 git add -A
-git commit -q -m "v0.7.3: Discord RPC tum OS'lerde garanti (flatpak/snap + yeniden baglanma), aninda arayuz tazeleme, kozmetik silinme/onizleme duzeltmeleri"
+git commit -q -m "v0.7.4: Discord RPC tum OS'lerde garanti (flatpak/snap + yeniden baglanma), aninda arayuz tazeleme, kozmetik silinme/onizleme duzeltmeleri"
 git push origin refs/heads/main:refs/heads/main 2>&1 | Select-Object -Last 1
 
 Write-Host "[2/7] Windows derleme dosyasi kontrolu"
@@ -30,13 +34,12 @@ foreach ($i in 1..60) {
   if ($runId) { break }
 }
 Write-Host "CI run: $runId"
-if ($runId) {
-  gh run watch $runId --exit-status 2>&1 | ForEach-Object { $_.ToString() } | Select-Object -Last 3
-  if ($LASTEXITCODE -ne 0) { Write-Host "CI BASARISIZ (linux derleme) - Windows surumu yine de yayinda"; exit 1 }
-}
+if (-not $runId) { Write-Host "CI RUN BULUNAMADI - linux derleme yok"; exit 1 }
+gh run watch $runId --exit-status 2>&1 | ForEach-Object { $_.ToString() } | Select-Object -Last 3
+if ($LASTEXITCODE -ne 0) { Write-Host "CI BASARISIZ (linux derleme) - Windows surumu yine de yayinda"; exit 1 }
 
 Write-Host "[5/7] Linux indir + bizim imza"
-$tmp = Join-Path $env:TEMP "linux073"
+$tmp = Join-Path $env:TEMP "linux074"
 New-Item $tmp -ItemType Directory -Force | Out-Null
 $rel = gh api "repos/YKSAMI1/yikimlient/releases/tags/v$V" | ConvertFrom-Json
 foreach ($ad in @("YIKIMLient_${V}_amd64.AppImage", "YIKIMLient_${V}_amd64.deb")) {
