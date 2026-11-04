@@ -2498,7 +2498,21 @@ pub async fn cmd_get_community_stats() -> Result<CommunityStats, String> {
                     for r in arr {
                         if let Some(assets) = r["assets"].as_array() {
                             for a in assets {
-                                downloads += a["download_count"].as_u64().unwrap_or(0);
+                                // SAYAÇ DÜZELTMESİ: eskiden release'teki HER asset
+                                // sayılıyordu. `latest.json` her launcher açılışında
+                                // güncelleme kontrolü için indirilir, `.sig`/`.sha256`
+                                // da aynı şekilde → 800 "kullanıcı" sanılıyordu.
+                                // Artık yalnız GERÇEK kurulum dosyaları sayılır.
+                                let ad = a["name"].as_str().unwrap_or("").to_ascii_lowercase();
+                                if ad.ends_with(".sig") || ad.ends_with(".json") {
+                                    continue;
+                                }
+                                let kurulum = ad.ends_with("_x64-setup.exe")
+                                    || ad.ends_with("_amd64.appimage")
+                                    || ad.ends_with("_amd64.deb");
+                                if kurulum {
+                                    downloads += a["download_count"].as_u64().unwrap_or(0);
+                                }
                             }
                         }
                     }

@@ -1383,7 +1383,7 @@ function resimAc(f: File): Promise<HTMLImageElement | null> {
  *  indirerek (mipmap mantığı) sonuç çok daha temiz çıkıyor.
  *  `yumusak` kapalıyken komşu-piksel (nearest) kullanılır — pixel-art için. */
 function ornekle(
-  resim: HTMLImageElement,
+  resim: HTMLImageElement | HTMLCanvasElement,
   sx: number,
   sy: number,
   sw: number,
@@ -1444,11 +1444,13 @@ interface KirpSecim {
  *  `duz` false → vanilla yerleşim: dış yüz + iç astar aynası + yan/üst/alt
  *  şeritleri. `duz` true → yalnız seçilen dikdörtgen (diğer yüzler boş). */
 function hdPafta(
-  resim: HTMLImageElement,
+  resim: HTMLImageElement | HTMLCanvasElement,
   sec: KirpSecim,
   tur: Tur,
   duz: boolean,
   hd: boolean,
+  ayna = false,
+  don = 0,
 ): HTMLCanvasElement {
   const ana = disBolge(tur);
   const ic = icBolge(tur);
@@ -1467,7 +1469,31 @@ function hdPafta(
   const dh = ana.h * N;
   g.imageSmoothingEnabled = false;
   // HD açık → yumuşak (kaliteli) ölçekleme; kapalı → keskin piksel örnekleme.
-  const kaynak = ornekle(resim, sec.x, sec.y, sec.w, sec.h, dw, dh, hd);
+  const kirpilmis = ornekle(resim, sec.x, sec.y, sec.w, sec.h, dw, dh, hd);
+  // ÇERÇEVE İÇİ DÖNÜŞÜM: ayna ve 90° döndürme SEÇİLEN DİKDÖRTGENİN içinde
+  // uygulanır. Döndürünce fotoğraf dikdörtgeni doldurmaz → dışarıda kalan
+  // alanlar oluşur. O alanlar:
+  //   pelerin → opak SİYAH kumaş
+  //   elitra  → SAYDAM (vanilla silüet maskesi + oyun)
+  let kaynak: HTMLCanvasElement = kirpilmis;
+  if (ayna || don !== 0) {
+    const t = document.createElement("canvas");
+    t.width = dw;
+    t.height = dh;
+    const ig = t.getContext("2d");
+    if (ig) {
+      ig.imageSmoothingEnabled = !hd;
+      ig.translate(dw / 2, dh / 2);
+      ig.rotate((don * Math.PI) / 2);
+      ig.scale(ayna ? -1 : 1, 1);
+      ig.drawImage(kirpilmis, -dw / 2, -dh / 2);
+      kaynak = t;
+    }
+  }
+  if (tur === "pelerin") {
+    g.fillStyle = "#000000";
+    g.fillRect(dx, dy, dw, dh);
+  }
   // PELERİN: oyun görünen yüzü (nz) YATAY AYNALAYARAK örer → doku şimdiden
   // aynalanır, oyunda düz görünür. (Elitrada böyle bir ayna yok.)
   if (tur === "pelerin") {
@@ -1608,13 +1634,15 @@ function fotografDurumlari(root: HTMLElement, durum: KozmetikDurum): void {
 async function fotografUygula(
   root: HTMLElement,
   tur: Tur,
-  resim: HTMLImageElement,
+  resim: HTMLImageElement | HTMLCanvasElement,
   sec: KirpSecim,
   duz: boolean,
   hd: boolean,
+  ayna = false,
+  don = 0,
 ): Promise<void> {
   silmeIstegi[tur] = false;
-  const pafta = hdPafta(resim, sec, tur, duz, hd);
+  const pafta = hdPafta(resim, sec, tur, duz, hd, ayna, don);
   const b64 = await tuvalB64(pafta);
   let sonuc: { kurulum: number; yuklendi: boolean; hata: string; genislik: number; yukseklik: number };
   try {
@@ -1703,6 +1731,9 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
   // "HD görünüm" varsayılan AÇIK: fotoğraf yumuşak/HD ölçeklenir.
   // Kapatılırsa eski keskin (pixel-art) örnekleme kullanılır.
   let hd = true;
+  // AYNA (yatay ters) ve DÖNDÜRME (90° adımlar) — çerçevenin İÇİNDE uygulanır.
+  let ayna = false;
+  let don = 0; // 0=0°, 1=90°, 2=180°, 3=270° (saat yönü)
 
   const kat = document.createElement("div");
   kat.className = "kz-kirp";
@@ -1728,6 +1759,12 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
             <button class="seg-btn" data-mod="duz">Düz dikdörtgen</button>
           </div>
           <p class="kz-kirp-not" id="kz-kirp-mod-not"></p>
+          <span class="kz-etiket">Ayarlama</span>
+          <div class="kz-kirp-mod" id="kz-kirp-ayar">
+            <button class="seg-btn" id="kz-kirp-ayna" title="Fotoğrafı yatay olarak ters çevir">Ayna</button>
+            <button class="seg-btn" id="kz-kirp-don" title="Fotoğrafı 90° döndür">90° döndür</button>
+          </div>
+          <p class="kz-kirp-not" id="kz-kirp-ayar-not">Döndürünce fotoğrafın dışında kalan yerler pelerinde SİYAH, elitrada SAYDAM kalır.</p>
           <span class="kz-etiket">Kalite</span>
           <label class="kz-kirp-piksel"><input type="checkbox" id="kz-kirp-piksel" checked /> HD görünüm</label>
           <p class="kz-kirp-not">İşaretliyken fotoğraf HD dokusu olarak kaydedilir. Kapatırsan 64×32 piksel dokusuna iner ve üzerine yeniden çizebilirsin.</p>
@@ -1818,7 +1855,7 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
     // atlas hdPafta() ile birebir üretilir, elitrada vanilla siluet maskesi
     // uygulanır, pelerinde oyunun aynası geri çevrilir. Böylece önizleme ile
     // kaydettikten sonraki görünüm aynı olur.
-    const pafta = hdPafta(resim, sec, tur, duz, hd);
+    const pafta = hdPafta(resim, sec, tur, duz, hd, ayna, don);
     const kN = pafta.width / KOZ_G;
     const yuz = disBolge(tur);
     const pw = yuz.w * kN;
@@ -1931,6 +1968,31 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
       modNotu();
     });
   });
+  const ayarNotu = (): void => {
+    const n = kat.querySelector<HTMLElement>("#kz-kirp-ayar-not");
+    if (!n) return;
+    if (don === 0 && !ayna) {
+      n.textContent = "Döndürünce fotoğrafın dışında kalan yerler pelerinde SİYAH, elitrada SAYDAM kalır.";
+    } else {
+      const d = don * 90;
+      n.textContent = `${d ? d + "° döndürüldü" : ""}${don && ayna ? " · " : ""}${ayna ? "aynalandı" : ""} — boş kalan yerler pelerinde SİYAH, elitrada SAYDAM.`;
+    }
+  };
+  kat.querySelector<HTMLElement>("#kz-kirp-ayna")?.addEventListener("click", (e) => {
+    ayna = !ayna;
+    (e.currentTarget as HTMLElement).classList.toggle("aktif", ayna);
+    ayarNotu();
+    ciz();
+  });
+  kat.querySelector<HTMLElement>("#kz-kirp-don")?.addEventListener("click", (e) => {
+    don = (don + 1) % 4;
+    (e.currentTarget as HTMLElement).classList.toggle("aktif", don !== 0);
+    (e.currentTarget as HTMLElement).textContent = don === 0 ? "90° döndür" : `${don * 90}° döndür`;
+    ayarNotu();
+    ciz();
+  });
+  ayarNotu();
+
   kat.querySelector<HTMLInputElement>("#kz-kirp-piksel")?.addEventListener("change", (e) => {
     hd = (e.target as HTMLInputElement).checked;
     ciz();
@@ -1953,7 +2015,7 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
     if (uygulaBtn.disabled) return;
     uygulaBtn.disabled = true;
     uygulaBtn.textContent = "Kaydediliyor…";
-    void fotografUygula(root, tur, resim, { ...sec }, duz, hd)
+    void fotografUygula(root, tur, resim, { ...sec }, duz, hd, ayna, don)
       .then(() => kapat())
       .catch((e) => {
         uygulaBtn.disabled = false;
