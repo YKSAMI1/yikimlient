@@ -67,6 +67,8 @@ public final class YikimKozmetikSecim {
     private static String bekleyenId = "";
     private static long bekleyenZaman;
     private static final ConcurrentHashMap<String, class_2960> DOKULAR = new ConcurrentHashMap<>();
+    /** Küçük görsellerin 8×8 renk ızgarası (v1.30.0 — doku çizimi yok). */
+    private static final ConcurrentHashMap<String, int[]> IZGARA = new ConcurrentHashMap<>();
 
     private YikimKozmetikSecim() {
     }
@@ -333,24 +335,98 @@ public final class YikimKozmetikSecim {
         return yukseklik;
     }
 
-    /** Deri için kafa, pelerin/kanat için tam görsel. */
+    /**
+     * Deri için kafa, pelerin/kanat için küçük görsel.
+     *
+     * v1.30.0: ARTIK DOKU ÇİZİLMİYOR. Menüde özel doku basmak, metin partisiyle
+     * birleşip ekranı tek renk bloklarla kaplayan gri kutulara yol açıyordu;
+     * burada görsel önce 8×8 renk ızgarasına indiriliyor, sonra HÜCRE olarak
+     * (dolgularla) boyanıyor. Hiçbir doku bağlama durumu değişmiyor.
+     */
     private static void kucukResim(class_332 g, Oge oge, int x, int y, int boyut) {
-        class_2960 kimlik = YikimKozmetikSecim.doku(oge == null ? "" : oge.dosya);
-        if (kimlik == null || oge == null) {
+        if (oge == null) {
             YikimDraw.roundedFill(g, x + 4, y + 4, x + boyut - 4, y + boyut - 4, 0x33FFFFFF);
             return;
         }
-        try {
-            if (oge.dosya.startsWith("kozmetik/deri/")) {
-                g.method_70845(kimlik, x, y, boyut, boyut,
-                    8.0f / 64.0f, 8.0f / 64.0f, 16.0f / 64.0f, 16.0f / 64.0f);
-            } else {
-                int gen = boyut - 2;
-                g.method_70845(kimlik, x + 1, y + 3, gen, gen - 4, 0.0f, 0.0f, 1.0f, 1.0f);
+        int[] izgara = YikimKozmetikSecim.izgara(oge.dosya, oge.dosya.startsWith("kozmetik/deri/"));
+        if (izgara == null) {
+            YikimDraw.roundedFill(g, x + 4, y + 4, x + boyut - 4, y + boyut - 4, 0x33FFFFFF);
+            return;
+        }
+        int hucre = Math.max(1, boyut / 8);
+        int sol = x + (boyut - hucre * 8) / 2;
+        int ust = y + (boyut - hucre * 8) / 2;
+        for (int sy = 0; sy < 8; ++sy) {
+            int satir = sy * 8;
+            int sx = 0;
+            while (sx < 8) {
+                int renk = izgara[satir + sx];
+                if (renk == 0) {
+                    ++sx;
+                    continue;
+                }
+                int bitis = sx + 1;
+                while (bitis < 8 && izgara[satir + bitis] == renk) {
+                    ++bitis;
+                }
+                g.method_25294(sol + sx * hucre, ust + sy * hucre, sol + bitis * hucre,
+                    ust + (sy + 1) * hucre, renk);
+                sx = bitis;
             }
         }
+    }
+
+    /** Görsel dosyasını 8×8 renk ızgarasına indir (dosya+ölçüm başına önbellek). */
+    private static int[] izgara(String goreli, boolean kafa) {
+        try {
+            Path yol = YikimBridge.stateDir().resolve(goreli);
+            if (!Files.isRegularFile(yol, new LinkOption[0])) {
+                return null;
+            }
+            long zaman = Files.getLastModifiedTime(yol, new LinkOption[0]).toMillis();
+            String anahtar = goreli + "|" + zaman + "|" + kafa;
+            int[] hazir = YikimKozmetikSecim.IZGARA.get(anahtar);
+            if (hazir != null) {
+                return hazir;
+            }
+            java.awt.image.BufferedImage gorsel = javax.imageio.ImageIO.read(yol.toFile());
+            if (gorsel == null) {
+                return null;
+            }
+            if (YikimKozmetikSecim.IZGARA.size() > 256) {
+                YikimKozmetikSecim.IZGARA.clear();
+            }
+            int[] hedef = new int[64];
+            for (int y = 0; y < 8; ++y) {
+                for (int x = 0; x < 8; ++x) {
+                    int sx;
+                    int sy;
+                    if (kafa) {
+                        int olcek = gorsel.getWidth() / 64;
+                        if (olcek < 1) {
+                            olcek = 1;
+                        }
+                        sx = 8 * olcek + x * olcek;
+                        sy = 8 * olcek + y * olcek;
+                    } else {
+                        sx = x * gorsel.getWidth() / 8;
+                        sy = (4 + y * 3) * gorsel.getHeight() / 40;
+                    }
+                    if (sx >= gorsel.getWidth()) {
+                        sx = gorsel.getWidth() - 1;
+                    }
+                    if (sy >= gorsel.getHeight()) {
+                        sy = gorsel.getHeight() - 1;
+                    }
+                    int argb = gorsel.getRGB(sx, sy);
+                    hedef[y * 8 + x] = (argb >>> 24) > 32 ? argb | 0xFF000000 : 0;
+                }
+            }
+            YikimKozmetikSecim.IZGARA.put(anahtar, hedef);
+            return hedef;
+        }
         catch (Throwable ignored) {
-            YikimDraw.roundedFill(g, x + 4, y + 4, x + boyut - 4, y + boyut - 4, 0x33FFFFFF);
+            return null;
         }
     }
 }
