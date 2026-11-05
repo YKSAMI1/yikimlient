@@ -2458,6 +2458,9 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
     // Oyun içi hesap değiştirme: ana menüdeki liste için hesap özetleri
     // (jeton YOK — jeton yalnız mod istediğinde hesap-oturum.json ile verilir)
     crate::hesap_kopru::write_hesaplar(&inst);
+    // Oyun içi "sade" ana menü karakteri: aktif hesabın derisi yerel olarak
+    // kopyalanır (mod ağa dokunmaz, internet yokken de doğru görünür).
+    write_oyun_derisi(&inst, &account);
 
     // Ayar profili: her açılışta yeniden zorlanır (dil TR, sınırsız FPS, VSync kapalı,
     // ölçek 2, erişilebilirlik sarsıntıları kapalı) — başlangıç ekranı atlanır.
@@ -2835,23 +2838,8 @@ pub fn spawn_catalog_watcher(_app: tauri::AppHandle) {
                 //   2+ satır: sekme ayraçlı slug, başlık, açıklama, indirme, yazar…
                 catalog_cache_put(&cache_key, rows.clone(), header_err.clone());
 
-                let resp_path = entry.path().join(".yikim").join("catalog-response.txt");
-                if let Some(parent) = resp_path.parent() {
-                    let _ = std::fs::create_dir_all(parent);
-                }
-                let err_clean = header_err
-                    .replace('"', "'")
-                    .replace(['\n', '\r'], " ");
-                let header = format!(
-                    "{{\"id\": {id}, \"source\": \"{source}\", \"error\": \"{err_clean}\", \"total\": {}}}\n",
-                    rows.len()
-                );
-                let mut out = header;
-                for row in rows {
-                    out.push_str(&row);
-                    out.push('\n');
-                }
-                let _ = std::fs::write(&resp_path, out);
+                // ÖNCE İKONLAR: mod ilk karede gerçek logoları görsün (yanıt
+                // yazıldıktan sonra indirilirse ilk liste harf rozetleriyle açılıyordu).
                 // KATALOG İKONLARI: arama sonuçlarının ikonlarını da önden indir.
                 // Mod ağa dokunmaz; YikimIcons yalnız yerel PNG'den doku kurar.
                 // İndirilmezse katalogda yalnız harf rozetleri görünür (kullanıcı hatası).
@@ -2873,6 +2861,24 @@ pub fn spawn_catalog_watcher(_app: tauri::AppHandle) {
                         }
                     }
                 }
+                // yanıt (ikonlar hazır olduktan sonra)
+                let resp_path = entry.path().join(".yikim").join("catalog-response.txt");
+                if let Some(parent) = resp_path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                let err_clean = header_err
+                    .replace('"', "'")
+                    .replace(['\n', '\r'], " ");
+                let header = format!(
+                    "{{\"id\": {id}, \"source\": \"{source}\", \"error\": \"{err_clean}\", \"total\": {}}}\n",
+                    rows.len()
+                );
+                let mut out = header;
+                for row in rows {
+                    out.push_str(&row);
+                    out.push('\n');
+                }
+                let _ = std::fs::write(&resp_path, out);
                 core::yikim_log(format!("oyun içi katalog yanıtı yazıldı: {instance_id} (id:{id})"));
             }
         }
@@ -3095,4 +3101,25 @@ mod yerlesik_emote_testleri {
         assert_eq!(&bayt[0..4], &[0xff, 0x7a, 0x18, 0xff], "R,G,B,A sırası");
         assert_eq!(&bayt[4..8], &[0, 0, 0, 0], "boş piksel saydam olmalı");
     }
+}
+
+
+/// Aktif hesabın deri PNG'sini `.yikim/deri.png`'ye kopyalar; oyun içi sade
+/// menü karakteri bunu kullanır. Cache'teki dosya yoksa gömülü varsayılan.
+fn write_oyun_derisi(inst: &Instance, acc: &crate::auth::Account) {
+    let dir = inst.dir().join(".yikim");
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let hedef = dir.join("deri.png");
+    let anahtar = acc.uuid.replace('-', "");
+    if !anahtar.is_empty() {
+        let cache = core::app_dir().join("cache").join(format!("skin-{anahtar}.png"));
+        if let Ok(bayt) = std::fs::read(&cache) {
+            if !bayt.is_empty() && std::fs::write(&hedef, &bayt).is_ok() {
+                return;
+            }
+        }
+    }
+    let _ = std::fs::write(&hedef, VARSAYILAN_STEVE);
 }

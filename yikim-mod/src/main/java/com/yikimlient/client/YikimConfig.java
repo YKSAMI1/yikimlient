@@ -46,6 +46,10 @@ public final class YikimConfig {
     public boolean customAccent;
     public String catalogSource = "modrinth";
     public boolean customMainMenu = true;
+    /** Arayüz düzeni: "klasik" | "sade" (v1.28.0). */
+    public String uiTema = "klasik";
+    /** Kullanıcının tema seçimini gördüğü sürüm (0 = hiç sormadık). */
+    public int temaSurum;
     public String backdropStyle = "random";
     public final Map<String, WidgetState> widgets = new LinkedHashMap<String, WidgetState>();
     private int performanceDefaultsVersion;
@@ -88,6 +92,8 @@ public final class YikimConfig {
         config.customAccent = YikimConfig.bool(properties, "renk.ozel", config.customAccent);
         config.catalogSource = properties.getProperty("katalog.kaynak", config.catalogSource).toLowerCase(Locale.ROOT);
         config.customMainMenu = YikimConfig.bool(properties, "menu.yikim", config.customMainMenu);
+        config.uiTema = properties.getProperty("arayuz.tema", config.uiTema).trim().toLowerCase(Locale.ROOT);
+        config.temaSurum = (int)YikimConfig.number(properties, "arayuz.tema-surum", config.temaSurum);
         config.backdropStyle = properties.getProperty("menu.arka", config.backdropStyle).trim().toLowerCase(Locale.ROOT);
         for (YikimWidget widget : YikimWidgets.all()) {
             WidgetState state = new WidgetState();
@@ -138,6 +144,8 @@ public final class YikimConfig {
         properties.setProperty("renk.ozel", Boolean.toString(this.customAccent));
         properties.setProperty("katalog.kaynak", this.catalogSource);
         properties.setProperty("menu.yikim", Boolean.toString(this.customMainMenu));
+        properties.setProperty("arayuz.tema", this.uiTema == null ? "klasik" : this.uiTema);
+        properties.setProperty("arayuz.tema-surum", Integer.toString(this.temaSurum));
         properties.setProperty("menu.arka", this.backdropStyle == null ? "random" : this.backdropStyle);
         properties.setProperty(PERFORMANCE_DEFAULTS_KEY, Integer.toString(this.performanceDefaultsVersion));
         for (Map.Entry<String, WidgetState> entry : this.widgets.entrySet()) {

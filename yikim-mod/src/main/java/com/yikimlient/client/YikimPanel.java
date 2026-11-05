@@ -249,10 +249,17 @@ public final class YikimPanel {
         this.syncCatalog();
         this.syncCurve();
         this.slots = YikimLayout.arrange(font, screenWidth, screenHeight);
-        graphics.method_25294(0, 0, screenWidth, screenHeight, -1946157056);
-        YikimDraw.roundedFill(graphics, this.px1, this.py1, this.px2, this.py2, -234223089);
-        YikimDraw.outline(graphics, this.px1, this.py1, this.px2 - this.px1, this.py2 - this.py1, 0x33FFFFFF);
-        graphics.method_25294(this.px1 + 2, this.py1 + 1, this.px1 + 2 + (int)((float)(this.px2 - this.px1 - 4) * eased), this.py1 + 3, YikimTheme.alpha(YikimTheme.accent, 240));
+        boolean sadeTema = YikimTema.sade();
+        graphics.method_25294(0, 0, screenWidth, screenHeight, sadeTema ? -15066592 : -1946157056);
+        if (sadeTema) {
+            // SADE: düz koyu zemin + ince çerçeve, üstteki aksan şeridi yok
+            graphics.method_25294(this.px1, this.py1, this.px2, this.py2, 0xFF0C0C10);
+            YikimDraw.outline(graphics, this.px1, this.py1, this.px2 - this.px1, this.py2 - this.py1, 0x22FFFFFF);
+        } else {
+            YikimDraw.roundedFill(graphics, this.px1, this.py1, this.px2, this.py2, -234223089);
+            YikimDraw.outline(graphics, this.px1, this.py1, this.px2 - this.px1, this.py2 - this.py1, 0x33FFFFFF);
+            graphics.method_25294(this.px1 + 2, this.py1 + 1, this.px1 + 2 + (int)((float)(this.px2 - this.px1 - 4) * eased), this.py1 + 3, YikimTheme.alpha(YikimTheme.accent, 240));
+        }
         this.drawHeader(graphics, font);
         this.drawTabs(graphics, font, client);
         this.drawList(graphics, font);
@@ -274,9 +281,13 @@ public final class YikimPanel {
     }
 
     private void drawHeader(class_332 graphics, class_327 font) {
-        YikimDraw.roundedFill(graphics, this.px1 + 10, this.py1 + 7, this.px1 + 10 + 16, this.py1 + 23, YikimTheme.alpha(YikimTheme.accent, 240));
-        YikimMenuIcons.draw(graphics, 0, this.px1 + 10 + 3, this.py1 + 10, 10, -15724524);
-        int titleX = this.px1 + 10 + 22;
+        boolean sade = YikimTema.sade();
+        int titleX = this.px1 + 10;
+        if (!sade) {
+            YikimDraw.roundedFill(graphics, this.px1 + 10, this.py1 + 7, this.px1 + 10 + 16, this.py1 + 23, YikimTheme.alpha(YikimTheme.accent, 240));
+            YikimMenuIcons.draw(graphics, 0, this.px1 + 10 + 3, this.py1 + 10, 10, -15724524);
+            titleX = this.px1 + 10 + 22;
+        }
         YikimAdapter.push(graphics, titleX, this.py1 + 6, 1.25f);
         YikimAdapter.text(graphics, font, "YIKIM", 0, 0, -723722, true);
         YikimAdapter.pop(graphics);
@@ -304,7 +315,11 @@ public final class YikimPanel {
                 YikimDraw.roundedFill(graphics, x, y, x + width, y + height, active ? YikimTheme.alpha(YikimTheme.accent, 46) : 0x44FFFFFF);
             }
             int iconX = labels ? x + 7 : x + (width - 12) / 2;
-            YikimMenuIcons.draw(graphics, TAB_ICONS[index], iconX, y + (height - 12) / 2, 12, active ? YikimTheme.accent : (hovered ? -6645082 : -9539974));
+            if (!YikimTema.sade()) {
+                YikimMenuIcons.draw(graphics, TAB_ICONS[index], iconX, y + (height - 12) / 2, 12, active ? YikimTheme.accent : (hovered ? -6645082 : -9539974));
+            } else {
+                iconX = x + 6;
+            }
             if (!labels) continue;
             YikimAdapter.text(graphics, font, TAB_NAMES[index], iconX + 16, y + (height - 8) / 2, active ? -723722 : -9539974, true);
         }
@@ -658,6 +673,18 @@ public final class YikimPanel {
         this.rows.add(new TextRow(this, "De\u011fi\u015fiklik hemen uygulan\u0131r ve kaydedilir.", -9539974));
         this.rows.add(new ValueRow(this, "Y\u00fckl\u00fc mod", () -> this.cacheModsCount, -723722));
         this.rows.add(new ValueRow(this, "Oturum", () -> this.cacheSession, -6645082));
+        this.rows.add(new SectionRow(this, "Arayüz teması"));
+        this.rows.add(new SegmentRow(new String[]{"Klasik", "Sade"}, YikimTema.sade() ? 1 : 0, index -> {
+            YikimTema.sec(index == 1 ? YikimTema.SADE : YikimTema.KLASIK);
+            YikimMetrics.notify("Arayüz teması: " + YikimTema.ad());
+            this.cacheAt = 0L;
+            this.rebuild();
+        }));
+        this.rows.add(new TextRow(this, "Sade: karakter önde, tek sütun, süssüz. Klasik: pano + yan panel.", -9539974));
+        this.rows.add(new ButtonRow(this, "Ön izlemeli tema seçimini aç", false, () -> {
+            YikimPanel.close();
+            class_310.method_1551().method_1507(new YikimTemaEkrani());
+        }));
     }
 
     private void buildHud() {
@@ -2018,9 +2045,11 @@ public final class YikimPanel {
                 graphics.method_25294(this.x, this.y + 3, this.x + 3, this.y + this.height() - 3, queued ? YikimTheme.accent : YikimTheme.alpha(YikimTheme.accent, 85));
             }
             int actionWidth = 52;
-            // ikon: katalog yanıtının 7. kolonu (Modrinth/CurseForge görseli)
-            YikimIcons.draw(graphics, font, "catalog:" + this.hit.slug, this.hit.icon, this.hit.title, this.x + 10, this.y + 4, 22);
-            int textX = this.x + 38;
+            // SADE temada logo daha buyuk: 22 px rozet kucukte kayboluyordu.
+            int ikonBoy = YikimTema.sade() ? 28 : 24;
+            YikimIcons.draw(graphics, font, "catalog:" + this.hit.slug, this.hit.icon, this.hit.title,
+                this.x + 9, this.y + (this.height() - ikonBoy) / 2, ikonBoy);
+            int textX = this.x + 12 + ikonBoy;
             int textRoom = this.width - actionWidth - 52;
             YikimAdapter.text(graphics, font, YikimDraw.clip(font, this.hit.title, textRoom), textX, this.y + 4, -723722, true);
             YikimAdapter.text(graphics, font, YikimDraw.clip(font, this.meta, textRoom), textX, this.y + 15, -9539974, false);

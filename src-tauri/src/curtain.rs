@@ -232,6 +232,9 @@ pub struct CurtainPlanView {
     pub label: String,
     pub toggles: Vec<CurtainToggleView>,
     pub installs: Vec<CurtainInstallView>,
+    /// Oyun içi menülerle AYNI vurgu renkleri (perde teması bunları kullanır).
+    pub accent: String,
+    pub accent2: String,
 }
 
 /// restart-request.json var mı BAK (silmeksizin). Dönüş: (instance_id, istek).
@@ -322,12 +325,15 @@ pub async fn open_restart_curtain(app: &AppHandle) -> Option<CurtainPlanView> {
     let instance_name = crate::instances::Instance::load(&instance_id)
         .map(|i| i.name)
         .unwrap_or_else(|| instance_id.clone());
+    let (accent, accent2, _) = theme_colors(&crate::config::YikimConfig::load_or_default());
     let view = CurtainPlanView {
         instance_id: instance_id.clone(),
         instance_name,
         label: "Değişiklikler uygulanıyor".into(),
         toggles,
         installs,
+        accent,
+        accent2,
     };
     if let Some(state) = app.try_state::<crate::AppState>() {
         *state.curtain_plan.write().await = Some(view.clone());
@@ -507,12 +513,21 @@ pub async fn handle_game_exit(app: &AppHandle, instance_id: &str) {
             let _ = app.emit("game-started", &view.instance_id);
             match crate::commands::cmd_launch_instance(app.clone(), view.instance_id.clone()).await {
                 Ok(_) => {
+                    // BAYAT "ready" TEMİZLİĞİ: önceki oturumdan kalan dosya varsa
+                    // perde açılır açılmaz kapanırdı (kullanıcı "hiçbir şey olmadı"
+                    // görüyordu). Yeni oturum kendi ready dosyasını yazacak.
+                    if let Some(ref inst_now) = crate::instances::Instance::load(&view.instance_id) {
+                        let _ = std::fs::remove_file(ready_path(inst_now));
+                    }
                     // PERDE: oyunun ana menüsü gelene kadar açık kal.
                     // Mod ana menü hazır olunca .yikim/ready dosyası yazar.
                     // 500ms'de bir kontrol, 60 sn timeout (mod yoksa veya crash olursa kapanmasın).
                     yikim_log("restart: oyun süreci doğdu, ana menü bekleniyor...".into());
                     let inst = crate::instances::Instance::load(&view.instance_id);
                     let ready_path = inst.map(|i| crate::curtain::ready_path(&i));
+                    // İlk 1,2 sn ready dosyası aranmaz: oyun süreci daha yeni
+                    // doğdu, eski/erken yazılmış bir dosya perdeyi hemen kapatmasın.
+                    tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
                     let start = std::time::Instant::now();
                     loop {
                         // ready dosyası var mı? (mod ana menüyü çizince yazar)

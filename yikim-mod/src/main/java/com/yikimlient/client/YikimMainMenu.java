@@ -135,6 +135,16 @@ public final class YikimMainMenu {
         float eased = 1.0f - (1.0f - appear) * (1.0f - appear);
         int slide = (int)((1.0f - eased) * 24.0f);
         YikimBackdrop.render(graphics, screenWidth, screenHeight, now);
+        // GÜNCELLEME SONRASI İLK AÇILIŞ: arayüz temasını ön izlemeli olarak sor
+        YikimTemaEkrani.ilkAcilisKontrol();
+        if (YikimTemaEkrani.acik()) {
+            YikimUiMetrics.menuEnd(started);
+            return;
+        }
+        if (YikimTema.sade()) {
+            this.drawSade(graphics, font, client, screenWidth, screenHeight, mouseX, mouseY, started);
+            return;
+        }
         int margin = screenWidth < 640 ? 12 : 24;
         int footerHeight = 20;
         float wordScale = screenHeight >= 300 ? 3.0f : 2.0f;
@@ -220,6 +230,115 @@ public final class YikimMainMenu {
             this.cacheTipWidth = tipWidth;
             this.cacheTipLines = YikimMainMenu.wrap(font, TIPS[tipIndex], tipWidth);
         }
+    }
+
+    /**
+     * SADE TEMA ANA MENÜ (v1.28.0).
+     *
+     * Yeni düzen: solda tek sütun sade tuşlar, sağda oyuncunun KARAKTERİ
+     * (launcher'ın oyun öncesi yazdığı deri), altta ince şerit. Pano/yan panel
+     * yok — "karmaşık" geri bildiriminin hedefi tam olarak buydu.
+     */
+    private void drawSade(class_332 graphics, class_327 font, class_310 client,
+                          int screenWidth, int screenHeight, int mouseX, int mouseY, long started) {
+        // GÜVENLİK AĞI: yeni tema çizimi beklenmedik bir şey yüzünden patlarsa
+        // oyun kilitlenmesin; tema klasik'e döner ve menü normal çizilir.
+        try {
+            this.drawSadeGovde(graphics, font, client, screenWidth, screenHeight, mouseX, mouseY, started);
+        }
+        catch (Throwable sorun) {
+            YikimConfig cfg = YikimConfig.get();
+            cfg.uiTema = YikimTema.KLASIK;
+            cfg.save();
+            YikimLog.info("sade tema cizilemedi, klasik temaya donuldu: " + sorun);
+            YikimMetrics.notify("Sade tema çizilemedi — Klasik temaya dönüldü");
+        }
+    }
+
+    private void drawSadeGovde(class_332 graphics, class_327 font, class_310 client,
+                               int screenWidth, int screenHeight, int mouseX, int mouseY, long started) {
+        YikimMetrics.frame(3);
+        this.hitCount = 0;
+        int margin = screenWidth < 640 ? 16 : 34;
+        // sakin örtü: arka plan görünür ama süssüz
+        graphics.method_25294(0, 0, screenWidth, screenHeight, 0x77000000);
+        float wordScale = screenHeight >= 320 ? 2.0f : 1.6f;
+        int logoY = margin;
+        YikimMainMenu.bigText(graphics, font, "YIKIM", margin, logoY, -723722, wordScale);
+        int wordWidth = (int)((float)font.method_1727("YIKIM") * wordScale);
+        int altCizgi = logoY + (int)(8.0f * wordScale) + 4;
+        YikimDraw.horizontalGradient(graphics, margin, altCizgi, margin + wordWidth, altCizgi + 3,
+            YikimTheme.accent, YikimTheme.accent2, 6);
+        YikimAdapter.text(graphics, font, "CLIENT  •  v" + YikimClient.MOD_VERSION, margin + 1, altCizgi + 8,
+            YikimTheme.TEXT_MUTED, true);
+
+        // ---- tuş sütunu ----
+        int sutun = Math.min(310, Math.max(180, screenWidth / 3));
+        int satirH = 30;
+        int bosluk = 6;
+        int toplam = this.buttons.size() * satirH + (this.buttons.size() - 1) * bosluk;
+        int tepe = Math.max(altCizgi + 30, (screenHeight - toplam) / 2 - 4);
+        if (tepe + toplam > screenHeight - 74) {
+            satirH = Math.max(22, saldir(screenHeight - 74 - tepe, this.buttons.size(), 4));
+            toplam = this.buttons.size() * satirH + (this.buttons.size() - 1) * 4;
+            bosluk = 4;
+            tepe = Math.max(altCizgi + 24, (screenHeight - toplam) / 2 - 4);
+        }
+        this.columnX = margin;
+        this.columnWidth = sutun;
+        for (int index = 0; index < this.buttons.size(); ++index) {
+            Button button = this.buttons.get(index);
+            int y = tepe + index * (satirH + bosluk);
+            boolean hovered = YikimDraw.inside(mouseX, mouseY, margin, y, sutun, satirH);
+            if (hovered) {
+                YikimDraw.roundedFill(graphics, margin, y, margin + sutun, y + satirH,
+                    YikimTheme.alpha(YikimTheme.accent, 30));
+                graphics.method_25294(margin, y + 3, margin + 2, y + satirH - 3, YikimTheme.accent);
+            }
+            int iconSize = Math.max(12, satirH - 12);
+            YikimMenuIcons.draw(graphics, button.icon(), margin + 12, y + (satirH - iconSize) / 2, iconSize,
+                hovered ? YikimTheme.accent : YikimTheme.TEXT_MUTED);
+            YikimAdapter.text(graphics, font, YikimDraw.clip(font, button.label(), sutun - 34),
+                margin + 12 + iconSize + 10, y + (satirH - 8) / 2, hovered ? -723722 : -6645082, true);
+            this.addHit(margin, y, sutun, satirH, button.action());
+        }
+
+        // ---- karakter ----
+        int boy = Math.min((int)((float)screenHeight * 0.52f), 200);
+        int karakterX = screenWidth - margin - Math.max(80, screenWidth / 7);
+        int karakterTepe = Math.max(tepe, (screenHeight - boy) / 2 - 18);
+        YikimKarakter.draw(graphics, karakterX, karakterTepe, boy, YikimTheme.backdrop);
+
+        // ---- hesap satırı (karakterin altında) ----
+        String isim = this.cacheUser.isEmpty() ? "—" : this.cacheUser;
+        int hesapY = Math.min(screenHeight - 74, karakterTepe + boy + 8);
+        YikimAdapter.push(graphics, karakterX - (int)((float)font.method_1727(isim) * 1.15f) / 2, hesapY, 1.15f);
+        YikimAdapter.text(graphics, font, isim, 0, 0, -723722, true);
+        YikimAdapter.pop(graphics);
+        String alt = this.cacheAccount + "  •  " + this.cacheMods;
+        YikimAdapter.text(graphics, font, alt, karakterX - font.method_1727(alt) / 2, hesapY + 13,
+            YikimTheme.TEXT_MUTED, false);
+
+        // ---- alt: küçük anahtarlar + şerit ----
+        int anahtarY = screenHeight - 46;
+        this.drawChips(graphics, font, anahtarY, sutun, mouseX, mouseY);
+        graphics.method_25294(0, screenHeight - 20, screenWidth, screenHeight - 19,
+            YikimTheme.alpha(YikimTheme.accent, 60));
+        YikimAdapter.text(graphics, font, this.cacheFooterLeft, margin, screenHeight - 14, YikimTheme.TEXT_MUTED, false);
+        String sag = "Sağ Shift  •  YIKIM menüsü  •  Tema: Sade";
+        if (screenWidth - margin - font.method_1727(sag) > margin + sutun + 8) {
+            YikimAdapter.text(graphics, font, sag, screenWidth - margin - font.method_1727(sag),
+                screenHeight - 14, YikimTheme.TEXT_MUTED, false);
+        }
+        YikimUiMetrics.menuEnd(started);
+    }
+
+    /** Tuşlar sığsın diye satır yüksekliği (en az 20 px). */
+    private static int saldir(int alan, int adet, int bosluk) {
+        if (adet <= 0) {
+            return 24;
+        }
+        return Math.max(20, (alan - (adet - 1) * bosluk) / adet);
     }
 
     private void drawHeader(class_332 graphics, class_327 font, int x, int y, float scale, int slide) {

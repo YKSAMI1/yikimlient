@@ -197,12 +197,14 @@
       const prettify = (id) => (id || "").replace(/[-_]([a-z0-9])/g, (_, c) => " " + c.toUpperCase())
         .replace(/^./, (c) => c.toUpperCase());
 
-      const mkRow = (kind, id, file, on) => {
+      const mkRow = (kind, id, file, on, display, note) => {
         if (!listEl.querySelector(".row")) listEl.innerHTML = "";
         const el = document.createElement("div");
         el.className = "row";
-        const name = id ? prettify(id) : (file || "").replace(/\.jar$/, "");
-        const tag = kind === "install" ? "KUR" : (on ? "AÇ" : "KAPAT");
+        // GERÇEK AD: mod kimliği yerine katalogdan gelen başlık yazılır
+        // ("P7dR8mSH" gibi karma kimlikler yalnız yedek olarak kalır).
+        const name = display || (id ? prettify(id) : (file || "").replace(/\.jar$/, ""));
+        const tag = note || (kind === "install" ? "KUR" : (on ? "AÇ" : "KAPAT"));
         el.innerHTML = `
           <span class="st"></span>
           <span class="name">${name} <span class="file">${file ? file + " " : ""}· ${tag}</span></span>
@@ -225,14 +227,32 @@
         fillEl.style.transform = `scaleX(${Math.min(1, doneCount / Math.max(1, total))})`;
       };
 
+      // oyun içi menülerle aynı vurgu rengi (perde teması uyumu)
+      const rgba = (hex, a) => {
+        const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+        if (!m) return null;
+        const n = parseInt(m[1], 16);
+        return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+      };
+      const applyTheme = (plan) => {
+        const kok = document.documentElement.style;
+        if (plan.accent) kok.setProperty("--accent", plan.accent);
+        if (plan.accent2) kok.setProperty("--accent-soft", plan.accent2);
+        const dim = rgba(plan.accent, 0.14);
+        if (dim) kok.setProperty("--accent-dim", dim);
+        const cam = rgba(plan.accent, 0.5);
+        if (cam) kok.setProperty("--accent-glow", cam);
+      };
+
       const renderPlan = (plan) => {
         planLoaded = true;
+        applyTheme(plan);
         phTitle.textContent = plan.label || "Değişiklikler uygulanıyor";
         phSub.innerHTML = `<b>${plan.instance_name}</b> için oyun içi değişiklikler uygulanıyor…`;
         if (plan.toggles?.length || plan.installs?.length) {
           listEl.innerHTML = "";
           for (const t of plan.toggles) mkRow("toggle", t.id, t.file, t.on);
-          for (const i of plan.installs) mkRow("install", i.id, "", true);
+          for (const i of plan.installs) mkRow("install", i.id, "", true, i.name, "KURULACAK");
         }
       };
 
