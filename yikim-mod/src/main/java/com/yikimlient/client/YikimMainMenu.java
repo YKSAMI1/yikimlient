@@ -80,6 +80,11 @@ public final class YikimMainMenu {
         this.buttons.add(new Button("YIKIM Men\u00fcs\u00fc", "Performans, g\u00f6r\u00fcn\u00fcm, HUD, modlar", 0, 0, () -> YikimPanel.open(class_310.method_1551(), 0)));
         this.buttons.add(new Button("HUD'u d\u00fczenle", "\u00d6\u011feleri yerle\u015ftir", 3, 2, () -> YikimPanel.open(class_310.method_1551(), 2)));
         this.buttons.add(new Button("Modlar", "Mod ara ve kur", 4, 4, () -> YikimPanel.open(class_310.method_1551(), 4)));
+        // v1.27.0: oyun içi hesap değiştirme (launcher hesapları)
+        String hesapAdi = YikimHesaplar.aktifAd(class_310.method_1551());
+        this.buttons.add(new Button("Hesap: " + (hesapAdi.isEmpty() ? "değiştir" : hesapAdi),
+            "Premium / çevrimdışı arasında anında geçiş", YikimMenuIcons.KULLANICI, -1,
+            () -> YikimMainMenu.open(new YikimHesapEkrani())));
         this.buttons.add(new Button("Ayarlar", "Minecraft ayarlar\u0131", 5, -1, () -> YikimMainMenu.open(YikimAdapter.optionsScreen(screen, class_310.method_1551().field_1690))));
         this.buttons.add(new Button("\u00c7\u0131k\u0131\u015f", "Oyundan ayr\u0131l", 8, -1, () -> class_310.method_1551().method_1592()));
         // DİĞER MODLARIN TUŞLARI (Flashback, Mod Menu vb.): vanilla menüye mixin ile

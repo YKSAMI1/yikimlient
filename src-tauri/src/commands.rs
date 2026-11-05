@@ -946,6 +946,7 @@ pub async fn cmd_add_offline_account(name: String) -> Result<SanitizedAccount, S
     let mut cfg = YikimConfig::load_or_default();
     cfg.last_selected_account = acc.id.clone();
     cfg.save()?;
+    crate::hesap_kopru::tum_kurulumlara_yaz();
     Ok(sanitize(&acc))
 }
 
@@ -960,6 +961,7 @@ pub async fn cmd_ms_login_begin(app: AppHandle) -> Result<SanitizedAccount, Stri
     let mut cfg = YikimConfig::load_or_default();
     cfg.last_selected_account = acc.id.clone();
     cfg.save()?;
+    crate::hesap_kopru::tum_kurulumlara_yaz();
     Ok(sanitize(&acc))
 }
 
@@ -974,6 +976,7 @@ pub async fn cmd_select_account(account_id: String) -> Result<(), String> {
     let mut cfg = YikimConfig::load_or_default();
     cfg.last_selected_account = account_id;
     cfg.save()?;
+    crate::hesap_kopru::tum_kurulumlara_yaz();
     Ok(())
 }
 
@@ -987,6 +990,7 @@ pub async fn cmd_remove_account(account_id: String) -> Result<(), String> {
         cfg.last_selected_account = list.first().map(|a| a.id.clone()).unwrap_or_default();
         cfg.save()?;
     }
+    crate::hesap_kopru::tum_kurulumlara_yaz();
     Ok(())
 }
 
@@ -2451,6 +2455,9 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
     crate::curtain::write_theme_json(&inst, &cfg);
     // Atölye yetkisi: hesap adı + türü launcher'da bilinir → mod güvenle okur
     crate::curtain::write_atolye_yetki(&inst, &cfg, &account.name, &account.kind);
+    // Oyun içi hesap değiştirme: ana menüdeki liste için hesap özetleri
+    // (jeton YOK — jeton yalnız mod istediğinde hesap-oturum.json ile verilir)
+    crate::hesap_kopru::write_hesaplar(&inst);
 
     // Ayar profili: her açılışta yeniden zorlanır (dil TR, sınırsız FPS, VSync kapalı,
     // ölçek 2, erişilebilirlik sarsıntıları kapalı) — başlangıç ekranı atlanır.

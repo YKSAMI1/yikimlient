@@ -7,6 +7,7 @@ pub mod bellek;
 pub mod discord_rpc;
 pub mod emote_binary;
 pub mod game_options;
+pub mod hesap_kopru;
 pub mod instances;
 pub mod kozmetik;
 pub mod kozmetik_katalog;
@@ -251,6 +252,8 @@ pub fn run() {
             });
             // Oyun içi katalog isteklerini yanıtlayan arka plan izleyicisi
             commands::spawn_catalog_watcher(app.handle().clone());
+            // Oyun içi hesap değiştirme istekleri (mod → launcher → taze oturum)
+            hesap_kopru::spawn_hesap_watcher(app.handle().clone());
             // Discord presence: launcher açık → "YIKIMLient açık" (yerel IPC, internet yok)
             discord_rpc::basla();
             discord_rpc::launcher_presence();

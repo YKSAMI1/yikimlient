@@ -12,7 +12,8 @@
                    "TabBadgeMixin",
                    "YikimFontStokMixin",
                    "YikimFontCtxSahasi",
-                   "BaslikEkraniMixin"
+                   "BaslikEkraniMixin",
+                   "YikimOturum"
                ],
     "injectors":  {
                       "defaultRequire":  0

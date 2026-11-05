@@ -33,6 +33,18 @@ public final class YikimBridge {
         return YikimBridge.stateDir().resolve("restart-request.json");
     }
 
+    public static Path hesaplarFile() {
+        return YikimBridge.stateDir().resolve("hesaplar.json");
+    }
+
+    public static Path hesapIstekFile() {
+        return YikimBridge.stateDir().resolve("hesap-istek.json");
+    }
+
+    public static Path hesapOturumFile() {
+        return YikimBridge.stateDir().resolve("hesap-oturum.json");
+    }
+
     public static Path catalogRequestFile() {
         return YikimBridge.stateDir().resolve("catalog-request.json");
     }
@@ -98,6 +110,44 @@ public final class YikimBridge {
         }
         catch (Throwable ignored) {
             return -1L;
+        }
+    }
+
+    /**
+     * Oyun içi hesap değiştirme isteği yaz (mod -> launcher).
+     * Launcher taze oturum üretir ve `hesap-oturum.json`'a aynı `at` değeriyle
+     * cevap verir. Dönüş: istek damgası (>0) veya hata (-1).
+     */
+    public static long writeHesapIstek(String hesapId) {
+        long at = System.currentTimeMillis();
+        try {
+            Path dir = YikimBridge.stateDir();
+            Files.createDirectories(dir, new FileAttribute[0]);
+            String instance = System.getProperty("yikimlient.instance", "");
+            String json = "{\n  \"at\": " + at + ",\n  \"id\": \"" + YikimJson.escape(hesapId) + "\",\n  \"instance\": \"" + YikimJson.escape(instance) + "\"\n}\n";
+            Files.writeString(YikimBridge.hesapIstekFile(), (CharSequence)json, StandardCharsets.UTF_8, new OpenOption[0]);
+            return at;
+        }
+        catch (Throwable ignored) {
+            return -1L;
+        }
+    }
+
+    /** `at` değeri isteğe ait oturum cevabını döndürür; hazır değilse null. */
+    public static String readHesapOturum(long at) {
+        try {
+            Path path = YikimBridge.hesapOturumFile();
+            if (!Files.exists(path, new LinkOption[0])) {
+                return null;
+            }
+            String metin = Files.readString(path, StandardCharsets.UTF_8);
+            if (metin.isBlank()) {
+                return null;
+            }
+            return YikimJson.longNumber(metin, "istek", -1L) == at ? metin : null;
+        }
+        catch (Throwable ignored) {
+            return null;
         }
     }
 
