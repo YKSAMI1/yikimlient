@@ -152,7 +152,9 @@ public final class YikimKozmetik {
      *  olmalı: yalnız alan okuma, kilit/ağ/reflection yok. */
     public static boolean etkinMi() {
         YikimKozmetik.dosyalariTazele(); // saniyede en fazla bir dosya kontrolü
-        return !YikimKozmetik.pelerinYerel.isEmpty()
+        YikimKozmetikSecim.tazele();      // menüden seçilmiş deri var mı?
+        return !YikimKozmetikSecim.aktifId(YikimKozmetikSecim.DERI).isEmpty()
+            || !YikimKozmetik.pelerinYerel.isEmpty()
             || !YikimKozmetik.kanatYerel.isEmpty()
             || !YikimKozmetik.UZAK_PELERIN.isEmpty()
             || !YikimKozmetik.UZAK_KANAT.isEmpty();
@@ -598,6 +600,22 @@ public final class YikimKozmetik {
         }
     }
 
+    /** Menüden seçilmiş deri (yoksa null): yalnız KENDİ oyuncuya uygulanır. */
+    private static class_2960 kendiDeri(UUID id) {
+        try {
+            if (!YikimKozmetik.kendim(id)) {
+                return null;
+            }
+            if (YikimKozmetikSecim.aktifId(YikimKozmetikSecim.DERI).isEmpty()) {
+                return null;
+            }
+            return YikimKarakter.deriDoku();
+        }
+        catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     /** Oyuncunun pelerin dokusu (yoksa null → vanilla). */
     public static class_2960 pelerin(UUID id) {
         try {
@@ -861,15 +879,16 @@ public final class YikimKozmetik {
             }
             class_2960 pelerin = YikimKozmetik.pelerin(id);
             class_2960 kanat = YikimKozmetik.kanat(id);
-            if (pelerin == null && kanat == null) {
+            class_2960 deri = YikimKozmetik.kendiDeri(id);
+            if (pelerin == null && kanat == null && deri == null) {
                 return null;
             }
-            String anahtar = pelerin + "|" + kanat;
+            String anahtar = deri + "|" + pelerin + "|" + kanat;
             Object[] kayit = YikimKozmetik.ONBELLEK.get(mevcut);
             if (kayit != null && anahtar.equals(kayit[0])) {
                 return kayit[1];
             }
-            Object var = YikimKozmetik.uygula(mevcut, pelerin, kanat);
+            Object var = YikimKozmetik.uygula(mevcut, pelerin, kanat, deri);
             if (var == null) {
                 return null;
             }
@@ -889,7 +908,15 @@ public final class YikimKozmetik {
      * Doku yoksa veya derleme tutmazsa `null` döner → vanilla kalır.
      */
     public static Object uygula(Object mevcut, class_2960 pelerin, class_2960 kanat) {
-        if (mevcut == null || (pelerin == null && kanat == null)) {
+        return YikimKozmetik.uygula(mevcut, pelerin, kanat, null);
+    }
+
+    /**
+     * `deri` verilirse GÖVDE dokusu da değiştirilir (menüden seçilen skin —
+     * yalnız yerel görünüm; gövde doğrulaması yine yapılır).
+     */
+    public static Object uygula(Object mevcut, class_2960 pelerin, class_2960 kanat, class_2960 deri) {
+        if (mevcut == null || (pelerin == null && kanat == null && deri == null)) {
             return null;
         }
         try {
@@ -915,7 +942,14 @@ public final class YikimKozmetik {
                     yeniKanat = bilgi;
                 }
             }
-            if (yeniPelerin == eskiPelerin && yeniKanat == eskiKanat) {
+            Object yeniGovde = govde;
+            if (deri != null) {
+                Object bilgi = YikimKozmetik.dokuBilgisi(deri);
+                if (bilgi != null) {
+                    yeniGovde = bilgi;
+                }
+            }
+            if (yeniPelerin == eskiPelerin && yeniKanat == eskiKanat && yeniGovde == govde) {
                 return null;
             }
             Class<?> tur = Class.forName("net.minecraft.class_8685");
@@ -924,14 +958,14 @@ public final class YikimKozmetik {
                 if (p.length != 5 || p[4] != boolean.class) {
                     continue;
                 }
-                Object var = c.newInstance(govde, yeniPelerin, yeniKanat, model, secure);
+                Object var = c.newInstance(yeniGovde, yeniPelerin, yeniKanat, model, secure);
                 // GÜVENLİK KİLİDİ (v1.19.3) — "kozmetik takınca skinim Steve
                 // oldu" hatası: yansımayla kurulan nesnenin bileşen sırası
                 // sürümler arasında değişebilir. Yeni nesnenin GÖVDE dokusu
                 // mevcutla birebir aynı değilse hiçbir şey uygulanmaz → oyuncu
                 // kendi skinini asla kaybetmez, en fazla kozmetik görünmez.
                 Object varGovde = YikimKozmetik.cagir(var, "comp_1626");
-                if (varGovde == null || !YikimKozmetik.ayniDoku(varGovde, govde)) {
+                if (varGovde == null || !YikimKozmetik.ayniDoku(varGovde, yeniGovde)) {
                     return null;
                 }
                 return var;

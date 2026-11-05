@@ -2461,6 +2461,8 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
     // Oyun içi "sade" ana menü karakteri: aktif hesabın derisi yerel olarak
     // kopyalanır (mod ağa dokunmaz, internet yokken de doğru görünür).
     write_oyun_derisi(&inst, &account);
+    // Oyun içi deri/pelerin/elitra seçicisi: katalog + görsel kopyaları
+    crate::kozmetik_kopru::katalog_yaz(&inst);
 
     // Ayar profili: her açılışta yeniden zorlanır (dil TR, sınırsız FPS, VSync kapalı,
     // ölçek 2, erişilebilirlik sarsıntıları kapalı) — başlangıç ekranı atlanır.
@@ -2762,6 +2764,17 @@ pub fn spawn_catalog_watcher(_app: tauri::AppHandle) {
             let dir = crate::core::instances_dir();
             let Ok(entries) = std::fs::read_dir(&dir) else { continue };
             for entry in entries.flatten() {
+                // Oyun içi deri/pelerin/elitra seçimi (mod yazar, launcher uygular)
+                let koz_istek = entry.path().join(".yikim").join("kozmetik-istek.txt");
+                let koz_katalog = entry.path().join(".yikim").join("kozmetik-katalog.txt");
+                if koz_istek.is_file() || (!koz_katalog.is_file()
+                    && entry.path().join(".yikim").is_dir()) {
+                    if let Some(inst) = crate::instances::Instance::load(
+                        &entry.file_name().to_string_lossy(),
+                    ) {
+                        crate::kozmetik_kopru::istek_isle(&inst);
+                    }
+                }
                 let req_path = entry.path().join(".yikim").join("catalog-request.json");
                 if !req_path.is_file() {
                     continue;

@@ -11,6 +11,7 @@ pub mod hesap_kopru;
 pub mod instances;
 pub mod kozmetik;
 pub mod kozmetik_katalog;
+pub mod kozmetik_kopru;
 pub mod launcher;
 pub mod modpacks;
 pub mod repos;

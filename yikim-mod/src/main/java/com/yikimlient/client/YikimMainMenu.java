@@ -189,7 +189,10 @@ public final class YikimMainMenu {
             this.drawChips(graphics, font, this.buttonsTop + blockHeight + 8, buttonWidth, mouseX, mouseY);
         }
         if (this.cardWidth > 0 && this.cardX - (this.columnX + this.columnWidth) >= 24) {
-            this.drawSidePanel(graphics, client, font, this.cardX, this.cardY, this.cardWidth, screenHeight - this.cardY - footerHeight - margin, mouseX, mouseY);
+            // v1.29.0: sağ üstteki "SEN" bilgi paneli KALDIRILDI — yerine
+            // dönen 3B karakter + deri/pelerin/elitra seçicisi geldi.
+            int altSinir = screenHeight - footerHeight - margin - this.modDockYukseklik();
+            this.drawKarakterPaneli(graphics, font, this.cardX, this.cardY, this.cardWidth, altSinir, mouseX, mouseY);
         }
         // v1.15.0: diğer modlarin tuslari ARTIK yan panelin icinde degil —
         // ekranin SAG ALTINDA kendi piksel bloku olarak duruyorlar.
@@ -303,21 +306,10 @@ public final class YikimMainMenu {
             this.addHit(margin, y, sutun, satirH, button.action());
         }
 
-        // ---- karakter ----
-        int boy = Math.min((int)((float)screenHeight * 0.52f), 200);
-        int karakterX = screenWidth - margin - Math.max(80, screenWidth / 7);
-        int karakterTepe = Math.max(tepe, (screenHeight - boy) / 2 - 18);
-        YikimKarakter.draw(graphics, karakterX, karakterTepe, boy, YikimTheme.backdrop);
-
-        // ---- hesap satırı (karakterin altında) ----
-        String isim = this.cacheUser.isEmpty() ? "—" : this.cacheUser;
-        int hesapY = Math.min(screenHeight - 74, karakterTepe + boy + 8);
-        YikimAdapter.push(graphics, karakterX - (int)((float)font.method_1727(isim) * 1.15f) / 2, hesapY, 1.15f);
-        YikimAdapter.text(graphics, font, isim, 0, 0, -723722, true);
-        YikimAdapter.pop(graphics);
-        String alt = this.cacheAccount + "  •  " + this.cacheMods;
-        YikimAdapter.text(graphics, font, alt, karakterX - font.method_1727(alt) / 2, hesapY + 13,
-            YikimTheme.TEXT_MUTED, false);
+        // ---- karakter + kozmetik seçici (sağ sütun) ----
+        int panelG = Math.min(320, Math.max(200, screenWidth / 3));
+        int panelX = Math.max(margin + sutun + 24, screenWidth - margin - panelG);
+        this.drawKarakterPaneli(graphics, font, panelX, tepe, panelG, screenHeight - 66, mouseX, mouseY);
 
         // ---- alt: küçük anahtarlar + şerit ----
         int anahtarY = screenHeight - 46;
@@ -331,6 +323,47 @@ public final class YikimMainMenu {
                 screenHeight - 14, YikimTheme.TEXT_MUTED, false);
         }
         YikimUiMetrics.menuEnd(started);
+    }
+
+    /** Sağ alt mod bloğunun kapladığı yükseklik (karakter paneli üstüne binmesin). */
+    private int modDockYukseklik() {
+        int count = this.modButtons.size();
+        if (count == 0) {
+            return 0;
+        }
+        int rowH = 18;
+        int gap = 3;
+        int shown = Math.min(count, Math.max(1, 12));
+        return shown * (rowH + gap) + 30;
+    }
+
+    /**
+     * SAĞ SÜTUN (v1.29.0) — her iki temada da aynı: dönen 3B karakter,
+     * altında hesap adı ve deri / pelerin / elitra seçicisi.
+     */
+    private void drawKarakterPaneli(class_332 graphics, class_327 font, int x, int ust, int genislik,
+                                    int alt, int mouseX, int mouseY) {
+        if (genislik < 120 || alt - ust < 90) {
+            return;
+        }
+        int seciciYukseklik = 84;
+        int boy = Math.min((int)((float)genislik * 1.4f), Math.max(80, alt - ust - seciciYukseklik - 24));
+        int cx = x + genislik / 2;
+        YikimKarakter.draw(graphics, cx, ust + 2, boy, YikimTheme.backdrop);
+        int isimY = ust + boy + 8;
+        String isim = this.cacheUser.isEmpty() ? "—" : this.cacheUser;
+        float olcek = 1.15f;
+        YikimAdapter.push(graphics, cx - (int)((float)font.method_1727(isim) * olcek) / 2.0f, isimY, olcek);
+        YikimAdapter.text(graphics, font, isim, 0, 0, -723722, true);
+        YikimAdapter.pop(graphics);
+        String altSatir = this.cacheMods;
+        YikimAdapter.text(graphics, font, altSatir, cx - font.method_1727(altSatir) / 2, isimY + 13,
+            YikimTheme.TEXT_MUTED, false);
+        int seciciY = isimY + 26;
+        if (seciciY + seciciYukseklik > alt + 12) {
+            return;
+        }
+        YikimKozmetikSecim.draw(graphics, font, x, seciciY, genislik, mouseX, mouseY, this::addHit);
     }
 
     /** Tuşlar sığsın diye satır yüksekliği (en az 20 px). */
