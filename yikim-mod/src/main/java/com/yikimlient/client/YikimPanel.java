@@ -1964,7 +1964,8 @@ public final class YikimPanel {
 
         @Override
         int height() {
-            return 23;
+            // SADE: logo daha buyuk olsun diye satir da bir tik yuksek
+            return YikimTema.sade() ? 28 : 23;
         }
 
         @Override
@@ -1985,13 +1986,15 @@ public final class YikimPanel {
                 graphics.method_25294(this.x, this.y + 3, this.x + 3, this.y + this.height() - 3, -340971);
             }
             // düzen: [bekleme çubuğu] ikon · isim/meta · [switch sağda]
+            int ikonBoy = YikimTema.sade() ? 24 : 17;
             int iconX = this.x + 10;
+            int iconY = this.y + Math.max(2, (this.height() - ikonBoy) / 2);
             if (this.mod.builtin) {
-                YikimIcons.drawBadge(graphics, font, iconX, this.y + 3, 17);
+                YikimIcons.drawBadge(graphics, font, iconX, iconY, ikonBoy);
             } else {
-                YikimIcons.draw(graphics, font, this.mod.fileName, null, this.mod.name, iconX, this.y + 3, 17);
+                YikimIcons.draw(graphics, font, this.mod.fileName, null, this.mod.name, iconX, iconY, ikonBoy);
             }
-            int textX = this.x + 32;
+            int textX = iconX + ikonBoy + 8;
             int switchX = this.x + this.width - 32;
             int textWidth = switchX - textX - 8;
             YikimAdapter.text(graphics, font, YikimDraw.clip(font, this.label, textWidth), textX, this.y + 3, this.mod.toggleable() ? -723722 : -6645082, true);
