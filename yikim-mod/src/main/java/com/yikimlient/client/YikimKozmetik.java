@@ -600,6 +600,21 @@ public final class YikimKozmetik {
         }
     }
 
+    /**
+     * Kendi oyuncumuz için menüden deri seçilmiş mi? (tek oyunculuda oyuncu
+     * listesi girişi olmadığı için mixin koruması bu durumda atlanır)
+     */
+    public static boolean kendiSeciliDeri(UUID id) {
+        try {
+            return YikimKozmetik.kendim(id)
+                && !YikimKozmetikSecim.aktifId(YikimKozmetikSecim.DERI).isEmpty()
+                && YikimKarakter.deriDoku() != null;
+        }
+        catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     /** Menüden seçilmiş deri (yoksa null): yalnız KENDİ oyuncuya uygulanır. */
     private static class_2960 kendiDeri(UUID id) {
         try {
@@ -874,12 +889,19 @@ public final class YikimKozmetik {
 
     public static Object onbellekli(Object mevcut, UUID id) {
         try {
-            if (mevcut == null || YikimKozmetik.varsayilanMi(mevcut, id)) {
+            class_2960 kendi = YikimKozmetik.kendiDeri(id);
+            if (mevcut == null) {
+                return null;
+            }
+            // Kendi derimiz seçiliyse "varsayılan skin" korumasını atla: tek
+            // oyunculuda giriş olmadığı için gövde varsayılan görünür ve
+            // seçim hiç uygulanmazdı.
+            if (kendi == null && YikimKozmetik.varsayilanMi(mevcut, id)) {
                 return null;
             }
             class_2960 pelerin = YikimKozmetik.pelerin(id);
             class_2960 kanat = YikimKozmetik.kanat(id);
-            class_2960 deri = YikimKozmetik.kendiDeri(id);
+            class_2960 deri = kendi;
             if (pelerin == null && kanat == null && deri == null) {
                 return null;
             }

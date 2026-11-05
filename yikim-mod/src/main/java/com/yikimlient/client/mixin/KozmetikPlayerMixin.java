@@ -38,8 +38,11 @@ public abstract class KozmetikPlayerMixin {
             // rozet/kozmetik hiç görünmüyordu). Oyuncu listesi girişi üzerinden
             // aynı kontrolü yapıyoruz: giriş yoksa varsayılan skin gelir.
             class_310 mc = class_310.method_1551();
-            if (mc == null || mc.method_1562() == null
-                || mc.method_1562().method_2871(oyuncu.method_5667()) == null) {
+            // Menüden deri seçildiyse tek oyunculuda da gövde değişsin
+            boolean kendiSecili = YikimKozmetik.kendiSeciliDeri(oyuncu.method_5667());
+            if (!kendiSecili
+                && (mc == null || mc.method_1562() == null
+                    || mc.method_1562().method_2871(oyuncu.method_5667()) == null)) {
                 return;
             }
             Object yeni = YikimKozmetik.onbellekli(mevcut, oyuncu.method_5667());
