@@ -71,7 +71,8 @@ public final class YikimKozmetikEkrani extends class_437 {
 
     @Override
     protected void method_25426() {
-        // yerleşim çizim sırasında hesaplanıyor
+        // yerleşim çizim sırasında hesaplanıyor; karakter pozu sekmeye uyar
+        this.sekmeSec(YikimKozmetikSecim.sekme());
     }
 
     @Override
@@ -91,12 +92,15 @@ public final class YikimKozmetikEkrani extends class_437 {
         YikimAdapter.push(graphics, KENAR, 14, 1.35f);
         YikimAdapter.text(graphics, font, "ÖZELLEŞTİRME", 0, 0, YikimTheme.TEXT, true);
         YikimAdapter.pop(graphics);
-        String alt = "deri  •  pelerin  •  Mojang pelerinleri  •  elitra";
-        YikimAdapter.text(graphics, font, alt, KENAR + font.method_1727("ÖZELLEŞTİRME") + 16, 24,
-            YikimTheme.TEXT_MUTED, false);
 
+        // v1.32.0: üst sağda HESAPLAR — hesaplar menüsünü bu ekranın ÜSTÜNE açar.
         int kapatG = 84;
         int kapatX = genislik - KENAR - kapatG;
+        int hesapG = 92;
+        int hesapX = kapatX - 8 - hesapG;
+        boolean hesapUzerinde = YikimDraw.inside(mouseX, mouseY, hesapX, 14, hesapG, 22);
+        YikimDraw.button(graphics, font, hesapX, 14, hesapG, 22, "HESAPLAR", false, hesapUzerinde);
+        this.hit(hesapX, 14, hesapG, 22, this::hesaplariAc);
         boolean kapatUzerinde = YikimDraw.inside(mouseX, mouseY, kapatX, 14, kapatG, 22);
         YikimDraw.button(graphics, font, kapatX, 14, kapatG, 22, "KAPAT", false, kapatUzerinde);
         this.hit(kapatX, 14, kapatG, 22, this::method_25419);
@@ -132,14 +136,6 @@ public final class YikimKozmetikEkrani extends class_437 {
             onizlemeY + onizlemeH - 32, YikimTheme.TEXT_MUTED, false);
         this.hit(onizlemeX, onizlemeY, onizlemeG, onizlemeH - 24, () -> { });
 
-        // seçili parçalar (kısa adlar)
-        int ozetY = onizlemeY + onizlemeH - 18;
-        String ozet = this.ozet("Deri", YikimKozmetikSecim.DERI)
-            + "  •  " + this.ozet("Pelerin", YikimKozmetikSecim.PELERIN)
-            + "  •  " + this.ozet("Elitra", YikimKozmetikSecim.ELITRA);
-        YikimAdapter.text(graphics, font, YikimDraw.clip(font, ozet, onizlemeG - 12),
-            onizlemeX + 6, ozetY, YikimTheme.TEXT_DIM, false);
-
         // ---- sağ: sekmeler + kartlar ----
         int sagX = onizlemeX + onizlemeG + 18;
         int sagG = genislik - KENAR - sagX;
@@ -150,11 +146,9 @@ public final class YikimKozmetikEkrani extends class_437 {
             boolean uzerinde = YikimDraw.inside(mouseX, mouseY, x, SEKME_Y + 20, sekmeG, 24);
             YikimDraw.tab(graphics, font, x, SEKME_Y + 20, sekmeG, 24, YikimKozmetikSecim.BASLIK[i], secili, uzerinde);
             final int indeks = i;
-            this.hit(x, SEKME_Y + 20, sekmeG, 24, () -> YikimKozmetikSecim.sekmeAyarla(indeks));
+            this.hit(x, SEKME_Y + 20, sekmeG, 24, () -> this.sekmeSec(indeks));
         }
         int sekme = YikimKozmetikSecim.sekme();
-        String altBaslik = YikimKozmetikSecim.ALT_BASLIK[sekme];
-        YikimAdapter.text(graphics, font, altBaslik, sagX, SEKME_Y + 50, YikimTheme.TEXT_MUTED, false);
 
         List<YikimKozmetikSecim.Oge> liste = YikimKozmetikSecim.liste(sekme);
         List<YikimKozmetikSecim.Oge> tumu = new ArrayList<YikimKozmetikSecim.Oge>(liste.size() + 1);
@@ -213,21 +207,34 @@ public final class YikimKozmetikEkrani extends class_437 {
             YikimAdapter.text(graphics, font, mesaj, genislik - KENAR - font.method_1727(mesaj),
                 yukseklik - 20, YikimTheme.accent, false);
         }
-        String altBilgi = "ESC: geri  •  tekerlek: sayfa  •  değişiklik anında uygulanır";
-        YikimAdapter.text(graphics, font, altBilgi, KENAR, yukseklik - 20, YikimTheme.TEXT_MUTED, false);
     }
 
-    private String ozet(String etiket, int tur) {
-        String id = YikimKozmetikSecim.gorunen(tur);
-        if (id.isEmpty()) {
-            return etiket + ": yok";
+    /**
+     * Sekme seçimi + karakter pozu: pelerin/Mojang/elitra sekmelerinde karakter
+     * ARKASINI döner (pelerini/kanadı görürsün), elitra sekmesinde sırtta
+     * pelerin değil KANAT çizilir.
+     */
+    private void sekmeSec(int indeks) {
+        YikimKozmetikSecim.sekmeAyarla(indeks);
+        YikimKarakter.elitraModu(indeks == YikimKozmetikSecim.ELITRA);
+        if (indeks == YikimKozmetikSecim.DERI) {
+            YikimKarakter.oneDon();
+        } else {
+            YikimKarakter.arkayaDon();
         }
-        for (YikimKozmetikSecim.Oge oge : YikimKozmetikSecim.liste(tur)) {
-            if (oge.id.equals(id)) {
-                return etiket + ": " + oge.ad;
+    }
+
+    /** Hesaplar menüsünü bu ekranın ÜSTÜNE aç (geri dönünce buraya gelir). */
+    private void hesaplariAc() {
+        try {
+            class_310 istemci = class_310.method_1551();
+            if (istemci != null) {
+                istemci.method_1507(new YikimHesapEkrani());
             }
         }
-        return etiket + ": seçili";
+        catch (Throwable ignored) {
+            // hesap ekranı açılamazsa burada kal
+        }
     }
 
     /** Tek kart: önizleme + ad (+ seçili kenarı). */
@@ -313,7 +320,7 @@ public final class YikimKozmetikEkrani extends class_437 {
             return true;
         }
         if (kod == 258) {
-            YikimKozmetikSecim.sekmeAyarla((YikimKozmetikSecim.sekme() + 1) % YikimKozmetikSecim.SEKME_SAYISI);
+            this.sekmeSec((YikimKozmetikSecim.sekme() + 1) % YikimKozmetikSecim.SEKME_SAYISI);
             return true;
         }
         if (kod == 262 || kod == 263) {
@@ -334,6 +341,9 @@ public final class YikimKozmetikEkrani extends class_437 {
 
     @Override
     public void method_25419() {
+        // ana menüye dönerken karakter önden ve pelerinli hâline döner
+        YikimKarakter.elitraModu(false);
+        YikimKarakter.oneDon();
         class_310 istemci = class_310.method_1551();
         if (istemci != null) {
             istemci.method_1507(YikimAdapter.titleScreen());

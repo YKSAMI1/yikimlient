@@ -26,38 +26,51 @@ fn state_dir(inst: &Instance) -> PathBuf {
     inst.dir().join(".yikim")
 }
 
-fn secili_yol() -> PathBuf {
-    crate::core::app_dir().join("kozmetik").join("secili-deri.json")
+/// Hesaba özel seçim dosyası (v0.7.12): deri / Mojang pelerini her hesapta ayrı.
+fn hesap_dosya(ad: &str) -> PathBuf {
+    crate::kozmetik_katalog::hesap_dosya(ad)
 }
+
+/// Hesaba özel dosya, yoksa eski paylaşılan dosyayı oku.
+fn hesap_oku(ad: &str) -> Option<serde_json::Value> {
+    let yol = hesap_dosya(ad);
+    if let Ok(s) = std::fs::read_to_string(&yol) {
+        if let Ok(j) = serde_json::from_str::<serde_json::Value>(&s) {
+            return Some(j);
+        }
+    }
+    let eski = crate::core::app_dir().join("kozmetik").join(format!("{ad}.json"));
+    std::fs::read_to_string(eski)
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+}
+
+fn hesap_yaz(ad: &str, js: &serde_json::Value) {
+    let yol = hesap_dosya(ad);
+    if let Some(parent) = yol.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(yol, js.to_string());
+}
+
+
 
 /// Oyun içinde seçilmiş deri kimliği ("" = hesabın kendi derisi).
 pub fn secili_deri() -> String {
-    std::fs::read_to_string(secili_yol())
-        .ok()
-        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+    hesap_oku("secili-deri")
         .and_then(|j| j["id"].as_str().map(str::to_string))
         .unwrap_or_default()
 }
 
 /// Oyun içinde seçilmiş Mojang pelerini ("" = yok).
-fn mojang_secili_yol() -> PathBuf {
-    crate::core::app_dir().join("kozmetik").join("mojang-aktif.json")
-}
-
 fn mojang_secili() -> String {
-    std::fs::read_to_string(mojang_secili_yol())
-        .ok()
-        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+    hesap_oku("mojang-aktif")
         .and_then(|j| j["id"].as_str().map(str::to_string))
         .unwrap_or_default()
 }
 
 fn mojang_secili_yaz(id: &str) {
-    let yol = mojang_secili_yol();
-    if let Some(parent) = yol.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let _ = std::fs::write(yol, serde_json::json!({ "id": id }).to_string());
+    hesap_yaz("mojang-aktif", &serde_json::json!({ "id": id }));
 }
 
 /// Aktif hesabın Mojang pelerinleri (launcher bunları önbelleğe indirir).
@@ -75,12 +88,7 @@ fn mojang_pelerinleri() -> Vec<crate::skins::Pelerin> {
 }
 
 fn secili_deri_yaz(id: &str) {
-    let yol = secili_yol();
-    if let Some(parent) = yol.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let govde = serde_json::json!({ "id": id }).to_string();
-    let _ = std::fs::write(yol, govde);
+    hesap_yaz("secili-deri", &serde_json::json!({ "id": id }));
 }
 
 /// Aktif hesap (UUID eşlemesi için). Yoksa None.
@@ -214,6 +222,38 @@ pub fn katalog_yaz(inst: &Instance) {
         out.push_str(&format!("MA\t{mojang}\n"));
     }
 
+    // --- bu HESABIN seçimlerini kuruluma uygula (v0.7.12) ---
+    // Hesap değişince oyun içinde de o hesabın pelerini/kanadı görünsün:
+    // seçim yoksa kurulumdaki kopya kaldırılır, varsa yazılır.
+    let pelerin_hedef = dir.join("pelerin.png");
+    if !pelerin.is_empty() {
+        if let Some(png) = crate::kozmetik_katalog::icerik(crate::kozmetik_katalog::PELERIN, &pelerin) {
+            let yaz = match std::fs::metadata(&pelerin_hedef) {
+                Ok(m) => m.len() != png.len() as u64,
+                Err(_) => true,
+            };
+            if yaz {
+                let _ = std::fs::write(&pelerin_hedef, &png);
+            }
+        }
+    } else if mojang.is_empty() {
+        // Bu hesapta hiç pelerin seçili değil: kurulumdaki eski kopya kalmasın
+        // (yoksa hesap değişince önceki hesabın pelerini görünmeye devam eder).
+        let _ = std::fs::remove_file(&pelerin_hedef);
+    }
+    let kanat_hedef = dir.join("elytra.png");
+    if kanat.is_empty() {
+        let _ = std::fs::remove_file(&kanat_hedef);
+    } else if let Some(png) = crate::kozmetik_katalog::icerik(crate::kozmetik_katalog::KANAT, &kanat) {
+        let yaz = match std::fs::metadata(&kanat_hedef) {
+            Ok(m) => m.len() != png.len() as u64,
+            Err(_) => true,
+        };
+        if yaz {
+            let _ = std::fs::write(&kanat_hedef, &png);
+        }
+    }
+
     let _ = std::fs::write(dir.join("kozmetik-katalog.txt"), out);
 }
 
@@ -236,13 +276,19 @@ pub fn istek_isle(inst: &Instance) {
 }
 
 fn secim_deri(id: &str) {
+    let cache_kok = crate::core::app_dir().join("cache");
+    let hesap = aktif_hesap().map(|a| a.uuid.replace('-', ""));
     if id.is_empty() {
         secili_deri_yaz("");
-        if let Some(acc) = aktif_hesap() {
-            // hesabın kendi derisine dön: önbellek yoksa dokunma
-            let anahtar = acc.uuid.replace('-', "");
-            let cache = crate::core::app_dir().join("cache").join(format!("skin-{anahtar}.png"));
-            if let Ok(bayt) = std::fs::read(&cache) {
+        if let Some(anahtar) = hesap {
+            // Hesabın KENDİ derisine dön. Seçilen kitaplık derisi önbelleğe
+            // yazıldığı için gerçek deri ayrı yedekte tutulur (v0.7.12).
+            let gercek = cache_kok.join(format!("hesap-deri-{anahtar}.png"));
+            let bayt = std::fs::read(&gercek)
+                .ok()
+                .or_else(|| std::fs::read(cache_kok.join(format!("skin-{anahtar}.png"))).ok());
+            if let Some(bayt) = bayt {
+                let _ = std::fs::write(cache_kok.join(format!("skin-{anahtar}.png")), &bayt);
                 deri_yaz_her_kuruluma(&bayt);
             }
         }
@@ -255,13 +301,20 @@ fn secim_deri(id: &str) {
     let Ok(png) = std::fs::read(&kayit.dosya) else { return };
 
     // Aktif hesabın önbelleği: sonraki açılışlar da bu deriyle başlasın
-    if let Some(acc) = aktif_hesap() {
-        let anahtar = acc.uuid.replace('-', "");
-        let cache = crate::core::app_dir().join("cache");
-        let _ = std::fs::create_dir_all(&cache);
-        let _ = std::fs::write(cache.join(format!("skin-{anahtar}.png")), &png);
+    if let Some(anahtar) = hesap {
+        let _ = std::fs::create_dir_all(&cache_kok);
+        // Hesabın GERÇEK derisini ilk seçimde yedekle ("Kullanma" geri dönsün)
+        let gercek = cache_kok.join(format!("hesap-deri-{anahtar}.png"));
+        if !gercek.is_file() {
+            if let Ok(eski) = std::fs::read(cache_kok.join(format!("skin-{anahtar}.png"))) {
+                if !eski.is_empty() {
+                    let _ = std::fs::write(&gercek, &eski);
+                }
+            }
+        }
+        let _ = std::fs::write(cache_kok.join(format!("skin-{anahtar}.png")), &png);
         let _ = std::fs::write(
-            cache.join(format!("skin-{anahtar}.json")),
+            cache_kok.join(format!("skin-{anahtar}.json")),
             serde_json::json!({ "slim": kayit.slim }).to_string(),
         );
     }

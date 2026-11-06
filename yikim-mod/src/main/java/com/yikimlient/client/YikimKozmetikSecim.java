@@ -32,7 +32,7 @@ public final class YikimKozmetikSecim {
     public static final int SEKME_SAYISI = 4;
 
     static final String[] TUR = new String[]{"deri", "pelerin", "mojang", "kanat"};
-    public static final String[] BASLIK = new String[]{"DERİ", "PELERİN", "MOJANG", "ELİTRA"};
+    public static final String[] BASLIK = new String[]{"SKIN", "PELERİN", "MOJANG", "ELİTRA"};
     public static final String[] ALT_BASLIK = new String[]{
         "kendi deri kitaplığın", "YIKIM'de yaptığın pelerinler", "hesabının Mojang pelerinleri", "kanat tasarımların"};
 

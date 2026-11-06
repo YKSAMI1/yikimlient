@@ -40,8 +40,39 @@ fn katalog_yol() -> PathBuf {
     kok().join("katalog.json")
 }
 
+/// Aktif hesabın kısa anahtarı ("" = hesap yok).
+///
+/// v0.7.12 — "her hesabın pelerinleri ayrı olsun": seçim dosyaları hesap
+/// anahtarıyla ayrılır. Hesap yoksa eski (paylaşılan) dosya kullanılır.
+pub fn hesap_anahtari() -> String {
+    let cfg = crate::config::YikimConfig::load_or_default();
+    let liste = crate::commands::load_accounts();
+    let Some(ilk) = liste.first().cloned() else {
+        return String::new();
+    };
+    if cfg.last_selected_account.trim().is_empty() {
+        return crate::skins::hesap_anahtari(&ilk);
+    }
+    liste
+        .iter()
+        .find(|a| a.id == cfg.last_selected_account)
+        .cloned()
+        .map(|a| crate::skins::hesap_anahtari(&a))
+        .unwrap_or_else(|| crate::skins::hesap_anahtari(&ilk))
+}
+
+/// Hesaba özel dosya yolu; hesap yoksa paylaşılan dosya.
+pub fn hesap_dosya(ad: &str) -> PathBuf {
+    let anahtar = hesap_anahtari();
+    if anahtar.is_empty() {
+        kok().join(format!("{ad}.json"))
+    } else {
+        kok().join(format!("{ad}-{anahtar}.json"))
+    }
+}
+
 fn aktif_yol() -> PathBuf {
-    kok().join("aktif.json")
+    hesap_dosya("aktif")
 }
 
 fn tur_dosya_yolu(tur: &str, id: &str) -> PathBuf {
@@ -87,9 +118,16 @@ fn yaz(liste: &[KozKayit]) {
 
 /// Aktif kayıt kimlikleri: `{"pelerin": Option<String>, "kanat": Option<String>}`
 pub fn aktifler() -> serde_json::Value {
+    // Hesaba özel dosya yoksa eski PAYLAŞILAN dosyadan devralınır: yeni hesap
+    // ilk açılışta o anki görünümle başlar, sonra kendi seçimini tutar.
     let js: serde_json::Value = std::fs::read_to_string(aktif_yol())
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
+        .or_else(|| {
+            std::fs::read_to_string(kok().join("aktif.json"))
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+        })
         .unwrap_or_else(|| serde_json::json!({}));
     let al = |t: &str| -> serde_json::Value {
         match js.get(t).and_then(|v| v.as_str()) {
