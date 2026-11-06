@@ -27,12 +27,16 @@ import net.minecraft.class_332;
  * (değişmediği sürece) yeniden kurulmaz.
  */
 public final class YikimKarakter {
-    /** 15° adım — tam tur. */
-    private static final int KARE_SAYISI = 24;
-    /** Arkadan görünüm (180°). */
-    public static final int ARKA = KARE_SAYISI / 2;
+    /** Bir sürükleme adımı (derece). */
+    private static final float ADIM = 15.0f;
+    /** Boşta yavaş dönüş: saniyede 9° (tam tur ~40 sn). */
+    private static final float BOSTA_HIZ = 9.0f;
+    /** Etkileşimden sonra dönüşün duraklama süresi (ms). */
+    private static final long DURAKLAMA = 2600L;
 
-    private static volatile int kareIndeksi;
+    private static volatile float aci;
+    private static volatile long duraklamaSonu;
+    private static long sonKare;
     private static volatile boolean slim;
     private static volatile boolean elitraModu;
 
@@ -62,21 +66,44 @@ public final class YikimKarakter {
 
     /** Karakteri arkadan göster (pelerin/elitra sekmelerine geçince). */
     public static void arkayaDon() {
-        YikimKarakter.kareIndeksi = ARKA;
+        YikimKarakter.aci = 180.0f;
+        YikimKarakter.duraklamaSonu = System.currentTimeMillis() + 3200L;
     }
 
     /** Karakteri önden göster (skin sekmesi). */
     public static void oneDon() {
-        YikimKarakter.kareIndeksi = 0;
+        YikimKarakter.aci = 0.0f;
+        YikimKarakter.duraklamaSonu = System.currentTimeMillis() + DURAKLAMA;
     }
 
-    /** Kullanıcı sürükleyerek döndürür (24 kademe arasında). */
+    /** Kullanıcı sürükleyerek döndürür (her adım 15°). */
     public static void dondur(int kareFarki) {
-        int yeni = (YikimKarakter.kareIndeksi + kareFarki) % KARE_SAYISI;
-        if (yeni < 0) {
-            yeni += KARE_SAYISI;
+        if (kareFarki == 0) {
+            return;
         }
-        YikimKarakter.kareIndeksi = yeni;
+        float yeni = YikimKarakter.aci + (float)kareFarki * ADIM;
+        yeni %= 360.0f;
+        if (yeni < 0.0f) {
+            yeni += 360.0f;
+        }
+        YikimKarakter.aci = yeni;
+        YikimKarakter.duraklamaSonu = System.currentTimeMillis() + DURAKLAMA;
+    }
+
+    /** O anki açı — boştayken yavaşça döner, etkileşimden sonra duraklar. */
+    private static float aci() {
+        long simdi = System.currentTimeMillis();
+        long gecen = YikimKarakter.sonKare == 0L ? 0L : Math.min(120L, simdi - YikimKarakter.sonKare);
+        YikimKarakter.sonKare = simdi;
+        if (simdi > YikimKarakter.duraklamaSonu) {
+            float yeni = YikimKarakter.aci + BOSTA_HIZ * (float)gecen / 1000.0f;
+            yeni %= 360.0f;
+            if (yeni < 0.0f) {
+                yeni += 360.0f;
+            }
+            YikimKarakter.aci = yeni;
+        }
+        return YikimKarakter.aci;
     }
 
     private static Path yol(String ad) {
@@ -134,12 +161,15 @@ public final class YikimKarakter {
 
     /** Karakteri çiz: `cx` yatay merkez, `tepe` başın üstü, `boy` toplam boy (px). */
     public static void draw(class_332 graphics, int cx, int tepe, int boy, int arkaRenk) {
-        int yukseklik = Math.max(48, boy);
+        // v1.33.1 — "kocaman": model artık panele %82 oranında sığar ve
+        // dikeyde ortalanır (kenarlarda nefes payı kalır).
+        int yukseklik = Math.max(48, Math.round((float)boy * 0.82f));
+        int tepe2 = tepe + (boy - yukseklik) / 2;
+        int ayak = tepe2 + yukseklik;
         int yariG = Math.max(yukseklik / 4, yukseklik * 9 / 20);
         // ayak altı yumuşak gölge
-        YikimDraw.roundedFill(graphics, cx - yariG / 2, tepe + yukseklik - 4,
-            cx + yariG / 2, tepe + yukseklik + 3, YikimTheme.alpha(arkaRenk, 90));
-        float aci = (float)YikimKarakter.kareIndeksi / (float)KARE_SAYISI * 360.0f;
-        YikimModel.draw(graphics, cx, tepe, yukseklik, aci);
+        YikimDraw.roundedFill(graphics, cx - yariG / 2, ayak - 4,
+            cx + yariG / 2, ayak + 3, YikimTheme.alpha(arkaRenk, 90));
+        YikimModel.draw(graphics, cx, tepe2, yukseklik, YikimKarakter.aci());
     }
 }

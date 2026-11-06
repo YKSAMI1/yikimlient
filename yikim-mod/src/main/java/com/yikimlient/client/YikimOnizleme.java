@@ -28,9 +28,11 @@ public final class YikimOnizleme {
     private static final ConcurrentHashMap<String, int[]> DOKU = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, int[]> IZGARA = new ConcurrentHashMap<>();
 
-    /** 64×32 kozmetik paftasında ARKADAN GÖRÜNEN yüzler (x, y, w, h). */
-    private static final int[] PELERIN_DIS = new int[]{12, 1, 10, 16};
-    private static final int[] PELERIN_IC = new int[]{1, 1, 10, 16};
+    /** 64×32 kozmetik paftasında DIŞ (kartta görünen) yüzler (x, y, w, h).
+     *  v1.33.1 — pelerin kartları (12,1) = TERSTEN (aynalı) yüzü gösteriyordu;
+     *  kullanıcı düz yüzü görmek istiyor. Dış yüz (1,1), iç yüz (12,1). */
+    private static final int[] PELERIN_DIS = new int[]{1, 1, 10, 16};
+    private static final int[] PELERIN_IC = new int[]{12, 1, 10, 16};
     private static final int[] KANAT_DIS = new int[]{36, 2, 10, 20};
     private static final int[] KANAT_IC = new int[]{24, 2, 10, 20};
     /** Kart ızgara çözünürlüğü — 10×16 kaba ızgara HD dokuda "nokta nokta"
@@ -252,15 +254,19 @@ public final class YikimOnizleme {
         double pi = (double)genislik / (double)gX;
         double py = (double)yukseklik / (double)gY;
         for (int gy = 0; gy < gY; ++gy) {
+            int pyTop = y + (int)Math.round(gy * py);
+            int ph = (int)Math.round((gy + 1) * py) - pyTop;
             for (int gx = 0; gx < gX; ++gx) {
                 int renk = ızgara[gy * gX + gx];
                 if (renk == 0) {
                     continue;
                 }
+                // v1.33.1 — KARTLARDA "NOKTA NOKTALI" GÖRÜNÜMÜN KÖKÜ:
+                // `pw` mutlak px'ten çıkartılıyordu (x ofseti genişliğe
+                // giriyordu) → her hücre 1 px'e düşüyordu. Genişlik artık
+                // iki kenarın farkı.
                 int px = x + (int)Math.round(gx * pi);
-                int pw = (int)Math.round((gx + 1) * pi) - px;
-                int pyTop = y + (int)Math.round(gy * py);
-                int ph = (int)Math.round((gy + 1) * py) - pyTop;
+                int pw = (int)Math.round((gx + 1) * pi) - (int)Math.round(gx * pi);
                 YikimOnizleme.hucre(graphics, px, pyTop, Math.max(1, pw), Math.max(1, ph), renk);
             }
         }

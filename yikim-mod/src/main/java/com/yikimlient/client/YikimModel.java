@@ -172,6 +172,13 @@ public final class YikimModel {
 
             class_10055 s = new class_10055();
             s.field_58171 = class_1299.field_6099;
+            // v1.33.1 — model ARKASI DÖNÜK çiziliyordu: envanter önizlemesi
+            // gövde yaw'ını 180° yapar; 0 iken sırtımızı görüyorduk (pelerin
+            // "göğüste" gibi duruyordu). Yaw her karede `draw` içinde ayarlanır.
+            s.field_53446 = 180.0f;
+            s.field_53447 = 0.0f;
+            s.field_53448 = 0.0f;
+            s.field_53453 = 1.0f;
             s.field_53329 = 0.6f;
             s.field_53330 = OYUNCU_BOY_BLOK;
             s.field_53520 = dokular;
@@ -213,13 +220,18 @@ public final class YikimModel {
             if (s == null) {
                 return false;
             }
+            // v1.33.1 — DÖNME: dönme açısı quaternion'a değil GÖVDE YAW'ına
+            // yazılır. `method_70856`'nın ikinci quaternion'ı modelin dönüşü
+            // DEĞİL, ışığın yönüdür (vanilla onu fare eğimi için kullanıyor);
+            // bu yüzden sürükleme hiç etki etmiyordu.
+            s.field_53446 = 180.0f + aciDerece;
+            s.field_53447 = 0.0f;
             int yukseklik = Math.max(64, boy);
             float olcek = (float)yukseklik / OYUNCU_BOY_BLOK;
             int yariG = Math.max(yukseklik / 2, (int)(olcek * 0.95f));
             Vector3f orta = new Vector3f(0.0f, OYUNCU_BOY_BLOK / 2.0f, 0.0f);
             Quaternionf cevir = new Quaternionf().rotateZ((float)Math.PI);
-            Quaternionf don = new Quaternionf().rotateY(-aciDerece * (float)Math.PI / 180.0f);
-            graphics.method_70856(s, olcek, orta, cevir, don,
+            graphics.method_70856(s, olcek, orta, cevir, null,
                 cx - yariG, tepe, cx + yariG, tepe + yukseklik);
             return true;
         }
