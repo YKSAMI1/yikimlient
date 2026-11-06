@@ -94,13 +94,23 @@ public final class YikimKozmetikSecim {
     }
 
     public static String aktifId(int tur) {
-        if (tur >= 0 && tur < 3) {
-            return YikimKozmetikSecim.aktif[tur];
-        }
+        // v1.33.4 — `A` satırı üç alan taşıyor (deri, pelerin, kanat); MOJANG
+        // ise ayrı `MA` satırında. Eskiden ELITRA (3) hiçbir dala girmediği
+        // için daima boş dönüyordu: elitra seçili olsa bile model kanadı
+        // çizmiyordu.
         if (tur == MOJANG) {
             return YikimKozmetikSecim.mojangAktif;
         }
-        return "";
+        int indeks = switch (tur) {
+            case DERI -> 0;
+            case PELERIN -> 1;
+            case ELITRA -> 2;
+            default -> -1;
+        };
+        if (indeks < 0) {
+            return "";
+        }
+        return YikimKozmetikSecim.aktif[indeks];
     }
 
     public static int sayfa(int tur) {
