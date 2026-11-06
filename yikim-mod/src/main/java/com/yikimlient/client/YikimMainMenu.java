@@ -45,6 +45,7 @@ public final class YikimMainMenu {
     private final List<Hit> hits = new ArrayList<Hit>();
     private final List<class_4185> modButtons;
     private int hitCount;
+    private boolean surukleme;
     private long openedAt;
     private long hintUntil;
     private String hint = "";
@@ -338,16 +339,18 @@ public final class YikimMainMenu {
     }
 
     /**
-     * SAĞ SÜTUN (v1.29.0) — her iki temada da aynı: dönen 3B karakter,
-     * altında hesap adı ve deri / pelerin / elitra seçicisi.
+     * SAĞ SÜTUN (v1.31.0) — her iki temada da aynı: karakter (kendiliğinden
+     * dönmez, fareyle sürükleyerek döndürülür), altında hesap adı ve
+     * "Özelleştirme" düğmesi. Deri/pelerin/elitra seçimi ayrı ekranda
+     * yapılır; böylece ana menüde doku ve kart kalabalığı yok.
      */
     private void drawKarakterPaneli(class_332 graphics, class_327 font, int x, int ust, int genislik,
                                     int alt, int mouseX, int mouseY) {
         if (genislik < 120 || alt - ust < 90) {
             return;
         }
-        int seciciYukseklik = 84;
-        int boy = Math.min((int)((float)genislik * 1.4f), Math.max(80, alt - ust - seciciYukseklik - 24));
+        int dugmeYukseklik = 26;
+        int boy = Math.min((int)((float)genislik * 1.4f), Math.max(80, alt - ust - dugmeYukseklik - 46));
         int cx = x + genislik / 2;
         YikimKarakter.draw(graphics, cx, ust + 2, boy, YikimTheme.backdrop);
         int isimY = ust + boy + 8;
@@ -359,11 +362,34 @@ public final class YikimMainMenu {
         String altSatir = this.cacheMods;
         YikimAdapter.text(graphics, font, altSatir, cx - font.method_1727(altSatir) / 2, isimY + 13,
             YikimTheme.TEXT_MUTED, false);
-        int seciciY = isimY + 26;
-        if (seciciY + seciciYukseklik > alt + 12) {
+        int dugmeY = isimY + 28;
+        if (dugmeY + dugmeYukseklik > alt + 16) {
             return;
         }
-        YikimKozmetikSecim.draw(graphics, font, x, seciciY, genislik, mouseX, mouseY, this::addHit);
+        int dugmeG = Math.min(genislik, 190);
+        int dugmeX = cx - dugmeG / 2;
+        boolean uzerinde = YikimDraw.inside(mouseX, mouseY, dugmeX, dugmeY, dugmeG, dugmeYukseklik);
+        YikimDraw.button(graphics, font, dugmeX, dugmeY, dugmeG, dugmeYukseklik, "ÖZELLEŞTİRME", true, uzerinde);
+        // karakter alanı ÖNCE yazılır: düğme üstte kalsın
+        this.addHit(x, ust, genislik, Math.max(24, boy), () -> this.surukleme = true);
+        this.addHit(dugmeX, dugmeY, dugmeG, dugmeYukseklik, () -> YikimMainMenu.open(new YikimKozmetikEkrani()));
+    }
+
+    /** Sürükleme sırasında karakteri döndür (v1.31.0). */
+    boolean drag(double x, double y, double farkX) {
+        if (!this.surukleme) {
+            return false;
+        }
+        int hedef = (int)Math.round(farkX / 5.0);
+        if (hedef == 0) {
+            return true;
+        }
+        YikimKarakter.dondur(hedef);
+        return true;
+    }
+
+    void birak() {
+        this.surukleme = false;
     }
 
     /** Tuşlar sığsın diye satır yüksekliği (en az 20 px). */
@@ -590,6 +616,7 @@ public final class YikimMainMenu {
         if (button != 0) {
             return true;
         }
+        this.surukleme = false;
         for (int index = this.hitCount - 1; index >= 0; --index) {
             Hit hit = this.hits.get(index);
             if (!hit.inside(mouseX, mouseY)) continue;

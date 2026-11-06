@@ -38,6 +38,9 @@ public final class YikimKarakter {
     private static int[][] kareler;
     private static long kareImza = Long.MIN_VALUE;
     private static long sonDeneme;
+    private static long sonKontrol;
+    /** 0 = önden; kullanıcı sürükledikçe değişir (kendiliğinden dönmez). */
+    private static volatile int kareIndeksi = 3;
     private static volatile boolean slim;
     private static volatile boolean pelerinVar;
 
@@ -112,11 +115,15 @@ public final class YikimKarakter {
         }
         int sol = cx - genislik / 2;
         int orta = adim / 2;
-        for (int gy = 0; gy < izgaraY; ++gy) {
-            int satir = (gy * adim + orta) * IC_G;
-            int py = tepe + gy * pi;
+        // DİKEY birleştirme: üst üste aynı renk/aynı genişlikteki hücreler tek
+        // dolguda toplanir. Böylece kare başına dolum sayısı ~5 kat düşer
+        // (menü FPS'i doku çağırmadan ve dolgu yağmurundan kurtulur).
+        java.util.ArrayList<int[]> acik = new java.util.ArrayList<int[]>();
+        for (int gy = 0; gy <= izgaraY; ++gy) {
+            int satir = gy < izgaraY ? (gy * adim + orta) * IC_G : -1;
+            java.util.ArrayList<int[]> simdi = new java.util.ArrayList<int[]>();
             int gx = 0;
-            while (gx < izgaraG) {
+            while (gy < izgaraY && gx < izgaraG) {
                 int renk = kare[satir + gx * adim + orta];
                 if (renk == 0) {
                     ++gx;
@@ -126,10 +133,42 @@ public final class YikimKarakter {
                 while (bitis < izgaraG && kare[satir + bitis * adim + orta] == renk) {
                     ++bitis;
                 }
-                graphics.method_25294(sol + gx * pi, py, sol + bitis * pi, py + pi, renk);
+                simdi.add(new int[]{gx, bitis, renk, gy});
                 gx = bitis;
             }
+            java.util.ArrayList<int[]> kalan = new java.util.ArrayList<int[]>();
+            for (int[] r : acik) {
+                boolean devam = false;
+                if (gy < izgaraY) {
+                    for (int[] n : simdi) {
+                        if (n[0] == r[0] && n[1] == r[1] && n[2] == r[2]) {
+                            n[3] = r[3];
+                            devam = true;
+                            break;
+                        }
+                    }
+                }
+                if (devam) {
+                    continue;
+                }
+                kalan.add(r);
+            }
+            for (int[] r : kalan) {
+                int px = sol + r[0] * pi;
+                int py = tepe + r[3] * pi;
+                graphics.method_25294(px, py, sol + r[1] * pi, py + (gy - r[3]) * pi, r[2]);
+            }
+            acik = simdi;
         }
+    }
+
+    /** Kullanıcı sürükleyerek döndürür (24 kare arasında). */
+    public static void dondur(int kareFarki) {
+        int yeni = (YikimKarakter.kareIndeksi + kareFarki) % KARE_SAYISI;
+        if (yeni < 0) {
+            yeni += KARE_SAYISI;
+        }
+        YikimKarakter.kareIndeksi = yeni;
     }
 
     /** Geçerli kare (renk ızgarası) — gerekirse yeniden üretir. */
@@ -139,8 +178,7 @@ public final class YikimKarakter {
             if (hepsi == null) {
                 return null;
             }
-            int indeks = (int)(System.currentTimeMillis() / 150L % (long)KARE_SAYISI);
-            return hepsi[indeks];
+            return hepsi[YikimKarakter.kareIndeksi % KARE_SAYISI];
         }
         catch (Throwable ignored) {
             return null;
@@ -149,6 +187,12 @@ public final class YikimKarakter {
 
     private static int[][] kareler() {
         try {
+            long kontrol = System.currentTimeMillis();
+            // Dosya denetimi saniyede bir: her karede 2 disk çağrısı menüyü yoruyordu.
+            if (YikimKarakter.kareler != null && kontrol - YikimKarakter.sonKontrol < 900L) {
+                return YikimKarakter.kareler;
+            }
+            YikimKarakter.sonKontrol = kontrol;
             Path deriYol = YikimKarakter.yol("deri.png");
             Path pelerinYol = YikimKarakter.yol("pelerin.png");
             boolean pelerinVarMi = Files.isRegularFile(pelerinYol, new LinkOption[0]);

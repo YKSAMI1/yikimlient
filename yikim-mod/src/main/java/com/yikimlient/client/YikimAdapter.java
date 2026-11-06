@@ -275,6 +275,19 @@ public final class YikimAdapter {
             return this.menu.click(YikimAdapter.mouseX(mouse), YikimAdapter.mouseY(mouse), YikimAdapter.mouseButton(mouse));
         }
 
+        /** Karakteri sürükleyerek döndürme (v1.31.0). */
+        public boolean method_25403(class_11909 mouse, double dragX, double dragY) {
+            if (this.menu.drag(YikimAdapter.mouseX(mouse), YikimAdapter.mouseY(mouse), dragX)) {
+                return true;
+            }
+            return super.method_25403(mouse, dragX, dragY);
+        }
+
+        public boolean method_25406(class_11909 mouse) {
+            this.menu.birak();
+            return super.method_25406(mouse);
+        }
+
         public boolean method_25404(class_11908 key) {
             if (this.menu.key(key.comp_4795())) {
                 return true;
