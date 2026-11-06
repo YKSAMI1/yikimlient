@@ -150,8 +150,12 @@ public final class YikimModel {
             if (deri == null) {
                 return null;
             }
-            class_2960 pelerin = elitraModu ? null : YikimModel.pelerin();
-            class_2960 kanat = elitraModu ? YikimModel.kanat() : null;
+            // v1.33.2 — SEÇİM NEYSE O: dosya duruyor diye kozmetik gösterme.
+            boolean pelerinSecili = !YikimKozmetikSecim.aktifId(YikimKozmetikSecim.PELERIN).isEmpty()
+                || !YikimKozmetikSecim.aktifId(YikimKozmetikSecim.MOJANG).isEmpty();
+            boolean kanatSecili = !YikimKozmetikSecim.aktifId(YikimKozmetikSecim.ELITRA).isEmpty();
+            class_2960 pelerin = (elitraModu || !pelerinSecili) ? null : YikimModel.pelerin();
+            class_2960 kanat = (elitraModu && kanatSecili) ? YikimModel.kanat() : null;
             String yeniImza = deri + "|" + pelerin + "|" + kanat + "|" + slim;
             if (YikimModel.durum != null && yeniImza.equals(YikimModel.imza)) {
                 return YikimModel.durum;
@@ -227,9 +231,12 @@ public final class YikimModel {
             s.field_53446 = 180.0f + aciDerece;
             s.field_53447 = 0.0f;
             int yukseklik = Math.max(64, boy);
-            float olcek = (float)yukseklik / OYUNCU_BOY_BLOK;
-            int yariG = Math.max(yukseklik / 2, (int)(olcek * 0.95f));
-            Vector3f orta = new Vector3f(0.0f, OYUNCU_BOY_BLOK / 2.0f, 0.0f);
+            // v1.33.2 — "çok büyük, sığmıyor": modelin vanilya çizim uzayındaki
+            // gerçek yüksekliği 1.8 değil ~2.3 blok (şapka katmanı dahil); ölçek
+            // buna göre küçültülüp kutuya nefes payı bırakılıyor.
+            float olcek = (float)yukseklik / 2.35f;
+            int yariG = Math.max(yukseklik / 2, (int)(olcek * 1.05f));
+            Vector3f orta = new Vector3f(0.0f, 1.0f, 0.0f);
             Quaternionf cevir = new Quaternionf().rotateZ((float)Math.PI);
             graphics.method_70856(s, olcek, orta, cevir, null,
                 cx - yariG, tepe, cx + yariG, tepe + yukseklik);

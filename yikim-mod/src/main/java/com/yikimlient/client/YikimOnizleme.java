@@ -6,41 +6,31 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.imageio.ImageIO;
+import net.minecraft.class_1011;
+import net.minecraft.class_1043;
+import net.minecraft.class_1060;
+import net.minecraft.class_10799;
+import net.minecraft.class_2960;
+import net.minecraft.class_310;
 import net.minecraft.class_332;
 
 /**
- * KOZMETİK ÖNİZLEMELERİ (v1.32.0) — DOSYA DOKUSU BASMADAN.
+ * KOZMETİK ÖNİZLEMELERİ (v1.33.2) — GERÇEK PNG DOKUSU.
  *
- * Menüde `class_1043` (dinamik doku) basmak ImmediatelyFast/Sodium'lu
- * kurulumlarda metin partisiyle birleşip ekranın yarısını gri/blok kaplıyordu.
- * Bu yüzden önizlemeler de karakter gibi CPU'da okunur, renk ızgarasına
- * indirilir ve yalnızca DOLGU ile çizilir (doku bağlaması hiç değişmez).
+ * Önceden kartlar CPU'da hücre hücre DOLGU ile çiziliyordu; hücre genişliği
+ * hatası yüzünden pelerinler "nokta/çizgi" gibi görünüyordu ve HD desenler
+ * kayboluyordu. Artık dosya doku olarak kaydedilip `DrawContext`'in GUI doku
+ * boru hattıyla BASILIYOR: kartta gördüğün şey dosyanın kendisi (nearest
+ * örnekleme, HD dahil).
  *
- * v1.32.0 — "pelerin/Mojang pelerinleri önizlemesi görünmüyor, elitra saçma":
- *  Bölgeler vanilla kutu UV düzenine göre düzeltildi. Pelerin paftası 64×32:
- *  ARKADAN GÖRÜNEN yüz (12,1) 10×16'dır ((1,1) gövdeye bakan iç astardır).
- *  Elitra paftası 64×32: görünen yüz (36,2) 10×20 ((24,2) iç yüz).
- *  Eskiden pelerinde (1,1) okunuyordu → HD paftalarda o panel boş olduğu için
- *  kartlar bomboş görünüyordu.
+ * Bölgeler 64×32 kozmetik paftası oranıyla verilir (HD dosyada otomatik
+ * ölçeklenir):
+ *   pelerin  dış yüz (1,1) 10×16     — kullanıcı DÜZ yüzü görür
+ *   elitra   görünen kanat (36,2) 10×20 / boşsa (24,2)
  */
 public final class YikimOnizleme {
-    /** path|mtime → ARGB pikseller. */
-    private static final ConcurrentHashMap<String, int[]> DOKU = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<String, int[]> IZGARA = new ConcurrentHashMap<>();
-
-    /** 64×32 kozmetik paftasında DIŞ (kartta görünen) yüzler (x, y, w, h).
-     *  v1.33.1 — pelerin kartları (12,1) = TERSTEN (aynalı) yüzü gösteriyordu;
-     *  kullanıcı düz yüzü görmek istiyor. Dış yüz (1,1), iç yüz (12,1). */
-    private static final int[] PELERIN_DIS = new int[]{1, 1, 10, 16};
-    private static final int[] PELERIN_IC = new int[]{12, 1, 10, 16};
-    private static final int[] KANAT_DIS = new int[]{36, 2, 10, 20};
-    private static final int[] KANAT_IC = new int[]{24, 2, 10, 20};
-    /** Kart ızgara çözünürlüğü — 10×16 kaba ızgara HD dokuda "nokta nokta"
-     *  görünüyordu; artık her hücre kaynak pikselin ORTALAMASIDIR. */
-    private static final int PELERIN_GX = 20;
-    private static final int PELERIN_GY = 32;
-    private static final int KANAT_GX = 20;
-    private static final int KANAT_GY = 40;
+    /** path|mtime → {Identifier, texW, texH, int[] pikseller} */
+    private static final ConcurrentHashMap<String, Object[]> DOKULAR = new ConcurrentHashMap<>();
 
     private YikimOnizleme() {
     }
@@ -49,265 +39,236 @@ public final class YikimOnizleme {
         return YikimBridge.stateDir();
     }
 
-    /** Göreli adı çöz ve görüntüyü oku (yoksa null). */
-    static int[] doku(String goreli) {
+    private static Path yol(String goreli) {
+        if (goreli == null || goreli.isEmpty()) {
+            return null;
+        }
+        Path p = Path.of(goreli);
+        if (!p.isAbsolute()) {
+            p = YikimOnizleme.kok().resolve(goreli);
+        }
+        return Files.isRegularFile(p, new LinkOption[0]) ? p : null;
+    }
+
+    /** Dosyayı doku olarak kaydet (değişmedikçe bir kez). */
+    private static Object[] doku(String goreli) {
         try {
-            if (goreli == null || goreli.isEmpty()) {
+            Path p = YikimOnizleme.yol(goreli);
+            if (p == null) {
                 return null;
             }
-            Path yol = Path.of(goreli);
-            if (!yol.isAbsolute()) {
-                yol = YikimOnizleme.kok().resolve(goreli);
+            String anahtar = p + "|" + Files.getLastModifiedTime(p, new LinkOption[0]).toMillis()
+                + "|" + Files.size(p);
+            Object[] hazir = YikimOnizleme.DOKULAR.get(anahtar);
+            if (hazir != null) {
+                return hazir;
             }
-            if (!Files.isRegularFile(yol, new LinkOption[0])) {
-                return null;
-            }
-            String anahtar = yol + "|" + Files.getLastModifiedTime(yol, new LinkOption[0]).toMillis();
-            int[] onbellek = YikimOnizleme.DOKU.get(anahtar);
-            if (onbellek != null) {
-                return onbellek;
-            }
-            BufferedImage resim = ImageIO.read(yol.toFile());
+            BufferedImage resim = ImageIO.read(p.toFile());
             if (resim == null) {
                 return null;
             }
             int w = resim.getWidth();
             int h = resim.getHeight();
-            // başta genişlik/yükseklik, sonra ARGB pikseller
-            int[] tam = new int[w * h + 2];
-            tam[0] = w;
-            tam[1] = h;
-            resim.getRGB(0, 0, w, h, tam, 2, w);
-            if (YikimOnizleme.DOKU.size() > 128) {
-                YikimOnizleme.DOKU.clear();
+            int[] piksel = new int[w * h];
+            resim.getRGB(0, 0, w, h, piksel, 0, w);
+
+            class_1011 gorsel;
+            try (java.io.InputStream in = Files.newInputStream(p)) {
+                gorsel = class_1011.method_4309(in);
             }
-            YikimOnizleme.DOKU.put(anahtar, tam);
-            return tam;
+            if (gorsel == null) {
+                return null;
+            }
+            class_1043 doku = new class_1043(() -> "yikim-onizleme", gorsel);
+            String ad = "onizleme/" + Integer.toHexString(anahtar.hashCode());
+            class_2960 id = class_2960.method_43902("yikimlient", ad);
+            class_2960 yolu = class_2960.method_43902("yikimlient", "textures/" + ad + ".png");
+            class_1060 tm = class_310.method_1551().method_1531();
+            tm.method_4616(id, doku);
+            tm.method_4616(yolu, doku);
+            if (YikimOnizleme.DOKULAR.size() > 96) {
+                YikimOnizleme.DOKULAR.clear();
+            }
+            Object[] kayit = new Object[] {id, w, h, piksel};
+            YikimOnizleme.DOKULAR.put(anahtar, kayit);
+            return kayit;
         }
         catch (Throwable ignored) {
             return null;
         }
     }
 
-    /** Doku bölgesini `gx`×`gy` renk ızgarasına indir (şeffaf = 0). */
-    static int[] izgara(String anahtar, int[] doku, double u0, double v0, double u1, double v1, int gx, int gy) {
-        if (doku == null || gx <= 0 || gy <= 0) {
-            return null;
+    /**
+     * Dokunun verilen bölgesini (normalize 0..1) kutuya oranlı bas.
+     * `olcek` = hedef/kaynak oranı; kart içinde ortalanır.
+     */
+    public static void blit(class_332 graphics, String goreli,
+                            double u0, double v0, double uw, double vh,
+                            int x, int y, int genislik, int yukseklik) {
+        Object[] d = YikimOnizleme.doku(goreli);
+        if (d == null) {
+            return;
         }
-        String k = anahtar + "|" + gx + "x" + gy + "|" + u0 + "," + v0 + "," + u1 + "," + v1;
-        int[] hazir = YikimOnizleme.IZGARA.get(k);
-        if (hazir != null) {
-            return hazir;
+        class_2960 id = (class_2960)d[0];
+        int texW = (Integer)d[1];
+        int texH = (Integer)d[2];
+        int sx = (int)Math.round(u0 * texW);
+        int sy = (int)Math.round(v0 * texH);
+        int sw = Math.max(1, (int)Math.round(uw * texW));
+        int sh = Math.max(1, (int)Math.round(vh * texH));
+        if (sx < 0) { sx = 0; }
+        if (sy < 0) { sy = 0; }
+        if (sx + sw > texW) { sw = texW - sx; }
+        if (sy + sh > texH) { sh = texH - sy; }
+        if (sw <= 0 || sh <= 0) {
+            return;
         }
-        int w = doku[0];
-        int h = doku[1];
-        int[] cikti = new int[gx * gy];
-        double x0 = u0 * (double)w;
-        double y0 = v0 * (double)h;
-        double x1 = u1 * (double)w;
-        double y1 = v1 * (double)h;
-        if (x1 <= x0) {
-            x1 = x0 + 1.0;
+        float olcek = Math.min((float)genislik / (float)sw, (float)yukseklik / (float)sh);
+        int cizG = Math.max(1, Math.round(sw * olcek));
+        int cizY = Math.max(1, Math.round(sh * olcek));
+        int dx = x + (genislik - cizG) / 2;
+        int dy = y + (yukseklik - cizY) / 2;
+        try {
+            YikimAdapter.push(graphics, dx, dy, olcek);
+            graphics.method_25290(class_10799.field_56883, id, 0, 0,
+                (float)sx, (float)sy, sw, sh, texW, texH);
+            YikimAdapter.pop(graphics);
         }
-        if (y1 <= y0) {
-            y1 = y0 + 1.0;
+        catch (Throwable ignored) {
+            // doku basılamazsa kart boş kalır (oyun düşmez)
         }
-        // Her hücre için kaynak piksellerin alfa ağırlıklı ORTALAMASI:
-        // HD pelerinlerde tek pikseli kaçıran noktalı görünüm böyle biter.
-        for (int y = 0; y < gy; ++y) {
-            int sy0 = (int)Math.floor(y0 + (y1 - y0) * (double)y / (double)gy);
-            int sy1 = (int)Math.ceil(y0 + (y1 - y0) * (double)(y + 1) / (double)gy);
-            if (sy1 <= sy0) {
-                sy1 = sy0 + 1;
-            }
-            for (int x = 0; x < gx; ++x) {
-                int sx0 = (int)Math.floor(x0 + (x1 - x0) * (double)x / (double)gx);
-                int sx1 = (int)Math.ceil(x0 + (x1 - x0) * (double)(x + 1) / (double)gx);
-                if (sx1 <= sx0) {
-                    sx1 = sx0 + 1;
-                }
-                long ar = 0L;
-                long ag = 0L;
-                long ab = 0L;
-                long aa = 0L;
-                for (int sy = sy0; sy < sy1; ++sy) {
-                    if (sy < 0 || sy >= h) {
-                        continue;
-                    }
-                    for (int sx = sx0; sx < sx1; ++sx) {
-                        if (sx < 0 || sx >= w) {
-                            continue;
-                        }
-                        int renk = doku[2 + sy * w + sx];
-                        int a = renk >>> 24;
-                        if (a < 16) {
-                            continue;
-                        }
-                        ar += (long)(renk >> 16 & 0xFF) * a;
-                        ag += (long)(renk >> 8 & 0xFF) * a;
-                        ab += (long)(renk & 0xFF) * a;
-                        aa += a;
-                    }
-                }
-                if (aa <= 0L) {
-                    continue;
-                }
-                int r = (int)(ar / aa);
-                int g2 = (int)(ag / aa);
-                int b = (int)(ab / aa);
-                cikti[y * gx + x] = 0xFF000000 | r << 16 | g2 << 8 | b;
-            }
-        }
-        if (YikimOnizleme.IZGARA.size() > 1024) {
-            YikimOnizleme.IZGARA.clear();
-        }
-        YikimOnizleme.IZGARA.put(k, cikti);
-        return cikti;
     }
 
-    /** Bölge ızgarası: önce dış (görünen) panel, boşsa iç panel. */
-    private static int[] bolge(String anahtar, int[] doku, int[] dis, int[] ic, int gx, int gy) {
-        if (doku == null) {
-            return null;
-        }
-        int[] a = YikimOnizleme.dilim(anahtar + ":dis", doku, dis, gx, gy);
-        if (a != null && YikimOnizleme.dolu(a)) {
-            return a;
-        }
-        int[] b = YikimOnizleme.dilim(anahtar + ":ic", doku, ic, gx, gy);
-        return b;
+    /** Pelerin kartı: düz (dış) yüz — 64×32 paftasında (1,1) 10×16. */
+    public static void pelerin(class_332 graphics, String goreli, int x, int y, int genislik, int yukseklik) {
+        YikimOnizleme.blit(graphics, goreli, 1.0 / 64.0, 1.0 / 32.0, 10.0 / 64.0, 16.0 / 32.0,
+            x, y, genislik, yukseklik);
     }
 
-    private static int[] dilim(String anahtar, int[] doku, int[] d, int gx, int gy) {
-        return YikimOnizleme.izgara(anahtar, doku,
-            (double)d[0] / 64.0, (double)d[1] / 32.0,
-            (double)(d[0] + d[2]) / 64.0, (double)(d[1] + d[3]) / 32.0, gx, gy);
+    /**
+     * Elitra kartı: kanadın görünen yüzü. Doku dolu değilse iç yüze düşer;
+     * ikisi de boşsa dosyanın dolu olduğu alan (otomatik kırpma) basılır.
+     */
+    public static void elitra(class_332 graphics, String goreli, int x, int y, int genislik, int yukseklik) {
+        // Kanat tasarımları 64×32 paftasının kanat alanına çizilir; kartta
+        // dosyanın DOLU olduğu alanın tamamı basılır (kırpılmış dilim değil).
+        int[] kutu = YikimOnizleme.icerik(goreli);
+        if (kutu != null) {
+            Object[] d = YikimOnizleme.doku(goreli);
+            int texW = (Integer)d[1];
+            int texH = (Integer)d[2];
+            YikimOnizleme.blit(graphics, goreli,
+                (double)kutu[0] / (double)texW, (double)kutu[1] / (double)texH,
+                (double)kutu[2] / (double)texW, (double)kutu[3] / (double)texH,
+                x, y, genislik, yukseklik);
+        }
     }
 
-    private static boolean dolu(int[] izgara) {
-        for (int renk : izgara) {
-            if (renk != 0) {
-                return true;
+    /** Bölge opak piksel içeriyor mu? (64×32 kozmetik paftası koordinatı) */
+    private static boolean doluMu(String goreli, int bx, int by, int bw, int bh) {
+        Object[] d = YikimOnizleme.doku(goreli);
+        if (d == null) {
+            return false;
+        }
+        int texW = (Integer)d[1];
+        int texH = (Integer)d[2];
+        int[] px = (int[])d[3];
+        int x0 = bx * texW / 64;
+        int y0 = by * texH / 32;
+        int x1 = (bx + bw) * texW / 64;
+        int y1 = (by + bh) * texH / 32;
+        for (int y = Math.max(0, y0); y < Math.min(texH, y1); ++y) {
+            for (int x = Math.max(0, x0); x < Math.min(texW, x1); ++x) {
+                if ((px[y * texW + x] >>> 24) > 40) {
+                    return true;
+                }
             }
         }
         return false;
     }
 
-    /** Deri kafası (ön yüz 8×8) ızgarası. */
-    public static int[] kafaIzgara(String goreli) {
-        int[] doku = YikimOnizleme.doku(goreli);
-        return YikimOnizleme.izgara("kafa:" + goreli, doku,
-            8.0 / 64.0, 8.0 / 64.0, 16.0 / 64.0, 16.0 / 64.0, 8, 8);
-    }
-
-    /** Pelerin gövdesi (arkadan görünen 10×16 panel) ızgarası. */
-    public static int[] pelerinIzgara(String goreli) {
-        return YikimOnizleme.bolge("pelerin:" + goreli, YikimOnizleme.doku(goreli),
-            YikimOnizleme.PELERIN_DIS, YikimOnizleme.PELERIN_IC,
-            YikimOnizleme.PELERIN_GX, YikimOnizleme.PELERIN_GY);
-    }
-
-    /** Elitra kanadı (görünen 10×20 panel) ızgarası. */
-    public static int[] kanatIzgara(String goreli) {
-        return YikimOnizleme.bolge("kanat:" + goreli, YikimOnizleme.doku(goreli),
-            YikimOnizleme.KANAT_DIS, YikimOnizleme.KANAT_IC,
-            YikimOnizleme.KANAT_GX, YikimOnizleme.KANAT_GY);
-    }
-
-    private static void hucre(class_332 graphics, int x, int y, int w, int h, int renk) {
-        if (w <= 0 || h <= 0) {
-            return;
+    /** Dokunun opak içeriğinin sınırları {x, y, w, h} (piksel). */
+    private static int[] icerik(String goreli) {
+        Object[] d = YikimOnizleme.doku(goreli);
+        if (d == null) {
+            return null;
         }
-        graphics.method_25294(x, y, x + w, y + h, renk);
-    }
-
-    /** Kafayı `boyut` px kare olarak çiz (8×8 hücre). */
-    public static void kafa(class_332 graphics, int[] ızgara, int x, int y, int boyut) {
-        if (ızgara == null) {
-            YikimDraw.roundedFill(graphics, x, y, x + boyut, y + boyut, 0x22FFFFFF);
-            return;
-        }
-        int pi = Math.max(1, boyut / 8);
-        for (int gy = 0; gy < 8; ++gy) {
-            for (int gx = 0; gx < 8; ++gx) {
-                int renk = ızgara[gy * 8 + gx];
-                if (renk == 0) {
-                    continue;
+        int texW = (Integer)d[1];
+        int texH = (Integer)d[2];
+        int[] px = (int[])d[3];
+        int minX = texW;
+        int minY = texH;
+        int maxX = -1;
+        int maxY = -1;
+        for (int y = 0; y < texH; ++y) {
+            for (int x = 0; x < texW; ++x) {
+                if ((px[y * texW + x] >>> 24) > 40) {
+                    if (x < minX) { minX = x; }
+                    if (y < minY) { minY = y; }
+                    if (x > maxX) { maxX = x; }
+                    if (y > maxY) { maxY = y; }
                 }
-                YikimOnizleme.hucre(graphics, x + gx * pi, y + gy * pi, pi, pi, renk);
             }
         }
+        if (maxX < minX || maxY < minY) {
+            return null;
+        }
+        return new int[] {minX, minY, maxX - minX + 1, maxY - minY + 1};
     }
 
-    /** Pelerini düz panel olarak çiz (10×16, kartı ortalayarak). */
-    public static void pelerin(class_332 graphics, int[] ızgara, int x, int y, int genislik, int yukseklik) {
-        if (ızgara == null) {
-            YikimDraw.roundedFill(graphics, x, y, x + genislik, y + yukseklik, 0x22FFFFFF);
+    /** Deri kartı — kafa değil TAM VÜCUT (launcher'daki gibi, düz kâğıt bebek). */
+    public static void deri(class_332 graphics, String goreli, int x, int y, int genislik, int yukseklik) {
+        // 64×64 deri paftası; model 32 px boy, 16 px genişlik (kollar dahil)
+        float olcek = Math.min((float)genislik / 17.0f, (float)yukseklik / 33.0f);
+        if (olcek <= 0.0f) {
             return;
         }
-        int gX = YikimOnizleme.PELERIN_GX;
-        int gY = YikimOnizleme.PELERIN_GY;
-        if (ızgara.length != gX * gY) {
-            gX = 10;
-            gY = 16;
-        }
-        double pi = (double)genislik / (double)gX;
-        double py = (double)yukseklik / (double)gY;
-        for (int gy = 0; gy < gY; ++gy) {
-            int pyTop = y + (int)Math.round(gy * py);
-            int ph = (int)Math.round((gy + 1) * py) - pyTop;
-            for (int gx = 0; gx < gX; ++gx) {
-                int renk = ızgara[gy * gX + gx];
-                if (renk == 0) {
-                    continue;
-                }
-                // v1.33.1 — KARTLARDA "NOKTA NOKTALI" GÖRÜNÜMÜN KÖKÜ:
-                // `pw` mutlak px'ten çıkartılıyordu (x ofseti genişliğe
-                // giriyordu) → her hücre 1 px'e düşüyordu. Genişlik artık
-                // iki kenarın farkı.
-                int px = x + (int)Math.round(gx * pi);
-                int pw = (int)Math.round((gx + 1) * pi) - (int)Math.round(gx * pi);
-                YikimOnizleme.hucre(graphics, px, pyTop, Math.max(1, pw), Math.max(1, ph), renk);
-            }
-        }
+        int govdeG = Math.round(16 * olcek);
+        int govdeY = Math.round(32 * olcek);
+        int sol = x + (genislik - govdeG) / 2;
+        int ust = y + (yukseklik - govdeY) / 2;
+        // baş (8×8) + şapka katmanı (40,8)
+        YikimOnizleme.parca(graphics, goreli, 8, 8, 8, 8, 40, 8, sol + 4 * olcek, ust, 8 * olcek);
+        // gövde (8×12) + ceket (20,36)
+        YikimOnizleme.parca(graphics, goreli, 20, 20, 8, 12, 20, 36, sol + 4 * olcek, ust + 8 * olcek, 8 * olcek);
+        // sağ kol (44,20) + kolluk (44,36)
+        YikimOnizleme.parca(graphics, goreli, 44, 20, 4, 12, 44, 36, sol, ust + 8 * olcek, 4 * olcek);
+        // sol kol (36,52) + kolluk (52,52)
+        YikimOnizleme.parca(graphics, goreli, 36, 52, 4, 12, 52, 52, sol + 12 * olcek, ust + 8 * olcek, 4 * olcek);
+        // sağ bacak (4,20) + pantolon (4,36)
+        YikimOnizleme.parca(graphics, goreli, 4, 20, 4, 12, 4, 36, sol + 4 * olcek, ust + 20 * olcek, 4 * olcek);
+        // sol bacak (20,52) + pantolon (4,52)
+        YikimOnizleme.parca(graphics, goreli, 20, 52, 4, 12, 4, 52, sol + 8 * olcek, ust + 20 * olcek, 4 * olcek);
     }
 
-    /**
-     * Elitrayı İKİ KANAT olarak çiz: her kanat 10×20 panel, üstte omuzda
-     * birleşip aşağıda hafifçe dışa açılır; kanatlar birbirinin aynasıdır.
-     */
-    public static void elitra(class_332 graphics, int[] ızgara, int x, int y, int genislik, int yukseklik) {
-        if (ızgara == null) {
-            YikimDraw.roundedFill(graphics, x, y, x + genislik, y + yukseklik, 0x22FFFFFF);
+    /** Deri paftasından tek parça: taban + üst katman üst üste. */
+    private static void parca(class_332 graphics, String goreli, int u, int v, int w, int h,
+                              int ou, int ov, float x, float y, float boyut) {
+        Object[] d = YikimOnizleme.doku(goreli);
+        if (d == null) {
             return;
         }
-        int gX = YikimOnizleme.KANAT_GX;
-        int gY = YikimOnizleme.KANAT_GY;
-        if (ızgara.length != gX * gY) {
-            gX = 10;
-            gY = 20;
+        class_2960 id = (class_2960)d[0];
+        int texW = (Integer)d[1];
+        int texH = (Integer)d[2];
+        float olcek = boyut / (float)w;
+        int px = Math.round(x);
+        int py = Math.round(y);
+        // üst katman (şeffafsa kendiliğinden görünmez)
+        YikimOnizleme.katman(graphics, id, texW, texH, ou, ov, w, h, px, py, olcek);
+        YikimOnizleme.katman(graphics, id, texW, texH, u, v, w, h, px, py, olcek);
+    }
+
+    private static void katman(class_332 graphics, class_2960 id, int texW, int texH,
+                               int u, int v, int w, int h, int px, int py, float olcek) {
+        try {
+            YikimAdapter.push(graphics, px, py, olcek);
+            graphics.method_25290(class_10799.field_56883, id, 0, 0,
+                (float)(u * texW / 64), (float)(v * texH / 64), w * texW / 64, h * texH / 64, texW, texH);
+            YikimAdapter.pop(graphics);
         }
-        int kanatG = Math.max(6, genislik / 2 - 3);
-        double pi = (double)kanatG / (double)gX;
-        double py = (double)yukseklik / (double)gY;
-        int orta = x + genislik / 2;
-        for (int gy = 0; gy < gY; ++gy) {
-            // aşağı indikçe kanat dışa açılır
-            int kayma = (int)Math.round((double)gy / (double)gY * 3.0);
-            int pyTop = y + (int)Math.round(gy * py);
-            int ph = Math.max(1, (int)Math.round((gy + 1) * py) - (int)Math.round(gy * py));
-            for (int gx = 0; gx < gX; ++gx) {
-                int renk = ızgara[gy * gX + gx];
-                if (renk == 0) {
-                    continue;
-                }
-                int pw = Math.max(1, (int)Math.round((gx + 1) * pi) - (int)Math.round(gx * pi));
-                // sol kanat aynalanır
-                int sagX = orta + 1 + kayma + (int)Math.round(gx * pi);
-                int solX = orta - 1 - kayma - (int)Math.round((gx + 1) * pi);
-                YikimOnizleme.hucre(graphics, solX, pyTop, pw, ph, renk);
-                YikimOnizleme.hucre(graphics, sagX, pyTop, pw, ph, renk);
-            }
+        catch (Throwable ignored) {
+            // tek parça basılamazsa kartın geri kalanı çizilir
         }
     }
 }

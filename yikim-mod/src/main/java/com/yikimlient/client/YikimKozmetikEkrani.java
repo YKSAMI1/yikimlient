@@ -261,18 +261,15 @@ public final class YikimKozmetikEkrani extends class_437 {
             YikimAdapter.text(graphics, font, "YOK", onx + ong / 2 - font.method_1727("YOK") / 2,
                 ony + onh / 2 - 4, YikimTheme.TEXT_DIM, false);
         } else if (sekme == YikimKozmetikSecim.DERI) {
-            int boy = Math.min(ong - 8, onh - 8);
-            YikimOnizleme.kafa(graphics, YikimOnizleme.kafaIzgara(oge.dosya),
-                onx + (ong - boy) / 2, ony + (onh - boy) / 2, boy);
+            // v1.33.2 — kartta yalnız kafa değil TAM VÜCUT (launcher gibi)
+            YikimOnizleme.deri(graphics, oge.dosya, onx + 2, ony + 2, ong - 4, onh - 4);
             if (oge.slim) {
                 YikimAdapter.text(graphics, font, "slim", x + 4, y + KART_Y - 20, YikimTheme.TEXT_MUTED, false);
             }
         } else if (sekme == YikimKozmetikSecim.ELITRA) {
-            YikimOnizleme.elitra(graphics, YikimOnizleme.kanatIzgara(oge.dosya),
-                onx + 2, ony + 2, ong - 4, onh - 4);
+            YikimOnizleme.elitra(graphics, oge.dosya, onx + 2, ony + 2, ong - 4, onh - 4);
         } else {
-            YikimOnizleme.pelerin(graphics, YikimOnizleme.pelerinIzgara(oge.dosya),
-                onx + 2, ony + 2, ong - 4, onh - 4);
+            YikimOnizleme.pelerin(graphics, oge.dosya, onx + 2, ony + 2, ong - 4, onh - 4);
         }
         String ad = oge == null ? "Kullanma" : oge.ad;
         YikimAdapter.text(graphics, font, YikimDraw.clip(font, ad, KART_G - 6),
