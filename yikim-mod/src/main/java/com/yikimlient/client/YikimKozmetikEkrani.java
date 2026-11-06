@@ -113,9 +113,13 @@ public final class YikimKozmetikEkrani extends class_437 {
         YikimDraw.roundedFill(graphics, onizlemeX, onizlemeY, onizlemeX + onizlemeG, onizlemeY + onizlemeH,
             YikimTheme.PANEL);
         YikimDraw.outline(graphics, onizlemeX, onizlemeY, onizlemeG, onizlemeH, YikimTheme.BORDER);
-        int boy = Math.min(onizlemeH - 62, (int)((float)onizlemeG * 1.55f));
+        // v1.33.0 — karakter PANELİN İÇİNE sığar: eskiden boy panelden büyük
+        // çıkıp baş üstten kesiliyor, model panelin dışına taşıyordu.
+        int alanH = Math.max(120, onizlemeH - 62);
+        int boy = Math.min(alanH, (int)((float)onizlemeG * 1.45f));
         int cx = onizlemeX + onizlemeG / 2;
-        YikimKarakter.draw(graphics, cx, onizlemeY + 12, Math.max(96, boy), YikimTheme.backdrop);
+        int tepe = onizlemeY + Math.max(4, (alanH - boy) / 2);
+        YikimKarakter.draw(graphics, cx, tepe, boy, YikimTheme.backdrop);
         String isim = "";
         try {
             class_310 istemci = class_310.method_1551();

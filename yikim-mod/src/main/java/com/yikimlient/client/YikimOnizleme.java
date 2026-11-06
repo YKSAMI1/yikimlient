@@ -33,6 +33,12 @@ public final class YikimOnizleme {
     private static final int[] PELERIN_IC = new int[]{1, 1, 10, 16};
     private static final int[] KANAT_DIS = new int[]{36, 2, 10, 20};
     private static final int[] KANAT_IC = new int[]{24, 2, 10, 20};
+    /** Kart ızgara çözünürlüğü — 10×16 kaba ızgara HD dokuda "nokta nokta"
+     *  görünüyordu; artık her hücre kaynak pikselin ORTALAMASIDIR. */
+    private static final int PELERIN_GX = 20;
+    private static final int PELERIN_GY = 32;
+    private static final int KANAT_GX = 20;
+    private static final int KANAT_GY = 40;
 
     private YikimOnizleme() {
     }
@@ -104,19 +110,50 @@ public final class YikimOnizleme {
         if (y1 <= y0) {
             y1 = y0 + 1.0;
         }
+        // Her hücre için kaynak piksellerin alfa ağırlıklı ORTALAMASI:
+        // HD pelerinlerde tek pikseli kaçıran noktalı görünüm böyle biter.
         for (int y = 0; y < gy; ++y) {
-            int sy = (int)(y0 + (y1 - y0) * ((double)y + 0.5) / (double)gy);
+            int sy0 = (int)Math.floor(y0 + (y1 - y0) * (double)y / (double)gy);
+            int sy1 = (int)Math.ceil(y0 + (y1 - y0) * (double)(y + 1) / (double)gy);
+            if (sy1 <= sy0) {
+                sy1 = sy0 + 1;
+            }
             for (int x = 0; x < gx; ++x) {
-                int sx = (int)(x0 + (x1 - x0) * ((double)x + 0.5) / (double)gx);
-                if (sx < 0 || sy < 0 || sx >= w || sy >= h) {
+                int sx0 = (int)Math.floor(x0 + (x1 - x0) * (double)x / (double)gx);
+                int sx1 = (int)Math.ceil(x0 + (x1 - x0) * (double)(x + 1) / (double)gx);
+                if (sx1 <= sx0) {
+                    sx1 = sx0 + 1;
+                }
+                long ar = 0L;
+                long ag = 0L;
+                long ab = 0L;
+                long aa = 0L;
+                for (int sy = sy0; sy < sy1; ++sy) {
+                    if (sy < 0 || sy >= h) {
+                        continue;
+                    }
+                    for (int sx = sx0; sx < sx1; ++sx) {
+                        if (sx < 0 || sx >= w) {
+                            continue;
+                        }
+                        int renk = doku[2 + sy * w + sx];
+                        int a = renk >>> 24;
+                        if (a < 16) {
+                            continue;
+                        }
+                        ar += (long)(renk >> 16 & 0xFF) * a;
+                        ag += (long)(renk >> 8 & 0xFF) * a;
+                        ab += (long)(renk & 0xFF) * a;
+                        aa += a;
+                    }
+                }
+                if (aa <= 0L) {
                     continue;
                 }
-                int renk = doku[2 + sy * w + sx];
-                // saydam / yarı saydam pikselleri atla
-                if ((renk >>> 24) < 40) {
-                    continue;
-                }
-                cikti[y * gx + x] = renk | 0xFF000000;
+                int r = (int)(ar / aa);
+                int g2 = (int)(ag / aa);
+                int b = (int)(ab / aa);
+                cikti[y * gx + x] = 0xFF000000 | r << 16 | g2 << 8 | b;
             }
         }
         if (YikimOnizleme.IZGARA.size() > 1024) {
@@ -164,13 +201,15 @@ public final class YikimOnizleme {
     /** Pelerin gövdesi (arkadan görünen 10×16 panel) ızgarası. */
     public static int[] pelerinIzgara(String goreli) {
         return YikimOnizleme.bolge("pelerin:" + goreli, YikimOnizleme.doku(goreli),
-            YikimOnizleme.PELERIN_DIS, YikimOnizleme.PELERIN_IC, 10, 16);
+            YikimOnizleme.PELERIN_DIS, YikimOnizleme.PELERIN_IC,
+            YikimOnizleme.PELERIN_GX, YikimOnizleme.PELERIN_GY);
     }
 
     /** Elitra kanadı (görünen 10×20 panel) ızgarası. */
     public static int[] kanatIzgara(String goreli) {
         return YikimOnizleme.bolge("kanat:" + goreli, YikimOnizleme.doku(goreli),
-            YikimOnizleme.KANAT_DIS, YikimOnizleme.KANAT_IC, 10, 20);
+            YikimOnizleme.KANAT_DIS, YikimOnizleme.KANAT_IC,
+            YikimOnizleme.KANAT_GX, YikimOnizleme.KANAT_GY);
     }
 
     private static void hucre(class_332 graphics, int x, int y, int w, int h, int renk) {
@@ -204,11 +243,17 @@ public final class YikimOnizleme {
             YikimDraw.roundedFill(graphics, x, y, x + genislik, y + yukseklik, 0x22FFFFFF);
             return;
         }
-        double pi = (double)genislik / 10.0;
-        double py = (double)yukseklik / 16.0;
-        for (int gy = 0; gy < 16; ++gy) {
-            for (int gx = 0; gx < 10; ++gx) {
-                int renk = ızgara[gy * 10 + gx];
+        int gX = YikimOnizleme.PELERIN_GX;
+        int gY = YikimOnizleme.PELERIN_GY;
+        if (ızgara.length != gX * gY) {
+            gX = 10;
+            gY = 16;
+        }
+        double pi = (double)genislik / (double)gX;
+        double py = (double)yukseklik / (double)gY;
+        for (int gy = 0; gy < gY; ++gy) {
+            for (int gx = 0; gx < gX; ++gx) {
+                int renk = ızgara[gy * gX + gx];
                 if (renk == 0) {
                     continue;
                 }
@@ -230,17 +275,23 @@ public final class YikimOnizleme {
             YikimDraw.roundedFill(graphics, x, y, x + genislik, y + yukseklik, 0x22FFFFFF);
             return;
         }
+        int gX = YikimOnizleme.KANAT_GX;
+        int gY = YikimOnizleme.KANAT_GY;
+        if (ızgara.length != gX * gY) {
+            gX = 10;
+            gY = 20;
+        }
         int kanatG = Math.max(6, genislik / 2 - 3);
-        double pi = (double)kanatG / 10.0;
-        double py = (double)yukseklik / 20.0;
+        double pi = (double)kanatG / (double)gX;
+        double py = (double)yukseklik / (double)gY;
         int orta = x + genislik / 2;
-        for (int gy = 0; gy < 20; ++gy) {
+        for (int gy = 0; gy < gY; ++gy) {
             // aşağı indikçe kanat dışa açılır
-            int kayma = (int)Math.round((double)gy / 20.0 * 3.0);
+            int kayma = (int)Math.round((double)gy / (double)gY * 3.0);
             int pyTop = y + (int)Math.round(gy * py);
             int ph = Math.max(1, (int)Math.round((gy + 1) * py) - (int)Math.round(gy * py));
-            for (int gx = 0; gx < 10; ++gx) {
-                int renk = ızgara[gy * 10 + gx];
+            for (int gx = 0; gx < gX; ++gx) {
+                int renk = ızgara[gy * gX + gx];
                 if (renk == 0) {
                     continue;
                 }

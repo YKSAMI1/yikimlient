@@ -129,7 +129,10 @@ public final class YikimTemaEkrani extends class_437 {
         YikimAdapter.text(graphics, font, "YIKIM", 12, 12, YikimTheme.TEXT, true);
         YikimAdapter.text(graphics, font, "v" + YikimClient.MOD_VERSION, 12, 24, YikimTheme.TEXT_MUTED, false);
         if (sade) {
-            YikimKarakter.draw(graphics, 236, 26, 108, YikimTheme.backdrop);
+            // v1.33.0 — 3B model kendi kutusuna çizilir (ertelenen GUI görevi),
+            // bu yüzden ekran koordinatına çevrilir.
+            YikimKarakter.draw(graphics, icX + Math.round(236.0f * olcek), icY + Math.round(26.0f * olcek),
+                Math.max(28, Math.round(108.0f * olcek)), YikimTheme.backdrop);
             String[] tuşlar = new String[]{"Tek Oyunculu", "Çok Oyunculu", "YIKIM Menüsü", "Modlar", "Ayarlar"};
             for (int i = 0; i < tuşlar.length; i++) {
                 int ry = 52 + i * 20;

@@ -88,6 +88,15 @@ public final class YikimKozmetik {
     private static volatile String pelerinKucuk = "";
     private static volatile String kanatKucuk = "";
 
+    /**
+     * Yerel kozmetik dosyalarını tazele.
+     *
+     * v1.33.0 — FPS: bu metot `getSkinTextures` üzerinden HER KAREDE çağrılır.
+     * Eskiden saniyede bir 4 dosya baştan okunup base64'e çevriliyordu; HD
+     * dokularda bu tek başına büyük bir takılma dalgasıydı ("fps bir fırlıyor,
+     * bir düşüyor"). Artık yalnız mtime+boyut DENETLENİR, dosya gerçekten
+     * değişmedikçe okunmaz/kodlanmaz.
+     */
     private static synchronized void dosyalariTazele() {
         long simdi = System.currentTimeMillis();
         if (simdi - YikimKozmetik.sonKontrol < 1000L) {
@@ -96,15 +105,47 @@ public final class YikimKozmetik {
         YikimKozmetik.sonKontrol = simdi;
         String oncekiPelerin = YikimKozmetik.pelerinYerel;
         String oncekiKanat = YikimKozmetik.kanatYerel;
-        YikimKozmetik.pelerinYerel = YikimKozmetik.disktenOku("pelerin.png");
-        YikimKozmetik.kanatYerel = YikimKozmetik.disktenOku("elytra.png");
-        YikimKozmetik.pelerinKucuk = YikimKozmetik.kucukDosya("pelerin.kucuk.png", YikimKozmetik.pelerinYerel);
-        YikimKozmetik.kanatKucuk = YikimKozmetik.kucukDosya("elytra.kucuk.png", YikimKozmetik.kanatYerel);
-        // v1.26: YENİ doku kaydedildi → sonraki kalp atışını (3 sn) BEKLEME.
-        // Oyun açıkken kozmetik kaydetmek anında karşı tarafa gider.
-        if (!YikimKozmetik.pelerinYerel.equals(oncekiPelerin)
-            || !YikimKozmetik.kanatYerel.equals(oncekiKanat)) {
+        YikimKozmetik.pelerinYerel = YikimKozmetik.imzaliOku("pelerin.png", 0);
+        YikimKozmetik.kanatYerel = YikimKozmetik.imzaliOku("elytra.png", 1);
+        boolean degisti = !YikimKozmetik.pelerinYerel.equals(oncekiPelerin)
+            || !YikimKozmetik.kanatYerel.equals(oncekiKanat);
+        if (degisti) {
+            YikimKozmetik.pelerinKucuk = YikimKozmetik.kucukDosya("pelerin.kucuk.png", YikimKozmetik.pelerinYerel);
+            YikimKozmetik.kanatKucuk = YikimKozmetik.kucukDosya("elytra.kucuk.png", YikimKozmetik.kanatYerel);
+            // v1.26: YENİ doku kaydedildi → sonraki kalp atışını (3 sn) BEKLEME.
             YikimPresence.hemenGonder();
+        }
+    }
+
+    /** Dosya imzası (mtime ^ boyut) → base64 önbelleği. Değişmeyen dosya okunmaz. */
+    private static final long[] DOSYA_DAMGA = new long[] {Long.MIN_VALUE, Long.MIN_VALUE};
+    private static final String[] DOSYA_B64 = new String[] {"", ""};
+
+    private static String imzaliOku(String ad, int yuva) {
+        try {
+            Path f = YikimKozmetik.stateDir().resolve(ad);
+            if (!Files.isRegularFile(f)) {
+                YikimKozmetik.DOSYA_DAMGA[yuva] = Long.MIN_VALUE;
+                YikimKozmetik.DOSYA_B64[yuva] = "";
+                return "";
+            }
+            long damga = Files.getLastModifiedTime(f).toMillis() ^ Files.size(f) << 8;
+            if (damga == YikimKozmetik.DOSYA_DAMGA[yuva]) {
+                return YikimKozmetik.DOSYA_B64[yuva];
+            }
+            byte[] png = Files.readAllBytes(f);
+            if (png.length < 8) {
+                YikimKozmetik.DOSYA_DAMGA[yuva] = damga;
+                YikimKozmetik.DOSYA_B64[yuva] = "";
+                return "";
+            }
+            String b64 = Base64.getEncoder().encodeToString(png);
+            YikimKozmetik.DOSYA_DAMGA[yuva] = damga;
+            YikimKozmetik.DOSYA_B64[yuva] = b64;
+            return b64;
+        }
+        catch (Throwable ignored) {
+            return YikimKozmetik.DOSYA_B64[yuva];
         }
     }
 
@@ -703,7 +744,10 @@ public final class YikimKozmetik {
         if (b64 == null || b64.isEmpty()) {
             return null;
         }
-        String imza = anahtar + ":" + Integer.toHexString(b64.hashCode()) + ":" + b64.length();
+        // v1.33.0 — FPS: eskiden base64 metninin TAMAMI hash'leniyordu (HD
+        // pelerinde ~1.4M karakter, her kare!). Kimlik + uzunluk yeterli:
+        // doku değişince yeni String nesnesi gelir.
+        String imza = anahtar + ":" + System.identityHashCode(b64) + ":" + b64.length();
         YikimKozmetik.kayitlariTazele();
         class_2960 var = YikimKozmetik.DOKULAR.get(imza);
         if (var != null) {

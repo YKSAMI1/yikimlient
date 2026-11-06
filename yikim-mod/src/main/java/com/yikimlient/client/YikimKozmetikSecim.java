@@ -127,15 +127,18 @@ public final class YikimKozmetikSecim {
     /** Kataloğu (değiştiyse) oku. */
     public static void tazele() {
         try {
-            Path yol = YikimKozmetikSecim.katalog();
-            if (!Files.isRegularFile(yol, new LinkOption[0])) {
-                return;
-            }
+            // v1.33.0 — FPS: bu metot getSkinTextures üzerinden her karede
+            // çağrılır. Kapı (zaman kontrolü) İLK olmalı; yoksa her karede
+            // disk syscall'ı yapılıyordu.
             long simdi = System.currentTimeMillis();
             if (simdi - YikimKozmetikSecim.sonOkuma < 800L) {
                 return;
             }
             YikimKozmetikSecim.sonOkuma = simdi;
+            Path yol = YikimKozmetikSecim.katalog();
+            if (!Files.isRegularFile(yol, new LinkOption[0])) {
+                return;
+            }
             long zaman = Files.getLastModifiedTime(yol, new LinkOption[0]).toMillis();
             if (zaman == YikimKozmetikSecim.damga) {
                 return;
