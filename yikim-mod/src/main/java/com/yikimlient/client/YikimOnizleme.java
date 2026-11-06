@@ -235,10 +235,10 @@ public final class YikimOnizleme {
         YikimOnizleme.parca(graphics, goreli, 44, 20, 4, 12, 44, 36, sol, ust + 8 * olcek, 4 * olcek);
         // sol kol (36,52) + kolluk (52,52)
         YikimOnizleme.parca(graphics, goreli, 36, 52, 4, 12, 52, 52, sol + 12 * olcek, ust + 8 * olcek, 4 * olcek);
-        // sağ bacak (4,20) + pantolon (4,36)
-        YikimOnizleme.parca(graphics, goreli, 4, 20, 4, 12, 4, 36, sol + 4 * olcek, ust + 20 * olcek, 4 * olcek);
-        // sol bacak (20,52) + pantolon (4,52)
-        YikimOnizleme.parca(graphics, goreli, 20, 52, 4, 12, 4, 52, sol + 8 * olcek, ust + 20 * olcek, 4 * olcek);
+        // sağ bacak (4,20) + pantolon (0,36)
+        YikimOnizleme.parca(graphics, goreli, 4, 20, 4, 12, 0, 36, sol + 4 * olcek, ust + 20 * olcek, 4 * olcek);
+        // sol bacak (20,52) + pantolon (0,52)
+        YikimOnizleme.parca(graphics, goreli, 20, 52, 4, 12, 0, 52, sol + 8 * olcek, ust + 20 * olcek, 4 * olcek);
     }
 
     /** Deri paftasından tek parça: taban + üst katman üst üste. */
@@ -254,9 +254,10 @@ public final class YikimOnizleme {
         float olcek = boyut / (float)w;
         int px = Math.round(x);
         int py = Math.round(y);
-        // üst katman (şeffafsa kendiliğinden görünmez)
-        YikimOnizleme.katman(graphics, id, texW, texH, ou, ov, w, h, px, py, olcek);
+        // v1.33.3 — sıra TERS'ti: üst katman (şapka/ceket) altta kalıp taban
+        // deriyle örtülüyordu, kartlarda overlay hiç görünmüyordu.
         YikimOnizleme.katman(graphics, id, texW, texH, u, v, w, h, px, py, olcek);
+        YikimOnizleme.katman(graphics, id, texW, texH, ou, ov, w, h, px, py, olcek);
     }
 
     private static void katman(class_332 graphics, class_2960 id, int texW, int texH,

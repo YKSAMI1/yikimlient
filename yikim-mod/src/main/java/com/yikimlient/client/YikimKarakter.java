@@ -81,7 +81,9 @@ public final class YikimKarakter {
         if (kareFarki == 0) {
             return;
         }
-        float yeni = YikimKarakter.aci + (float)kareFarki * ADIM;
+        // v1.33.3 — sürükleme yönü TERS'ti: fare sağa giderken karakter sola
+        // dönüyordu ("tutup çevirme" hissi bozuk). İşaret çevrildi.
+        float yeni = YikimKarakter.aci - (float)kareFarki * ADIM;
         yeni %= 360.0f;
         if (yeni < 0.0f) {
             yeni += 360.0f;

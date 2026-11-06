@@ -150,10 +150,22 @@ public final class YikimModel {
             if (deri == null) {
                 return null;
             }
+            // v1.33.3 — ana menüde katalog hiç tazelenmiyordu: seçim boş
+            // görünüp pelerin kayboluyordu. Her durum kurulumunda tazele
+            // (kendi içinde 800 ms kapılı).
+            YikimKozmetikSecim.tazele();
             // v1.33.2 — SEÇİM NEYSE O: dosya duruyor diye kozmetik gösterme.
             boolean pelerinSecili = !YikimKozmetikSecim.aktifId(YikimKozmetikSecim.PELERIN).isEmpty()
                 || !YikimKozmetikSecim.aktifId(YikimKozmetikSecim.MOJANG).isEmpty();
             boolean kanatSecili = !YikimKozmetikSecim.aktifId(YikimKozmetikSecim.ELITRA).isEmpty();
+            // katalog okunamadıysa (liste boş) seçim kapısı uygulanmaz —
+            // yoksa bir kez katalog okunamayınca kozmetik tamamen kayboluyordu
+            if (YikimKozmetikSecim.liste(YikimKozmetikSecim.PELERIN).isEmpty()) {
+                pelerinSecili = true;
+            }
+            if (YikimKozmetikSecim.liste(YikimKozmetikSecim.ELITRA).isEmpty()) {
+                kanatSecili = true;
+            }
             class_2960 pelerin = (elitraModu || !pelerinSecili) ? null : YikimModel.pelerin();
             class_2960 kanat = (elitraModu && kanatSecili) ? YikimModel.kanat() : null;
             String yeniImza = deri + "|" + pelerin + "|" + kanat + "|" + slim;
