@@ -950,10 +950,15 @@ public final class YikimKozmetik {
                 return null;
             }
             boolean ince = YikimKozmetikSecim.deriSlim;
-            String anahtar = deri + "|" + pelerin + "|" + kanat + "|" + (deri != null && ince);
+            // FPS (v1.34.0): anahtar artık METİN değil — kimlik karşılaştırması.
+            // Eskiden her kare her oyuncu için 4 dizgi birleştirme + String.hashCode
+            // yapılıyordu; çok oyunculu sunucularda (80+ oyuncu) bu kare başına
+            // yüzlerce gereksiz nesne ve GC baskısı demekti. Artık doğrudan
+            // doku kimliklerine bakılır — aynı sonuç, sıfır ayırma.
             Object[] kayit = YikimKozmetik.ONBELLEK.get(mevcut);
-            if (kayit != null && anahtar.equals(kayit[0])) {
-                return kayit[1];
+            if (kayit != null && kayit[0] == deri && kayit[1] == pelerin
+                && kayit[2] == kanat && kayit[3] == (Object) ince) {
+                return kayit[4];
             }
             Object var = YikimKozmetik.uygula(mevcut, pelerin, kanat, deri, ince);
             if (var == null) {
@@ -962,7 +967,7 @@ public final class YikimKozmetik {
             if (YikimKozmetik.ONBELLEK.size() > 512) {
                 YikimKozmetik.ONBELLEK.clear();
             }
-            YikimKozmetik.ONBELLEK.put(mevcut, new Object[] {anahtar, var});
+            YikimKozmetik.ONBELLEK.put(mevcut, new Object[] {deri, pelerin, kanat, (Object) ince, var});
             return var;
         }
         catch (Throwable ignored) {

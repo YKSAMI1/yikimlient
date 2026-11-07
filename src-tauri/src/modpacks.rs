@@ -346,16 +346,15 @@ pub fn standard_mods() -> Vec<StandardMod> {
             description: "Oyun içinde mod listesi + ayar butonu; kurulu modları oyun içinden yönet.".into(),
             category: "gorunum".into(), enabled_by_default: true,
         },
-        StandardMod {
-            id: "capes".into(), slug: "capes".into(),
-            name: "Capes".into(),
-            description: "OptiFine/LabyMod vb. pelerinleri gösterir.".into(),
-            category: "gorunum".into(), enabled_by_default: true,
-        },
+        // NOT: "Capes" / "MinecraftCapes" modları ARTIK PAKETTE YOK.
+        // Sebep: (1) Mojang/OptiFine pelerinini oyunda gösterirler — YIKIM
+        // pelerininin TEK kaynak olması isteniyor ("sadece YIKIMLient
+        // pelerinleri"); (2) YIKIM kozmetik sistemiyle aynı slotta çalışıp
+        // çakışıyordu. Eski kurulumlarda kalanları retired_mods/'a taşınır.
         StandardMod {
             id: "fabric-language-kotlin".into(), slug: "fabric-language-kotlin".into(),
             name: "Fabric Language Kotlin".into(),
-            description: "Kotlin tabanlı modların bağımlılığı (Zoomify, Capes, Particle Core ister).".into(),
+            description: "Kotlin tabanlı modların bağımlılığı (Zoomify gibi modlar ister).".into(),
             category: "gorunum".into(), enabled_by_default: true,
         },
         StandardMod {
@@ -369,6 +368,18 @@ pub fn standard_mods() -> Vec<StandardMod> {
             name: "Fzzy Config".into(),
             description: "Konfigürasyon kütüphanesi; Particle Core gibi modlar bağımlıdır.".into(),
             category: "gorunum".into(), enabled_by_default: true,
+        },
+        StandardMod {
+            id: "moreculling".into(), slug: "moreculling".into(),
+            name: "More Culling".into(),
+            description: "Varlık/blok yüzlerini daha agresif süzer; kalabalık yerlerde ekstra FPS.".into(),
+            category: "performans".into(), enabled_by_default: true,
+        },
+        StandardMod {
+            id: "threadfixer".into(), slug: "threadfixer".into(),
+            name: "ThreadFixer".into(),
+            description: "Arka plan iş parçacıklarını düzgün adlandırır; takılmaları azaltır.".into(),
+            category: "performans".into(), enabled_by_default: true,
         },
         // ==================== İSTEK LİSTESİ + KÜTÜPHANELER ====================
         // (kullanıcı listesindeki eksik modlar; (Kapalı) işaretliler varsayılan kapalı)
@@ -498,12 +509,6 @@ pub fn standard_mods() -> Vec<StandardMod> {
             description: "Lectern sayfalama otomasyonu; yerel oyunlarda kolaylık.".into(),
             category: "yardarci".into(), enabled_by_default: false,
         },
-        StandardMod {
-            id: "minecraftcapes".into(), slug: "minecraftcapes".into(),
-            name: "MinecraftCapes (kapalı)".into(),
-            description: "MinecraftCapes servisi pelerinleri gösterir; Capes modu ile ikileşebilir (varsayılan kapalı).".into(),
-            category: "gorunum".into(), enabled_by_default: false,
-        },
     ]
 }
 
@@ -512,9 +517,11 @@ pub fn standard_mods() -> Vec<StandardMod> {
 /// - zfastnoise: Noisium ile aynı işi yapıyor (dünya üretimi) → çakışma + sıfır fayda
 /// - ixeris: 1.21.9+ yeni giriş sistemi (KeyInput/MouseInput) riski; panel girişlerimize zarar verebilir
 /// - c2me-fabric: kalite/kararlılık gözetimi ile çıkarıldı
+/// - capes / minecraftcapes: Mojang ve üçüncü parti pelerinini oyunda gösterir;
+///     YIKIM pelerini tek kaynak olmalı + kozmetik sistemimizle çakışıyordu
 /// Kurulumda rastlanırsa `retired_mods/` klasörüne TAŞINIR (silinmez — geri dönüş her zaman açık).
 pub fn retired_mod_prefixes() -> Vec<&'static str> {
-    vec!["zoomify", "zfastnoise", "ixeris", "c2me-fabric"]
+    vec!["zoomify", "zfastnoise", "ixeris", "c2me-fabric", "capes", "minecraftcapes"]
 }
 
 /// Launcher içinde sunduğumuz başlangıç sürümleri (quick pick).

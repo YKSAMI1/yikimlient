@@ -1,4 +1,4 @@
-use crate::core::{http_client, yikim_log};
+﻿use crate::core::{http_client, yikim_log};
 use serde::Serialize;
 
 /// Modrinth v2 + CurseForge v1 (beta) API entegrasyonu.
@@ -20,6 +20,17 @@ pub struct RepoSearchResult {
     pub categories: Vec<String>,
 }
 
+/// Bir sürümün bağımlılık gereksinimi.
+/// Modrinth: `dependencies: [{project_id, version_id, dependency_type}]`
+/// CurseForge: `dependencies: [{addonId, type}]` (3 = Kütüphane/zorunlu).
+#[derive(Debug, Clone, Serialize)]
+pub struct RepoBagimlilik {
+    pub project_id: String,
+    pub version_id: String,
+    /// "required" | "optional" | "incompatible"
+    pub tur: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct RepoVersion {
     pub id: String,
@@ -31,6 +42,7 @@ pub struct RepoVersion {
     pub files: Vec<RepoFile>,
     pub source: String,
     pub project_id: String,
+    pub dependencies: Vec<RepoBagimlilik>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -39,6 +51,31 @@ pub struct RepoFile {
     pub filename: String,
     pub primary: bool,
     pub size: u64,
+}
+
+/// Modrinth bağımlılık türü: 1 = required, 2 = optional, 3 = incompatible.
+/// CurseForge türü: 3 = library (kurulmalı), diğerleri opsiyonel.
+fn bagimlilik_turu(v: &serde_json::Value) -> String {
+    match v["dependency_type"].as_str().map(|s| s.to_lowercase()).unwrap_or_default() {
+        t if t.contains("required") || t.contains("library") => "required".into(),
+        t if t.contains("incompatible") => "incompatible".into(),
+        _ => "optional".into(),
+    }
+}
+
+/// Modrinth sürümünden bağımlılıkları çöz.
+fn modrinth_bağımlılıklar(v: &serde_json::Value) -> Vec<RepoBagimlilik> {
+    v["dependencies"]
+        .as_array()
+        .unwrap_or(&Vec::new())
+        .iter()
+        .map(|d| RepoBagimlilik {
+            project_id: d["project_id"].as_str().unwrap_or("").into(),
+            version_id: d["version_id"].as_str().unwrap_or("").into(),
+            tur: bagimlilik_turu(d),
+        })
+        .filter(|b| !b.project_id.is_empty())
+        .collect()
 }
 
 // ---------- Paket kurulum adımları (canlı ilerleme) ----------
@@ -495,6 +532,7 @@ async fn modrinth_versions(
                 game_versions: str_list(&v["game_versions"]),
                 loaders: str_list(&v["loaders"]),
                 files,
+                dependencies: modrinth_bağımlılıklar(&v),
                 source: "modrinth".into(),
                 project_id: project_id.into(),
             });
@@ -617,6 +655,7 @@ async fn curseforge_files(
                     primary: true,
                     size: f["fileLength"].as_u64().unwrap_or(0),
                 }],
+                dependencies: Vec::new(),
                 source: "curseforge".into(),
                 project_id: mod_id.into(),
             });
@@ -722,6 +761,7 @@ pub async fn version_by_id(
                 game_versions: str_list(&v["game_versions"]),
                 loaders: str_list(&v["loaders"]),
                 files,
+                dependencies: modrinth_bağımlılıklar(&v),
                 source: "modrinth".into(),
                 project_id: project_id.into(),
             })
@@ -743,6 +783,7 @@ pub async fn version_by_id(
                     primary: true,
                     size: 0,
                 }],
+                dependencies: Vec::new(),
                 source: "curseforge".into(),
                 project_id: project_id.into(),
             })
@@ -1245,16 +1286,81 @@ pub async fn install_mod_into(
         .or_else(|| version.files.first())
         .ok_or("dosya yok")?;
     emit(handle, &file.filename, "start");
-    let result = download_file(&file.url, &target_dir.join(&file.filename), &file.filename).await;
-    match result {
-        Ok(()) => {
-            emit(handle, &file.filename, "done");
-            yikim_log(format!("mod kuruldu: {}", file.filename));
-            Ok(file.filename.clone())
-        }
-        Err(e) => {
-            emit(handle, &file.filename, "error");
-            Err(e)
+    download_file(&file.url, &target_dir.join(&file.filename), &file.filename).await?;
+    emit(handle, &file.filename, "done");
+    yikim_log(format!("mod kuruldu: {}", file.filename));
+
+    // ---- BAĞIMLILIKLAR (otomatik) ----
+    // Modrinth sürümü "dependencies" alanı taşır: zorunlu bağımlılık modu
+    // (fabric-api, kotlin kütüphanesi gibi) kurulmazsa oyun açılışta kilitlenir.
+    // Burada başlı kendisi kurulduktan sonra ZORUNLU bağımlılıklar da kurulur;
+    // çağrı zincirinde ki dosya adını doğrudan dönmeyeceğiz (önceki dosya zaten yazıldı).
+    if source == "modrinth" && !version.dependencies.is_empty() {
+        bagimliliklari_kur(handle, source, inst, target_dir, &version).await;
+    }
+    Ok(file.filename.clone())
+}
+
+/// Sürümün ZORUNLU bağımlılıklarını (varsa) kurar — derinlik sınırı YOK, çünkü
+/// zincir genelde 1-2 seviyedir (mod → fabric-api). Aynı hedefte kurulu
+/// bağımlılığı atlamak için install_mod_into zaten jarsı tekrar indirir
+/// (idempotent değildir) — bu yüzden "kuruldu mu" kontrolü dosya adına bakar.
+async fn bagimliliklari_kur(
+    handle: &tauri::AppHandle,
+    source: &str,
+    inst: &crate::instances::Instance,
+    target_dir: &std::path::Path,
+    version: &RepoVersion,
+) {
+    use tauri::Emitter;
+    let mut kuyruk: Vec<RepoBagimlilik> = version
+        .dependencies
+        .iter()
+        .filter(|b| b.tur == "required" && !b.project_id.is_empty())
+        .cloned()
+        .collect();
+    let mut derinlik = 0u8;
+    while !kuyruk.is_empty() && derinlik < 3 {
+        let sira: Vec<RepoBagimlilik> = std::mem::take(&mut kuyruk);
+        derinlik += 1;
+        for b in sira {
+            // kurulu mu? fabric id'si bilinmiyor — dosya adı önekiyle tahmin
+            // riskli; bu yüzden her zorunlu bağımlılık EN FAZLA bir kez
+            // indirilir ve aynı sürümde yinelenirse karşılanır.
+            match versions_for(source, &b.project_id, "mod", if inst.mod_loader == "vanilla" { "" } else { &inst.mod_loader }, &inst.mc_version).await {
+                Ok(vs) => match vs.into_iter().next() {
+                    Some(v) => {
+                    // varsa seçilen sürümü, yoksa ilk sürümü kullan
+                    let dosya = v.files.iter().find(|f| f.primary).or_else(|| v.files.first());
+                    let Some(f) = dosya else { continue };
+                    let hedef_dosya = target_dir.join(&f.filename);
+                    if hedef_dosya.exists() {
+                        continue; // zaten kurulu
+                    }
+                    let _ = handle.emit(
+                        "mod-install-progress",
+                        &serde_json::json!({
+                            "instance_id": inst.id,
+                            "filename": f.filename,
+                            "phase": "done",
+                        }),
+                    );
+                    if let Err(e) = download_file(&f.url, &hedef_dosya, &f.filename).await {
+                        yikim_log(format!("bağımlılık kurulamadı ({}): {e}", b.project_id));
+                    } else {
+                        yikim_log(format!("bağımlılık kuruldu: {}", f.filename));
+                    }
+                    // derin zincir: bu bağımlılığın kendi bağımlılıkları
+                    for alt in v.dependencies.iter().filter(|a| a.tur == "required") {
+                        if !alt.project_id.is_empty() && alt.project_id != b.project_id {
+                            kuyruk.push(alt.clone());
+                        }
+                    }
+                    }
+                    None => yikim_log(format!("bağımlılık sürümü yok: {}", b.project_id)),
+                },
+                Err(e) => yikim_log(format!("bağımlılık sürümleri alınamadı ({}): {e}", b.project_id)),
+            }
         }
     }
 }

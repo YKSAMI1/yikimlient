@@ -9,6 +9,7 @@
 //   6 oyun dosyaları (sürüm kurulumu) → 7 YIKIM modu → 8 hazır.
 
 import { listen, toast } from "./main";
+import { bildirimEkle } from "./bildirim";
 
 export type Durum = "bekliyor" | "aktif" | "bitti" | "hata" | "atlandi";
 
@@ -72,7 +73,8 @@ export function packKartBaslat(ad: string): void {
       adimUygula(p.adim, p.durum, p.done || 0, p.total || 0, p.ayrinti || "", p.percent || 0);
     }).then((off: () => void) => { dinleyiciOff = off; });
   }
-  zilGuncelle(true, false);
+  zilGuncelle("kurulum");
+  bildirimEkle("kurulum", ad, "Kurulum başladı — adım adım sağ altta gösterilecek");
 }
 
 /// Tam listeyi aç/kapa (kart kafası + başlık çubuğu zili aynı işi yapar).
@@ -102,7 +104,8 @@ export function packKartTamam(): void {
   kart.bitti = true;
   kart.root.classList.add("pk-bitti");
   kart.kapatZamani = Date.now() + 6000;
-  zilGuncelle(false, true);
+  zilGuncelle("bitti");
+  bildirimEkle("kurulum", "Kurulum tamamlandı", "Paket oynanmaya hazır — Kurulumlar sayfasından başlatabilirsin");
   if (sonKapatlayici === null) kapatZamanlayiciBaslat();
 }
 
@@ -118,7 +121,8 @@ export function packKartHata(mesaj: string): void {
     aktif.classList.add("pk-hata");
   }
   kart.root.classList.add("pk-acik"); // hata detayı görünsün
-  zilGuncelle(true, false);
+  zilGuncelle("kurulum");
+  bildirimEkle("sistem", "Kurulum durdu", mesaj.length > 120 ? `${mesaj.slice(0, 120)}…` : mesaj);
 }
 
 /// Dışarıdan (mock / test) elle adım basmak için.
@@ -134,16 +138,15 @@ export function packKartTest(
 }
 
 /// Zil durumu: kurulum sürüyorsa nokta canlı, bittiyse gri, yoksa soluk.
-function zilGuncelle(kurulum: boolean, bitti: boolean): void {
+function zilGuncelle(durum: "yok" | "kurulum" | "bitti"): void {
   const btn = document.querySelector("#tb-pack") as HTMLElement | null;
   if (!btn) return;
-  btn.classList.toggle("pk-var", kurulum || bitti);
-  btn.classList.toggle("pk-bitti", bitti);
-  btn.title = bitti
+  btn.classList.toggle("bild-var", durum !== "yok");
+  btn.title = durum === "bitti"
     ? "Kurulum tamamlandı — durumu göster"
-    : kurulum
+    : durum === "kurulum"
       ? "Mod paketi kuruluyor — durumu göster"
-      : "Kurulum durumu";
+      : "Bildirimler — kurulum durumu ve diğer haberler";
 }
 
 function adimUygula(
@@ -247,6 +250,5 @@ function kapatZamanlayiciBaslat(): void {
   sonKapatlayici = iv as unknown as number;
 }
 
-/// Baslik çubuğu zili de başlangıçta dursun (paket gelmeden önce soluk).
+/// Debug/test kanalı: mock harness dış yollar buradan adım sayabilir.
 (window as any).__PACK_KART_TEST__ = packKartTest;
-(window as any).__PACK_ZIL__ = { guncelle: zilGuncelle, degistir: packKartDegistir, baslat: packKartBaslat, tamam: packKartTamam, hata: packKartHata };

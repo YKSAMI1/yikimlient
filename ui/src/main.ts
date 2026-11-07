@@ -11,6 +11,7 @@ import "@fontsource/pixelify-sans/700.css";
 import "@fontsource/pixelify-sans/latin-ext-400.css";
 import "@fontsource/pixelify-sans/latin-ext-700.css";
 import { registerPages } from "./pages";
+import { bildirimAcKapa, bildirimKutuBaslat, bildirimZilIlkDurum } from "./bildirim";
 import { startDropWatcher } from "./drop";
 import { maybeStartTour } from "./tour";
 import { maybeStartOnboarding } from "./onboarding";
@@ -350,14 +351,9 @@ export function setupShell(): void {
   // Zil: kurulum durumu penceresini aç/kapa — karta tıkla ya da zile tıkla,
   // tam adım listesi acilir; kurulum yoksa sessizce yoksay.
   $("#tb-pack")?.addEventListener("click", () => {
-    const pk = (window as any).__PACK_ZIL__;
-    const kartAcik = document.querySelector(".pk-kart:not(.pk-gizli)");
-    if (kartAcik) {
-      // kart görünür → listeyi aç/kapa (kafa tıklaması ile aynı)
-      pk?.degistir();
-    } else {
-      pk?.baslat("Kurulum durumu");
-    }
+    // Zil = GENEL bildirim kutusu (mod paketi dahil her haber burada).
+    // Boşken "Şu an bir şey olmuyor." yazar; kurulum sürüyorsa bildirim düşer.
+    bildirimAcKapa();
   });
   // Alt+F4 / görev çubuğu kapatması da aynı kurala düşsün
   try {
@@ -669,6 +665,9 @@ export async function boot(): Promise<void> {
     // Otomatik güncelleme kontrolü (imzalı; GitHub releases'ten) — sessiz kontrol,
     // güncelleme varsa kullanıcıya sorar, hata asla açılışı bozmaz.
     void checkForUpdate();
+    // Bildirim kutusu: zilin geçmişinden yeni-var noktası ilk açılışta dursun.
+    bildirimKutuBaslat();
+    bildirimZilIlkDurum();
     // .yikimpack çift tıklama: uygulama dışarıdan bir paketle açıldıysa
     // doğrudan "Paketler" sayfasına geç ve kurulumu kendiliğinden başlat.
     dinleYikimpackAc();

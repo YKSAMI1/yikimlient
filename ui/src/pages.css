@@ -1541,6 +1541,45 @@ input.search-in.input, .search-in.input {
 .share-kutu.kapali:hover { border-color: var(--bg4, #262a33); }
 .share-not { font-size: 11.5px; color: var(--text-faint); margin-top: 10px; }
 
+/* ---------- BİLDİRİM KUTUSU (zilin altından açılır) ---------- */
+.bildirim-panel {
+  position: fixed; right: 12px; top: 46px; z-index: 3950;
+  width: 330px; max-width: calc(100vw - 24px); max-height: 60vh;
+  background: var(--bg2, #14161c);
+  border: 1px solid var(--bg4, #262a33);
+  border-radius: 12px;
+  box-shadow: 0 16px 46px rgba(0, 0, 0, 0.5);
+  display: none; flex-direction: column; overflow: hidden;
+  font-size: 12px; color: var(--text-dim);
+}
+.bildirim-panel.bildirim-acik { display: flex; }
+.bild-kafa {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid var(--bg4, #262a33);
+  flex: none;
+}
+.bild-kafa-ad { font-weight: 800; font-size: 12.5px; color: var(--text, #fff); }
+.bild-kafa-islem { display: flex; gap: 4px; }
+.bild-kafa-islem button {
+  background: none; border: none; color: var(--text-faint); cursor: pointer;
+  font-size: 11px; padding: 3px 6px; border-radius: 6px;
+}
+.bild-kafa-islem button:hover { background: var(--bg3, #1c1f26); color: var(--text); }
+.bild-liste { overflow-y: auto; overscroll-behavior: contain; }
+.bild-satir {
+  display: grid; grid-template-columns: 22px 1fr auto; gap: 8px;
+  align-items: start; padding: 9px 12px; border-bottom: 1px solid var(--bg3, #1c1f26);
+}
+.bild-satir:last-child { border-bottom: none; }
+.bild-satir[data-tur="kurulum"] { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.bild-ikon { font-size: 13px; line-height: 1.2; }
+.bild-baslik { font-size: 12px; font-weight: 700; color: var(--text, #fff); }
+.bild-mesaj { font-size: 11px; color: var(--text-faint); margin-top: 2px; line-height: 1.45; }
+.bild-saat { font-size: 10px; color: var(--text-faint); opacity: 0.7; }
+.bild-bos { padding: 26px 18px 30px; text-align: center; }
+.bild-bos-ikon { font-size: 22px; opacity: 0.5; }
+.bild-bos-alt { font-size: 10.5px; color: var(--text-faint); opacity: 0.75; margin-top: 6px; line-height: 1.5; }
+
 /* baslik cubugu Zil dügmesi — kurulum varsa nokta, yoksa soluk */
 .tb-btn.tb-pack { position: relative; opacity: 0.5; }
 .tb-btn.tb-pack.pk-var { opacity: 1; color: var(--accent); }
