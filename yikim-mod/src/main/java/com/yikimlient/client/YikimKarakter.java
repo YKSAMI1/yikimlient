@@ -97,7 +97,10 @@ public final class YikimKarakter {
         long simdi = System.currentTimeMillis();
         long gecen = YikimKarakter.sonKare == 0L ? 0L : Math.min(120L, simdi - YikimKarakter.sonKare);
         YikimKarakter.sonKare = simdi;
-        if (simdi > YikimKarakter.duraklamaSonu) {
+        // v1.33.7 — ELİTRA sekmesinde KENDİLİĞİNDEN DÖNME YOK: karakter her
+        // 40 sn'de bir tur attığı için kanat çoğu anda profilden görünüyor ve
+        // "elitra gözükmüyor" oluyordu. Sırttaki elitra sabit ve tam karşıdan.
+        if (!YikimKarakter.elitraModu && simdi > YikimKarakter.duraklamaSonu) {
             float yeni = YikimKarakter.aci + BOSTA_HIZ * (float)gecen / 1000.0f;
             yeni %= 360.0f;
             if (yeni < 0.0f) {

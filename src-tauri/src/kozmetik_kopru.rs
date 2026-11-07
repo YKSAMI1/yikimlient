@@ -290,6 +290,22 @@ fn secim_deri(id: &str) {
             if let Some(bayt) = bayt {
                 let _ = std::fs::write(cache_kok.join(format!("skin-{anahtar}.png")), &bayt);
                 deri_yaz_her_kuruluma(&bayt);
+                // v0.7.13 — "Kullanma" da HESABA yazılır: aksi hâlde sunucular
+                // ve diğer oyuncular seçilmiş deriyi görmeye devam ediyordu.
+                let slim = std::fs::read_to_string(
+                    cache_kok.join(format!("hesap-deri-{anahtar}.json")),
+                )
+                .ok()
+                .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+                .and_then(|j| j["slim"].as_bool())
+                .unwrap_or(false);
+                if let Some(acc) = aktif_hesap() {
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = crate::skins::skin_uygula(&acc, &bayt, slim).await {
+                            crate::core::yikim_log(format!("deri geri yuklenemedi: {e}"));
+                        }
+                    });
+                }
             }
         }
         return;
@@ -311,6 +327,14 @@ fn secim_deri(id: &str) {
                     let _ = std::fs::write(&gercek, &eski);
                 }
             }
+            // Varyantı da yedekle: "Kullanma" geri dönerken slim/classic
+            // bilgisi kaybolmasın (yoksa kalın gövdeye dönüyordu).
+            let gercek_meta = cache_kok.join(format!("hesap-deri-{anahtar}.json"));
+            if !gercek_meta.is_file() {
+                if let Ok(eski) = std::fs::read_to_string(cache_kok.join(format!("skin-{anahtar}.json"))) {
+                    let _ = std::fs::write(&gercek_meta, eski);
+                }
+            }
         }
         let _ = std::fs::write(cache_kok.join(format!("skin-{anahtar}.png")), &png);
         let _ = std::fs::write(
@@ -320,6 +344,21 @@ fn secim_deri(id: &str) {
     }
     deri_yaz_her_kuruluma(&png);
     secili_deri_yaz(&kayit.id);
+    // v0.7.13 — SEÇİM HESABA YAZILIR: eskiden yalnız `.yikim/deri.png`
+    // yazılıyordu, yani değişiklik SADECE bu istemcide görünüyordu (sunucular
+    // ve diğer oyuncular eski skini görüyordu, slim seçimi de kayboluyordu).
+    // Artık launcher'ın Skin Merkezi ile aynı yol: Mojang'a `variant` ile
+    // yükleme → skin her yerde (sunucuda, launcher'da) değişir.
+    if let Some(acc) = aktif_hesap() {
+        let png = png.clone();
+        let slim = kayit.slim;
+        tauri::async_runtime::spawn(async move {
+            match crate::skins::skin_uygula(&acc, &png, slim).await {
+                Ok(_) => crate::core::yikim_log("deri hesaba uygulandi".to_string()),
+                Err(e) => crate::core::yikim_log(format!("deri hesaba uygulanamadi: {e}")),
+            }
+        });
+    }
 }
 
 fn deri_yaz_her_kuruluma(png: &[u8]) {
