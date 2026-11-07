@@ -810,10 +810,16 @@ pub async fn cmd_skin_giy(
 ) -> Result<SkinHub, String> {
     let acc = hesap_bul(&id)?;
     let png = dogrula_png(&veri)?;
+    let mut yeni_id = String::new();
     if let Some(ad) = ad.as_deref() {
-        kayit_ekle(&kitaplik_kok(), ad, &png, slim, "editor")?;
+        let k = kayit_ekle(&kitaplik_kok(), ad, &png, slim, "editor")?;
+        yeni_id = k.id;
     }
-    skin_uygula(&acc, &png, slim).await
+    let hub = skin_uygula(&acc, &png, slim).await?;
+    // v0.7.15 — seçim kaydı: Skin Merkezi ile oyun içi panel aynı kartı
+    // "SEÇİLİ" göstersin (launcher'dan giyilince de).
+    crate::kozmetik_kopru::secili_deri_yaz_pub(&yeni_id);
+    Ok(hub)
 }
 
 /// Kitaplıktaki bir kaydı giyer.
@@ -826,7 +832,9 @@ pub async fn cmd_skin_giy_kitaplik(id: String, kayit_id: String) -> Result<SkinH
         .find(|k| k.id == kayit_id)
         .ok_or_else(|| "Skin bulunamadı.".to_string())?;
     let veri = std::fs::read(&kayit.dosya).map_err(|_| "Skin dosyası okunamadı.".to_string())?;
-    skin_uygula(&acc, &veri, kayit.slim).await
+    let hub = skin_uygula(&acc, &veri, kayit.slim).await?;
+    crate::kozmetik_kopru::secili_deri_yaz_pub(&kayit_id);
+    Ok(hub)
 }
 
 #[tauri::command]

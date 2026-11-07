@@ -91,6 +91,11 @@ fn secili_deri_yaz(id: &str) {
     hesap_yaz("secili-deri", &serde_json::json!({ "id": id }));
 }
 
+/// Skin Merkezi'nden giyilen kitaplık derisini kaydet (v0.7.15).
+pub fn secili_deri_yaz_pub(id: &str) {
+    secili_deri_yaz(id);
+}
+
 /// Aktif hesap (UUID eşlemesi için). Yoksa None.
 fn aktif_hesap() -> Option<crate::auth::Account> {
     let cfg = crate::config::YikimConfig::load_or_default();
