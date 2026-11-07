@@ -1274,13 +1274,23 @@ public final class YikimPanel {
     private boolean applyModChanges() {
         List<String[]> decisions = YikimModBridge.decisions();
         List<String[]> installs = YikimCatalog.queueCopy();
+        // v1.33.8 — TEŞHİS: "aç/kapa çalışmıyor" şikâyetinde isteğin neyle
+        // gittiğini latest.log'da görebilelim (dosya adı boş gelen modlar da).
+        StringBuilder ozet = new StringBuilder();
+        for (String[] d : decisions) {
+            ozet.append(d[0]).append("/").append(d[1]).append("/").append(d[2]).append(' ');
+        }
+        YikimLog.info("mod degisikligi uygula: " + decisions.size() + " mod, " + installs.size() + " kurulum [" + (String)ozet.toString().trim() + "]");
         if (decisions.isEmpty() && installs.isEmpty()) {
+            YikimMetrics.notify("Uygulanacak de\u011fi\u015fiklik yok");
             return false;
         }
         if (!YikimBridge.requestRestart("oyun-ici-mod-degisikligi", decisions, installs)) {
+            YikimLog.warn("restart-request.json yazilamadi");
             YikimMetrics.notify("\u0130stek yaz\u0131lamad\u0131 (oyun klas\u00f6r\u00fc salt okunur olabilir)");
             return false;
         }
+        YikimLog.info("restart-request.json yazildi, oyun kapatiliyor");
         YikimModBridge.clearPending();
         YikimCatalog.clearQueue();
         this.cacheAt = 0L;
@@ -1971,6 +1981,7 @@ public final class YikimPanel {
         @Override
         boolean click(double mouseX, double mouseY, int button) {
             if (button == 0 && this.mod.toggleable()) {
+                YikimLog.info("mod satiri tiklandi: " + this.mod.id + " dosya='" + this.mod.fileName + "' disabled=" + this.mod.disabled);
                 YikimModBridge.toggle(this.mod);
                 YikimPanel.this.cacheAt = 0L;
                 YikimPanel.this.rebuild();

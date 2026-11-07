@@ -949,12 +949,13 @@ public final class YikimKozmetik {
             if (pelerin == null && kanat == null && deri == null) {
                 return null;
             }
-            String anahtar = deri + "|" + pelerin + "|" + kanat;
+            boolean ince = YikimKozmetikSecim.deriSlim;
+            String anahtar = deri + "|" + pelerin + "|" + kanat + "|" + (deri != null && ince);
             Object[] kayit = YikimKozmetik.ONBELLEK.get(mevcut);
             if (kayit != null && anahtar.equals(kayit[0])) {
                 return kayit[1];
             }
-            Object var = YikimKozmetik.uygula(mevcut, pelerin, kanat, deri);
+            Object var = YikimKozmetik.uygula(mevcut, pelerin, kanat, deri, ince);
             if (var == null) {
                 return null;
             }
@@ -974,7 +975,7 @@ public final class YikimKozmetik {
      * Doku yoksa veya derleme tutmazsa `null` döner → vanilla kalır.
      */
     public static Object uygula(Object mevcut, class_2960 pelerin, class_2960 kanat) {
-        return YikimKozmetik.uygula(mevcut, pelerin, kanat, null);
+        return YikimKozmetik.uygula(mevcut, pelerin, kanat, null, false);
     }
 
     /**
@@ -982,6 +983,10 @@ public final class YikimKozmetik {
      * yalnız yerel görünüm; gövde doğrulaması yine yapılır).
      */
     public static Object uygula(Object mevcut, class_2960 pelerin, class_2960 kanat, class_2960 deri) {
+        return YikimKozmetik.uygula(mevcut, pelerin, kanat, deri, false);
+    }
+
+    public static Object uygula(Object mevcut, class_2960 pelerin, class_2960 kanat, class_2960 deri, boolean ince) {
         if (mevcut == null || (pelerin == null && kanat == null && deri == null)) {
             return null;
         }
@@ -990,6 +995,15 @@ public final class YikimKozmetik {
             Object eskiPelerin = YikimKozmetik.cagir(mevcut, "comp_1627");
             Object eskiKanat = YikimKozmetik.cagir(mevcut, "comp_1628");
             Object model = YikimKozmetik.cagir(mevcut, "comp_1629");
+            if (deri != null) {
+                // v1.33.8 — SLIM/WIDE: eskiden model hesabın GERÇEK varyantından
+                // (genelde WIDE) kopyalanıyordu; slim deri seçilince oyunda kalın
+                // gövde çıkıyordu (menüde ince, oyunda geniş). Artık seçilen
+                // derinin varyantı uygulanır.
+                model = ince
+                    ? net.minecraft.class_7920.field_41122
+                    : net.minecraft.class_7920.field_41123;
+            }
             Object secure = YikimKozmetik.cagir(mevcut, "comp_1630");
             if (govde == null || model == null || secure == null) {
                 return null;

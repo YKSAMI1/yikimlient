@@ -1093,12 +1093,12 @@ async fn install_standard_mods_inner(
 // ---------- Mod paketi tamamlama (mevcut kurulumlar yeni modları otomatik alır) ----------
 
 /// Dosya adı/slug karşılaştırması için normalize: '-', '_', '.' atılır, küçük harf.
-fn mod_key_norm(s: &str) -> String {
+pub(crate) fn mod_key_norm(s: &str) -> String {
     s.chars().filter(|c| *c != '-' && *c != '_' && *c != '.').collect::<String>().to_lowercase()
 }
 
 /// Jar'ın fabric.mod.json içindeki "id" alanı (varlık tespitinde ikinci kanıt).
-fn jar_mod_id(path: &std::path::Path) -> Option<String> {
+pub(crate) fn jar_mod_id(path: &std::path::Path) -> Option<String> {
     let file = std::fs::File::open(path).ok()?;
     let mut zip = zip::ZipArchive::new(file).ok()?;
     let mut entry = zip.by_name("fabric.mod.json").ok()?;

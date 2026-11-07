@@ -31,6 +31,9 @@ public final class YikimKozmetikSecim {
     public static final int ELITRA = 3;
     public static final int SEKME_SAYISI = 4;
 
+    /** Seçili DERİ ince (Alex/slim) mi? Oyun içi gövde modeli buna göre kurulur. */
+    public static volatile boolean deriSlim;
+
     static final String[] TUR = new String[]{"deri", "pelerin", "mojang", "kanat"};
     public static final String[] BASLIK = new String[]{"SKIN", "PELERİN", "MOJANG", "ELİTRA"};
     public static final String[] ALT_BASLIK = new String[]{
@@ -208,6 +211,9 @@ public final class YikimKozmetikSecim {
                     break;
                 }
             }
+            // v1.33.8 — oyun içi gövde modeli de bu bayrağı kullanır (eskiden
+            // yalnız menü modeli kullanıyordu → oyunda kalın gövde kalıyordu).
+            YikimKozmetikSecim.deriSlim = slim;
             YikimKarakter.slimAyarla(slim);
         }
         catch (Throwable ignored) {

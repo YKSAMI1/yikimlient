@@ -177,37 +177,79 @@ pub fn read_restart_request(inst: &crate::instances::Instance) -> Option<Restart
 /// Ok(true) = uygulandı · Ok(false) = kaynak dosya yok · Err = I/O hatası.
 pub fn toggle_one(inst: &crate::instances::Instance, d: &ModDecision) -> Result<bool, String> {
     let mods_dir = inst.mods_dir();
-    // güvenlik: yalnız mods/ klasörü içindeki .jar dosyalarıyla çalış
+    // 1) isimden: güvenlik için yalnız dosya adı kullanılır (yol bileşeni yok)
     let full_name = std::path::Path::new(&d.file)
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_default();
-    if full_name.is_empty() {
-        return Ok(false);
-    }
-    // suffix temizle: "ad.jar.disabled" → "ad"  |  "ad.jar" → "ad"
     let base = full_name
         .strip_suffix(".jar.disabled")
         .or_else(|| full_name.strip_suffix(".jar"))
         .or_else(|| full_name.strip_suffix(".disabled"))
         .map(str::to_string)
         .unwrap_or_else(|| full_name.clone());
-    if base.is_empty() {
+    if !base.is_empty() {
+        if let Some(sonuc) = cevir(&mods_dir, &base, d.on) {
+            return sonuc;
+        }
+    }
+    // 2) YEDEK YOL (v0.7.13) — oyun içi panel dosya adını boş/yanlış
+    // gönderebiliyor (bazı modlarda root path jar değil). O zaman jar'ı
+    // fabric kimliğiyle bulup çevir; aksi hâlde "aç/kapa hiçbir şey yapmıyor"
+    // oluyordu.
+    if d.id.is_empty() {
         return Ok(false);
     }
+    let istenen = crate::commands::mod_key_norm(&d.id);
+    let mut adaylar: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&mods_dir) {
+        for giris in rd.flatten() {
+            let ad = giris.file_name().to_string_lossy().to_string();
+            if !ad.ends_with(".jar") && !ad.ends_with(".jar.disabled") {
+                continue;
+            }
+            let anahtar = crate::commands::mod_key_norm(
+                ad.trim_end_matches(".disabled").trim_end_matches(".jar"),
+            );
+            let jar_id = crate::commands::jar_mod_id(&giris.path())
+                .map(|i| crate::commands::mod_key_norm(&i))
+                .unwrap_or_default();
+            if anahtar == istenen || jar_id == istenen {
+                adaylar.push(giris.path());
+            }
+        }
+    }
+    for yol in adaylar {
+        let ad = yol
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let b = ad
+            .strip_suffix(".jar.disabled")
+            .or_else(|| ad.strip_suffix(".jar"))
+            .unwrap_or(ad.as_str())
+            .to_string();
+        if let Some(sonuc) = cevir(&mods_dir, &b, d.on) {
+            return sonuc;
+        }
+    }
+    Ok(false)
+}
+
+/// `mods/<base>.jar` ↔ `mods/<base>.jar.disabled` çevir.
+/// None = kaynak dosya yok (başka bir aday denenmeli).
+fn cevir(mods_dir: &std::path::Path, base: &str, on: bool) -> Option<Result<bool, String>> {
     let active = mods_dir.join(format!("{base}.jar"));
     let disabled = mods_dir.join(format!("{base}.jar.disabled"));
-    let (from, to) = if d.on {
-        (disabled, active)
-    } else {
-        (active, disabled)
-    };
+    let (from, to) = if on { (disabled, active) } else { (active, disabled) };
     if !from.exists() {
-        return Ok(false);
+        return None;
     }
-    std::fs::rename(&from, &to)
-        .map(|_| true)
-        .map_err(|e| format!("{base}: {e}"))
+    Some(
+        std::fs::rename(&from, &to)
+            .map(|_| true)
+            .map_err(|e| format!("{base}: {e}")),
+    )
 }
 
 // ---------- Perde planı (pencere bunu çizer; Rust state'te tutar) ----------
@@ -296,7 +338,9 @@ pub async fn open_restart_curtain(app: &AppHandle) -> Option<CurtainPlanView> {
     let toggles: Vec<CurtainToggleView> = request
         .mods
         .iter()
-        .filter(|d| d.id != "yikimlient" && d.id != "fabric-api" && !d.file.is_empty())
+        // v0.7.13 — "id VAR ama dosya adı YOK" kararı da geçerli: jar fabric
+        // kimliğinden bulunur (eskiden bu kararlar sessizce düşüyordu.
+        .filter(|d| d.id != "yikimlient" && d.id != "fabric-api" && (!d.id.is_empty() || !d.file.is_empty()))
         .map(|d| CurtainToggleView {
             id: if d.id.is_empty() {
                 d.file.trim_end_matches(".jar").to_string()
@@ -317,6 +361,11 @@ pub async fn open_restart_curtain(app: &AppHandle) -> Option<CurtainPlanView> {
         .collect();
     // uygulanacak iş yoksa perde açma; istek dosyası da temizlenir (tekrar tetiklenmesin)
     if toggles.is_empty() && installs.is_empty() {
+        yikim_log(format!(
+            "restart isteği uygulanacak iş içermiyor (mods={}, installs={})",
+            request.mods.len(),
+            request.installs.len()
+        ));
         if let Some(inst) = crate::instances::Instance::load(&instance_id) {
             let _ = std::fs::remove_file(restart_request_path(&inst));
         }
@@ -405,9 +454,16 @@ pub async fn process_restart(app: &AppHandle) -> Result<Option<CurtainPlan>, Str
     let inst = inst.clone();
 
     // 1) mod aç/kapat — tek tek, perde ekranında canlı
+    yikim_log(format!(
+        "restart isteği: {} mod, {} kurulum",
+        request.mods.len(),
+        request.installs.len()
+    ));
     let mut toggles = 0u32;
     for d in &request.mods {
-        if d.id == "yikimlient" || d.id == "fabric-api" || d.file.is_empty() {
+        if d.id == "yikimlient" || d.id == "fabric-api"
+            || (d.id.is_empty() && d.file.is_empty())
+        {
             continue; // çekirdek modlar asla kapatılmaz
         }
         let _ = app.emit(
