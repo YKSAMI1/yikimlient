@@ -166,8 +166,14 @@ public final class YikimModel {
             if (YikimKozmetikSecim.liste(YikimKozmetikSecim.ELITRA).isEmpty()) {
                 kanatSecili = true;
             }
-            class_2960 pelerin = (elitraModu || !pelerinSecili) ? null : YikimModel.pelerin();
-            class_2960 kanat = (elitraModu && kanatSecili) ? YikimModel.kanat() : null;
+            // v1.33.5 — ELİTRA GİYDİR: kanat seçiliyse HER sekmede sırtta
+            // durur. Eskiden yalnız ELİTRA sekmesinde takılıyordu; sekme
+            // durumuna bağlı kaldığı için kullanıcı kanadı hiç göremedi.
+            class_2960 kanat = kanatSecili ? YikimModel.kanat() : null;
+            // kanat varsa pelerin ÇİZİLMEZ: ikisi aynı sırta oturur, üst üste
+            // binince pelerin kanadı örtüyordu.
+            class_2960 pelerin = (elitraModu || !pelerinSecili || kanat != null)
+                ? null : YikimModel.pelerin();
             String yeniImza = deri + "|" + pelerin + "|" + kanat + "|" + slim;
             if (YikimModel.durum != null && yeniImza.equals(YikimModel.imza)) {
                 return YikimModel.durum;
@@ -213,9 +219,19 @@ public final class YikimModel {
             s.field_61820 = 15728880;
             s.field_61821 = 0;
             s.field_61823.clear();
-            if (elitraModu && kanat != null) {
+            if (kanat != null) {
                 s.field_53418 = new class_1799(class_1802.field_8833);
             }
+            // v1.33.5 — teşhis: state yeniden kurulduğunda bir kez yaz
+            YikimLog.info("MENU KARAKTER sekme=" + YikimKozmetikSecim.sekme()
+                + " elitraModu=" + elitraModu
+                + " pelerinSecili=" + pelerinSecili
+                + " kanatSecili=" + kanatSecili
+                + " pelerinDoku=" + (pelerin != null)
+                + " kanatDoku=" + (kanat != null)
+                + " aktifPelerin='" + YikimKozmetikSecim.aktifId(YikimKozmetikSecim.PELERIN) + "'"
+                + " aktifKanat='" + YikimKozmetikSecim.aktifId(YikimKozmetikSecim.ELITRA) + "'"
+                + " gogusEsyasi=" + (s.field_53418 != null));
             YikimModel.durum = s;
             YikimModel.imza = yeniImza;
             return s;
