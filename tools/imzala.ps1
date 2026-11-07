@@ -1,4 +1,4 @@
-# YIKIMLient — Windows Authenticode imzalama (SmartScreen için tek gerçek çözüm)
+# YIKIMLient - Windows Authenticode imzalama (SmartScreen için tek gerçek çözüm)
 #
 # Kullanım (yayimla.ps1 tarafından otomatik çağrılır):
 #   powershell -ExecutionPolicy Bypass -File tools\imzala.ps1 -Dosya "C:\...\setup.exe"
@@ -9,7 +9,7 @@
 #   3) tools\codesign-thumbprint.txt → aynı parmak izi, dosyadan
 #
 # Sertifika yoksa betik HATA VERMEZ: uyarı basıp 0 döner, derleme devam eder.
-# (İmzasız çıkarsa SmartScreen "bilinmeyen yayıncı" uyarısı verir — kodla
+# (İmzasız çıkarsa SmartScreen "bilinmeyen yayıncı" uyarısı verir - kodla
 #  çözülemez, sertifika gerekir. Bkz. docs/IMZALAMA-SMARTSREEN.md)
 param(
     [Parameter(Mandatory = $true)][string]$Dosya
@@ -42,7 +42,7 @@ if (-not (Test-Path $Dosya)) { throw "imzalanacak dosya yok: $Dosya" }
 
 $signtool = SigntoolBul
 if (-not $signtool) {
-    Write-Host "[imza] signtool bulunamadi (Windows SDK yok) — imzasiz devam." -ForegroundColor Yellow
+    Write-Host "[imza] signtool bulunamadi (Windows SDK yok) - imzasiz devam." -ForegroundColor Yellow
     exit 0
 }
 
@@ -70,7 +70,7 @@ if ($pfx -and (Test-Path $pfx)) {
     & $signtool @ortak /sha1 $sha1 /d "YIKIMLient" $Dosya
     $basarili = ($LASTEXITCODE -eq 0)
 } else {
-    Write-Host "[imza] Kod imzalama sertifikasi tanimli degil — imzasiz devam." -ForegroundColor Yellow
+    Write-Host "[imza] Kod imzalama sertifikasi tanimli degil - imzasiz devam." -ForegroundColor Yellow
     Write-Host "[imza] SmartScreen uyarisini kaldirmak icin: docs/IMZALAMA-SMARTSREEN.md"
     exit 0
 }
@@ -78,4 +78,4 @@ if ($pfx -and (Test-Path $pfx)) {
 if (-not $basarili) { throw "imzalama basarisiz (signtool $LASTEXITCODE)" }
 & $signtool verify /pa /v $Dosya | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "imza dogrulanamadi" }
-Write-Host "[imza] TAMAM — imza dogrulandi." -ForegroundColor Green
+Write-Host "[imza] TAMAM - imza dogrulandi." -ForegroundColor Green
