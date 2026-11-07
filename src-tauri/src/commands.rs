@@ -1926,7 +1926,7 @@ pub async fn cmd_route_dropped(path: String) -> Result<String, String> {
         .unwrap_or_default();
     match ext.as_str() {
         "jar" => return Ok("jar".into()),
-        "mrpack" => return Ok("modpack".into()),
+        "mrpack" | "yikimpack" => return Ok("modpack".into()),
         "emotecraft" => return Ok("emote".into()),
         "zip" => {
             // içinde ne var? paket indeksleri / dünya verisi
@@ -2108,14 +2108,14 @@ pub async fn cmd_install_pack_files(
 
 // ---------- haberler & istatistik & sistem ----------
 
-/// Kullanıcıdan .mrpack / .zip paket dosyası seçmesini iste (yerel import).
+/// Kullanıcıdan .yikimpack / .mrpack / .zip paket dosyası seçmesini iste.
 #[tauri::command]
 pub async fn cmd_pick_pack_file(app: AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
     let picked = tauri::async_runtime::spawn_blocking(move || {
         app.dialog()
             .file()
-            .add_filter("Mod Paketi (.mrpack / .zip)", &["mrpack", "zip"])
+            .add_filter("Mod Paketi (.yikimpack / .mrpack / .zip)", &["yikimpack", "mrpack", "zip"])
             .blocking_pick_file()
     })
     .await
@@ -2123,8 +2123,9 @@ pub async fn cmd_pick_pack_file(app: AppHandle) -> Result<Option<String>, String
     Ok(picked.map(|p| p.to_string()))
 }
 
-/// Yerel paket dosyasını (.mrpack veya CurseForge .zip) yeni kurulum olarak içe aktar.
-/// Format dosya içeriğinden algılanır: modrinth.index.json → mrpack, manifest.json → cfpack.
+/// Yerel paket dosyasını (.yikimpack / .mrpack / CurseForge .zip) yeni kurulum
+/// olarak içe aktar. Format dosya içeriğinden algılanır:
+/// yikimpack.json → yikimpack, modrinth.index.json → mrpack, manifest.json → cfpack.
 #[tauri::command]
 pub async fn cmd_import_pack_file(
     app: AppHandle,
@@ -2149,7 +2150,11 @@ pub async fn cmd_import_pack_file(
             .find(|n| n.as_str() == hedef || n.ends_with(&format!("/{hedef}")))
             .cloned()
     };
-    let (fmt, inner_name): (String, String) = if let Some(ad) = bul("modrinth.index.json") {
+    let (fmt, inner_name): (String, String) = if crate::yikimpack::uzanti_mi(&p) {
+        // YIKIMPACK: manifest + logo ayrı okunur (cfpack/mrpack akışından farklı)
+        let oku = crate::yikimpack::oku(&p)?;
+        ("yikimpack".into(), oku.manifest.name)
+    } else if let Some(ad) = bul("modrinth.index.json") {
         let mut idx = archive.by_name(&ad).map_err(|e| e.to_string())?;
         let mut s = String::new();
         use std::io::Read;
@@ -2182,9 +2187,12 @@ pub async fn cmd_import_pack_file(
         ..Default::default()
     };
     instances::create(inst.clone())?;
-    let result = match fmt.as_str() {
-        "modrinth" => repos::install_mrpack(&app, &p, &mut inst).await,
-        _ => repos::install_cfpack(&app, &p, &mut inst).await,
+    let result = if crate::yikimpack::uzanti_mi(&p) {
+        crate::commands::yikimpack_yukle(&app, &p, &mut inst).await
+    } else if fmt.as_str() == "modrinth" {
+        repos::install_mrpack(&app, &p, &mut inst).await
+    } else {
+        repos::install_cfpack(&app, &p, &mut inst).await
     };
     match result {
         Ok(()) => {
@@ -2560,6 +2568,145 @@ pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Resu
     // ---- 8) hazır ----
     pack_adim(app, ADIM_HAZIR, "bitti", 1, 1, "Kurulum tamamlandı");
     Ok(())
+}
+
+/// .yikimpack dosyasını kurulum olarak al.
+/// Manifest'ten MC sürümü + yükleyici okunur, içerik kurulum dizinine açılır,
+/// sonra paket kurulumu adımları (yükleyici → oyun dosyaları → YIKIM modu)
+/// yayınlanır (pack-step kartı canlı akar).
+pub async fn yikimpack_yukle(
+    app: &AppHandle,
+    paket: &std::path::Path,
+    inst: &mut Instance,
+) -> Result<(), String> {
+    use repos::{pack_adim, ADIM_ACMA, ADIM_MODLAR, ADIM_OVERRIDE};
+    // 1) manifest
+    let okuyucu = crate::yikimpack::oku(paket)?;
+    let mf = okuyucu.manifest;
+    inst.name = if mf.name.trim().is_empty() {
+        inst.name.clone()
+    } else {
+        mf.name.trim().to_string()
+    };
+    inst.mc_version = mf.minecraft.clone();
+    if !mf.loader.trim().is_empty() {
+        inst.mod_loader = mf.loader.trim().to_string();
+        inst.loader_version = mf.loader_version.trim().to_string();
+    }
+    inst.save()?;
+
+    // 2) logo (varsa) kurulumun ikonu olsun
+    if let Some(ikon) = crate::yikimpack::logoyu_koy(paket, &inst.dir()) {
+        inst.icon = ikon;
+    } else {
+        inst.icon = "📦".into();
+    }
+
+    // 3) içeriği aç (adım adım)
+    pack_adim(app, ADIM_ACMA, "bitti", 1, 1, &format!("{} · MC {}", inst.name, inst.mc_version));
+    let inst_dir = inst.dir();
+    let _ = inst_dir.join("mods");
+    let kopyalanan = crate::yikimpack::ac(paket, &inst_dir, |n, toplam, ad| {
+        pack_adim(app, ADIM_OVERRIDE, "bitti", 0, 0, "paket içeriği yazılıyor");
+        pack_adim(
+            app,
+            ADIM_MODLAR,
+            "bitti",
+            n as u32,
+            toplam as u32,
+            &format!("{n} / {toplam} dosya yazıldı ({ad})"),
+        );
+    })
+    .map_err(|e| {
+        let _ = pack_adim(app, ADIM_MODLAR, "hata", 0, 0, &e);
+        e
+    })?;
+    crate::core::yikim_log(format!(
+        "yikimpack kuruldu: {} ({} dosya)",
+        inst.name, kopyalanan
+    ));
+    Ok(())
+}
+
+/// Kurulumu `.yikimpack` olarak dışa aktar (paylaşım paketi).
+/// `secenek` JSON: {"mods":bool,"config":bool,"saves":bool,"resourcepacks":bool,"shaderpacks":bool,"options":bool}
+#[derive(serde::Deserialize)]
+pub struct ExportSecenekJson {
+    #[serde(default = "v_true")]
+    pub config: bool,
+    #[serde(default)]
+    pub saves: bool,
+    #[serde(default)]
+    pub resourcepacks: bool,
+    #[serde(default)]
+    pub shaderpacks: bool,
+    #[serde(default)]
+    pub options: bool,
+}
+
+fn v_true() -> bool {
+    true
+}
+
+#[tauri::command]
+pub async fn cmd_export_yikimpack(
+    app: AppHandle,
+    instance_id: String,
+    secenek: Option<ExportSecenekJson>,
+) -> Result<String, String> {
+    use repos::{pack_adim, ADIM_MODLAR, ADIM_OVERRIDE, ADIM_HAZIR};
+    let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
+    let s = secenek.unwrap_or(ExportSecenekJson {
+        config: true,
+        saves: false,
+        resourcepacks: false,
+        shaderpacks: false,
+        options: false,
+    });
+    let secenek = crate::yikimpack::ExportSecenek {
+        mods: true, // paketin özü: her zaman
+        config: s.config,
+        saves: s.saves,
+        resourcepacks: s.resourcepacks,
+        shaderpacks: s.shaderpacks,
+        options: s.options,
+    };
+    // hedef: Masaüstü (bulunamazsa app_dir)
+    let hedef = dirs::desktop_dir()
+        .or_else(|| dirs::download_dir())
+        .map(|d| d.to_string_lossy().to_string())
+        .unwrap_or_else(|| crate::core::app_dir().to_string_lossy().to_string());
+    let bilgi = crate::yikimpack::PaketBilgi {
+        name: inst.name.clone(),
+        version: String::new(),
+        description: String::new(),
+        author: String::new(),
+        minecraft: inst.mc_version.clone(),
+        loader: inst.mod_loader.clone(),
+        loader_version: inst.loader_version.clone(),
+        hedef_klasor: hedef,
+    };
+    pack_adim(&app, ADIM_MODLAR, "aktif", 0, 0, "paket hazırlanıyor");
+    let yol = crate::yikimpack::yaz(&inst.dir(), bilgi, &secenek, |n, toplam, _ad| {
+        pack_adim(
+            &app,
+            ADIM_MODLAR,
+            "aktif",
+            n as u32,
+            toplam as u32,
+            &format!("{n} / {toplam} dosya paketleniyor"),
+        );
+    })?;
+    let _ = pack_adim(&app, ADIM_OVERRIDE, "bitti", 1, 1, "paket oluşturuldu");
+    let _ = pack_adim(
+        &app,
+        ADIM_HAZIR,
+        "bitti",
+        1,
+        1,
+        &format!("{} · Masaüstüne kaydedildi", std::path::Path::new(&yol).file_name().unwrap_or_default().to_string_lossy()),
+    );
+    Ok(yol.to_string_lossy().to_string())
 }
 
 #[derive(Serialize)]

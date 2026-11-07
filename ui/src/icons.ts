@@ -117,12 +117,13 @@ const redo = `<svg ${A}><path d="m15 14 5-5-5-5"/><path d="M20 9h-9a6 6 0 0 0 0 
 
 /** lucide "lock" — premium kapısı */
 const lock = `<svg ${A}><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>`;
+const share = `<svg ${A}><circle cx="6" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="M8.2 10.8 14.8 7.2M8.2 13.2l6.6 3.6"/></svg>`;
 
 export const ICONS: Record<string, string> = {
   home, grid, compass, news, gear, plus, search, play, image, folder,
   trash, eraser, copy, back, check, user, puzzle, box, cpu, args, term, chart,
   dl, mug, globe, sparkle, file, info, clock, stop,
-  shirt, brush, bucket, picker, undo, redo, lock,
+  shirt, brush, bucket, picker, undo, redo, lock, share,
 };
 
 /** içine gömülü SVG üretir; span'a sarılırsa .ic ile hizalanır */
@@ -150,4 +151,6 @@ export const WINDOW_CONTROLS = {
   restore: `<svg ${W}>${g(`<rect x="0.5" y="2.5" width="7" height="7"/><path d="M2.5 2.5V0.5h7v7h-2"/>`)}</svg>`,
   /** ✕ */
   close: `<svg ${W}>${g(`<path d="m0.43 0.43 9.14 9.14M9.57 0.43 0.43 9.57"/>`)}</svg>`,
+  /** Zil — başlık çubuğundaki "kurulum durumu" düğmesi (pack-kur ile konuşur) */
+  bell: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5a5 5 0 0 0-5 5v3.2L4 13.2h12l-1-2.5V7.5a5 5 0 0 0-5-5Z"/><path d="M7.6 15.4a2.6 2.6 0 0 0 1.4 1.4 2.6 2.6 0 0 0 3.2-1.4"/></svg>`,
 };

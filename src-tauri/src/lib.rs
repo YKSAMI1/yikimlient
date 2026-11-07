@@ -23,6 +23,7 @@ pub mod util;
 pub mod yikim_mod;
 pub mod yikim_sicak;
 pub mod yikim_ui;
+pub mod yikimpack;
 
 /// Launcher sürümü (Cargo.toml) — Discord presence ve loglar için.
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -165,6 +166,7 @@ pub fn run() {
             commands::cmd_get_community_stats,
             commands::cmd_pick_pack_file,
             commands::cmd_import_pack_file,
+            commands::cmd_export_yikimpack,
             commands::cmd_repos_install_content,
             commands::cmd_list_content_files,
             commands::cmd_add_content_file,
@@ -214,6 +216,36 @@ pub fn run() {
                     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                     std::process::exit(0);
                 });
+            }
+            // .yikimpack çift tıklama: dosya açılışta argüman olarak gelir →
+            // arayüze "kurulumu başlat" olayı yayınlanır. Arayüz hazır olmadan
+            // emit edilirse olay yutulur; kısa bekleyip atmak gerekir.
+            if let Some(yol) = std::env::args().nth(1).filter(|a| {
+                std::path::Path::new(a)
+                    .extension()
+                    .map(|e| e.to_string_lossy().to_lowercase() == yikimpack::UZANTI)
+                    .unwrap_or(false)
+            }) {
+                let h = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    let _ = { use tauri::Emitter; h.emit("yikimpack-ac", &yol) };
+                    core::yikim_log(format!("yikimpack dosyası açıldı: {yol}"));
+                });
+            }
+            // Uzantı kaydı: .yikimpack çift tıklaması YIKIMLient'i açsın.
+            // (HKCU — yükseltilmiş izin gerekmez; yalnızca ilk kez yazılır.)
+            {
+                let exe = std::env::current_exe()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                if !exe.is_empty() {
+                    let onayli = crate::core::app_dir().join(".yikimpack-kayitli");
+                    if !onayli.exists() {
+                        yikimpack::uzanti_kaydet(&exe);
+                        let _ = std::fs::write(&onayli, &exe);
+                    }
+                }
             }
             // Asset scope'a gerçek veri klasörünü (core::app_dir) runtime'da ekle.
             // conf'taki $APPDATA, identifier klasörüne (com.yikimlient.app) çözüldüğü için

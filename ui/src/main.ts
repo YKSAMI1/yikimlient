@@ -75,8 +75,7 @@ export const state: YikimState = {
   sys: null,
 };
 
-export async function refreshState(rerender = false): Promise<void> {
-  const s = await invoke("cmd_get_state");
+export async function refreshState(rerender = false): Promise<void> {  const s = await invoke("cmd_get_state");
   state.config = s.config;
   state.accounts = s.accounts;
   state.instances = s.instances;
@@ -311,6 +310,7 @@ export function setupShell(): void {
       </div>
       <div class="tb-center"></div>
       <div class="tb-actions">
+        <button class="tb-btn tb-pack" id="tb-pack" title="Kurulum durumu (mod paketi)" aria-label="Kurulum durumu">${WINDOW_CONTROLS.bell}<span class="tb-pack-dot" id="tb-pack-dot"></span></button>
         <button class="tb-btn" id="tb-min" title="Küçült" aria-label="Küçült">${WINDOW_CONTROLS.min}</button>
         <button class="tb-btn" id="tb-max" title="Ekranı Kapla" aria-label="Ekranı Kapla">${WINDOW_CONTROLS.max}</button>
         <button class="tb-btn close" id="tb-close" title="Kapat" aria-label="Kapat">${WINDOW_CONTROLS.close}</button>
@@ -347,6 +347,18 @@ export function setupShell(): void {
     w.close();
   };
   $("#tb-close")?.addEventListener("click", closeOrKeepAlive);
+  // Zil: kurulum durumu penceresini aç/kapa — karta tıkla ya da zile tıkla,
+  // tam adım listesi acilir; kurulum yoksa sessizce yoksay.
+  $("#tb-pack")?.addEventListener("click", () => {
+    const pk = (window as any).__PACK_ZIL__;
+    const kartAcik = document.querySelector(".pk-kart:not(.pk-gizli)");
+    if (kartAcik) {
+      // kart görünür → listeyi aç/kapa (kafa tıklaması ile aynı)
+      pk?.degistir();
+    } else {
+      pk?.baslat("Kurulum durumu");
+    }
+  });
   // Alt+F4 / görev çubuğu kapatması da aynı kurala düşsün
   try {
     w.onCloseRequested((e: any) => {
@@ -657,9 +669,38 @@ export async function boot(): Promise<void> {
     // Otomatik güncelleme kontrolü (imzalı; GitHub releases'ten) — sessiz kontrol,
     // güncelleme varsa kullanıcıya sorar, hata asla açılışı bozmaz.
     void checkForUpdate();
+    // .yikimpack çift tıklama: uygulama dışarıdan bir paketle açıldıysa
+    // doğrudan "Paketler" sayfasına geç ve kurulumu kendiliğinden başlat.
+    dinleYikimpackAc();
   } catch (e) {
     fatalBoot(e);
   }
+}
+
+/// .yikimpack çift tıklama: kayıtlı state tazeleme (döngüsel çözümleme
+/// hatasını önlemek için doğrudan export edilmiş fonksiyona bakar).
+const refreshStateRef = refreshState;
+
+/// `.yikimpack` dosyasına çift tıklanınca çalışan akış.
+/// Uygulama kapalıysa açılır ve paketi kendiliğinden kurar; açıksa doğrudan
+/// "Paketler" sayfasına geçip yüklemeyi başlatır. Arayüzü MEŞGUL ETMEZ —
+/// kurulum durumu sağ alttaki adım kartında canlı görünür.
+async function dinleYikimpackAc(): Promise<void> {
+  const { packKartBaslat, packKartHata, packKartTamam } = await import("./pack-kur");
+  await listen("yikimpack-ac", async (e: any) => {
+    const yol: string | undefined = e?.payload;
+    if (!yol) return;
+    packKartBaslat("Paket açıldı — kurulum başlıyor");
+    navigate("instances");
+    try {
+      const inst = await invoke("cmd_import_pack_file", { path: yol, name: null });
+      await refreshStateRef();
+      packKartTamam();
+      toast(`${(inst as any).name || "Paket"} kuruldu ✓`, "ok");
+    } catch (err) {
+      packKartHata(String(err));
+    }
+  });
 }
 
 /// GitHub'dan yeni sürüm kontrolü → varsa "indir ve kur" onayı.

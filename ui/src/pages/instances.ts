@@ -70,7 +70,8 @@ function renderGrid(root: HTMLElement): void {
         <p>Kurulumlarını yönet, yeni profiller oluştur.</p>
       </div>
       <div style="display:flex; gap:8px">
-        <button class="btn ghost" id="btn-import" title="Modrinth .mrpack veya CurseForge .zip paket dosyası içe aktar">${icon("box")} Paket İçe Aktar</button>
+        <button class="btn ghost" id="btn-import" title=".yikimpack / .mrpack / .zip paket dosyası içe aktar">${icon("box")} Paket İçe Aktar</button>
+        <button class="btn ghost" id="btn-export" title="Bu kurulumu .yikimpack olarak paylaş">${icon("share")} Paketi Paylaş</button>
         <button class="btn primary" id="btn-new">${icon("plus")} Yeni Kurulum</button>
       </div>
     </div>
@@ -151,6 +152,10 @@ function renderGrid(root: HTMLElement): void {
   }
   root.querySelector("#btn-new")?.addEventListener("click", () => openCreateWizard());
   root.querySelector("#btn-import")?.addEventListener("click", () => importPackFile().catch(() => {}));
+  root.querySelector("#btn-export")?.addEventListener("click", () => {
+    const hedef = state.instances.find((i) => i.id === selectedId) || state.instances[0];
+    if (hedef) exportPackFile(hedef.id);
+  });
 
   // Popüler mod paketleri — tıklayınca Keşfet'te o paket açılır
   loadPopularPacks();
@@ -176,7 +181,53 @@ async function importPackFile(): Promise<void> {
   }
 }
 
-async function loadPopularPacks(): Promise<void> {  const strip = document.querySelector("#popular-strip") as HTMLElement | null;
+/// Kurulumu `.yikimpack` olarak paylaş.
+/// Modlar HER ZAMAN gider; dünyalar/dokular/ayarlar kullanıcı onaylı ekler.
+async function exportPackFile(instanceId: string): Promise<void> {
+  const inst = state.instances.find((i) => i.id === instanceId);
+  if (!inst) return;
+  const { openModal, toast } = await import("../main");
+  const { root, close } = openModal(`
+    <h2>Paketi Paylaş</h2>
+    <div class="sub"><b>${inst.name}</b> — .yikimpack dosyası oluştur. Bu dosyaya çift tıklayan
+    herkes YIKIMLient ile kurulumu yapabilir.</div>
+    <div class="share-kutular">
+      <label class="share-kutu kapali"><input type="checkbox" checked disabled /><span>Modlar<em>her zaman</em></span></label>
+      <label class="share-kutu"><input type="checkbox" id="sh-config" checked /><span>Yapılandırma dosyaları<em>config/</em></span></label>
+      <label class="share-kutu"><input type="checkbox" id="sh-saves" /><span>Dünyalar<em>saves/</em></span></label>
+      <label class="share-kutu"><input type="checkbox" id="sh-rp" /><span>Doku paketleri<em>resourcepacks/</em></span></label>
+      <label class="share-kutu"><input type="checkbox" id="sh-sp" /><span>Shader paketleri<em>shaderpacks/</em></span></label>
+      <label class="share-kutu"><input type="checkbox" id="sh-opts" /><span>Oyun ayarları<em>options.txt, sunucu listesi</em></span></label>
+    </div>
+    <p class="share-not">Masaüstüne kaydedilir. Modlar zaten sıkıştırıldığı için boyut minimumda tutulur.</p>
+    <div style="display:flex; gap:8px; margin-top:16px">
+      <button class="btn primary" id="sh-go">Oluştur</button>
+      <button class="btn ghost" id="sh-no">İptal</button>
+    </div>
+  `);
+  root.querySelector("#sh-no")?.addEventListener("click", close);
+  root.querySelector("#sh-go")?.addEventListener("click", async () => {
+    const secenek = {
+      config: (root.querySelector("#sh-config") as HTMLInputElement).checked,
+      saves: (root.querySelector("#sh-saves") as HTMLInputElement).checked,
+      resourcepacks: (root.querySelector("#sh-rp") as HTMLInputElement).checked,
+      shaderpacks: (root.querySelector("#sh-sp") as HTMLInputElement).checked,
+      options: (root.querySelector("#sh-opts") as HTMLInputElement).checked,
+    };
+    close();
+    packKartBaslat(`${inst.name} paketleniyor`);
+    try {
+      const yol = await invoke("cmd_export_yikimpack", { instanceId, secenek }) as string;
+      packKartTamam();
+      toast(`Paket hazır: ${yol}`, "ok");
+    } catch (e) {
+      packKartHata(String(e));
+    }
+  });
+}
+
+async function loadPopularPacks(): Promise<void> {
+  const strip = document.querySelector("#popular-strip") as HTMLElement | null;
   if (!strip) return;
   try {
     const popular: any[] = await invoke("cmd_repos_popular", { kind: "modpack", loader: "" });
