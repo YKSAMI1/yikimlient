@@ -72,17 +72,24 @@ biçimde saklanır.
 
 ## 5. Veri modeli (Turso)
 
+> **v2 düzeltmesi:** hesap anahtarı kararlı kimliktir (`ms:<uuid>` / `offline:<uuid>`),
+> görünen ad ayrı alandadır. Çatlak "Notch" ile lisanslı Notch farklı UUID'lerdir → çakışma yok.
+
 ```
-hesap        (ad TEXT PK, tur TEXT, uuid TEXT, argon_bayt BLOB, tuz BLOB,
-              sifre_var INTEGER, olusturma INTEGER, son_giris INTEGER,
-              crack_limiti INTEGER DEFAULT 3, kosmetik_kilitli INTEGER DEFAULT 0)
-baglanti     (hesap_ad TEXT PK, discord_id TEXT, discord_ad TEXT,
-              rol_yol INTEGER DEFAULT 0, dogrulama INTEGER DEFAULT 0, tarih INTEGER)
-cihaz        (cihaz_id TEXT PK, hesap_ad TEXT, ilk_gorulen INTEGER, son_gorulen INTEGER,
-              yetki_bitis INTEGER, iptal INTEGER DEFAULT 0)
-olay         (id INTEGER PK, tur TEXT, hesap_ad TEXT, cihaz_id TEXT,
-              ip TEXT, detay TEXT, tarih INTEGER)     -- IP 1 hafta silinir
-kozmetik     (hesap_ad TEXT PK, surum TEXT, pelerin_url TEXT, pelerin_sha TEXT,
+hesap        (anahtar TEXT PK, ad TEXT, ad_kucuk TEXT, tur TEXT,  -- "cracked" | "microsoft"
+              uuid TEXT, argon_tuz BLOB, argon_veri BLOB, sifre_var INTEGER,
+              olusturma INTEGER, son_giris INTEGER, crack_limiti INTEGER DEFAULT 3,
+              sahip_istisna INTEGER DEFAULT 0, kosmetik_kilitli INTEGER DEFAULT 0)
+baglanti     (hesap_anahtar TEXT PK, hesap_turu TEXT, discord_id TEXT, discord_ad TEXT,
+              rol_yol INTEGER DEFAULT 0, durum TEXT,            -- "aktif" | "ayrildi"
+              tarih INTEGER)                                    -- ayrılanlar da SAYILIR (sınır aşılmasın)
+baglanti_gecmisi (discord_id TEXT, hesap_anahtar TEXT, tarih INTEGER)  -- limit sayaci kaynagi
+cihaz        (cihaz_id TEXT PK, hesap_anahtar TEXT, pub_key TEXT, ilk_gorulen INTEGER,
+              son_gorulen INTEGER, yetki_bitis INTEGER, iptal INTEGER DEFAULT 0)
+ip_kaydi     (id INTEGER PK, cihaz_id TEXT, ip TEXT, silme_zamani INTEGER)  -- 1 hafta, gerçek silinir
+olay         (id INTEGER PK, tur TEXT, hesap_anahtar TEXT, cihaz_id TEXT, detay TEXT,
+              tarih INTEGER)
+kozmetik     (hesap_anahtar TEXT PK, surum TEXT, pelerin_url TEXT, pelerin_sha TEXT,
               elytra_url TEXT, elytra_sha TEXT, skin_url TEXT, skin_sha TEXT,
               saklanan TEXT, tarih INTEGER)
 haber        (id INTEGER PK, baslik TEXT, govde TEXT, imza TEXT, yayin INTEGER, tarih INTEGER)
@@ -90,22 +97,42 @@ haber        (id INTEGER PK, baslik TEXT, govde TEXT, imza TEXT, yayin INTEGER, 
 
 ## 6. Güvenlik modeli
 
-- **Şifre:** plaintext hiçbir yerde tutulmaz. `doğrulayıcı = Argon2id(tuz, pepper‖şifre)`,
-  pepper yalnızca bot sürecinde (env) — veritabanı sızdırılsa bile kırma maliyeti yüksek.
-  Launcher parolayı Argon2id ile türetip doğrulayıcıyı gönderir; sunucu sabit zamanda karşılaştırır.
-- **Yetki belgesi (cihaz→hesap):** HMAC-SHA256(server_sır, "hesap|cihaz|bitiş"). Launcher
-  yerelde doğrular → API kapalıyken de giriş çalışır. Süre 7 gün; süresi geçen ve API'ye
-  ulaşılamayan hesapta **kozmetik değişikliği kapalı**, oyun açılabilir (bkz. §8).
-- **İstek imzası:** her API çağrısı `ts + nonce + HMAC(secret, method|yol|gövde|ts|nonce)`
-  ile imzalı; nonce önbelleği ile tekrar koruması; IP başına hız sınırı.
-- **Bağlama kodları:** 8 karakter (BÜYÜK HARF + rakam), tek kullanım, 10 dk, hesap+cihaz bağlı.
-  5 hatalı girişte o cihazda o hesap 24 saat kilitlenir (sunucu tarafında sayılır).
-- **IP:** yeni yerden (yeni cihaz/şehir) ilk başarılı açılışta bir kez yazılır; temizleme işi
-  1 haftadan eski `olay.ip` satırlarını gerçekten siler (iş kaydı loglanır).
-- **Blob şifreleme:** kozmetik dosyaları GitHub'da açık değil, sürüm adı rastgele+
-  imzalı indeksle erişilir; kozmetik "mahremiyet gerektiren" bir şey değildir ama
-  yine de indeks IMZALIDır (haber akışı gibi) — erkenden tanımlanmayan bir yerden
-  dosya enjekte edilemez.
+> **v2 düzeltmesi (denetçi bulguları sonrası):** "Ortak sır + launcher'da doğrulama" modeli
+> açık kaynak launcher ile çöker. Aşağıdaki model kullanılır.
+
+**Kimlik doğrulama (asenkron, taklit edilemez):**
+- Launcher ilk açılışta kendi **Ed25519 anahtar çiftini** üretir (özel anahtar yalnızca
+  cihazda). Sunucu genel anahtarını kaydeder (Discord bağlama kodunun kabulüyle birlikte).
+- Her API isteği imzalıdır: `{ts, nonce, imza}`; sunucu nonce önbelleği ile tekrar oynatmayı,
+  ±5 dk saat penceresi ile yaşlı isteği reddeder.
+- Sunucu **yanıtlarını kendi Ed25519 özel anahtarıyla** imzar; launcher'da gömülü genel
+  anahtar (döndürülebilir: iki anahtar dönemi) ile doğrulanır → sahte sunucu/MITM durdu.
+- TLS (HTTPS) her zaman; isteğe bağlı sertifika sabitleme sonraki adım.
+
+**Parola:**
+- Sunucu `doğrulayıcı = Argon2id(tuz, pepper‖parola)` saklar (pepper yalnız bot sürecinde,
+  asla launcher'da ve veritabanında değil). Launcher parolayı TLS üzerinden gönderir;
+  türetme sunucuda yapılır (launcher'da pepper tutma hatası böylece kalkar).
+- **Çevrimdışı giriş** (bot kapalı): launcher'da yerel `Argon2id(yerel_tuz, parola)` hash'i
+  + sunucunun **Ed25519 ile imzaladığı süreli çevrimdışı belgesi** durur. İkisi birden
+  tutmalıdır: parola bilinmeden belge kullanılamaz; belge sunucu imzası olmadan üretilemez
+  (launcher'daki sır yalnız DOĞRULAMA içindir, İMZALAMA değil).
+- Önceki sürümdeki "HMAC(ortak_sır, ...)" belgesi bulgada: launcher aynı sırla imza
+  üretebilirdi. Bu nedenle yetki belgesi **asenkron imza** ile değiştirilmiştir.
+
+**Kozmetik/rol zorlaması (istemci tarafına aldanmama):**
+- "Yol Silindiri" rolü yalnızca **sunucu tarafında** yetki verir: rolü olanların kozmetikleri
+  yayınlanır ve oyuncular bunu başka istemcilerden görür. İstemcide dosya elle değiştirilebilir
+  (bu teknik olarağ kaçınılmaz) ama bu yalnızca o kullanıcının kendi ekranını etkiler;
+  paylaşım/presence yolu artık cihaz anahtarı ile imzalıdır (presence yükleme kapısı).
+- Önceki sürümde `izin_listesi_yaz` gibi açık uçların tamamı aynı imza kapısına alınır.
+- Discord'taki rol canlı olarak sorgulanır; `croxydb` yalnızça hız sınırı önbelleği olarak kalır.
+
+**IP kaydı ve "gerçekten silme":**
+- `ip_kaydi` ayrı tabloda `silme_zamani` alanıyla tutulur (denetim izini bozmamak için ayrı kolon).
+- Silme üç yerde: (a) API her açılışta süresi geçen satırları temizler, (b) panelde "Şimdi sil",
+  (c) okumada süzme. Bot 1 haftadan uzun kapalıysa yeni kayıt da yazılamaz (başarısız giriş
+  reddedilir); açılış temizliği birikmiş olanları siler.
 
 ## 7. Akışlar
 
@@ -147,7 +174,15 @@ dosyalar ilk açılışta o hesaba taşınır (geriye dönük uyumluluk).
 - Haber yayınlama: panele yazılan haber **bot tarafında** ed25519 ile imzalanır (özel anahtar
   env'de, depoya girmez) → imzalı besleme yayınlanır. GitHub elle akışı kapanır.
 
-## 11. Bot değişiklikleri (zip olarak teslim)
+## 11. Zorunlu güncelleme (min-version)
+
+- **Bu sürüm ilk zorunlu olanıdır:** eski sürümler `minVersion` alanını görmediğinden
+  "ilk açılışta zorunlu" yalnızca yeni exe ile mümkün. Eski sürümler yerel olarak
+  çalışmaya devam eder, yeni sunucu özelliklerini kullanamaz.
+- Launcher açılışta `latest.json`'ı (veya sıcak kanal `sicak.json`'a eklenen `minSurum`)
+  okur; altındaysa **oyunu engeller**, güncelleme ister. GitHub erişilemezse **izin verir**
+  (çevrimdışı kullanıcı kilitlenmez) — bu davranış belgede açıkça böyledir.
+- Sıcak kanal exe dağıtamaz; "zorunlu güncelleme" yalnızca exe/updater üzerinden gelir.
 
 Mevcut davranış korunur (tag/rol otomasyonu, hoşgeldin/veda mesajı). Üzerine:
 - `/bagla <kod>`, `/sifirla` komutları + DM kod gönderimi.
@@ -197,3 +232,24 @@ Mevcut davranış korunur (tag/rol otomasyonu, hoşgeldin/veda mesajı). Üzerin
 - API'de hız sınırı değerleri, nonce önbelleği boyutu.
 - Kod biçimi ve DM metinleri.
 - Turso şema indeksleri ve sorgu planı.
+
+## 17. v2 düzeltmeleri özeti (denetçi bulguları)
+
+| Bulgu | Cozum |
+|---|---|
+| Açık kaynak + ortak sır → API'de kimlik doğrulaması yok | Cihaz başına Ed25519 anahtar çifti; sunucu genel anahtarı kaydeder; istekler özel anahtarla imzalanır; sunucu yanıtları da imzalı |
+| Yetki belgesi yerelde doğrulanınca sır launcher'da olur → sahte belge | Belge artık **sunucu imzalı** (Ed25519). Launcher yalnız doğrular, üretemez |
+| Pepper çelişkisi (türetme launcher'da ama pepper env'de) | Türetme sunucuda; launcher parolayı TLS ile gönderir. Çevrimdışı giriş için yerel hash + sunucu imzalı süreli belge |
+| Rol zorlaması istemci tarafında imkânsız / presence açık uç | Yetki yalnızca sunucu tarafında; presence ve tüm yazma uçları cihaz anahtarı imzası ister |
+| GitHub rastgele ad = mahremiyet yok | Kozmetik mahremiyet gerektirmez; imzalı indeks + indeks satırı silinince erişim durur |
+| IP "gerçekten silme" tanımsız, bot kapalıysa aşılır | Ayrı ip_kaydi tablosu, silme_zamani, açılış temizliği + okumada süzme + panelde anında sil |
+| Hesap PK = ad (Microsoft ad değişebilir, çatlak çakışır) | PK kararlı kimlik (ms:<uuid>/offline:<uuid>); ad sadece görünen |
+| Çatlak sınırı bağlantıyı koparınca atlanır | aglanti_gecmisi sayar; ayrılmış bağlantılar da limite düşer |
+| min-version eski launcher'a uygulanamaz | Bu sürüm ilk zorunlu kapı; eski sürüm yerelde çalışmaya devam eder |
+| İlk şifre akışı yok / kullanıcı yolda kalıyor | Onboarding: hesap başına sırayla "şifre oluştur" + "şimdi değil" (şimdi değil = kozmetik kilitli, hesap kullanılabilir) |
+| Bot tek hata noktası / panel kimliği belirsiz | Panel Discord OAuth (yalnızca sahip ID) + oturum şifresi; bot düşerse oyun ve kozmetik KULLANIMI sürer, DEĞİŞİKLİK durur |
+| Yerel kilitler yazılımla kırılabilir | Kabul: yerel kilitler SÜREÇ kontrolüdür, güvenlik sınırı değil; gerçek zorla sunucu tarafında |
+| Argon2 bağımlılığı yok | Yeni kutu eklenir (Argon2id); yoksa PBKDF2-HMAC-SHA256 elle başlar, sonra Argon2'e geçilir |
+| Cihaz kimliği üretimi, tuz döndürme, olay detay/ip ayrımı, haber anahtarı rotasyonu | Cihaz ID = ilk açılışta rastgele UUID (yeniden kurulumda yenilenir); tuz döndürme sunucuda rehash ile; olay.detay ile ip_kaydi ayrı; haber imzasında iki genel anahtar dönemi |
+| Rozet global kalıyor ama "kozmetik hesap bazlı" hedefi yazılı | Rozet kasten global (sahip logusu); kozmetik/skin hesap bazlı. Rozet yayınlama da cihaz imzası ister |
+| pp_dir/kozmetik/ zaten katalog için kullanılıyor | Yeni yol: .yikim/kosmetik/<hesap-anahtari>/ (tasarım §7'de adı geçen kozmetik/ yolu bu yüzle değişti) |
