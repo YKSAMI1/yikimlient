@@ -33,6 +33,10 @@ let sonPelerin: string | null = null;
  *  sadece TAKILI yazsın". */
 let ozelPelerinAktif = false;
 let kok: HTMLElement | null = null;
+/** Oyun kapanıp launcher öne geldiğinde skini tazelemek için (v0.7.15):
+ *  oyun içi seçim hesaba yazılıyor, launcher açıkken de görünmeli. */
+let canliKok: HTMLElement | null = null;
+let canliDinleyici = false;
 
 /** YIKIM kozmetik kataloğu (çoklu pelerin/elitra). */
 interface KozKayit {
@@ -68,6 +72,17 @@ export function renderSkins(root: HTMLElement): void {
   }
   root.innerHTML = iskelet(acc.name);
   baglantilar(root, acc.id);
+  canliKok = root;
+  if (!canliDinleyici) {
+    canliDinleyici = true;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") return;
+      const r = canliKok;
+      if (!r || !r.isConnected) return;
+      const a = currentAccount();
+      if (a && a.kind === "microsoft") void hubYukle(r, a.id, false);
+    });
+  }
   void hubYukle(root, acc.id, true);
 }
 
@@ -263,6 +278,12 @@ async function hubYukle(root: HTMLElement, hesapId: string, sahneKur: boolean): 
 
 function aktifSecim(): Secim | null {
   if (!hub) return null;
+  // v0.7.15 — oyun içi panelden seçilen deri launcher'da da "SEÇİLİ" görünsün:
+  // hesabın aktif dokusu önbellekte olduğu için kitaplık kimliğiyle eşleşmiyordu.
+  if (hub.secili) {
+    const k = hub.kitaplik.find((x) => x.id === hub!.secili);
+    if (k) return kayitSecim(k);
+  }
   if (hub.aktif) {
     return {
       tur: "kayit",

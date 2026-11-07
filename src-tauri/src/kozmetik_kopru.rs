@@ -300,11 +300,8 @@ fn secim_deri(id: &str) {
                 .and_then(|j| j["slim"].as_bool())
                 .unwrap_or(false);
                 if let Some(acc) = aktif_hesap() {
-                    tauri::async_runtime::spawn(async move {
-                        if let Err(e) = crate::skins::skin_uygula(&acc, &bayt, slim).await {
-                            crate::core::yikim_log(format!("deri geri yuklenemedi: {e}"));
-                        }
-                    });
+                    // Soğuma kuyruğu: "Kullanma" da sessizce düşmesin (v0.7.15)
+                    deri_hesaba_yaz(acc, bayt, slim, "");
                 }
             }
         }
@@ -350,14 +347,110 @@ fn secim_deri(id: &str) {
     // Artık launcher'ın Skin Merkezi ile aynı yol: Mojang'a `variant` ile
     // yükleme → skin her yerde (sunucuda, launcher'da) değişir.
     if let Some(acc) = aktif_hesap() {
-        let png = png.clone();
-        let slim = kayit.slim;
-        tauri::async_runtime::spawn(async move {
-            match crate::skins::skin_uygula(&acc, &png, slim).await {
-                Ok(_) => crate::core::yikim_log("deri hesaba uygulandi".to_string()),
-                Err(e) => crate::core::yikim_log(format!("deri hesaba uygulanamadi: {e}")),
+        deri_hesaba_yaz(acc, png.clone(), kayit.slim, &kayit.id);
+    }
+}
+
+// ---------------- Hesaba deri yazma kuyruğu (v0.7.15) ----------------
+
+/// Bekleyen son yükleme isteği. Hızlı seçimlerde (60 sn soğuma) eskiden istek
+/// sessizce düşüyordu: oyunda yeni skin görünüyor, sunucuda ve diğer
+/// oyuncularda ESKİ skin kalıyordu. Artık son istek kuyruğa alınır, soğuma
+/// bitince otomatik yüklenir ("en son seçilen kazanır").
+struct DeriIstegi {
+    acc: crate::auth::Account,
+    png: Vec<u8>,
+    slim: bool,
+    id: String,
+}
+
+fn deri_kuyruk() -> &'static std::sync::Mutex<Option<DeriIstegi>> {
+    static K: std::sync::OnceLock<std::sync::Mutex<Option<DeriIstegi>>> = std::sync::OnceLock::new();
+    K.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+fn deri_kuyruk_calisiyor() -> &'static std::sync::atomic::AtomicBool {
+    static D: std::sync::OnceLock<std::sync::atomic::AtomicBool> = std::sync::OnceLock::new();
+    D.get_or_init(|| std::sync::atomic::AtomicBool::new(false))
+}
+
+/// Seçilen deriyi hesaba yaz: soğuma varsa beklet, sonra yükle.
+fn deri_hesaba_yaz(acc: crate::auth::Account, png: Vec<u8>, slim: bool, id: &str) {
+    if let Ok(mut k) = deri_kuyruk().lock() {
+        *k = Some(DeriIstegi { acc, png, slim, id: id.to_string() });
+    }
+    if deri_kuyruk_calisiyor().swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return; // çalışan işçi yeni isteği kendisi alır
+    }
+    tauri::async_runtime::spawn(async move {
+        use std::sync::atomic::Ordering;
+        loop {
+            let Some(istek) = deri_kuyruk().lock().ok().and_then(|mut k| k.take()) else {
+                deri_kuyruk_calisiyor().store(false, Ordering::SeqCst);
+                // yarış: bu arada yeni istek geldiyse tekrar başlat
+                let var = deri_kuyruk().lock().map(|k| k.is_some()).unwrap_or(false);
+                if var && !deri_kuyruk_calisiyor().swap(true, Ordering::SeqCst) {
+                    continue;
+                }
+                return;
+            };
+            // soğuma bitene kadar bekle; yeni seçim gelirse bekleme kesilir
+            loop {
+                let kalan = crate::skins::soguma_kalan(&istek.acc);
+                if kalan <= 0 {
+                    break;
+                }
+                let yeni = deri_kuyruk().lock().map(|k| k.is_some()).unwrap_or(false);
+                if yeni {
+                    break; // dıştaki döngü yeni isteği alır
+                }
+                let bekle = kalan.min(2000).max(200) as u64;
+                tokio::time::sleep(std::time::Duration::from_millis(bekle)).await;
             }
-        });
+            let yeni = deri_kuyruk().lock().map(|k| k.is_some()).unwrap_or(false);
+            if yeni {
+                continue; // daha yeni bir seçim var, bunu atla
+            }
+            let mut son_hata = String::new();
+            let mut basarili = false;
+            for deneme in 0..3 {
+                match crate::skins::skin_uygula(&istek.acc, &istek.png, istek.slim).await {
+                    Ok(_) => {
+                        basarili = true;
+                        let ad = if istek.id.is_empty() { "hesabin kendi derisi" } else { istek.id.as_str() };
+                        crate::core::yikim_log(format!("deri hesaba uygulandi: {ad}"));
+                        break;
+                    }
+                    Err(e) => {
+                        son_hata = e;
+                        if deneme < 2 {
+                            tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
+                        }
+                    }
+                }
+            }
+            if basarili {
+                deri_durum_yaz("ok", &istek.id, "");
+            } else {
+                crate::core::yikim_log(format!("deri hesaba uygulanamadi: {son_hata}"));
+                deri_durum_yaz("hata", &istek.id, &son_hata);
+            }
+        }
+    });
+}
+
+/// Oyun içi panele sonucu göster: `.yikim/deri-durum.txt` (ok|hata<TAB>id<TAB>mesaj).
+fn deri_durum_yaz(durum: &str, id: &str, mesaj: &str) {
+    let satir = format!(
+        "{durum}\t{}\t{}\n",
+        id.replace(['\t', '\n'], " "),
+        mesaj.replace(['\t', '\n'], " ")
+    );
+    for inst in crate::instances::list() {
+        let dir = inst.dir().join(".yikim");
+        if std::fs::create_dir_all(&dir).is_ok() {
+            let _ = std::fs::write(dir.join("deri-durum.txt"), &satir);
+        }
     }
 }
 

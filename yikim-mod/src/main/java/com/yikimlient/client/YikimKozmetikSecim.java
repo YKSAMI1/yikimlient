@@ -34,6 +34,13 @@ public final class YikimKozmetikSecim {
     /** Seçili DERİ ince (Alex/slim) mi? Oyun içi gövde modeli buna göre kurulur. */
     public static volatile boolean deriSlim;
 
+    /** Son seçimin hesaba yazılma durumu (v1.33.9):
+     *  "hesaba yazıldı" / "hesaba yazılamadı: …" — launcher `.yikim/deri-durum.txt`
+     *  dosyasını yazar. Boşsa gösterilmez. */
+    public static volatile String deriDurum = "";
+    public static volatile boolean deriDurumHata;
+    private static long deriDurumDamga = -1L;
+
     static final String[] TUR = new String[]{"deri", "pelerin", "mojang", "kanat"};
     public static final String[] BASLIK = new String[]{"SKIN", "PELERİN", "MOJANG", "ELİTRA"};
     public static final String[] ALT_BASLIK = new String[]{
@@ -154,8 +161,10 @@ public final class YikimKozmetikSecim {
             }
             long zaman = Files.getLastModifiedTime(yol, new LinkOption[0]).toMillis();
             if (zaman == YikimKozmetikSecim.damga) {
+                YikimKozmetikSecim.durumOku();
                 return;
             }
+            YikimKozmetikSecim.durumOku();
             List<String> satirlar = Files.readAllLines(yol, StandardCharsets.UTF_8);
             for (List<Oge> liste : YikimKozmetikSecim.OGE) {
                 liste.clear();
@@ -218,6 +227,37 @@ public final class YikimKozmetikSecim {
         }
         catch (Throwable ignored) {
             // katalog okunamazsa mevcut hâl korunur
+        }
+    }
+
+    /** `.yikim/deri-durum.txt` → SKIN sekmesinde kalıcı durum satırı. */
+    private static void durumOku() {
+        try {
+            Path yol = YikimBridge.stateDir().resolve("deri-durum.txt");
+            if (!Files.isRegularFile(yol, new LinkOption[0])) {
+                return;
+            }
+            long zaman = Files.getLastModifiedTime(yol, new LinkOption[0]).toMillis();
+            if (zaman == YikimKozmetikSecim.deriDurumDamga) {
+                return;
+            }
+            YikimKozmetikSecim.deriDurumDamga = zaman;
+            String satir = Files.readString(yol, StandardCharsets.UTF_8).trim();
+            String[] p = satir.split("\t", -1);
+            if (p.length >= 1 && p[0].trim().equals("ok")) {
+                YikimKozmetikSecim.deriDurum = "hesaba yazıldı — sunucularda da bu skin";
+                YikimKozmetikSecim.deriDurumHata = false;
+            } else if (p.length >= 1 && p[0].trim().equals("hata")) {
+                String mesaj = p.length >= 3 ? p[2].trim() : "bilinmeyen hata";
+                if (mesaj.length() > 64) {
+                    mesaj = mesaj.substring(0, 64) + "…";
+                }
+                YikimKozmetikSecim.deriDurum = "hesaba yazılamadı: " + mesaj;
+                YikimKozmetikSecim.deriDurumHata = true;
+            }
+        }
+        catch (Throwable ignored) {
+            // durum dosyası okunamazsa sessiz kal
         }
     }
 

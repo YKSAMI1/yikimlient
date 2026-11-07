@@ -38,4 +38,6 @@ export interface SkinHub {
   yedek_var: boolean;
   varsayilanlar: Varsayilan[];
   hata: string | null;
+  /** Oyun içi panelden seçilmiş kitaplık derisi (id) — v0.7.15 */
+  secili?: string;
 }

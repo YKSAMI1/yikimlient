@@ -544,6 +544,278 @@ pub async fn versions_for(
     }
 }
 
+// ---------- Proje sayfası (v0.7.15) ----------
+
+/// Keşfet'te bir modun "sayfası" (Modrinth'teki proje sayfasının karşılığı).
+#[derive(Debug, Clone, Serialize)]
+pub struct RepoProject {
+    pub source: String,
+    pub id: String,
+    pub slug: String,
+    pub title: String,
+    pub description: String,
+    /// Modrinth: markdown gövde. CurseForge: HTML'den arındırılmış düz metin.
+    pub body: String,
+    pub author: String,
+    pub icon_url: String,
+    pub downloads: u64,
+    pub followers: u64,
+    pub categories: Vec<String>,
+    pub game_versions: Vec<String>,
+    pub loaders: Vec<String>,
+    pub gallery: Vec<RepoImage>,
+    pub links: Vec<RepoLink>,
+    pub license: String,
+    pub updated: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RepoImage {
+    pub url: String,
+    pub title: String,
+    pub featured: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RepoLink {
+    pub label: String,
+    pub url: String,
+}
+
+pub async fn project_detail(source: &str, project_id: &str, kind: &str) -> Result<RepoProject, String> {
+    match source {
+        "curseforge" => cf_project(project_id, kind).await,
+        _ => modrinth_project(project_id).await,
+    }
+}
+
+async fn modrinth_project(id: &str) -> Result<RepoProject, String> {
+    let js = api_json(&format!("https://api.modrinth.com/v2/project/{id}")).await?;
+    let mut author = String::new();
+    let team = js["team"].as_str().unwrap_or("");
+    if !team.is_empty() {
+        if let Ok(m) = api_json(&format!("https://api.modrinth.com/v2/team/{team}/members")).await {
+            let arr = m.as_array().cloned().unwrap_or_default();
+            let sec = arr
+                .iter()
+                .find(|x| x["role"].as_str() == Some("Owner"))
+                .or_else(|| arr.first());
+            if let Some(o) = sec {
+                author = o["user"]["username"].as_str().unwrap_or("").to_string();
+            }
+        }
+    }
+    let mut categories = str_list(&js["categories"]);
+    categories.extend(str_list(&js["additional_categories"]));
+    let gallery: Vec<RepoImage> = js["gallery"]
+        .as_array()
+        .unwrap_or(&Vec::new())
+        .iter()
+        .map(|g| RepoImage {
+            url: g["url"].as_str().unwrap_or("").into(),
+            title: g["title"].as_str().unwrap_or("").into(),
+            featured: g["featured"].as_bool().unwrap_or(false),
+        })
+        .filter(|g| !g.url.is_empty())
+        .collect();
+    let mut links = Vec::new();
+    for (label, key) in [
+        ("Kaynak kodu", "source_url"),
+        ("Sorunlar", "issues_url"),
+        ("Wiki", "wiki_url"),
+        ("Discord", "discord_url"),
+    ] {
+        if let Some(u) = js[key].as_str() {
+            if !u.trim().is_empty() {
+                links.push(RepoLink { label: label.into(), url: u.into() });
+            }
+        }
+    }
+    links.push(RepoLink {
+        label: "Modrinth'te aç".into(),
+        url: format!(
+            "https://modrinth.com/{}/{}",
+            js["project_type"].as_str().unwrap_or("mod"),
+            js["slug"].as_str().unwrap_or(id)
+        ),
+    });
+    Ok(RepoProject {
+        source: "modrinth".into(),
+        id: js["id"].as_str().unwrap_or(id).into(),
+        slug: js["slug"].as_str().unwrap_or("").into(),
+        title: js["title"].as_str().unwrap_or("").into(),
+        description: js["description"].as_str().unwrap_or("").into(),
+        body: js["body"].as_str().unwrap_or("").into(),
+        author,
+        icon_url: js["icon_url"].as_str().unwrap_or("").into(),
+        downloads: js["downloads"].as_u64().unwrap_or(0),
+        followers: js["followers"].as_u64().unwrap_or(0),
+        categories,
+        game_versions: str_list(&js["game_versions"]),
+        loaders: str_list(&js["loaders"]),
+        gallery,
+        links,
+        license: js["license"]["id"].as_str().unwrap_or("").into(),
+        updated: js["updated"].as_str().unwrap_or("").into(),
+    })
+}
+
+/// CF açıklaması HTML gelir; webview'e ham HTML basmıyoruz (uzak içerik).
+/// Etiketleri satır sonuna çevirip varlıkları çözüyoruz → güvenli düz metin.
+fn html_to_text(html: &str) -> String {
+    let mut s = html.to_string();
+    for (from, to) in [
+        ("<br>", "\n"),
+        ("<br/>", "\n"),
+        ("<br />", "\n"),
+        ("</p>", "\n\n"),
+        ("</li>", "\n"),
+        ("<li>", "- "),
+        ("</h1>", "\n\n"),
+        ("</h2>", "\n\n"),
+        ("</h3>", "\n\n"),
+        ("</h4>", "\n\n"),
+        ("<h1>", "\n\n# "),
+        ("<h2>", "\n\n## "),
+        ("<h3>", "\n\n### "),
+        ("<h4>", "\n\n#### "),
+        ("</div>", "\n"),
+        ("<hr>", "\n---\n"),
+        ("<hr/>", "\n---\n"),
+    ] {
+        s = s.replace(from, to);
+    }
+    // <img src="..."> → markdown görseli
+    let mut out = String::with_capacity(s.len());
+    let mut rest: &str = &s;
+    while let Some(i) = rest.find("<img") {
+        out.push_str(&rest[..i]);
+        let tail = &rest[i..];
+        let Some(end) = tail.find('>') else { break };
+        let tag = &tail[..=end];
+        if let Some(pos) = tag.find("src=\"") {
+            let after = &tag[pos + 5..];
+            if let Some(q) = after.find('"') {
+                let url = &after[..q];
+                if url.starts_with("http") {
+                    out.push_str(&format!("\n\n![resim]({url})\n\n"));
+                }
+            }
+        }
+        rest = &tail[end + 1..];
+    }
+    out.push_str(rest);
+    let mut s = out;
+    // kalan etiketleri at
+    let mut temiz = String::with_capacity(s.len());
+    let mut ic = false;
+    for c in s.chars() {
+        match c {
+            '<' => ic = true,
+            '>' => ic = false,
+            _ if !ic => temiz.push(c),
+            _ => {}
+        }
+    }
+    s = temiz
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("\r", "");
+    // üst üste boş satırları sadeleştir
+    let mut sonuc = String::new();
+    let mut bos = 0;
+    for line in s.lines() {
+        if line.trim().is_empty() {
+            bos += 1;
+            if bos > 2 {
+                continue;
+            }
+        } else {
+            bos = 0;
+        }
+        sonuc.push_str(line.trim_end());
+        sonuc.push('\n');
+    }
+    sonuc
+}
+
+async fn cf_project(id: &str, kind: &str) -> Result<RepoProject, String> {
+    let client = http_client();
+    let js = api_json_req(cf_get(&client, &format!("{}/mods/{id}", cf_base()))).await?;
+    let d = &js["data"];
+    let mut body = String::new();
+    if let Ok(g) = api_json_req(cf_get(&client, &format!("{}/mods/{id}/description", cf_base()))).await {
+        if let Some(h) = g["data"].as_str() {
+            body = html_to_text(h);
+        }
+    }
+    let gallery: Vec<RepoImage> = d["screenshots"]
+        .as_array()
+        .unwrap_or(&Vec::new())
+        .iter()
+        .map(|s| RepoImage {
+            url: s["url"].as_str().or_else(|| s["thumbnailUrl"].as_str()).unwrap_or("").into(),
+            title: s["title"].as_str().unwrap_or("").into(),
+            featured: false,
+        })
+        .filter(|g| !g.url.is_empty())
+        .collect();
+    let mut links = Vec::new();
+    for (label, key) in [
+        ("Kaynak kodu", "sourceUrl"),
+        ("Sorunlar", "issuesUrl"),
+        ("Wiki", "wikiUrl"),
+    ] {
+        if let Some(u) = d["links"][key].as_str() {
+            if !u.trim().is_empty() {
+                links.push(RepoLink { label: label.into(), url: u.into() });
+            }
+        }
+    }
+    links.push(RepoLink {
+        label: "CurseForge'da aç".into(),
+        url: d["links"]["websiteUrl"].as_str().map(|s| s.to_string()).unwrap_or_else(|| {
+            let yol = if kind == "modpack" { "minecraft/modpacks" } else { "minecraft/mc-mods" };
+            format!("https://www.curseforge.com/{yol}/{id}")
+        }),
+    });
+    let authors = d["authors"].as_array().unwrap_or(&Vec::new()).iter()
+        .filter_map(|a| a["name"].as_str().map(|s| s.to_string()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let categories = d["categories"].as_array().unwrap_or(&Vec::new()).iter()
+        .filter_map(|c| c["name"].as_str().map(|s| s.to_string()))
+        .collect();
+    let mut game_versions: Vec<String> = d["latestFilesIndexes"].as_array().unwrap_or(&Vec::new()).iter()
+        .filter_map(|f| f["gameVersion"].as_str().map(|s| s.to_string()))
+        .collect();
+    game_versions.sort_by(|a, b| b.cmp(a));
+    game_versions.dedup();
+    Ok(RepoProject {
+        source: "curseforge".into(),
+        id: d["id"].as_u64().map(|v| v.to_string()).unwrap_or_else(|| id.to_string()),
+        slug: d["slug"].as_str().unwrap_or("").into(),
+        title: d["name"].as_str().unwrap_or("").into(),
+        description: d["summary"].as_str().unwrap_or("").into(),
+        body,
+        author: authors,
+        icon_url: d["logo"]["thumbnailUrl"].as_str().unwrap_or("").into(),
+        downloads: d["downloadCount"].as_f64().unwrap_or(0.0) as u64,
+        followers: d["thumbsUpCount"].as_f64().unwrap_or(0.0) as u64,
+        categories,
+        game_versions,
+        loaders: Vec::new(),
+        gallery,
+        links,
+        license: String::new(),
+        updated: d["dateModified"].as_str().unwrap_or("").into(),
+    })
+}
+
 // ---------- Mod güncellemeleri (v0.4.11) ----------
 
 /// Bir mod dosyasının güncellemesi: eski dosya → sunucudaki en yeni sürüm.

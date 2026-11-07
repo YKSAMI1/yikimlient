@@ -2003,6 +2003,16 @@ pub async fn cmd_repos_popular(kind: String, loader: String) -> Result<Vec<repos
     repos::popular(&kind, &loader, 12).await
 }
 
+/// Keşfet proje sayfası: açıklama/gövde, galeri, bağlantılar, yazar.
+#[tauri::command]
+pub async fn cmd_repos_project(
+    source: String,
+    project_id: String,
+    kind: String,
+) -> Result<repos::RepoProject, String> {
+    repos::project_detail(&source, &project_id, &kind).await
+}
+
 #[tauri::command]
 pub async fn cmd_repos_get_versions(
     source: String,

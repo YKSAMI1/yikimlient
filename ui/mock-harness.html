@@ -349,6 +349,53 @@
         return Promise.resolve(hub());
       }
       if (cmd === "cmd_skin_disa_aktar") return Promise.resolve("C:\\mock\\skins\\disa\\" + String(args.ad || "skin") + ".png");
+      // Keşfet 2.0 — sahte repo verisi (proje sayfası/gövde render testi)
+      if (cmd === "cmd_repos_popular" || cmd === "cmd_repos_search") {
+        var xor = [
+          ["sodium", "Sodium", "Modern rendering engine and optimizations", "jellysquid3", 41200000],
+          ["iris", "Iris Shaders", "A modern shader pack loader", "coderbot", 12800000],
+          ["essential", "Essential Mod", "Friends, cosmetics and more", "Essential", 31000000],
+          ["lithium", "Lithium", "No-compromises game logic optimization mod", "jellysquid3", 22000000],
+          ["jei", "Just Enough Items", "View items and recipes", "mezz", 18000000],
+          ["betterf3", "BetterF3", "Better debug screen", "cominixo", 4200000]
+        ];
+        var liste = xor.map(function (m, i) {
+          return {
+            source: "modrinth", id: "p-" + i, slug: m[0], title: m[1], description: m[2],
+            author: m[3], icon_url: "", downloads: m[4], kind: (args.kind || "mod"),
+            categories: i % 2 ? ["optimization", "fabric"] : ["utility"],
+          };
+        });
+        if (cmd === "cmd_repos_popular") return Promise.resolve(liste.slice(0, 5));
+        return Promise.resolve({ results: liste, curseforge: false });
+      }
+      if (cmd === "cmd_repos_project") {
+        return Promise.resolve({
+          source: "modrinth", id: String(args.projectId), slug: "sodium", title: "Sodium",
+          description: "Modern rendering engine and optimizations",
+          body: "# Sodium\n\nSodium, **Fabric** için yazılmış modern bir render motorudur.\n\n## İçindekiler\n\n- Daha yüksek FPS\n- Daha az takılma\n- `sodium.properties` ile ince ayar\n\n> Not: OptiFine ile birlikte çalışmaz.\n\n---\n\n[Dokümantasyon](https://example.com)\n",
+          author: "jellysquid3", icon_url: "", downloads: 41200000, followers: 21000,
+          categories: ["optimization", "fabric"], game_versions: ["1.21.11", "1.21.10", "1.20.1"],
+          loaders: ["fabric", "quilt"], gallery: [],
+          links: [{ label: "Kaynak kodu", url: "https://example.com" }],
+          license: "LGPL-3.0-only", updated: "2026-10-30T10:00:00Z",
+        });
+      }
+      if (cmd === "cmd_repos_get_versions") {
+        var sur = ["1.21.11", "1.21.10", "1.20.1"];
+        var vv = [];
+        for (var q = 0; q < 9; q++) {
+          vv.push({
+            id: "v" + q, name: "Sodium " + (0.6 - q * 0.01).toFixed(2), version_number: (0.6 - q * 0.01).toFixed(2),
+            date: new Date(Date.now() - q * 864e5 * 21).toISOString(),
+            game_versions: q < 4 ? [sur[0]] : q < 7 ? [sur[1]] : [sur[2]],
+            loaders: q === 3 ? ["forge"] : ["fabric"],
+            files: [{ url: "https://example.com/a.jar", filename: "a.jar", primary: true, size: 1234567 }],
+            source: "modrinth", project_id: "p-0",
+          });
+        }
+        return Promise.resolve(vv);
+      }
       if (String(cmd).startsWith("plugin:")) return Promise.resolve(null);
       return Promise.resolve([]);
     }

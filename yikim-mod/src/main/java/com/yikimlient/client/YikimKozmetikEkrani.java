@@ -207,9 +207,18 @@ public final class YikimKozmetikEkrani extends class_437 {
 
         // durum ipucu
         String mesaj = System.currentTimeMillis() - this.ipucuAt < 2600L ? this.ipucu : "";
+        int mesajRenk = YikimTheme.accent;
+        if (mesaj.isEmpty() && sekme == YikimKozmetikSecim.DERI
+            && !YikimKozmetikSecim.deriDurum.isEmpty()) {
+            // v1.33.9 — seçim hesaba yazıldı mı? (sunucularda/diğer oyuncularda
+            // görünen skin Mojang'daki; yazılamadıysa burada sebebi yazar)
+            mesaj = YikimKozmetikSecim.deriDurum;
+            mesajRenk = YikimKozmetikSecim.deriDurumHata ? YikimTheme.BAD : YikimTheme.OK;
+        }
         if (!mesaj.isEmpty()) {
-            YikimAdapter.text(graphics, font, mesaj, genislik - KENAR - font.method_1727(mesaj),
-                yukseklik - 20, YikimTheme.accent, false);
+            String kirp = YikimDraw.clip(font, mesaj, genislik - KENAR * 2 - 8);
+            YikimAdapter.text(graphics, font, kirp, genislik - KENAR - font.method_1727(kirp),
+                yukseklik - 20, mesajRenk, false);
         }
     }
 

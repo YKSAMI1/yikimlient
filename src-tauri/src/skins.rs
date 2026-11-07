@@ -202,6 +202,10 @@ pub struct SkinHub {
     pub yedek_var: bool,
     pub varsayilanlar: Vec<Varsayilan>,
     pub hata: Option<String>,
+    /// Oyun içi panelden seçilmiş kitaplık derisi (id). Skin Merkezi bu kartı
+    /// "seçili" gösterir — launcher ile oyun aynı seçimi paylaşsın (v0.7.15).
+    #[serde(default)]
+    pub secili: String,
 }
 
 pub fn hesap_anahtari(acc: &crate::auth::Account) -> String {
@@ -271,6 +275,18 @@ fn son_giy() -> &'static std::sync::Mutex<std::collections::HashMap<String, i64>
     static SON: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, i64>>> =
         std::sync::OnceLock::new();
     SON.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// Kalan soğuma süresi (ms). 0 → hemen yüklenebilir.
+/// Oyun içi seçim kuyruğu bunu bekleyip tekrar dener (v0.7.15).
+pub fn soguma_kalan(acc: &crate::auth::Account) -> i64 {
+    let key = hesap_anahtari(acc);
+    let simdi = crate::core::now_millis();
+    let Ok(harita) = son_giy().lock() else { return 0 };
+    match soguma_kontrol_an(&harita, &key, simdi) {
+        Ok(()) => 0,
+        Err(kalan) => kalan,
+    }
 }
 
 fn soğuma_kontrol(acc: &crate::auth::Account) -> Result<(), String> {
@@ -521,6 +537,7 @@ fn hub_cache(acc: &crate::auth::Account) -> SkinHub {
         yedek_var: yedek_var(acc),
         varsayilanlar: varsayilan_kartlari(),
         hata: None,
+        secili: crate::kozmetik_kopru::secili_deri(),
     };
     hub.pelerin_aktif = hub
         .pelerinler
@@ -534,6 +551,7 @@ fn hub_cache(acc: &crate::auth::Account) -> SkinHub {
 /// Ağ hatasında son cache ile `cevrimdisi:true`.
 pub async fn hub_getir(acc: &crate::auth::Account) -> SkinHub {
     let mut hub = hub_cache(acc);
+    hub.secili = crate::kozmetik_kopru::secili_deri();
     if !hub.premium {
         hub.hata = Some("premium_gerekli".to_string());
         return hub;

@@ -138,6 +138,7 @@ pub fn run() {
             commands::cmd_repos_search,
             commands::cmd_repos_popular,
             commands::cmd_repos_get_versions,
+            commands::cmd_repos_project,
             commands::cmd_repos_install,
             commands::cmd_install_pack_files,
             commands::cmd_set_instance_java_preset,
