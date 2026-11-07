@@ -219,6 +219,47 @@ Mevcut davranış korunur (tag/rol otomasyonu, hoşgeldin/veda mesajı). Üzerin
 
 ## 15. Açık sorular (sahibin kararı)
 
+> v3: sorular sahip tarafından cevaplandı; kararlar §18-20'ye taşındı.
+> Yapıcının yerel kararları §17'de.
+
+## 18. Bot bilgisayara erişim yok — outbound bulut modeli (v3)
+
+Kullanıcı botunu çalıştırdığı bilgisayarı internete açamayacak. Eski "botta Express API
+sun, launcher oraya bağlanır" fikri kaldırıldı.
+
+- **Worker (Cloudflare) tek API kapısı.** Launcher ve bot ikisi de *outbound* istek atar.
+  Bot bilgisayarında dinleyen port yok: yalnızca Discord WebSocket (çıkış) + Worker'a
+  HTTPS çıkış istekleri.
+- **Bot durumu:** bot 60 saniyede bir kalp atışı atar; launcher 3 dakikadan eski damgayı
+  "bot kapalı" sayar ve Discord bağlantısı / şifre oluşturma / şifre sıfırlamayı kapatır.
+  Kullanıcı önerisi (/ping komutu) yedek doğrulama yöntemi olarak bırakılır.
+- **Akışlar (hepsi outbound):**
+  - bağlantı: launcher kod üretir → `POST /api/baglama/kod` (cihaz imzalı) → kullanıcı
+    `/bagla <kod>` yazar → bot `POST /api/baglama/dogrula` → launcher
+    `GET /api/baglama/durum` ile öğrenir.
+  - şifre sıfırlama: `/sifirla` → bot DM'e kod atar → launcher `POST /api/sifirla/dogrula`.
+  - rol: bot rolü sorgular → `POST /api/rol/yaz` → launcher okuyup panel kilidini açar.
+- **Blob:** kozmetik/pelerin/skin GitHub Releases; launcher buluttaki imzalı indeksten URL alır.
+
+## 19. Kozmetik mahremiyeti + doğrulanmamış işareti (v3)
+
+- **Doğrulanmamış (şifresiz girilmiş) hesapta sunucu kozmetikleri KAPALI:** hesabın kendi
+  özel pelerin/elitrası görünmez; görünüm boş temel hâle döner (Mojang profili varsa
+  orijinal skin/pelerin, yoksa varsayılan). Hesap kullanılabilir; kozmetik menüsü kapalı.
+- **Skin serbest (client-side):** herkes kendi ekranında kendi skinini seçebilir.
+- **İşaret:** hesap adının başında Y logosundan önce bir çarpı (X) işareti; anlamı
+  "gerçekten bu kişi değil". Launcher'da (hesap kartı/menü) ve oyun içinde (isim
+  etiketi/rozet) görünür; veri kaynağı buluttan gelen `dogrulandi: false`.
+  Orijinal hesaplarda Mojang'ın kendi pelerinleri serbest.
+- **İptal:** sahip iptal işaretlediğinde launcher yerel kozmetik dosyasını da temizler.
+
+## 20. Göç (mevcut kullanıcı verisi)
+
+- `app_dir` altındaki tüm kozmetik dosyaları tek kez hesap bazlına dağıtılır; asılları
+  `yedek/` altına alınır.
+- Yeni depo: `.yikim/kosmetik/<anahtar>/`; oyun açılışında seçili hesabın dosyaları
+  instance'ın `.yikim/pelerin.png` alanına yazılır (mod tarafı değişmez).
+
 1. **Skin çizme yetkisi:** "Yol Silindiri" rolü olan kullanıcı skin çizebilsin mi
    (pelerin gibi), rolü olmayan sadece kayıtlı skinleri seçebilsin mi? Çatlak oyuncu
    skin değiştiremesin mi yoksa yalnızca istemci tarafında mı denensin?
