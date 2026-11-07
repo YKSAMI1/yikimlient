@@ -435,7 +435,27 @@ fn deri_hesaba_yaz(acc: crate::auth::Account, png: Vec<u8>, slim: bool, id: &str
                 }
             }
             if basarili {
-                deri_durum_yaz("ok", &istek.id, "");
+                // v0.7.17 — KANIT: "yüklendi" demek yetmez, diğer oyuncular
+                // hesabın PROFİLİNDEKİ deriyi görür. Mojang profiline bakıp
+                // gerçekten bu deri mi duruyor diye kontrol et.
+                match crate::skins::hesaptaki_deri_ayni_mi(&istek.acc, &istek.png).await {
+                    Ok(true) => deri_durum_yaz("ok", &istek.id, ""),
+                    Ok(false) => {
+                        crate::core::yikim_log(
+                            "deri yuklendi AMA hesaptaki doku farkli — surum/hesap kontrol et"
+                                .to_string(),
+                        );
+                        deri_durum_yaz(
+                            "hata",
+                            &istek.id,
+                            "Mojang hesabi eski deride kaldi (yukleme kabul edilmedi)",
+                        );
+                    }
+                    Err(e) => {
+                        crate::core::yikim_log(format!("deri dogrulama atlandi: {e}"));
+                        deri_durum_yaz("ok", &istek.id, "");
+                    }
+                }
             } else {
                 crate::core::yikim_log(format!("deri hesaba uygulanamadi: {son_hata}"));
                 deri_durum_yaz("hata", &istek.id, &son_hata);

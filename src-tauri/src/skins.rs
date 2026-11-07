@@ -344,7 +344,30 @@ fn retry_after_baslik(r: &reqwest::Response) -> Option<u64> {
 }
 
 /// GET /minecraft/profile — 401'de jetonu bir kez zorla yeniler.
-async fn profil_cek(acc: &crate::auth::Account) -> Result<serde_json::Value, String> {
+/// Yükleme sonrası DOĞRULAMA (v0.7.17): hesabın profilindeki aktif deri
+/// gerçekten `png` mi? Diğer oyuncular ve sunucular bu dokuyu görür, bu yüzden
+/// "200 döndü" tek başına yeterli değil.
+pub async fn hesaptaki_deri_ayni_mi(
+    acc: &crate::auth::Account,
+    png: &[u8],
+) -> Result<bool, String> {
+    use sha2::{Digest, Sha256};
+    let profil = profil_cek(acc).await?;
+    let url = profil["skins"]
+        .as_array()
+        .and_then(|a| a.iter().find(|s| s["state"].as_str() == Some("ACTIVE")))
+        .and_then(|s| s["url"].as_str())
+        .ok_or_else(|| "profide aktif deri yok".to_string())?;
+    let r = crate::core::http_client()
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let bayt = r.bytes().await.map_err(|e| e.to_string())?;
+    Ok(hex::encode(Sha256::digest(&bayt)) == hex::encode(Sha256::digest(png)))
+}
+
+pub(crate) async fn profil_cek(acc: &crate::auth::Account) -> Result<serde_json::Value, String> {
     let mut token = token_al(acc, false).await?;
     for deneme in 0..2 {
         let r = crate::core::http_client()

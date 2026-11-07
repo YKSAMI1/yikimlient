@@ -245,7 +245,7 @@ public final class YikimKozmetikSecim {
             String satir = Files.readString(yol, StandardCharsets.UTF_8).trim();
             String[] p = satir.split("\t", -1);
             if (p.length >= 1 && p[0].trim().equals("ok")) {
-                YikimKozmetikSecim.deriDurum = "hesaba yazıldı — sunucularda da bu skin";
+                YikimKozmetikSecim.deriDurum = "hesaba yazıldı — sunucudan çıkıp yeniden gir";
                 YikimKozmetikSecim.deriDurumHata = false;
             } else if (p.length >= 1 && p[0].trim().equals("hata")) {
                 String mesaj = p.length >= 3 ? p[2].trim() : "bilinmeyen hata";
