@@ -99,6 +99,33 @@ pub fn kurulum_yolu(inst: &crate::instances::Instance) -> std::path::PathBuf {
     inst.dir().join(".yikim").join("rozet.png")
 }
 
+/// ANA kopyayı bir kurulumun `.yikim/rozet.png`'sine taşı (kurulum yeni
+/// açıldıysa rozeti yoktu — kök neden buydu: eskiden rozet yalnızca
+/// çizim ANINDA var olan kurulumlara yazılıyordu; sonradan açılan mod
+/// paketleri rozeti hiç görmezdi). Şimdi her kurulum başlatmada/ilk
+/// açılışta ana kopyadan doğrulanır — "ilk pakette görünüyor, yeni
+/// pakette görünmüyor" sorunu kökten biter.
+/// Dönen: true → dosya yazıldı/doğrulandı.
+pub fn kuruluma_dogrula(inst_dir: &std::path::Path) -> bool {
+    let ana = ana_yol();
+    if !ana.is_file() {
+        return false; // kullanıcı rozet çizmemiş — standart Y
+    }
+    let hedef = inst_dir.join(".yikim").join("rozet.png");
+    let kaynak = match std::fs::read(&ana) {
+        Ok(b) => b,
+        Err(_) => return false,
+    };
+    // aynı içerikse yazma (gereksiz disk yazımı + mtime değişimi yok)
+    if let Ok(mevcut) = std::fs::read(&hedef) {
+        if mevcut == kaynak {
+            return false;
+        }
+    }
+    let _ = std::fs::create_dir_all(inst_dir.join(".yikim"));
+    std::fs::write(&hedef, &kaynak).is_ok()
+}
+
 /// PNG'yi ana kopyaya + tüm kurulumların `.yikim/rozet.png` dosyasına yaz.
 /// Dönen sayı: yazılan yer adedi (ana kopya dahil; kurulum yoksa 1).
 pub fn tum_kurulumlara_yaz(png: &[u8]) -> usize {

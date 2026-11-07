@@ -137,6 +137,50 @@ fn disk_manifest() -> Option<SicakManifest> {
 }
 
 // ---------------------------------------------------------------------------
+// TEMİZLİK — manifestte olmayan eski jar'lar diskte birikirti, silinir
+// ---------------------------------------------------------------------------
+
+/// Sıcak klasöründeki jar'lardan manifestte ADİ GEÇMEYENLERİ sil.
+/// (Son N sürümü TUTMA: kurulum kararı "gömülüden daha yeni" zincirine
+/// bağlı — hepsi aynı anda indirildiğinden tek aktif sürüm bile yeterlidir.
+/// Senin cihazında `sicak` klasöründe birikmiş eski jar'lar bu yüzden
+/// kullanıcının diskinde gereksiz yer tutuyordu.)
+fn temizlenmis_eski_jarlar(m: &SicakManifest) {
+    let kannst = match fs::read_dir(sicak_dir()) {
+        Ok(rd) => rd,
+        Err(_) => return,
+    };
+    let mut silinen = 0usize;
+    let mut silinen_bayt = 0u64;
+    for girdi in kannst.filter_map(|e| e.ok()) {
+        let ad = girdi.file_name().to_string_lossy().to_string();
+        if !ad.starts_with("yikimlient-") || !ad.ends_with(".jar") {
+            continue; // manifest.json / durum.json / .yari dokunulmaz
+        }
+        let gecerli = m.mods.iter().any(|e| e.file == ad);
+        if gecerli {
+            continue;
+        }
+        let boyut = girdi.metadata().map(|md| md.len()).unwrap_or(0);
+        match fs::remove_file(girdi.path()) {
+            Ok(()) => {
+                silinen += 1;
+                silinen_bayt += boyut;
+                core::yikim_log(format!("sicak: eski sürüm silindi — {ad}"));
+            }
+            Err(h) => core::yikim_log(format!("sicak: {ad} silinemedi — {h}")),
+        }
+    }
+    if silinen > 0 {
+        core::yikim_log(format!(
+            "sicak: {} eski jar temizlendi ({:.1} MB boşaltıldı)",
+            silinen,
+            silinen_bayt as f64 / 1_048_576.0
+        ));
+    }
+}
+
+// ---------------------------------------------------------------------------
 // kurulum seçimi — gömülü olandan daha yeni bir sıcak jar indirilmişse onu seç
 // ---------------------------------------------------------------------------
 
@@ -264,6 +308,11 @@ pub async fn yazi_senkonize(handle: tauri::AppHandle) -> Result<(), String> {
             core::yikim_log(format!("sicak: {} indirildi (sha doğrulandı)", e.file));
         }
     }
+
+    // ESKİ SÜRÜMLERİ TEMİZLE: her sürüm kendi jar'ını indirdiği için klasör
+    // yığın yığın büyüyordu (kullanıcının diskinde üst üste gereksiz dosya).
+    // Manifestte ARTIK OLMAYAN jar'ları sil.
+    temizlenmis_eski_jarlar(&m);
 
     // Durumu kaydet: son okuma zamanı + çekilen sürüm haritası (teşhis için).
     let mut d = Durum {

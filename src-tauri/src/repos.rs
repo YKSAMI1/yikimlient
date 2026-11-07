@@ -406,7 +406,7 @@ pub async fn resolve_mod_icon_urls(filenames: &[String]) -> std::collections::Ha
 // ---------- Modrinth ----------
 
 /// API JSON çağrısı — 15 sn toplam timeout ile (spinner sonsuz dönmesin diye).
-async fn api_json_req(req: reqwest::RequestBuilder) -> Result<serde_json::Value, String> {
+pub(crate) async fn api_json_req(req: reqwest::RequestBuilder) -> Result<serde_json::Value, String> {
     match tokio::time::timeout(std::time::Duration::from_secs(15), req.send()).await {
         Err(_) => Err("zaman aşımı (15 sn) — internet bağlantını kontrol et".into()),
         Ok(Err(e)) => Err(e.to_string()),

@@ -189,6 +189,9 @@ pub fn logoyu_koy(pack: &Path, inst_dir: &Path) -> Option<String> {
 
 /// Dışa aktarma seçenekleri — UI onay kutularından gelir.
 /// `mods` HER ZAMAN açıktır: paketin özü modlardır.
+/// `ultra_hafif`: modlar pakete GÖMÜLMEZ — dosyanın SHA-1'i Modrinth'teki
+///   sürüme eşleştirilip indirme bağlantısı manifest'e yazılır (mrpack gibi:
+///   paket birkaç MB olur). Eşleşmeyen mod için "tam" moda düşülür.
 #[derive(Debug, Clone)]
 pub struct ExportSecenek {
     pub mods: bool,
@@ -197,6 +200,7 @@ pub struct ExportSecenek {
     pub resourcepacks: bool,
     pub shaderpacks: bool,
     pub options: bool,
+    pub ultra_hafif: bool,
 }
 
 impl Default for ExportSecenek {
@@ -208,6 +212,7 @@ impl Default for ExportSecenek {
             resourcepacks: false,
             shaderpacks: false,
             options: false,
+            ultra_hafif: false,
         }
     }
 }
@@ -229,7 +234,7 @@ fn logo_png() -> Option<Vec<u8>> {
 /// Kurulum dizinindeki içeriği `.yikimpack` olarak yaz.
 /// Dönüş: oluşturulan dosyanın yolu.
 /// `on_progress(dosya_sayaci, toplam)` ile canlı adım verilebilir.
-pub fn yaz<F: FnMut(usize, usize, &str)>(
+pub async fn yaz<F: FnMut(usize, usize, &str)>(
     inst_dir: &Path,
     info: PaketBilgi,
     secenek: &ExportSecenek,
@@ -309,6 +314,94 @@ pub fn yaz<F: FnMut(usize, usize, &str)>(
         return Err("pakete eklenecek dosya yok — kurulumda mod klasörü boş".into());
     }
 
+    // ---- KÜÇÜK PAKET (ultra_hafif) ----
+    // Modların SHA-1'i Modrinth'teki sürüme eşleştirilip pakete BAYT olarak
+    // değil, indirme BAĞLANTISI olarak yazılır — mrpack/CurseForge gibi:
+    // 300 MB'lık paket birkaç MB'a düşer. Eşleşmeyen mod (yerel/tepki modu)
+    // güvenlik ağı olarak pakete gömülür.
+    let mut baglanti_manifest: Vec<serde_json::Value> = Vec::new();
+    let mut saatlik: Vec<(String, PathBuf)> = Vec::new();
+    if secenek.ultra_hafif {
+        use sha1::{Digest, Sha1};
+        let mod_oneki = "mods/";
+        let mut hashler: Vec<String> = Vec::new();
+        let mut gecici: Vec<(String, PathBuf, String)> = Vec::new(); // (iç yol, disk yolu, sha1)
+        for (ic_yol, dis_yol) in &eklenecek {
+            let Ok(bayt) = std::fs::read(dis_yol) else {
+                continue;
+            };
+            let mut h = Sha1::new();
+            h.update(&bayt);
+            let sha1 = hex::encode(h.finalize());
+            hashler.push(sha1.clone());
+            gecici.push((ic_yol.clone(), dis_yol.clone(), sha1));
+        }
+        // 200'lik gruplar: Modrinth hakkı ve zaman aşımı yoktur
+        let mut eslesme: std::collections::HashMap<String, (String, String)> =
+            std::collections::HashMap::new();
+        for parca in hashler.chunks(200) {
+            let govde = serde_json::json!({
+                "hashes": parca,
+                "algorithm": "sha1",
+                "loaders": ["fabric", "neoforge", "forge", "quilt"],
+            });
+            if let Ok(yanit) = crate::repos::api_json_req(
+                crate::core::http_client()
+                    .post("https://api.modrinth.com/v2/version_files")
+                    .json(&govde),
+            )
+            .await
+            {
+                if let Some(harita) = yanit.as_object() {
+                    for (sha, sürüm) in harita {
+                        let dosya = sürüm
+                            .get("files")
+                            .and_then(|f| f.as_array())
+                            .and_then(|a| {
+                                a.iter()
+                                    .find(|f| {
+                                        f.get("primary").and_then(|p| p.as_bool()).unwrap_or(false)
+                                    })
+                                    .or_else(|| a.first())
+                                    .cloned()
+                            });
+                        if let Some(d) = dosya {
+                            if let (Some(url), Some(fname)) = (
+                                d.get("url").and_then(|v| v.as_str()),
+                                d.get("filename").and_then(|v| v.as_str()),
+                            ) {
+                                eslesme.insert(sha.clone(), (url.to_string(), fname.to_string()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (ic_yol, dis_yol, sha1) in gecici {
+            if let Some((url, _fname)) = eslesme.get(&sha1) {
+                // bağlantı olarak manifeste yaz — pakete hiç girmiyor
+                baglanti_manifest.push(serde_json::json!({
+                    "yol": ic_yol,
+                    "sha1": sha1,
+                    "url": url,
+                    "kaynak": "modrinth",
+                }));
+            } else {
+                // eşleşmedi → tam moda düş
+                saatlik.push((ic_yol, dis_yol));
+            }
+        }
+        // ayarlar/dünyalar/dokular hep gerçek dosya olarak gider (küçüktür)
+        for (ic_yol, dis_yol) in &eklenecek {
+            if ic_yol.starts_with(mod_oneki) {
+                continue;
+            }
+            saatlik.push((ic_yol.clone(), dis_yol.clone()));
+        }
+    } else {
+        saatlik = eklenecek.clone();
+    }
+
     // manifest: paketin sözlü anlatımı
     let mut includes: Vec<String> = vec!["mods".into()];
     if secenek.config {
@@ -338,6 +431,9 @@ pub fn yaz<F: FnMut(usize, usize, &str)>(
         "author": info.author,
         "includes": includes,
         "fileCount": toplam,
+        // küçük pakette indirilecek modların listesi (yol/url/sha1).
+        // tam pakette boş dizi — her şey paketin içinde.
+        "indirilecekler": baglanti_manifest,
     });
     let manifest_metni =
         serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;

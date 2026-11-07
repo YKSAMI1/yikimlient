@@ -2642,6 +2642,10 @@ pub struct ExportSecenekJson {
     pub shaderpacks: bool,
     #[serde(default)]
     pub options: bool,
+    /// Küçük paket: modlar gömülmez, Modrinth SHA-1 eşleşmesinden indirme
+    /// bağlantısı yazılır (birkaç MB — mrpack/CurseForge gibi).
+    #[serde(default)]
+    pub ultraHafif: bool,
 }
 
 fn v_true() -> bool {
@@ -2662,6 +2666,7 @@ pub async fn cmd_export_yikimpack(
         resourcepacks: false,
         shaderpacks: false,
         options: false,
+        ultraHafif: false,
     });
     let secenek = crate::yikimpack::ExportSecenek {
         mods: true, // paketin özü: her zaman
@@ -2670,6 +2675,7 @@ pub async fn cmd_export_yikimpack(
         resourcepacks: s.resourcepacks,
         shaderpacks: s.shaderpacks,
         options: s.options,
+        ultra_hafif: s.ultraHafif,
     };
     // hedef: Masaüstü (bulunamazsa app_dir)
     let hedef = dirs::desktop_dir()
@@ -2696,7 +2702,8 @@ pub async fn cmd_export_yikimpack(
             toplam as u32,
             &format!("{n} / {toplam} dosya paketleniyor"),
         );
-    })?;
+    })
+    .await?;
     let _ = pack_adim(&app, ADIM_OVERRIDE, "bitti", 1, 1, "paket oluşturuldu");
     let _ = pack_adim(
         &app,
@@ -2796,6 +2803,9 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
         profil_ekstra.push(("renderDistance", vd.to_string()));
     }
     crate::game_options::ensure_profile_with(&inst.dir(), &profil_ekstra);
+    // FPS teşhisi: kare sınırlayıcı gerçek değerleri log'a yaz (kullanıcı
+    // "FPS tavanda kaldı" dediğinde nereden bakılacağını bilmek için).
+    crate::game_options::fps_teshis_yaz(&inst.dir(), &inst.mc_version);
     // Sunucu listesi: YIKIMDARA (yikimdara.com.tr) her kurulumda hazır dursun.
     crate::server_list::ensure_default(&inst.dir());
 

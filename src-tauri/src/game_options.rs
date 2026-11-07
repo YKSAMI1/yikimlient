@@ -83,6 +83,41 @@ fn write_plan(game_dir: &Path, plan: Vec<(&str, String)>) {
     }
 }
 
+/// Oyun içi kare sınırlayıcı durumunu LOG'a yaz (teşhis).
+///
+/// Neden: kullanıcılar "100 FPS geçemiyorum" diyor; options.txt'de her şey
+/// doğru yazılıyor (maxFps:260 = Sınırsız, vsync kapalı, AFK sınırlayıcı
+/// "minimized"). Yine de bir tavanda kalan varsa sebebi options.txt'te değil,
+/// genelde şu üçünden biri: (1) tam ekran değil pencere/borderless modda DWM
+/// monitör yenileme oranına kilitliyor, (2) oyun penceresi odakta değil,
+/// (3) gerçek yük. Bu fonksiyon oyunun açılış anındaki GERÇEK değerleri yazar;
+/// kullanıcı bir log gönderince tavanın nereden geldiğini okuruz.
+pub fn fps_teshis_yaz(game_dir: &Path, mc: &str) {
+    let yol = game_dir.join("options.txt");
+    let metin = std::fs::read_to_string(&yol).unwrap_or_default();
+    let al = |anahtar: &str| -> Option<String> {
+        metin
+            .lines()
+            .find(|l| l.split(':').next().map(str::trim) == Some(anahtar))
+            .and_then(|l| l.split_once(':'))
+            .map(|(_, v)| v.trim().trim_matches('"').to_string())
+    };
+    if metin.is_empty() {
+        yikim_log("fps teşhis: options.txt yok (oyun ilk açılışta kendisi üretecek)".into());
+        return;
+    }
+    yikim_log(format!(
+        "fps teşhis [MC {mc}]: maxFps={:?} (260=tavan yok) vsync={:?} afkSiniri={:?} tamEkran={:?} guiScale={:?} parcacik={:?} gorus={:?} — pencere/borderless kullanıyorsa DWM tavanı monitör oranı verir, tam ekran daha yüksek FPS'a izin verir",
+        al("maxFps"),
+        al("enableVsync"),
+        al("inactivityFpsLimit"),
+        al("fullscreen"),
+        al("guiScale"),
+        al("particles"),
+        al("renderDistance"),
+    ));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

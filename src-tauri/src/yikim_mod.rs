@@ -180,6 +180,12 @@ pub fn ensure_installed(app: &tauri::AppHandle, inst: &Instance) -> Result<bool,
 /// Çekirdek kurulum: kaynak jar dizini + kurulum → mods klasörüne kopya.
 /// AppHandle'sız; birim testleri de burayı kullanır.
 pub fn install_from(embedded_dir: &Path, inst: &Instance) -> Result<bool, String> {
+    // ROZET: kurulumun kendi rozeti yoksa ana kopyadan doğrula.
+    // (Eskiden rozet yalnızca çizim anındaki kurulumlara yazılıyordu →
+    // sonradan açılan mod paketinde "kendi rozetim görünmüyor" sorunu.)
+    if crate::rozet::kuruluma_dogrula(&inst.dir()) {
+        crate::core::yikim_log(format!("rozet: '{}' kurulumuna kopyalandı", inst.name));
+    }
     if inst.mod_loader != "fabric" {
         return Ok(false); // mod yalnızca Fabric
     }

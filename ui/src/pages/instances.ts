@@ -1,5 +1,6 @@
 import { el, fmtBytes, fmtDuration, fileSrc, icon, invoke, lamp, launch, listen, nav, navigate, openLoginModal, state, toast } from "../main";
 import { packKartBaslat, packKartHata, packKartTamam } from "../pack-kur";
+import { bildirimEkle } from "../bildirim";
 import { enterRows } from "../motion";
 import { loaderIcon } from "../loader-icons";
 
@@ -152,10 +153,7 @@ function renderGrid(root: HTMLElement): void {
   }
   root.querySelector("#btn-new")?.addEventListener("click", () => openCreateWizard());
   root.querySelector("#btn-import")?.addEventListener("click", () => importPackFile().catch(() => {}));
-  root.querySelector("#btn-export")?.addEventListener("click", () => {
-    const hedef = state.instances.find((i) => i.id === selectedId) || state.instances[0];
-    if (hedef) exportPackFile(hedef.id);
-  });
+  root.querySelector("#btn-export")?.addEventListener("click", () => exportPickInstance());
 
   // Popüler mod paketleri — tıklayınca Keşfet'te o paket açılır
   loadPopularPacks();
@@ -181,16 +179,67 @@ async function importPackFile(): Promise<void> {
   }
 }
 
+/// Hangi kurulumun paylaşılacağını SORAR (varsayılan olarak seçili kurulum),
+/// sonra içerik kutularını gösterir. Artık "en üstteki paket" otomatik seçilmez.
+async function exportPickInstance(): Promise<void> {
+  const { openModal, toast } = await import("../main");
+  const { root, close } = openModal(`
+    <h2>Paketi Paylaş</h2>
+    <div class="sub">Hangi kurulumu paylaşmak istiyorsun?</div>
+    <div class="share-picker">
+      ${state.instances.map((i) => `
+        <button class="share-pick ${i.id === (selectedId || state.instances[0]?.id) ? "sel" : ""}" data-id="${i.id}">
+          <span class="sp-ik">${i.mod_loader === "fabric" ? "🧵" : i.mod_loader === "neoforge" ? "⚙️" : "📦"}</span>
+          <span class="sp-ad">${i.name}</span>
+          <span class="sp-meta">${i.mod_loader} ${i.mc_version}</span>
+        </button>`).join("")}
+    </div>
+    <div style="display:flex; gap:8px; margin-top:16px">
+      <button class="btn primary" id="sh-devam">Devam</button>
+      <button class="btn ghost" id="sh-no">İptal</button>
+    </div>
+  `);
+  root.querySelector("#sh-no")?.addEventListener("click", close);
+  let secilen = selectedId || state.instances[0]?.id || "";
+  root.querySelectorAll(".share-pick").forEach((b) => {
+    b.addEventListener("click", () => {
+      root.querySelectorAll(".share-pick").forEach((x) => x.classList.remove("sel"));
+      b.classList.add("sel");
+      secilen = (b as HTMLElement).dataset.id!;
+    });
+  });
+  root.querySelector("#sh-devam")?.addEventListener("click", () => {
+    const hedef = state.instances.find((i) => i.id === secilen);
+    if (!hedef) { toast("Bir kurulum seç", "err"); return; }
+    close();
+    exportPackFile(hedef.id, hedef.name);
+  });
+}
+
 /// Kurulumu `.yikimpack` olarak paylaş.
 /// Modlar HER ZAMAN gider; dünyalar/dokular/ayarlar kullanıcı onaylı ekler.
-async function exportPackFile(instanceId: string): Promise<void> {
+/// `ultraHafif` (varsayılan): modlar paketİNE gömülmez, sürüm numarası
+ /// Modrinth'ten çözülüp indirme bağlantısı yazılır — paket birkaç MB olur.
+/// `tam`: her mod bayt olarak gömülür (modlar dağıtım sitesinden kalkmışsa
+/// kurulum yine de çalışsın diye). İki mod aynı ekranda seçilir.
+async function exportPackFile(instanceId: string, instAd?: string): Promise<void> {
   const inst = state.instances.find((i) => i.id === instanceId);
   if (!inst) return;
   const { openModal, toast } = await import("../main");
   const { root, close } = openModal(`
     <h2>Paketi Paylaş</h2>
-    <div class="sub"><b>${inst.name}</b> — .yikimpack dosyası oluştur. Bu dosyaya çift tıklayan
+    <div class="sub"><b>${instAd || inst.name}</b> — .yikimpack dosyası oluştur. Bu dosyaya çift tıklayan
     herkes YIKIMLient ile kurulumu yapabilir.</div>
+    <div class="share-modlar">
+      <button class="share-mod sel" data-ultra="1">
+        <b>Küçük paket</b>
+        <em>Modlar gömülmez, Modrinth bağlantısı yazılır — birkaç MB. (Modrinth'e erişim şart.)</em>
+      </button>
+      <button class="share-mod" data-ultra="0">
+        <b>Tam paket</b>
+        <em>Tüm mod dosyaları gömülür — büyük olur ama bağlantı önemli değil.</em>
+      </button>
+    </div>
     <div class="share-kutular">
       <label class="share-kutu kapali"><input type="checkbox" checked disabled /><span>Modlar<em>her zaman</em></span></label>
       <label class="share-kutu"><input type="checkbox" id="sh-config" checked /><span>Yapılandırma dosyaları<em>config/</em></span></label>
@@ -199,12 +248,20 @@ async function exportPackFile(instanceId: string): Promise<void> {
       <label class="share-kutu"><input type="checkbox" id="sh-sp" /><span>Shader paketleri<em>shaderpacks/</em></span></label>
       <label class="share-kutu"><input type="checkbox" id="sh-opts" /><span>Oyun ayarları<em>options.txt, sunucu listesi</em></span></label>
     </div>
-    <p class="share-not">Masaüstüne kaydedilir. Modlar zaten sıkıştırıldığı için boyut minimumda tutulur.</p>
+    <p class="share-not">Masaüstüne kaydedilir. "Küçük paket"te sadece ayarlar/dünyalar dosya olarak gider.</p>
     <div style="display:flex; gap:8px; margin-top:16px">
       <button class="btn primary" id="sh-go">Oluştur</button>
       <button class="btn ghost" id="sh-no">İptal</button>
     </div>
   `);
+  let ultra = true;
+  root.querySelectorAll(".share-mod").forEach((b) => {
+    b.addEventListener("click", () => {
+      root.querySelectorAll(".share-mod").forEach((x) => x.classList.remove("sel"));
+      b.classList.add("sel");
+      ultra = (b as HTMLElement).dataset.ultra === "1";
+    });
+  });
   root.querySelector("#sh-no")?.addEventListener("click", close);
   root.querySelector("#sh-go")?.addEventListener("click", async () => {
     const secenek = {
@@ -213,15 +270,18 @@ async function exportPackFile(instanceId: string): Promise<void> {
       resourcepacks: (root.querySelector("#sh-rp") as HTMLInputElement).checked,
       shaderpacks: (root.querySelector("#sh-sp") as HTMLInputElement).checked,
       options: (root.querySelector("#sh-opts") as HTMLInputElement).checked,
+      ultraHafif: ultra,
     };
     close();
-    packKartBaslat(`${inst.name} paketleniyor`);
+    packKartBaslat(`${instAd || inst.name} paketleniyor`);
     try {
       const yol = await invoke("cmd_export_yikimpack", { instanceId, secenek }) as string;
       packKartTamam();
+      bildirimEkle("kurulum", "Paylaşım paketi hazır", `${instAd || inst.name}.yikimpack — ${yol}`);
       toast(`Paket hazır: ${yol}`, "ok");
     } catch (e) {
       packKartHata(String(e));
+      bildirimEkle("sistem", "Paket oluşturulamadı", String(e));
     }
   });
 }
