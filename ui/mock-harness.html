@@ -366,7 +366,14 @@
             categories: i % 2 ? ["optimization", "fabric"] : ["utility"],
           };
         });
-        if (cmd === "cmd_repos_popular") return Promise.resolve(liste.slice(0, 5));
+        if (cmd === "cmd_repos_popular") {
+          var pz = Math.max(0, Number(args.page) || 0);
+          var buyuk = [];
+          for (var t = 0; t < 6; t++) buyuk = buyuk.concat(liste.map(function (x, i) {
+            return Object.assign({}, x, { id: "p-" + (t * 6 + i) });
+          }));
+          return Promise.resolve(buyuk.slice(pz * 24, pz * 24 + 24));
+        }
         return Promise.resolve({ results: liste, curseforge: false });
       }
       if (cmd === "cmd_repos_project") {

@@ -286,6 +286,19 @@ async fn modrinth_search(
     offset: usize,
     limit: usize,
 ) -> Result<Vec<RepoSearchResult>, String> {
+    modrinth_search_sirali(query, kind, versions, loader, offset, limit, "relevance").await
+}
+
+/// `index`: relevance | downloads | follows | newest | updated
+async fn modrinth_search_sirali(
+    query: &str,
+    kind: &str,
+    versions: &[String],
+    loader: &str,
+    offset: usize,
+    limit: usize,
+    index: &str,
+) -> Result<Vec<RepoSearchResult>, String> {
     let mut facets: Vec<Vec<String>> = vec![vec![format!("project_type:{kind}")]];
     if !loader.is_empty() {
         facets.push(vec![format!("categories:{loader}")]);
@@ -295,9 +308,10 @@ async fn modrinth_search(
     }
     // Modrinth search yalnızca GET destekler (POST 404 döner)
     let url = format!(
-        "https://api.modrinth.com/v2/search?query={}&facets={}&index=relevance&offset={}&limit={}",
+        "https://api.modrinth.com/v2/search?query={}&facets={}&index={}&offset={}&limit={}",
         urlencoding::encode(query),
         urlencoding::encode(&serde_json::to_string(&facets).unwrap_or_default()),
+        index,
         offset,
         limit.min(50),
     );
@@ -522,12 +536,14 @@ pub async fn search_all(
 
 /// Keşfet açılışı: en çok indirilenler (Modrinth'in ana sayfasındaki popüler listesi gibi).
 /// CurseForge popular uçları mirror'da güvenilir olmadığından yalnız Modrinth kullanılır.
-pub async fn popular(kind: &str, loader: &str, limit: usize) -> Result<Vec<RepoSearchResult>, String> {
-    // index=relevance boş sorguda da indirme sırasına yakın döner; sonuçları biz yine sıralarız
-    let mut out = modrinth_search("", kind, &[], loader, 0, limit.min(24)).await?;
-    out.sort_by(|a, b| b.downloads.cmp(&a.downloads));
-    out.truncate(limit.min(12));
-    Ok(out)
+pub async fn popular(
+    kind: &str,
+    loader: &str,
+    offset: usize,
+    limit: usize,
+) -> Result<Vec<RepoSearchResult>, String> {
+    // index=downloads → sunucu tarafında indirme sırası; offset ile sayfa sayfa akar
+    modrinth_search_sirali("", kind, &[], loader, offset, limit.clamp(1, 50), "downloads").await
 }
 
 pub async fn versions_for(

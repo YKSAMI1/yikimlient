@@ -27,13 +27,19 @@ const TUR_AD: Record<string, string> = {
 
 let kind = "mod";
 let lastQuery = "";
-let lastResults: SearchResult[] = [];
-let pageLimit = 40;
-let pageNum = 1;
-let knownMax = 1;
 let lastVersion = "";
 let lastLoader = "";
-let pagerBusy = false;
+
+/* --- Sonsuz akış (v0.7.18): liste yukarıdan aşağı akar, dibe gelince
+   bir sonraki sayfa kendiliğinden eklenir. --- */
+const SAYFA_BOY = 24;
+let akisSayfa: ((offset: number, limit: number) => Promise<SearchResult[]>) | null = null;
+let akisOfset = 0;
+let akisBusy = false;
+let akisBitti = false;
+let akisGoz: IntersectionObserver | null = null;
+let akisId = 0;
+let akisDinleyici = false;
 
 /// Açık proje (Modrinth'teki gibi tam sayfa). null → liste görünümü.
 let acikProje: SearchResult | null = null;
@@ -105,18 +111,10 @@ function buildList(_preset = false): void {
         <span class="xp-hint" id="exp-hint">Sonuçlar iki kaynaktan birleştirilir.</span>
       </div>
 
-      <div class="xp-grid" id="exp-results">
-        <div class="xp-empty">
-          <div class="xp-empty-ic">${icon("compass")}</div>
-          <h3>Ne arıyorsun?</h3>
-          <p>“sodium”, “essential”, “pvp pack” gibi bir şey yaz ya da aşağıdaki popülerlere göz at.</p>
-        </div>
-      </div>
+      <div class="xp-section-head xp-flow-head anim-fade-up"><h2 id="exp-baslik">En çok indirilenler</h2></div>
 
-      <div class="xp-pop" id="exp-popular">
-        <div class="xp-section-head"><h2>En çok indirilenler</h2></div>
-        <div class="xp-pop-strip" id="popular-strip"><div class="spinner" style="margin:26px auto"></div></div>
-      </div>
+      <div class="xp-grid" id="exp-results"></div>
+      <div class="xp-son" id="exp-son"><div class="spinner"></div></div>
     </div>
   `;
 
@@ -126,7 +124,7 @@ function buildList(_preset = false): void {
       root.querySelectorAll(".xp-tab").forEach((x) => x.classList.remove("sel"));
       b.classList.add("sel");
       if (lastQuery) doSearch(lastQuery);
-      loadPopular();
+      else populerBaslat();
     })
   );
 
@@ -138,138 +136,154 @@ function buildList(_preset = false): void {
   });
   q.addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(q.value.trim()); });
   root.querySelector("#exp-go")?.addEventListener("click", () => doSearch(q.value.trim()));
-  root.querySelector("#exp-ver")?.addEventListener("change", () => { if (lastQuery) doSearch(lastQuery); });
-  root.querySelector("#exp-loader")?.addEventListener("change", () => { if (lastQuery) doSearch(lastQuery); });
+  root.querySelector("#exp-ver")?.addEventListener("change", () => {
+    if (lastQuery) doSearch(lastQuery); else populerBaslat();
+  });
+  root.querySelector("#exp-loader")?.addEventListener("change", () => {
+    if (lastQuery) doSearch(lastQuery); else populerBaslat();
+  });
   root.addEventListener("click", (e) => {
     const a = (e.target as HTMLElement).closest("a[data-ext]") as HTMLAnchorElement | null;
     if (a) { e.preventDefault(); openExternal(a.href); }
   });
 
-  loadPopular();
+  akisGoz?.disconnect();
+  akisGoz = null;
+  if (!akisDinleyici) {
+    // IntersectionObserver'a ek olarak kaydırma yedeği (bazı ortamlarda IO
+    // bildirimi gecikebiliyor; kullanıcı dibe gelince mutlaka tetiklensin).
+    document.addEventListener("scroll", akisKaydirma, true);
+    window.addEventListener("resize", akisKaydirma);
+    akisDinleyici = true;
+  }
+  const son = root.querySelector("#exp-son");
+  if (son && "IntersectionObserver" in window) {
+    akisGoz = new IntersectionObserver(
+      (girisler) => { if (girisler.some((g) => g.isIntersecting)) void akisEkle(); },
+      { root: null, rootMargin: "600px 0px", threshold: 0 }
+    );
+    akisGoz.observe(son);
+  }
+  populerBaslat();
 }
 
-async function loadPopular(): Promise<void> {
-  const strip = kok?.querySelector("#popular-strip") as HTMLElement | null;
-  if (!strip) return;
+/* ---------- Sonsuz akış ---------- */
+
+function akisBasliklar(): HTMLElement | null {
+  return kok?.querySelector("#exp-baslik") as HTMLElement | null;
+}
+
+function akisDurum(yazi: string | null): void {
+  const son = kok?.querySelector("#exp-son") as HTMLElement | null;
+  if (!son) return;
+  son.innerHTML = yazi === null ? `<div class="spinner"></div>` : `<span>${yazi}</span>`;
+  son.classList.toggle("bos", yazi !== null);
+}
+
+/// v0.7.18 — tek akış: popüler liste + arama aynı mekanizmayı kullanır.
+function akisBaslat(
+  saglayici: (offset: number, limit: number) => Promise<SearchResult[]>,
+  baslik: string
+): void {
+  akisId++;
+  akisSayfa = saglayici;
+  akisOfset = 0;
+  akisBusy = false;
+  akisBitti = false;
+  const grid = kok?.querySelector("#exp-results") as HTMLElement | null;
+  if (grid) grid.innerHTML = "";
+  const h = akisBasliklar();
+  if (h) h.textContent = baslik;
+  akisDurum(null);
+  void akisEkle();
+}
+
+function akisKaydirma(): void {
+  if (!akisSayfa || akisBitti || akisBusy) return;
+  const son = kok?.querySelector("#exp-son") as HTMLElement | null;
+  if (!son) return;
+  const r = son.getBoundingClientRect();
+  if (r.top < window.innerHeight + 500) void akisEkle();
+}
+
+async function akisEkle(): Promise<void> {
+  if (akisBusy || akisBitti || !akisSayfa) return;
+  const benim = akisId;
+  akisBusy = true;
+  const grid = kok?.querySelector("#exp-results") as HTMLElement | null;
+  akisDurum(null);
   try {
-    const popular: SearchResult[] = await invoke("cmd_repos_popular", { kind, loader: "" });
-    strip.innerHTML = "";
-    for (const r of popular) {
-      const card = el(`
-        <button class="xp-pop-card">
-          ${r.icon_url
-            ? `<img src="${r.icon_url}" loading="lazy" draggable="false" onerror="window.__iconFallback && window.__iconFallback(this,'xp-pop-ic ph','puzzle')" />`
-            : `<span class="xp-pop-ic ph">${icon("puzzle")}</span>`}
-          <span class="xp-pop-t">${r.title}</span>
-          <span class="xp-pop-m">${icon("dl")} ${fmtDownloads(r.downloads)}</span>
-        </button>
-      `);
-      card.addEventListener("click", () => openProject(r));
-      strip.appendChild(card);
+    const parca = await akisSayfa(akisOfset, SAYFA_BOY);
+    if (benim !== akisId) return;
+    if (!parca.length) {
+      akisBitti = true;
+      akisDurum(akisOfset === 0 ? "Sonuç yok." : "Hepsi bu kadar.");
+      return;
     }
-    if (!popular.length) strip.innerHTML = `<p class="xp-fail">Popüler listesi boş.</p>`;
-  } catch {
-    strip.innerHTML = `<p class="xp-fail">Popüler listesi yüklenemedi.</p>`;
+    const mevcut = new Set(
+      Array.from(grid?.querySelectorAll<HTMLElement>(".xp-card") || []).map(
+        (c) => c.dataset.id || ""
+      )
+    );
+    let eklenen = 0;
+    for (const r of parca) {
+      if (mevcut.has(`${r.source}:${r.id}`)) continue;
+      grid?.appendChild(resultCard(r));
+      eklenen++;
+    }
+    akisOfset += parca.length;
+    if (parca.length < SAYFA_BOY) akisBitti = true;
+    akisDurum(akisBitti ? "Hepsi bu kadar." : null);
+    // Sentinör hâlâ ekranda ise (kısa içerik) bir sayfa daha çek.
+    setTimeout(() => {
+      const son = kok?.querySelector("#exp-son") as HTMLElement | null;
+      if (!son || eklenen === 0) return;
+      const r = son.getBoundingClientRect();
+      if (!akisBitti && r.top < window.innerHeight + 600) void akisEkle();
+    }, 60);
+  } catch (e) {
+    if (benim !== akisId) return;
+    akisBitti = true;
+    akisDurum(`Yüklenemedi: ${String(e)}`);
+  } finally {
+    if (benim === akisId) akisBusy = false;
   }
 }
 
+function populerBaslat(): void {
+  lastQuery = "";
+  const ldr = (kok?.querySelector("#exp-loader") as HTMLSelectElement | null)?.value || "";
+  lastLoader = ["resourcepack", "shader", "world", "datapack"].includes(kind) ? "" : ldr;
+  akisBaslat(async (offset, limit) => {
+    const page = Math.floor(offset / SAYFA_BOY);
+    const r: SearchResult[] = await invoke("cmd_repos_popular", { kind, loader: lastLoader, page });
+    return r.slice(0, limit);
+  }, "En çok indirilenler");
+}
+
+/// Arama da aynı sonsuz akışa düşer: sorgu değişince akış sıfırlanır.
 async function doSearch(query: string): Promise<void> {
   const grid = kok?.querySelector("#exp-results") as HTMLElement | null;
   if (!grid) return;
-  if (!query) {
-    lastQuery = "";
-    grid.innerHTML = `
-      <div class="xp-empty">
-        <div class="xp-empty-ic">${icon("search")}</div>
-        <h3>Bir şeyler ara</h3>
-        <p>Aramak istediğin modun adını yaz.</p>
-      </div>`;
-    return;
-  }
+  if (!query) { populerBaslat(); return; }
   lastQuery = query;
-  grid.innerHTML = `<div class="spinner" style="grid-column:1/-1; margin:40px auto"></div>`;
   const verSel = kok!.querySelector("#exp-ver") as HTMLSelectElement;
   const loaderSel = kok!.querySelector("#exp-loader") as HTMLSelectElement;
   lastVersion = verSel?.value || "";
   const rawLoader = loaderSel?.value || "";
   const isContent = ["resourcepack", "shader", "world", "datapack"].includes(kind);
   lastLoader = isContent ? "" : rawLoader;
-  pageNum = 1;
-  try {
+  akisBaslat(async (offset, limit) => {
     const resp = await invoke("cmd_repos_search", {
-      query, kind, versions: lastVersion ? [lastVersion] : [], loader: lastLoader, offset: 0, limit: pageLimit,
+      query, kind, versions: lastVersion ? [lastVersion] : [], loader: lastLoader, offset, limit,
     });
-    lastResults = resp.results;
-    knownMax = lastResults.length >= pageLimit ? 2 : 1;
-    grid.innerHTML = "";
-    if (!lastResults.length) {
-      grid.innerHTML = `<div class="xp-empty"><div class="xp-empty-ic">${icon("search")}</div><h3>Sonuç yok</h3><p>Farklı bir kelime ya da filtre dene.</p></div>`;
-      return;
-    }
-    for (const r of lastResults) grid.appendChild(resultCard(r));
-    renderPager();
-  } catch (e) {
-    grid.innerHTML = `<div class="xp-empty"><h3>Arama hatası</h3><p>${String(e)}</p></div>`;
-  }
-}
-
-function renderPager(): void {
-  const grid = kok!.querySelector("#exp-results") as HTMLElement;
-  grid.querySelector("#exp-pager")?.remove();
-  const dolu = lastResults.length >= pageLimit;
-  if (pageNum === 1 && !dolu) return;
-  const btns = [`<button class="pg-btn" data-pg="prev" title="Önceki" ${pageNum <= 1 ? "disabled" : ""}>‹</button>`];
-  for (let i = 1; i <= knownMax; i++) {
-    btns.push(`<button class="pg-btn ${i === pageNum ? "cur" : ""}" data-pg="${i}">${i}</button>`);
-  }
-  btns.push(`<button class="pg-btn" data-pg="next" title="Sonraki" ${dolu ? "" : "disabled"}>›</button>`);
-  const bar = el(`<div class="exp-pager" id="exp-pager" style="grid-column:1/-1">${btns.join("")}</div>`);
-  bar.addEventListener("click", (e) => {
-    const target = (e.target as HTMLElement).closest(".pg-btn") as HTMLButtonElement | null;
-    if (!target || target.disabled) return;
-    const v = target.dataset.pg!;
-    const hedef = v === "prev" ? pageNum - 1 : v === "next" ? pageNum + 1 : parseInt(v, 10);
-    if (!Number.isFinite(hedef) || hedef < 1 || hedef === pageNum) return;
-    void loadPage(hedef);
-  });
-  grid.appendChild(bar);
-}
-
-async function loadPage(p: number): Promise<void> {
-  if (pagerBusy) return;
-  pagerBusy = true;
-  const grid = kok!.querySelector("#exp-results") as HTMLElement;
-  grid.innerHTML = `<div class="spinner" style="grid-column:1/-1; margin:40px auto"></div>`;
-  try {
-    const resp = await invoke("cmd_repos_search", {
-      query: lastQuery, kind, versions: lastVersion ? [lastVersion] : [], loader: lastLoader,
-      offset: (p - 1) * pageLimit, limit: pageLimit,
-    });
-    const fresh: SearchResult[] = resp.results;
-    if (!fresh.length) {
-      knownMax = Math.min(knownMax, Math.max(1, p - 1));
-      grid.innerHTML = "";
-      for (const r of lastResults) grid.appendChild(resultCard(r));
-      renderPager();
-      return;
-    }
-    lastResults = fresh;
-    pageNum = p;
-    knownMax = Math.max(knownMax, fresh.length >= pageLimit ? p + 1 : p);
-    grid.innerHTML = "";
-    for (const r of fresh) grid.appendChild(resultCard(r));
-    renderPager();
-    grid.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (e) {
-    grid.innerHTML = `<div class="xp-empty"><h3>Sayfa yüklenemedi</h3><p>${String(e)}</p></div>`;
-  } finally {
-    pagerBusy = false;
-  }
+    return resp.results as SearchResult[];
+  }, `Arama: ${query}`);
 }
 
 function resultCard(r: SearchResult): HTMLElement {
   const card = el(`
-    <button class="xp-card">
+    <button class="xp-card" data-id="${r.source}:${r.id}">
       <span class="xp-card-icon">${r.icon_url
         ? `<img src="${r.icon_url}" loading="lazy" draggable="false" onerror="window.__iconFallback && window.__iconFallback(this,'xp-card-icon ph','puzzle')" />`
         : icon(r.kind === "modpack" ? "box" : "puzzle")}</span>

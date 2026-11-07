@@ -1997,10 +1997,15 @@ pub async fn cmd_repos_search(
     Ok(serde_json::json!({ "results": results, "curseforge": cf }))
 }
 
-/// Keşfet açılışı: en çok indirilen mod/paketler.
+/// Keşfet açılışı: en çok indirilen mod/paketler (sayfa sayfa).
 #[tauri::command]
-pub async fn cmd_repos_popular(kind: String, loader: String) -> Result<Vec<repos::RepoSearchResult>, String> {
-    repos::popular(&kind, &loader, 12).await
+pub async fn cmd_repos_popular(
+    kind: String,
+    loader: String,
+    page: Option<usize>,
+) -> Result<Vec<repos::RepoSearchResult>, String> {
+    let page = page.unwrap_or(0);
+    repos::popular(&kind, &loader, page * 24, 24).await
 }
 
 /// Keşfet proje sayfası: açıklama/gövde, galeri, bağlantılar, yazar.
