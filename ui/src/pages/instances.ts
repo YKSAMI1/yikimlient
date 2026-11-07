@@ -1,4 +1,5 @@
 import { el, fmtBytes, fmtDuration, fileSrc, icon, invoke, lamp, launch, listen, nav, navigate, openLoginModal, state, toast } from "../main";
+import { packKartBaslat, packKartHata, packKartTamam } from "../pack-kur";
 import { enterRows } from "../motion";
 import { loaderIcon } from "../loader-icons";
 
@@ -157,17 +158,20 @@ function renderGrid(root: HTMLElement): void {
 
 /// Yerel .mrpack / CurseForge .zip paket dosyasını içe aktar.
 /// Dosya seçici Rust tarafında (dialog plugin) açılır; format otomatik algılanır.
+/// Canlı adım kartı (sağ alt): tüm kurulum aşamalarını gösterir.
 async function importPackFile(): Promise<void> {
   const path = await invoke("cmd_pick_pack_file");
   if (!path) return; // kullanıcı iptal etti
-  toast("Paket içe aktarılıyor…", "ok");
+  packKartBaslat("Yerel paket kurulumu");
   try {
     const inst = await invoke("cmd_import_pack_file", { path });
     const { refreshState } = await import("../main");
     await refreshState();
+    packKartTamam();
     toast(`${(inst as any).name || "Paket"} kuruldu!`, "ok");
     navigate("instances");
   } catch (e) {
+    packKartHata(String(e));
     toast(`Paket içe aktarılamadı: ${e}`, "err");
   }
 }

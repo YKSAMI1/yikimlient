@@ -604,11 +604,14 @@ fn rules_allow(rules: &[serde_json::Value]) -> bool {
 
 // ---------- İndirme planı ----------
 
+/// `pack_adim: Some(ADIM_SURUM)` verilirse "pack-step" olayını da yayınlar
+/// (paket kurulumu sonrası sürüm kurulumu adımı canlı görünsün diye).
 pub async fn download_all_for_version(
     vj: &serde_json::Value,
     handle: &tauri::AppHandle,
     percent_base: u8,
     percent_span: u8,
+    pack_adim: Option<u8>,
 ) -> Result<(), String> {
     let vid = vj["id"].as_str().unwrap_or("unknown").to_string();
     let mut jobs: Vec<(String, PathBuf, Option<String>)> = Vec::new();
@@ -706,8 +709,18 @@ pub async fn download_all_for_version(
             };
             let _ = handle2.emit(
                 "launch-progress",
-                &LaunchProgress { stage: "download".into(), percent: pct, detail },
+                &LaunchProgress { stage: "download".into(), percent: pct, detail: detail.clone() },
             );
+            if let Some(adim) = pack_adim {
+                crate::repos::pack_adim(
+                    &handle2,
+                    adim,
+                    if p.done_files >= p.total_files { "bitti" } else { "aktif" },
+                    p.done_files,
+                    p.total_files,
+                    &detail,
+                );
+            }
         },
     )
     .await

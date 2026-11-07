@@ -41,6 +41,110 @@ pub struct RepoFile {
     pub size: u64,
 }
 
+// ---------- Paket kurulum adımları (canlı ilerleme) ----------
+
+/// Paket kurulumunda bir adımın durumu.
+/// UI (sağ alttaki kart) bu olayı dinler ve adım adım gösterir:
+/// 1 paket indiriliyor → 2 paket açılıyor → 3 yapılandırma dosyaları →
+/// 4 modlar → 5 yükleyici → 6 oyun dosyaları (sürüm kurulumu) → 7 YIKIM modu → 8 hazır.
+#[derive(Debug, Clone, Serialize)]
+pub struct PackStep {
+    pub adim: u8,
+    /// "aktif" | "bitti" | "hata" | "atlandi"
+    pub durum: String,
+    pub done: u32,
+    pub total: u32,
+    pub ayrinti: String,
+    /// kümülatif yüzde (0..100)
+    pub percent: u8,
+    pub baslik: String,
+}
+
+pub const ADIM_PAKET: u8 = 1;
+pub const ADIM_ACMA: u8 = 2;
+pub const ADIM_OVERRIDE: u8 = 3;
+pub const ADIM_MODLAR: u8 = 4;
+pub const ADIM_LOADER: u8 = 5;
+pub const ADIM_SURUM: u8 = 6;
+pub const ADIM_MOD: u8 = 7;
+pub const ADIM_HAZIR: u8 = 8;
+
+fn adim_adi(adim: u8) -> &'static str {
+    match adim {
+        ADIM_PAKET => "Paket indiriliyor",
+        ADIM_ACMA => "Paket açılıyor",
+        ADIM_OVERRIDE => "Yapılandırma dosyaları",
+        ADIM_MODLAR => "Modlar indiriliyor",
+        ADIM_LOADER => "Yükleyici kuruluyor",
+        ADIM_SURUM => "Oyun dosyaları (sürüm kurulumu)",
+        ADIM_MOD => "YIKIM modu",
+        ADIM_HAZIR => "Hazır",
+        _ => "Kurulum",
+    }
+}
+
+/// Adımın kümülatif yüzde aralığı (başlangıç, uçluk).
+fn adim_araligi(adim: u8) -> (u8, u8) {
+    match adim {
+        ADIM_PAKET => (0, 8),
+        ADIM_ACMA => (8, 14),
+        ADIM_OVERRIDE => (14, 34),
+        ADIM_MODLAR => (34, 74),
+        ADIM_LOADER => (74, 84),
+        ADIM_SURUM => (84, 96),
+        ADIM_MOD => (96, 98),
+        ADIM_HAZIR => (98, 100),
+        _ => (0, 100),
+    }
+}
+
+/// Tek adım olayı yayınla (hem `pack-step` hem de eski `launch-progress`
+/// dinleyicileri için `modpack` aşaması — eski akış bozulmasın).
+pub fn pack_adim(
+    handle: &tauri::AppHandle,
+    adim: u8,
+    durum: &str,
+    done: u32,
+    total: u32,
+    ayrinti: &str,
+) {
+    use tauri::Emitter;
+    let (bas, ucluk) = adim_araligi(adim);
+    let percent = if total > 0 && done <= total {
+        bas + ((done as f32 / total as f32) * ucluk as f32) as u8
+    } else if durum == "bitti" {
+        bas + ucluk
+    } else {
+        bas
+    };
+    let _ = handle.emit(
+        "pack-step",
+        &PackStep {
+            adim,
+            durum: durum.into(),
+            done,
+            total,
+            ayrinti: ayrinti.into(),
+            percent: percent.min(100),
+            baslik: adim_adi(adim).into(),
+        },
+    );
+    // eski dinleyiciler (launch-progress stage=modpack) canlı kalsın
+    let _ = handle.emit(
+        "launch-progress",
+        &crate::launcher::LaunchProgress {
+            stage: "modpack".into(),
+            percent: percent.min(100),
+            detail: if ayrinti.is_empty() { adim_adi(adim).into() } else { ayrinti.into() },
+        },
+    );
+}
+
+/// MB/s biçimi (insan okur).
+fn hiz_metni(bytes_per_sec: u64) -> String {
+    format!("{:.1} MB/s", bytes_per_sec as f64 / 1_048_576.0)
+}
+
 fn cf_api_key() -> Option<String> {
     if let Ok(k) = std::env::var("CURSEFORGE_API_KEY") {
         if !k.trim().is_empty() {
@@ -1183,7 +1287,6 @@ pub async fn install_modpack(
     version_id: &str,
     inst: &mut crate::instances::Instance,
 ) -> Result<(), String> {
-    use tauri::Emitter;
     // Sürüm kimliği verildiyse MC sürümüne göre süzme YAPMA: paket kendi
     // Minecraft sürümünü/yükleyicisini getirir ve yeni kurulumun varsayılanı
     // (1.21.1) çoğu paketle uyuşmaz. Önceden `inst.mc_version` ile süzülüyordu
@@ -1205,18 +1308,23 @@ pub async fn install_modpack(
     let _ = std::fs::create_dir_all(&tmp);
     let pack_file = tmp.join(&file.filename);
 
-    let _ = handle.emit("launch-progress", &crate::launcher::LaunchProgress {
-        stage: "modpack".into(),
-        percent: 5,
-        detail: "Paket indiriliyor".into(),
-    });
+    pack_adim(
+        handle,
+        ADIM_PAKET,
+        "aktif",
+        0,
+        0,
+        &format!("{} ({:.1} MB)", file.filename, file.size as f64 / 1_048_576.0),
+    );
     download_file(&file.url, &pack_file, "modpack").await?;
-
-    let _ = handle.emit("launch-progress", &crate::launcher::LaunchProgress {
-        stage: "modpack".into(),
-        percent: 30,
-        detail: "Paket açılıyor".into(),
-    });
+    pack_adim(
+        handle,
+        ADIM_PAKET,
+        "bitti",
+        1,
+        1,
+        &format!("{} indirildi", file.filename),
+    );
 
     match source {
         "modrinth" => install_mrpack(handle, &pack_file, inst).await,
@@ -1243,7 +1351,6 @@ pub async fn install_mrpack(
     pack_file: &std::path::Path,
     inst: &mut crate::instances::Instance,
 ) -> Result<(), String> {
-    use tauri::Emitter;
     let zipf = std::fs::File::open(pack_file).map_err(|e| e.to_string())?;
     let mut archive = zip::ZipArchive::new(zipf).map_err(|e| e.to_string())?;
     // önce index.json çıkar (iç içe klasörde de olabilir)
@@ -1260,6 +1367,14 @@ pub async fn install_mrpack(
     };
     let d = index["dependencies"].as_object().cloned().unwrap_or_default();
     inst.mc_version = d.get("minecraft").and_then(|v| v.as_str()).unwrap_or("1.21.1").into();
+    pack_adim(
+        handle,
+        ADIM_ACMA,
+        "bitti",
+        1,
+        1,
+        &format!("{} · MC {}", index["name"].as_str().unwrap_or("paket"), inst.mc_version),
+    );
     let fabric = d.get("fabric-loader").and_then(|v| v.as_str());
     let neoforge = d.get("neoforge").and_then(|v| v.as_str());
     let forge = d.get("forge").and_then(|v| v.as_str());
@@ -1279,6 +1394,14 @@ pub async fn install_mrpack(
     let inst_dir = inst.dir();
     let overrides = format!("{kok}overrides/");
     let mut count = 0u32;
+    // kaç overrides dosyası yazılacağını önceden bil (bar gerçek sayısal)
+    let over_toplam = archive
+        .file_names()
+        .filter(|n| {
+            let n = n.replace('\\', "/");
+            n.starts_with(&overrides) && !n.ends_with('/')
+        })
+        .count() as u32;
     for i in 0..archive.len() {
         let mut zf = archive.by_index(i).map_err(|e| e.to_string())?;
         let name = zf.name().replace('\\', "/");
@@ -1293,14 +1416,19 @@ pub async fn install_mrpack(
             let mut of = std::fs::File::create(&out).map_err(|e| e.to_string())?;
             std::io::copy(&mut zf, &mut of).map_err(|e| e.to_string())?;
             count += 1;
-            if count % 40 == 0 {
-                let _ = handle.emit("launch-progress", &crate::launcher::LaunchProgress {
-                    stage: "modpack".into(),
-                    percent: 35,
-                    detail: format!("overrides: {count}"),
-                });
-            }
+            // canlı adım: yazılan her dosya durağan değil, akıyor
+            pack_adim(
+                handle,
+                ADIM_OVERRIDE,
+                if count >= over_toplam { "bitti" } else { "aktif" },
+                count,
+                over_toplam,
+                &format!("{count} / {over_toplam} dosya açılıyor"),
+            );
         }
+    }
+    if over_toplam == 0 {
+        pack_adim(handle, ADIM_OVERRIDE, "bitti", 0, 0, "yapılandırma dosyası yok");
     }
 
     // indirilecek dosyalar
@@ -1328,19 +1456,38 @@ pub async fn install_mrpack(
             ));
         }
     }
-    let _ = handle.emit("launch-progress", &crate::launcher::LaunchProgress {
-        stage: "modpack".into(),
-        percent: 45,
-        detail: format!("{} dosya indiriliyor", jobs.len()),
-    });
     let toplam = jobs.len();
+    let kuyruk_not = if toplam == 0 {
+        "paket indirilebilir dosya içermiyor".to_string()
+    } else {
+        format!("{toplam} dosya kuyruğa alındı")
+    };
+    pack_adim(
+        handle,
+        ADIM_MODLAR,
+        if toplam == 0 { "bitti" } else { "aktif" },
+        0,
+        toplam as u32,
+        &kuyruk_not,
+    );
     if toplam > 0 {
         // Tek dosyanın hatası tüm paketi düşürmesin: indirme motoru diğerlerini
         // yine indirir; yalnız hiçbir dosya inmediyse hata ver.
+        let h = handle.clone();
         if let Err(e) = crate::util::download_many(
             jobs,
             crate::util::DlOpts { concurrency: 24, retries: 3 },
-            |_p| {},
+            move |p| {
+                let hiz = hiz_metni(p.bytes_per_sec);
+                pack_adim(
+                    &h,
+                    ADIM_MODLAR,
+                    if p.done_files >= p.total_files { "bitti" } else { "aktif" },
+                    p.done_files,
+                    p.total_files,
+                    &format!("{} / {} mod · {}", p.done_files, p.total_files, hiz),
+                );
+            },
         )
         .await
         {
@@ -1350,17 +1497,24 @@ pub async fn install_mrpack(
             let inen = std::fs::read_dir(inst_dir.join("mods"))
                 .map(|d| d.count())
                 .unwrap_or(0);
+            pack_adim(handle, ADIM_MODLAR, "hata", toplam as u32, toplam as u32, &e);
             if inen == 0 {
                 return Err(format!("paket dosyaları indirilemedi: {e}"));
             }
+        } else {
+            pack_adim(
+                handle,
+                ADIM_MODLAR,
+                "bitti",
+                toplam as u32,
+                toplam as u32,
+                &format!("{toplam} mod indirildi"),
+            );
         }
     }
 
-    let _ = handle.emit("launch-progress", &crate::launcher::LaunchProgress {
-        stage: "modpack".into(),
-        percent: 95,
-        detail: "Tamamlandı".into(),
-    });
+    // NOT: "Hazır" (ADIM_HAZIR) burada DEĞİL — kurulum komutunda
+    // yükleyici/oyun dosyalı/YIKIM modu adımları bittikten sonra yayınlanır.
     Ok(())
 }
 
@@ -1417,33 +1571,63 @@ async fn cf_resolve_file(pid: u64, fid: u64) -> Option<(String, String)> {
 }
 
 /// Dosyaları eşzamanlı indir; tek dosya hatası tüm paketi düşürmez.
+/// Adım olayları (adim) her tamamlanan dosyada yayınlanır.
 /// Dönüş: (başarılı, hatalar).
 async fn indir_esnek(
+    handle: &tauri::AppHandle,
+    adim: u8,
     jobs: Vec<(String, std::path::PathBuf)>,
     eszamanli: usize,
 ) -> (usize, Vec<String>) {
     use futures_util::stream::{self, StreamExt};
-    let akis = stream::iter(jobs.into_iter().map(|(url, dest)| async move {
-        let ad = dest
-            .file_name()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let mut son = String::new();
-        for deneme in 0..3u32 {
-            match download_file(&url, &dest, &ad).await {
-                Ok(()) => return (true, ad),
-                Err(e) => {
-                    // 404/403 kalıcı: yeniden denemek anlamsız
-                    let kalici = e.contains("404") || e.contains("403");
-                    son = format!("{ad}: {e}");
-                    if kalici {
-                        break;
+    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+    let toplam = jobs.len();
+    let biten = std::sync::Arc::new(AtomicUsize::new(0));
+    let bayt = std::sync::Arc::new(AtomicU64::new(0));
+    let hiz = std::sync::Arc::new(HizOlcer::default());
+    let h = handle.clone();
+    let akis = stream::iter(jobs.into_iter().map(|(url, dest)| {
+        let biten = biten.clone();
+        let bayt = bayt.clone();
+        let hiz = hiz.clone();
+        let h = h.clone();
+        async move {
+            let ad = dest
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let mut son = String::new();
+            for deneme in 0..3u32 {
+                match download_file(&url, &dest, &ad).await {
+                    Ok(()) => {
+                        let n = biten.fetch_add(1, Ordering::Relaxed) + 1;
+                        let toplam_bayt = bayt.fetch_add(
+                            dest.metadata().map(|m| m.len()).unwrap_or(0),
+                            Ordering::Relaxed,
+                        ) + dest.metadata().map(|m| m.len()).unwrap_or(0);
+                        pack_adim(
+                            &h,
+                            adim,
+                            if n >= toplam { "bitti" } else { "aktif" },
+                            n as u32,
+                            toplam as u32,
+                            &format!("{n} / {toplam} · {}", hiz_metni(hiz.olc(toplam_bayt))),
+                        );
+                        return (true, ad);
                     }
-                    crate::core::msleep(400 * (deneme as u64 + 1));
+                    Err(e) => {
+                        // 404/403 kalıcı: yeniden denemek anlamsız
+                        let kalici = e.contains("404") || e.contains("403");
+                        son = format!("{ad}: {e}");
+                        if kalici {
+                            break;
+                        }
+                        crate::core::msleep(400 * (deneme as u64 + 1));
+                    }
                 }
             }
+            (false, son)
         }
-        (false, son)
     }))
     .buffer_unordered(eszamanli.max(1));
 
@@ -1458,6 +1642,31 @@ async fn indir_esnek(
         }
     }
     (ok, hatalar)
+}
+
+/// Basit anlık hız ölçer: her sorguda son ölçümden bu yana değişen baytı
+/// geçen süreye böler (dosya başına bir örnek).
+#[derive(Default)]
+struct HizOlcer {
+    ic: std::sync::Mutex<Option<(u64, std::time::Instant)>>,
+}
+
+impl HizOlcer {
+    fn olc(&self, toplam: u64) -> u64 {
+        let mut ic = self.ic.lock().unwrap();
+        let simdi = std::time::Instant::now();
+        match *ic {
+            Some((onceki, t0)) => {
+                let gecen = t0.elapsed().as_secs_f64().max(0.05);
+                *ic = Some((toplam, simdi));
+                ((toplam.saturating_sub(onceki)) as f64 / gecen) as u64
+            }
+            None => {
+                *ic = Some((toplam, simdi));
+                0
+            }
+        }
+    }
 }
 
 /// CurseForge pack zip: manifest.json → files[] {projectID,fileID} + overrides/
@@ -1486,6 +1695,14 @@ pub async fn install_cfpack(
         .as_str()
         .unwrap_or("1.21.1")
         .into();
+    pack_adim(
+        handle,
+        ADIM_ACMA,
+        "bitti",
+        1,
+        1,
+        &format!("{} · MC {}", inst.mc_version, if inst.mod_loader.is_empty() { "vanilla".to_string() } else { inst.mod_loader.clone() }),
+    );
     // modLoaders: birincil (primary) girdiyi seç; yoksa ilkini al.
     let loader = manifest["minecraft"]["modLoaders"]
         .as_array()
@@ -1518,6 +1735,14 @@ pub async fn install_cfpack(
     // overrides
     let inst_dir = inst.dir();
     let overrides = format!("{kok}overrides/");
+    let over_toplam = archive
+        .file_names()
+        .filter(|n| {
+            let n = n.replace('\\', "/");
+            n.starts_with(&overrides) && !n.ends_with('/')
+        })
+        .count() as u32;
+    let mut over_sayac = 0u32;
     for i in 0..archive.len() {
         let mut zf = archive.by_index(i).map_err(|e| e.to_string())?;
         let name = zf.name().replace('\\', "/");
@@ -1531,7 +1756,19 @@ pub async fn install_cfpack(
             }
             let mut of = std::fs::File::create(&out).map_err(|e| e.to_string())?;
             std::io::copy(&mut zf, &mut of).map_err(|e| e.to_string())?;
+            over_sayac += 1;
+            pack_adim(
+                handle,
+                ADIM_OVERRIDE,
+                if over_sayac >= over_toplam { "bitti" } else { "aktif" },
+                over_sayac,
+                over_toplam,
+                &format!("{over_sayac} / {over_toplam} dosya açılıyor"),
+            );
         }
+    }
+    if over_toplam == 0 {
+        pack_adim(handle, ADIM_OVERRIDE, "bitti", 0, 0, "yapılandırma dosyası yok");
     }
 
     // dosyaları EŞZAMANLI çöz (sıralı çözüm 300+ modlu paketlerde dakikalar
@@ -1578,32 +1815,49 @@ pub async fn install_cfpack(
         ));
     }
 
-    let _ = handle.emit(
-        "launch-progress",
-        &crate::launcher::LaunchProgress {
-            stage: "modpack".into(),
-            percent: 66,
-            detail: format!("{} dosya indiriliyor", jobs.len()),
-        },
+    pack_adim(
+        handle,
+        ADIM_MODLAR,
+        if jobs.is_empty() { "bitti" } else { "aktif" },
+        0,
+        jobs.len() as u32,
+        &format!("{} dosya kuyruğa alındı", jobs.len()),
     );
-    let (ok, hatalar) = indir_esnek(jobs, 16).await;
-    if !hatalar.is_empty() {
-        crate::core::yikim_log(format!(
-            "CurseForge paketi: {} dosya indirilemedi (paket yine de kuruldu). İlk hata: {}",
-            hatalar.len(),
-            hatalar.first().cloned().unwrap_or_default()
-        ));
+    let mut package_err: Option<String> = None;
+    if !jobs.is_empty() {
+        let (ok, hatalar) = indir_esnek(handle, ADIM_MODLAR, jobs, 16).await;
+        if !hatalar.is_empty() {
+            crate::core::yikim_log(format!(
+                "CurseForge paketi: {} dosya indirilemedi (paket yine de kuruldu). İlk hata: {}",
+                hatalar.len(),
+                hatalar.first().cloned().unwrap_or_default()
+            ));
+        }
+        if ok == 0 {
+            let hata = "paket dosyaları indirilemedi — internet/CurseForge erişimini kontrol et".to_string();
+            pack_adim(handle, ADIM_MODLAR, "hata", 0, total as u32, &hata);
+            return Err(hata);
+        }
+        if !hatalar.is_empty() {
+            package_err = Some(format!(
+                "{} / {} dosya indirilemedi (paket yine de kuruldu)",
+                hatalar.len(),
+                total
+            ));
+        }
+        pack_adim(
+            handle,
+            ADIM_MODLAR,
+            "bitti",
+            ok as u32,
+            ok as u32,
+            &format!("{ok} mod indirildi"),
+        );
     }
-    if ok == 0 && total > 0 {
-        return Err("paket dosyaları indirilemedi — internet/CurseForge erişimini kontrol et".into());
+    if let Some(not) = package_err {
+        pack_adim(handle, ADIM_MODLAR, "bitti", 1, 1, &not);
     }
-    let _ = handle.emit(
-        "launch-progress",
-        &crate::launcher::LaunchProgress {
-            stage: "modpack".into(),
-            percent: 95,
-            detail: "Tamamlandı".into(),
-        },
-    );
+    // NOT: "Hazır" (ADIM_HAZIR) burada DEĞİL — kurulum komutunda
+    // yükleyici/oyun dosyalı/YIKIM modu adımları bittikten sonra yayınlanır.
     Ok(())
 }

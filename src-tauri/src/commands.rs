@@ -2080,25 +2080,23 @@ pub async fn cmd_install_pack_files(
     }
     match repos::install_modpack(&app, &source, &project_id, &version_id, &mut inst).await {
         Ok(()) => {
-            // fabric/forge loader sürümü paketten geldiyse profil json'u önden kur
-            if inst.mod_loader == "fabric" && !inst.loader_version.is_empty() {
-                if let Err(e) = launcher::install_fabric_profile(&inst.mc_version, &inst.loader_version).await {
-                    core::yikim_log(format!("fabric profile önden indirilemedi (launch'ta tekrar denenir): {e}"));
-                }
-            } else if inst.mod_loader == "forge" && !inst.loader_version.is_empty() {
-                if let Err(e) = launcher::install_forge_profile(&inst.mc_version, &inst.loader_version).await {
-                    core::yikim_log(format!("forge önden kurulamadı (launch'ta tekrar denenir): {e}"));
-                }
-            } else if inst.mod_loader == "neoforge" && !inst.loader_version.is_empty() {
-                if let Err(e) = launcher::install_neoforge_profile(&inst.mc_version, &inst.loader_version).await {
-                    core::yikim_log(format!("neoforge önden kurulamadı (launch'ta tekrar denenir): {e}"));
-                }
+            // Yükleyici profili + oyun dosyaları + Java + YIKIM modu — adım adım
+            // canlı ilerleme (pack-step olayları). "Yarım kalmış gibi" hissinin
+            // nedeni buydu: paket açıldıktan sonra sessizce uzun indirmeler
+            // sürdürüyordu ve kullanıcı hiçbir ilerleme görmeden bekliyordu.
+            if let Err(e) = paket_sonrasi_hazirla(&app, &mut inst).await {
+                let _ = repos::pack_adim(
+                    &app,
+                    repos::ADIM_SURUM,
+                    "hata",
+                    0,
+                    0,
+                    &format!("kurulum hazırlığı durdu: {e}"),
+                );
+                inst.save().ok();
+                return Err(e);
             }
             inst.save()?;
-            // YIKIM çekirdeği — paket kurulumlarında da otomatik
-            if let Err(e) = yikim_mod::ensure_installed(&app, &inst) {
-                core::yikim_log(format!("YIKIM modu kurulamadı (kurulum engellenmedi): {e}"));
-            }
             Ok(inst)
         }
         Err(e) => {
@@ -2190,25 +2188,20 @@ pub async fn cmd_import_pack_file(
     };
     match result {
         Ok(()) => {
-            if inst.mod_loader == "fabric" && !inst.loader_version.is_empty() {
-                if let Err(e) =
-                    launcher::install_fabric_profile(&inst.mc_version, &inst.loader_version).await
-                {
-                    core::yikim_log(format!("fabric profile önden indirilemedi: {e}"));
-                }
-            } else if inst.mod_loader == "forge" && !inst.loader_version.is_empty() {
-                if let Err(e) = launcher::install_forge_profile(&inst.mc_version, &inst.loader_version).await {
-                    core::yikim_log(format!("forge önden kurulamadı (launch'ta tekrar denenir): {e}"));
-                }
-            } else if inst.mod_loader == "neoforge" && !inst.loader_version.is_empty() {
-                if let Err(e) = launcher::install_neoforge_profile(&inst.mc_version, &inst.loader_version).await {
-                    core::yikim_log(format!("neoforge önden kurulamadı (launch'ta tekrar denenir): {e}"));
-                }
+            // yerel zip: kurulum adımları 5-8 (yükleyici, oyun dosyaları, YIKIM modu)
+            if let Err(e) = paket_sonrasi_hazirla(&app, &mut inst).await {
+                let _ = repos::pack_adim(
+                    &app,
+                    repos::ADIM_SURUM,
+                    "hata",
+                    0,
+                    0,
+                    &format!("kurulum hazırlığı durdu: {e}"),
+                );
+                inst.save().ok();
+                return Err(e);
             }
             inst.save()?;
-            if let Err(e) = yikim_mod::ensure_installed(&app, &inst) {
-                core::yikim_log(format!("YIKIM modu kurulamadı (kurulum engellenmedi): {e}"));
-            }
             Ok(inst)
         }
         Err(e) => {
@@ -2384,6 +2377,191 @@ pub async fn cmd_pick_java(app: AppHandle) -> Result<Option<String>, String> {
 
 // ---------- başlatma ----------
 
+/// Kurulumun sürüm kimliğini çöz (profil json'u gerekirse kurar).
+/// Hem `cmd_launch_instance` hem paket kurulumu sonrası hazırlık kullanır —
+/// başlatma ile kurulum ARASINDA fark olmasın (aynı kimlik, aynı profil).
+pub(crate) async fn surum_kimligi_coz(inst: &mut Instance) -> Result<String, String> {
+    match inst.mod_loader.as_str() {
+        "vanilla" => Ok(inst.mc_version.clone()),
+        "fabric" => {
+            if inst.loader_version.is_empty() {
+                inst.loader_version = launcher::fabric_latest_loader().await?;
+                inst.save()?;
+            } else if let Ok(latest) = launcher::fabric_latest_loader().await {
+                // eski kayıtlı loader, güncel stable'dan küçükse yükselt (modlar
+                // yeni loader istiyor — aksi halde FabricLoader uyumsuzluk hatası)
+                if launcher::loader_version_lt(&inst.loader_version, &latest) {
+                    core::yikim_log(format!(
+                        "fabric loader yükseltiliyor: {} -> {latest}",
+                        inst.loader_version
+                    ));
+                    inst.loader_version = latest;
+                    inst.save()?;
+                }
+            }
+            let vid = format!("fabric-loader-{}-{}", inst.loader_version, inst.mc_version);
+            if !crate::core::versions_dir().join(&vid).join(format!("{vid}.json")).exists() {
+                launcher::install_fabric_profile(&inst.mc_version, &inst.loader_version).await?;
+            }
+            Ok(vid)
+        }
+        "forge" => {
+            if inst.loader_version.is_empty() {
+                inst.loader_version = launcher::forge_latest_build(&inst.mc_version).await?;
+                inst.save()?;
+            }
+            // mrpack/import bazen tam id ("1.21.1-forge-52.0.24") yazar — ayıkla
+            let forge_ver = inst
+                .loader_version
+                .rsplit_once("-forge-")
+                .map(|(_, v)| v.to_string())
+                .unwrap_or_else(|| inst.loader_version.clone());
+            let vid = format!("{}-forge-{}", inst.mc_version, forge_ver);
+            if !crate::core::versions_dir().join(&vid).join(format!("{vid}.json")).exists() {
+                launcher::install_forge_profile(&inst.mc_version, &forge_ver).await?;
+            }
+            Ok(vid)
+        }
+        "neoforge" => {
+            if inst.loader_version.is_empty() {
+                inst.loader_version = launcher::neoforge_latest_build(&inst.mc_version).await?;
+                inst.save()?;
+            }
+            // paket bazen "neoforge-21.1.80" ya da tam kimlik yazar — ayıkla
+            let nf_ver = inst
+                .loader_version
+                .strip_prefix("neoforge-")
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| inst.loader_version.clone());
+            let vid = launcher::neoforge_version_id(&inst.mc_version, &nf_ver);
+            if !crate::core::versions_dir().join(&vid).join(format!("{vid}.json")).exists() {
+                launcher::install_neoforge_profile(&inst.mc_version, &nf_ver).await?;
+            }
+            Ok(vid)
+        }
+        other => Err(format!("bilinmeyen loader: {other}")),
+    }
+}
+
+/// Paket kurulumu SONRASI hazırlık — adım adım ilerleme yayınlar:
+///   5 yükleyici profili · 6 oyun dosyaları (client jar, kütüphaneler, assetler,
+///   java) · 7 YIKIM modu · 8 hazır.
+/// Böylece paket kurulunca oyun "ilk açılışta" dakikalarca sessiz indirmede
+/// kalmaz; sürüm kurulumu kurulum ekranında canlı görünür.
+/// Hata veren adımlar (profil hariç) kurulumu düşürür; profil hatası yalnız
+/// not edilir çünkü başlatma yolunda tekrar denenir.
+pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Result<(), String> {
+    use repos::{
+        pack_adim, ADIM_HAZIR, ADIM_LOADER, ADIM_MOD, ADIM_SURUM,
+    };
+    // ---- 5) yükleyici ----
+    let yukleyici_adi = match inst.mod_loader.as_str() {
+        "fabric" => "Fabric",
+        "forge" => "Forge",
+        "neoforge" => "NeoForge",
+        _ => "Vanilla",
+    };
+    pack_adim(
+        app,
+        ADIM_LOADER,
+        "aktif",
+        0,
+        0,
+        &format!("{yukleyici_adi} profili kuruluyor"),
+    );
+    let vid = match surum_kimligi_coz(inst).await {
+        Ok(vid) => {
+            pack_adim(
+                app,
+                ADIM_LOADER,
+                "bitti",
+                1,
+                1,
+                &format!("{yukleyici_adi} hazır ({vid})"),
+            );
+            vid
+        }
+        Err(e) => {
+            // profil kurulamazsa oyun ilk açılışta yeniden dener — kurulumu düşürme
+            core::yikim_log(format!("yükleyici profili kurulamadı (başlatmada tekrar denenir): {e}"));
+            pack_adim(
+                app,
+                ADIM_LOADER,
+                "hata",
+                0,
+                0,
+                &format!("{yukleyici_adi} profili kurulamadı, ilk açılışta tekrar denenir"),
+            );
+            inst.save()?;
+            return Ok(());
+        }
+    };
+
+    // ---- 6) oyun dosyaları (sürüm kurulumu) ----
+    pack_adim(
+        app,
+        ADIM_SURUM,
+        "aktif",
+        0,
+        0,
+        "Sürüm bilgisi alınıyor",
+    );
+    let vj = launcher::load_version_json_merged(&vid).await?;
+    pack_adim(
+        app,
+        ADIM_SURUM,
+        "aktif",
+        0,
+        0,
+        "Oyun dosyaları indiriliyor (kütüphaneler + assetler)",
+    );
+    launcher::download_all_for_version(&vj, app, 84, 11, Some(repos::ADIM_SURUM)).await?;
+
+    // java (pak kurulumunda da hazır — ilk açılışta bekleme olmasın)
+    let component = vj["javaVersion"]["component"]
+        .as_str()
+        .unwrap_or("java-runtime-gamma")
+        .to_string();
+    let major = vj["javaVersion"]["majorVersion"].as_u64().unwrap_or(17) as u32;
+    let cfg = YikimConfig::load_or_default();
+    pack_adim(app, ADIM_SURUM, "aktif", 0, 0, "Java hazırlanıyor");
+    match launcher::resolve_java_dirs(&component, major, cfg.java_dir.clone()).await {
+        Ok(_) => pack_adim(app, ADIM_SURUM, "bitti", 1, 1, "Oyun dosyaları ve Java hazır"),
+        Err(e) => {
+            core::yikim_log(format!("java paket kurulumunda hazırlanamadı (başlatmada denenir): {e}"));
+            pack_adim(
+                app,
+                ADIM_SURUM,
+                "bitti",
+                1,
+                1,
+                "Oyun dosyaları hazır (Java başlatmada kurulacak)",
+            );
+        }
+    }
+
+    // ---- 7) YIKIM modu ----
+    pack_adim(app, ADIM_MOD, "aktif", 0, 0, "YIKIM çekirdeği kuruluyor");
+    match yikim_mod::ensure_installed(app, inst) {
+        Ok(_) => pack_adim(app, ADIM_MOD, "bitti", 1, 1, "YIKIM çekirdeği hazır"),
+        Err(e) => {
+            core::yikim_log(format!("YIKIM modu kurulamadı (kurulum engellenmedi): {e}"));
+            pack_adim(
+                app,
+                ADIM_MOD,
+                "hata",
+                0,
+                0,
+                &format!("YIKIM modu kurulamadı (ilk açılışta denenir): {e}"),
+            );
+        }
+    }
+
+    // ---- 8) hazır ----
+    pack_adim(app, ADIM_HAZIR, "bitti", 1, 1, "Kurulum tamamlandı");
+    Ok(())
+}
+
 #[derive(Serialize)]
 pub struct LaunchResponse {
     pub pid: u32,
@@ -2410,70 +2588,8 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
         account
     };
 
-    // sürüm kimliği
-    let version_id = match inst.mod_loader.as_str() {
-        "vanilla" => inst.mc_version.clone(),
-        "fabric" => {
-            if inst.loader_version.is_empty() {
-                inst.loader_version = launcher::fabric_latest_loader().await?;
-                inst.save()?;
-            } else {
-                // eski kayıtlı loader, güncel stable'dan küçükse yükselt (modlar
-                // yeni loader istiyor — aksi halde FabricLoader uyumsuzluk hatası
-                // atıyor ve oyun açılmıyor)
-                if let Ok(latest) = launcher::fabric_latest_loader().await {
-                    if launcher::loader_version_lt(&inst.loader_version, &latest) {
-                        core::yikim_log(format!(
-                            "fabric loader yükseltiliyor: {} -> {latest}",
-                            inst.loader_version
-                        ));
-                        inst.loader_version = latest;
-                        inst.save()?;
-                    }
-                }
-            }
-            let vid = format!("fabric-loader-{}-{}", inst.loader_version, inst.mc_version);
-            if !crate::core::versions_dir().join(&vid).join(format!("{vid}.json")).exists() {
-                launcher::install_fabric_profile(&inst.mc_version, &inst.loader_version).await?;
-            }
-            vid
-        }
-        "forge" => {
-            if inst.loader_version.is_empty() {
-                inst.loader_version = launcher::forge_latest_build(&inst.mc_version).await?;
-                inst.save()?;
-            }
-            // mrpack/import bazen tam id ("1.21.1-forge-52.0.24") yazar — ayıkla
-            let forge_ver = inst
-                .loader_version
-                .rsplit_once("-forge-")
-                .map(|(_, v)| v.to_string())
-                .unwrap_or_else(|| inst.loader_version.clone());
-            let vid = format!("{}-forge-{}", inst.mc_version, forge_ver);
-            if !crate::core::versions_dir().join(&vid).join(format!("{vid}.json")).exists() {
-                launcher::install_forge_profile(&inst.mc_version, &forge_ver).await?;
-            }
-            vid
-        }
-        "neoforge" => {
-            if inst.loader_version.is_empty() {
-                inst.loader_version = launcher::neoforge_latest_build(&inst.mc_version).await?;
-                inst.save()?;
-            }
-            // paket bazen "neoforge-21.1.80" ya da tam kimlik yazar — ayıkla
-            let nf_ver = inst
-                .loader_version
-                .strip_prefix("neoforge-")
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| inst.loader_version.clone());
-            let vid = launcher::neoforge_version_id(&inst.mc_version, &nf_ver);
-            if !crate::core::versions_dir().join(&vid).join(format!("{vid}.json")).exists() {
-                launcher::install_neoforge_profile(&inst.mc_version, &nf_ver).await?;
-            }
-            vid
-        }
-        other => return Err(format!("bilinmeyen loader: {other}")),
-    };
+    // sürüm kimliği (profil kurulumu dahil) — kurulum yoluyla AYNI yardımcı
+    let version_id = surum_kimligi_coz(&mut inst).await?;
 
     let _ = app.emit(
         "launch-progress",
@@ -2481,7 +2597,7 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
     );
 
     let vj = launcher::load_version_json_merged(&version_id).await?;
-    launcher::download_all_for_version(&vj, &app, 5, 60).await?;
+    launcher::download_all_for_version(&vj, &app, 5, 60, None).await?;
 
     // java
     let component = vj["javaVersion"]["component"].as_str().unwrap_or("java-runtime-gamma").to_string();

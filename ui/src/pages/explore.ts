@@ -1,4 +1,5 @@
 import { el, fmtBytes, icon, invoke, nav, navigate, openExternal, openModal, state, toast } from "../main";
+import { packKartBaslat, packKartHata, packKartTamam } from "../pack-kur";
 import { mdToHtml } from "../md";
 
 interface SearchResult {
@@ -702,36 +703,21 @@ function lightbox(url: string): void {
 }
 
 /// Paket kurulumu + ilk açılışta java preset sorusu.
+/// Canlı adım kartı (sağ alt): "pack-step" olayları `pack-kur.ts` çizer —
+/// paket indirilirken/çözümlenirken ekranda akış görünür, "yarıda kesildi"
+/// hissi olmaz.
 async function installPack(r: SearchResult, v: RepoVersion): Promise<void> {
-  const { root, close } = openModal(`
-    <h2>Paket Kurulumu</h2>
-    <div class="sub">${r.title} — indirilecek, açılacak ve kurulum oluşturulacak.</div>
-    <div class="progressbar"><div id="pk-bar" style="transform:scaleX(0.03)"></div></div>
-    <div id="pk-detail" style="margin-top:10px; font-size:12.5px; color:var(--text-dim)">Başlıyor…</div>
-    <div style="display:none" id="pk-done"></div>
-  `);
-  const bar = root.querySelector("#pk-bar") as HTMLElement;
-  const detail = root.querySelector("#pk-detail") as HTMLElement;
-  const { listen } = await import("../main");
-  const off = await listen("launch-progress", (e: any) => {
-    if (e.payload.stage === "modpack") {
-      bar.style.transform = `scaleX(${Math.min(1, Math.max(0, e.payload.percent / 100))})`;
-      detail.textContent = e.payload.detail || "";
-    }
-  });
+  packKartBaslat(r.title);
   try {
     const inst = await invoke("cmd_install_pack_files", {
       source: r.source, projectId: r.id, versionId: v.id, packName: r.title, icon: null, iconUrl: r.icon_url || null,
     });
-    off();
-    close();
     await import("../main").then((m) => m.refreshState());
+    packKartTamam();
     await askJavaPreset(inst);
     navigate("instances");
   } catch (e) {
-    off();
-    detail.textContent = `Kurulum başarısız: ${e}`;
-    detail.style.color = "var(--danger)";
+    packKartHata(String(e));
   }
 }
 

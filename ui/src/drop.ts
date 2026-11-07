@@ -7,6 +7,7 @@
    tüm kurulumlar yerel kopya/açma — internet trafiği yoktur.
    ============================================================ */
 import { invoke, openModal, navigate, refreshState, state, toast } from "./main";
+import { packKartBaslat, packKartHata, packKartTamam } from "./pack-kur";
 
 let veil: HTMLElement | null = null;
 
@@ -61,10 +62,18 @@ async function handleDropped(path: string): Promise<void> {
       });
       if (!ok) { toast("Kurulum iptal edildi"); return; }
       toast("Paket indiriliyor — süreç panelinden takip edebilirsin");
-      const inst = await invoke("cmd_import_pack_file", { path, name: null });
-      await refreshState();
-      navigate("instances");
-      toast(`${(inst as any).name} kuruldu ✓`);
+      packKartBaslat("Sürüklenen paket kurulumu");
+      let ad = "Paket";
+      try {
+        const inst = await invoke("cmd_import_pack_file", { path, name: null });
+        ad = (inst as any).name || "Paket";
+        await refreshState();
+        packKartTamam();
+        navigate("instances");
+      } catch (e) {
+        packKartHata(String(e));
+      }
+      toast(`${ad} kuruldu ✓`);
     } else if (route === "jar") {
       const inst = await pickInstance(`Mod eklenecek kurulum: <b>${esc(fileName)}</b>`);
       if (!inst) return;
