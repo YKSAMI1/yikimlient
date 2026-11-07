@@ -19,6 +19,11 @@ interface RepoProject {
   links: { label: string; url: string }[];
   license: string; updated: string;
 }
+interface ModrinthHit {
+  project_id?: string; slug?: string; title?: string; description?: string;
+  author?: string; icon_url?: string; downloads?: number;
+  display_categories?: string[];
+}
 
 const TUR_AD: Record<string, string> = {
   mod: "Mod", modpack: "Mod Paketi", resourcepack: "Doku Paketi",
@@ -232,7 +237,10 @@ async function akisEkle(): Promise<void> {
       eklenen++;
     }
     akisOfset += parca.length;
-    if (parca.length < SAYFA_BOY) akisBitti = true;
+    // Kısmi sayfa "bitti" demek DEĞİL: eski backend'ler istenen limitin
+    // altında dönebiliyor (ör. popüler uçta 12). Gerçek son, yeni kart
+    // gelmeyen sayfadır.
+    if (eklenen === 0) akisBitti = true;
     akisDurum(akisBitti ? "Hepsi bu kadar." : null);
     // Sentinör hâlâ ekranda ise (kısa içerik) bir sayfa daha çek.
     setTimeout(() => {
@@ -250,14 +258,50 @@ async function akisEkle(): Promise<void> {
   }
 }
 
+/// En çok indirilenler — doğrudan Modrinth (index=downloads, offset'li).
+///
+/// Neden backend değil? `cmd_repos_popular`'ın `page` parametresi yeni
+/// eklendi; eski launcher exe'lerinde komut bu parametreyi yok sayıp her
+/// çağrıda ilk 12 kaydı döndürüyordu → sıcak UI 12 < 24 görüp "Hepsi bu
+/// kadar." diyordu. Liste burada doğrudan çekilince exe güncellemesi
+/// gerekmeden gerçek sayfa sayfa akış çalışır (API CORS'a açık).
+async function modrinthPopuler(offset: number, limit: number): Promise<SearchResult[]> {
+  const facets: string[][] = [[`project_type:${kind}`]];
+  if (lastLoader) facets.push([`categories:${lastLoader}`]);
+  const url =
+    "https://api.modrinth.com/v2/search?query=&index=downloads" +
+    `&facets=${encodeURIComponent(JSON.stringify(facets))}` +
+    `&offset=${offset}&limit=${limit}`;
+  const yanit = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!yanit.ok) throw new Error(`Modrinth ${yanit.status}`);
+  const js = (await yanit.json()) as { hits?: ModrinthHit[] };
+  return (js.hits || []).map((h) => ({
+    source: "modrinth",
+    id: String(h.project_id || ""),
+    slug: String(h.slug || ""),
+    title: String(h.title || ""),
+    description: String(h.description || ""),
+    author: String(h.author || "Modrinth"),
+    icon_url: String(h.icon_url || ""),
+    downloads: Number(h.downloads || 0),
+    kind,
+    categories: Array.isArray(h.display_categories) ? h.display_categories : [],
+  }));
+}
+
 function populerBaslat(): void {
   lastQuery = "";
   const ldr = (kok?.querySelector("#exp-loader") as HTMLSelectElement | null)?.value || "";
   lastLoader = ["resourcepack", "shader", "world", "datapack"].includes(kind) ? "" : ldr;
   akisBaslat(async (offset, limit) => {
-    const page = Math.floor(offset / SAYFA_BOY);
-    const r: SearchResult[] = await invoke("cmd_repos_popular", { kind, loader: lastLoader, page });
-    return r.slice(0, limit);
+    try {
+      return await modrinthPopuler(offset, limit);
+    } catch {
+      // Çevrimdışı / API erişimi yok: eski backend yoluna düş.
+      const page = Math.floor(offset / SAYFA_BOY);
+      const r: SearchResult[] = await invoke("cmd_repos_popular", { kind, loader: lastLoader, page });
+      return r.slice(0, limit);
+    }
   }, "En çok indirilenler");
 }
 
