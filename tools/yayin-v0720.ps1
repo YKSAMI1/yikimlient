@@ -22,6 +22,10 @@ Kesfet:
 - En cok indirilenler sayfa sayfa akmaya devam ediyor.
 "@
 
+# notlari dosyaya yaz: --notes ile gecirirken tirnak/backtick native argumani boluyor
+$notDosya = Join-Path $env:TEMP "yikim-v$V-notlar.txt"
+[System.IO.File]::WriteAllText($notDosya, $not, (New-Object System.Text.UTF8Encoding($false)))
+
 Write-Host "[0/7] guvenlik: tag/release zaten var mi?"
 $var = gh release view "v$V" 2>&1
 if ($LASTEXITCODE -eq 0) { Write-Host "HATA: v$V release zaten var - surum numarasini artir"; exit 1 }
@@ -35,7 +39,7 @@ Write-Host "[2/7] Windows derleme dosyasi kontrolu"
 if (-not (Test-Path "$nsis\YIKIMLient_${V}_x64-setup.exe")) { Write-Host "WINDOWS DERLEME YOK - once npm run dist"; exit 1 }
 
 Write-Host "[3/7] release + tag"
-gh release create "v$V" --title "YIKIMLient v$V" --notes $not 2>&1 | ForEach-Object { $_.ToString() } | Select-Object -First 2
+gh release create "v$V" --title "YIKIMLient v$V" --notes-file $notDosya 2>&1 | ForEach-Object { $_.ToString() } | Select-Object -First 2
 gh release upload "v$V" "$nsis\YIKIMLient_${V}_x64-setup.exe" "$nsis\YIKIMLient_${V}_x64-setup.exe.sig" --clobber 2>&1 | Select-Object -First 1
 
 Write-Host "[4/7] tag CI bekle (linux derleme)"
