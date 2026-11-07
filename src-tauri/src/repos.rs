@@ -71,8 +71,14 @@ fn cf_get(client: &reqwest::Client, url: &str) -> reqwest::RequestBuilder {
     }
 }
 
+/// CurseForge kaynağı kullanılabilir mi?
+///
+/// Resmî API anahtarı yoksa anahtarsız genel ayna (api.curse.tools) kullanılır
+/// ve ayna resmî API'yi yansıtır. Bu yüzden CurseForge, anahtar olmadan da
+/// kullanılabilir; burada `false` dönmek aramayı/kataloğu tamamen kapatıyordu
+/// ("CurseForge komple yok" görüntüsünün nedeni).
 pub fn curseforge_available() -> bool {
-    cf_api_key().is_some()
+    true
 }
 
 /// Arka plan önbellek ısıtma: sürüm manifesti ve haberleri önden indir,
@@ -409,11 +415,16 @@ fn cf_class_id(kind: &str) -> u32 {
     if kind == "modpack" { 4471 } else { 4476 }
 }
 
-/// CF modLoaderType: 4 = Fabric, 5 = Forge, 0 = Any
+/// CF modLoaderType: 1 = Forge, 4 = Fabric, 5 = Quilt, 6 = NeoForge, 0 = Any.
+/// (Resmî CurseForge enum'u: Forge=1, Cauldron=2, LiteLoader=3, Fabric=4,
+/// Quilt=5, NeoForge=6. Eski kod forge'u 5 sanıyordu → Quilt sonuçları ya da
+/// boş liste dönüyordu.)
 fn cf_loader_id(loader: &str) -> u32 {
-    match loader {
+    match loader.to_lowercase().as_str() {
+        "forge" => 1,
         "fabric" => 4,
-        "forge" => 5,
+        "quilt" => 5,
+        "neoforge" => 6,
         _ => 0,
     }
 }
@@ -438,7 +449,11 @@ async fn curseforge_search(
     if game_versions.len() == 1 {
         url.push_str(&format!("&gameVersion={}", urlencoding::encode(game_versions[0])));
     }
-    let _ = loader;
+    // Yükleyici süzgeci gerçekten uygulanır (önceden yok sayılıyordu).
+    let lid = cf_loader_id(loader);
+    if lid != 0 {
+        url.push_str(&format!("&modLoaderType={lid}"));
+    }
     let js: serde_json::Value = api_json_req(cf_get(&http_client(), &url)).await?;
     let mut out = Vec::new();
     if let Some(data) = js["data"].as_array() {
@@ -527,8 +542,21 @@ pub async fn search_all(
         modrinth_search(query, kind, versions, loader, offset, limit),
         curseforge_search(query, kind, versions, loader, offset, limit)
     );
-    let mut out = mr?;
-    out.extend(cf?);
+    // Bir kaynağın hatası TÜM aramayı düşürmesin: diğeriyle devam et.
+    let mut out: Vec<RepoSearchResult> = Vec::new();
+    match mr {
+        Ok(v) => out.extend(v),
+        Err(e) => {
+            crate::core::yikim_log(format!("Modrinth araması başarısız: {e}"));
+            if cf.is_err() {
+                return Err(e);
+            }
+        }
+    }
+    match cf {
+        Ok(v) => out.extend(v),
+        Err(e) => crate::core::yikim_log(format!("CurseForge araması başarısız: {e}")),
+    }
     // indirilme sayısına göre sırala
     out.sort_by(|a, b| b.downloads.cmp(&a.downloads));
     Ok((out, curseforge_available()))
@@ -557,6 +585,65 @@ pub async fn versions_for(
         "modrinth" => modrinth_versions(project_id, kind, loader, game_version).await,
         "curseforge" => curseforge_files(project_id, game_version, loader).await,
         _ => Err("bilinmeyen kaynak".into()),
+    }
+}
+
+/// Tek sürüm kimliğinden sürüm bilgisi — 50'lik liste sınırına takılmadan.
+/// (Kullanıcı listede görünmeyen eski bir paket sürümünü seçtiğinde gerekir.)
+pub async fn version_by_id(
+    source: &str,
+    project_id: &str,
+    version_id: &str,
+) -> Option<RepoVersion> {
+    match source {
+        "modrinth" => {
+            let url = format!("https://api.modrinth.com/v2/version/{version_id}");
+            let v: serde_json::Value = api_json(&url).await.ok()?;
+            let files: Vec<RepoFile> = v["files"]
+                .as_array()
+                .unwrap_or(&Vec::new())
+                .iter()
+                .map(|f| RepoFile {
+                    url: f["url"].as_str().unwrap_or("").into(),
+                    filename: f["filename"].as_str().unwrap_or("").into(),
+                    primary: f["primary"].as_bool().unwrap_or(false),
+                    size: f["size"].as_u64().unwrap_or(0),
+                })
+                .collect();
+            Some(RepoVersion {
+                id: v["id"].as_str().unwrap_or(version_id).into(),
+                name: v["name"].as_str().unwrap_or("").into(),
+                version_number: v["version_number"].as_str().unwrap_or("").into(),
+                date: v["date_published"].as_str().unwrap_or("").into(),
+                game_versions: str_list(&v["game_versions"]),
+                loaders: str_list(&v["loaders"]),
+                files,
+                source: "modrinth".into(),
+                project_id: project_id.into(),
+            })
+        }
+        "curseforge" => {
+            let pid: u64 = project_id.parse().ok()?;
+            let fid: u64 = version_id.parse().ok()?;
+            let (url, fname) = cf_resolve_file(pid, fid).await?;
+            Some(RepoVersion {
+                id: version_id.into(),
+                name: fname.clone(),
+                version_number: fname.clone(),
+                date: String::new(),
+                game_versions: Vec::new(),
+                loaders: Vec::new(),
+                files: vec![RepoFile {
+                    url,
+                    filename: fname,
+                    primary: true,
+                    size: 0,
+                }],
+                source: "curseforge".into(),
+                project_id: project_id.into(),
+            })
+        }
+        _ => None,
     }
 }
 
@@ -1097,11 +1184,20 @@ pub async fn install_modpack(
     inst: &mut crate::instances::Instance,
 ) -> Result<(), String> {
     use tauri::Emitter;
-    let versions = versions_for(source, project_id, "modpack", "", &inst.mc_version).await?;
-    let version = if version_id.is_empty() {
-        versions.first().ok_or("paket sürümü yok")?
+    // Sürüm kimliği verildiyse MC sürümüne göre süzme YAPMA: paket kendi
+    // Minecraft sürümünü/yükleyicisini getirir ve yeni kurulumun varsayılanı
+    // (1.21.1) çoğu paketle uyuşmaz. Önceden `inst.mc_version` ile süzülüyordu
+    // → 1.21.1 dışı her pakette "paket sürümü yok" hatası.
+    let versions = versions_for(source, project_id, "modpack", "", "").await?;
+    let version: RepoVersion = if version_id.is_empty() {
+        versions.into_iter().next().ok_or("paket sürümü yok")?
+    } else if let Some(v) = versions.into_iter().find(|v| v.id == version_id) {
+        v
     } else {
-        versions.iter().find(|v| v.id == version_id).ok_or("paket sürümü yok")?
+        // Liste sınırı (50) dışında kalan eski sürüm: doğrudan kimlikten çek.
+        version_by_id(source, project_id, version_id)
+            .await
+            .ok_or("paket sürümü yok")?
     };
     let file = version.files.first().ok_or("paket dosyası yok")?;
     let tmp = crate::core::app_dir().join("tmp-pack-download");
@@ -1129,6 +1225,18 @@ pub async fn install_modpack(
     }
 }
 
+/// Zip içinde bir dosyayı kökte ya da tek bir alt klasörde bulur
+/// (kullanıcılar paketi klasörleyip yeniden sıkıştırabiliyor).
+fn zip_find(archive: &zip::ZipArchive<std::fs::File>, hedef: &str) -> Option<String> {
+    archive
+        .file_names()
+        .find(|n| {
+            let n = n.replace('\\', "/");
+            n == hedef || n.ends_with(&format!("/{hedef}"))
+        })
+        .map(|n| n.replace('\\', "/"))
+}
+
 /// Modrinth .mrpack: index.json → files[].downloads + overrides
 pub async fn install_mrpack(
     handle: &tauri::AppHandle,
@@ -1138,9 +1246,13 @@ pub async fn install_mrpack(
     use tauri::Emitter;
     let zipf = std::fs::File::open(pack_file).map_err(|e| e.to_string())?;
     let mut archive = zip::ZipArchive::new(zipf).map_err(|e| e.to_string())?;
-    // önce index.json çıkar
+    // önce index.json çıkar (iç içe klasörde de olabilir)
+    let index_name = zip_find(&archive, "modrinth.index.json")
+        .ok_or("mrpack index yok (modrinth.index.json bulunamadı)")?;
+    // overrides klasörünün öneki: index ile aynı klasörde
+    let kok = index_name.trim_end_matches("modrinth.index.json").to_string();
     let index: serde_json::Value = {
-        let mut idx = archive.by_name("modrinth.index.json").map_err(|e| format!("mrpack index yok: {e}"))?;
+        let mut idx = archive.by_name(&index_name).map_err(|e| format!("mrpack index yok: {e}"))?;
         let mut s = String::new();
         use std::io::Read;
         idx.read_to_string(&mut s).map_err(|e| e.to_string())?;
@@ -1148,10 +1260,15 @@ pub async fn install_mrpack(
     };
     let d = index["dependencies"].as_object().cloned().unwrap_or_default();
     inst.mc_version = d.get("minecraft").and_then(|v| v.as_str()).unwrap_or("1.21.1").into();
-    let loader = d.get("fabric-loader").and_then(|v| v.as_str());
+    let fabric = d.get("fabric-loader").and_then(|v| v.as_str());
+    let neoforge = d.get("neoforge").and_then(|v| v.as_str());
     let forge = d.get("forge").and_then(|v| v.as_str());
-    if let Some(lv) = loader {
+    if let Some(lv) = fabric {
         inst.mod_loader = "fabric".into();
+        inst.loader_version = lv.into();
+    } else if let Some(lv) = neoforge {
+        // Modrinth bazı paketlerde NeoForge'u "neoforge" anahtarıyla verir.
+        inst.mod_loader = "neoforge".into();
         inst.loader_version = lv.into();
     } else if let Some(lv) = forge {
         inst.mod_loader = "forge".into();
@@ -1160,11 +1277,12 @@ pub async fn install_mrpack(
 
     // overrides
     let inst_dir = inst.dir();
+    let overrides = format!("{kok}overrides/");
     let mut count = 0u32;
     for i in 0..archive.len() {
         let mut zf = archive.by_index(i).map_err(|e| e.to_string())?;
-        let name = zf.name().to_string();
-        if let Some(rel) = name.strip_prefix("overrides/") {
+        let name = zf.name().replace('\\', "/");
+        if let Some(rel) = name.strip_prefix(&overrides) {
             if rel.is_empty() || name.ends_with('/') {
                 continue;
             }
@@ -1215,13 +1333,28 @@ pub async fn install_mrpack(
         percent: 45,
         detail: format!("{} dosya indiriliyor", jobs.len()),
     });
-    crate::util::download_many(
-        jobs,
-        crate::util::DlOpts { concurrency: 24, retries: 3 },
-        |_p| {},
-    )
-    .await
-    .map_err(|e| format!("paket dosyaları: {e}"))?;
+    let toplam = jobs.len();
+    if toplam > 0 {
+        // Tek dosyanın hatası tüm paketi düşürmesin: indirme motoru diğerlerini
+        // yine indirir; yalnız hiçbir dosya inmediyse hata ver.
+        if let Err(e) = crate::util::download_many(
+            jobs,
+            crate::util::DlOpts { concurrency: 24, retries: 3 },
+            |_p| {},
+        )
+        .await
+        {
+            crate::core::yikim_log(format!(
+                "mrpack: bazı dosyalar indirilemedi (paket yine de kuruldu): {e}"
+            ));
+            let inen = std::fs::read_dir(inst_dir.join("mods"))
+                .map(|d| d.count())
+                .unwrap_or(0);
+            if inen == 0 {
+                return Err(format!("paket dosyaları indirilemedi: {e}"));
+            }
+        }
+    }
 
     let _ = handle.emit("launch-progress", &crate::launcher::LaunchProgress {
         stage: "modpack".into(),
@@ -1229,6 +1362,102 @@ pub async fn install_mrpack(
         detail: "Tamamlandı".into(),
     });
     Ok(())
+}
+
+/// CurseForge dosya bilgisini çöz (indirme URL'si + dosya adı).
+///
+/// Ayna bazen `downloadUrl` boş döndürür; bu durumda CDN kalıbından üretilir
+/// (`/files/{id/1000}/{id%1000}/{dosyaAdı}`). 429/5xx'te kısa beklemeyle
+/// yeniden denenir; tek dosyanın hatası tüm paketi düşürmez.
+async fn cf_resolve_file(pid: u64, fid: u64) -> Option<(String, String)> {
+    if pid == 0 || fid == 0 {
+        return None;
+    }
+    let url = format!("{}/mods/{pid}/files/{fid}", cf_base());
+    let client = http_client();
+    for deneme in 0..3u32 {
+        let istek = cf_get(&client, &url).timeout(std::time::Duration::from_secs(25));
+        match istek.send().await {
+            Ok(resp) => {
+                let kod = resp.status().as_u16();
+                if kod == 429 || resp.status().is_server_error() {
+                    crate::core::msleep(700 * (deneme as u64 + 1));
+                    continue;
+                }
+                if !resp.status().is_success() {
+                    return None;
+                }
+                let js: serde_json::Value = match resp.json().await {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                let d = &js["data"];
+                let mut dl = d["downloadUrl"].as_str().unwrap_or("").to_string();
+                let fname = d["fileName"].as_str().unwrap_or("").to_string();
+                if fname.is_empty() {
+                    return None;
+                }
+                if dl.is_empty() {
+                    dl = format!(
+                        "https://edge.forgecdn.net/files/{}/{}/{}",
+                        fid / 1000,
+                        fid % 1000,
+                        urlencoding::encode(&fname)
+                    );
+                }
+                return Some((dl, fname));
+            }
+            Err(e) => {
+                crate::core::yikim_log(format!("CF dosya çözümü ({fid}) deneme {}: {e}", deneme + 1));
+                crate::core::msleep(500 * (deneme as u64 + 1));
+            }
+        }
+    }
+    None
+}
+
+/// Dosyaları eşzamanlı indir; tek dosya hatası tüm paketi düşürmez.
+/// Dönüş: (başarılı, hatalar).
+async fn indir_esnek(
+    jobs: Vec<(String, std::path::PathBuf)>,
+    eszamanli: usize,
+) -> (usize, Vec<String>) {
+    use futures_util::stream::{self, StreamExt};
+    let akis = stream::iter(jobs.into_iter().map(|(url, dest)| async move {
+        let ad = dest
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let mut son = String::new();
+        for deneme in 0..3u32 {
+            match download_file(&url, &dest, &ad).await {
+                Ok(()) => return (true, ad),
+                Err(e) => {
+                    // 404/403 kalıcı: yeniden denemek anlamsız
+                    let kalici = e.contains("404") || e.contains("403");
+                    son = format!("{ad}: {e}");
+                    if kalici {
+                        break;
+                    }
+                    crate::core::msleep(400 * (deneme as u64 + 1));
+                }
+            }
+        }
+        (false, son)
+    }))
+    .buffer_unordered(eszamanli.max(1));
+
+    let mut ok = 0usize;
+    let mut hatalar = Vec::new();
+    let mut akis = std::pin::pin!(akis);
+    while let Some((basarili, bilgi)) = akis.next().await {
+        if basarili {
+            ok += 1;
+        } else {
+            hatalar.push(bilgi);
+        }
+    }
+    (ok, hatalar)
 }
 
 /// CurseForge pack zip: manifest.json → files[] {projectID,fileID} + overrides/
@@ -1240,32 +1469,59 @@ pub async fn install_cfpack(
     use tauri::Emitter;
     let zipf = std::fs::File::open(pack_file).map_err(|e| e.to_string())?;
     let mut archive = zip::ZipArchive::new(zipf).map_err(|e| e.to_string())?;
+    // manifest.json iç içe klasörde de olabilir (elle yeniden sıkıştırılmış zip)
+    let manifest_name =
+        zip_find(&archive, "manifest.json").ok_or("manifest yok (geçerli bir CurseForge paketi değil)")?;
+    let kok = manifest_name.trim_end_matches("manifest.json").to_string();
     let manifest: serde_json::Value = {
-        let mut m = archive.by_name("manifest.json").map_err(|e| format!("manifest yok: {e}"))?;
+        let mut m = archive
+            .by_name(&manifest_name)
+            .map_err(|e| format!("manifest yok: {e}"))?;
         let mut s = String::new();
         use std::io::Read;
         m.read_to_string(&mut s).map_err(|e| e.to_string())?;
         serde_json::from_str(&s).map_err(|e| e.to_string())?
     };
-    inst.mc_version = manifest["minecraft"]["version"].as_str().unwrap_or("1.21.1").into();
-    let loader = manifest["minecraft"]["modLoaders"].as_array().and_then(|a| a.first());
+    inst.mc_version = manifest["minecraft"]["version"]
+        .as_str()
+        .unwrap_or("1.21.1")
+        .into();
+    // modLoaders: birincil (primary) girdiyi seç; yoksa ilkini al.
+    let loader = manifest["minecraft"]["modLoaders"]
+        .as_array()
+        .and_then(|a| {
+            a.iter()
+                .find(|l| l["primary"].as_bool().unwrap_or(false))
+                .or_else(|| a.first())
+        });
     if let Some(l) = loader {
         let id = l["id"].as_str().unwrap_or("");
-        if id.starts_with("fabric-") {
-            inst.mod_loader = "fabric".into();
-            inst.loader_version = id.trim_start_matches("fabric-").into();
-        } else if id.starts_with("forge-") {
-            inst.mod_loader = "forge".into();
-            inst.loader_version = id.trim_start_matches("forge-").into();
+        let (tur, ver) = id.split_once('-').unwrap_or(("", id));
+        match tur {
+            "fabric" => {
+                inst.mod_loader = "fabric".into();
+                inst.loader_version = ver.into();
+            }
+            // NeoForge paketleri: "neoforge-21.1.80"
+            "neoforge" => {
+                inst.mod_loader = "neoforge".into();
+                inst.loader_version = ver.into();
+            }
+            "forge" => {
+                inst.mod_loader = "forge".into();
+                inst.loader_version = ver.into();
+            }
+            _ => {}
         }
     }
 
     // overrides
     let inst_dir = inst.dir();
+    let overrides = format!("{kok}overrides/");
     for i in 0..archive.len() {
         let mut zf = archive.by_index(i).map_err(|e| e.to_string())?;
-        let name = zf.name().to_string();
-        if let Some(rel) = name.strip_prefix("overrides/") {
+        let name = zf.name().replace('\\', "/");
+        if let Some(rel) = name.strip_prefix(&overrides) {
             if rel.is_empty() || name.ends_with('/') {
                 continue;
             }
@@ -1278,36 +1534,76 @@ pub async fn install_cfpack(
         }
     }
 
-    // dosyaları çöz
+    // dosyaları EŞZAMANLI çöz (sıralı çözüm 300+ modlu paketlerde dakikalar
+    // sürüyordu ve tek hata tüm kurulumu düşürüyordu).
     let files = manifest["files"].as_array().cloned().unwrap_or_default();
-    let client = http_client();
-    let mut jobs: Vec<(String, std::path::PathBuf, Option<String>)> = Vec::new();
-    for (i, f) in files.iter().enumerate() {
-        let pid = f["projectID"].as_u64().unwrap_or(0);
-        let fid = f["fileID"].as_u64().unwrap_or(0);
-        let resp = cf_get(&client, &format!("{}/mods/{pid}/files/{fid}", cf_base()))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        let js: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-        let url = js["data"]["downloadUrl"].as_str().unwrap_or("").to_string();
-        let fname = js["data"]["fileName"].as_str().unwrap_or("").to_string();
-        if url.is_empty() {
-            continue;
-        }
-        let _ = handle.emit("launch-progress", &crate::launcher::LaunchProgress {
-            stage: "modpack".into(),
-            percent: 50 + ((i as f32 / files.len().max(1) as f32) * 10.0) as u8,
-            detail: format!("çözümleniyor: {fname}"),
+    let total = files.len();
+    let mut jobs: Vec<(String, std::path::PathBuf)> = Vec::new();
+    let mut cozulemeyen = 0usize;
+    if total > 0 {
+        use futures_util::stream::{self, StreamExt};
+        let isler = files.iter().cloned().map(|f| async move {
+            let pid = f["projectID"].as_u64().unwrap_or(0);
+            let fid = f["fileID"].as_u64().unwrap_or(0);
+            cf_resolve_file(pid, fid).await
         });
-        jobs.push((url, inst_dir.join("mods").join(fname), None));
+        let mut akis = stream::iter(isler).buffer_unordered(16);
+        let mut islenen = 0usize;
+        while let Some(sonuc) = akis.next().await {
+            islenen += 1;
+            match sonuc {
+                Some((url, fname)) => jobs.push((url, inst_dir.join("mods").join(fname))),
+                None => cozulemeyen += 1,
+            }
+            if islenen % 20 == 0 || islenen == total {
+                let _ = handle.emit(
+                    "launch-progress",
+                    &crate::launcher::LaunchProgress {
+                        stage: "modpack".into(),
+                        percent: (40.0 + (islenen as f32 / total as f32) * 25.0) as u8,
+                        detail: format!("dosyalar çözümleniyor: {islenen}/{total}"),
+                    },
+                );
+            }
+        }
     }
-    crate::util::download_many(
-        jobs,
-        crate::util::DlOpts { concurrency: 16, retries: 3 },
-        |_p| {},
-    )
-    .await
-    .map_err(|e| format!("paket dosyaları: {e}"))?;
+    if cozulemeyen > 0 {
+        crate::core::yikim_log(format!(
+            "CurseForge paketi: {cozulemeyen}/{total} dosya çözümlenemedi (atlandı)"
+        ));
+    }
+    if total > 0 && jobs.is_empty() {
+        return Err(format!(
+            "paket dosyaları çözümlenemedi ({total} dosya) — CurseForge erişimi engellenmiş olabilir"
+        ));
+    }
+
+    let _ = handle.emit(
+        "launch-progress",
+        &crate::launcher::LaunchProgress {
+            stage: "modpack".into(),
+            percent: 66,
+            detail: format!("{} dosya indiriliyor", jobs.len()),
+        },
+    );
+    let (ok, hatalar) = indir_esnek(jobs, 16).await;
+    if !hatalar.is_empty() {
+        crate::core::yikim_log(format!(
+            "CurseForge paketi: {} dosya indirilemedi (paket yine de kuruldu). İlk hata: {}",
+            hatalar.len(),
+            hatalar.first().cloned().unwrap_or_default()
+        ));
+    }
+    if ok == 0 && total > 0 {
+        return Err("paket dosyaları indirilemedi — internet/CurseForge erişimini kontrol et".into());
+    }
+    let _ = handle.emit(
+        "launch-progress",
+        &crate::launcher::LaunchProgress {
+            stage: "modpack".into(),
+            percent: 95,
+            detail: "Tamamlandı".into(),
+        },
+    );
     Ok(())
 }

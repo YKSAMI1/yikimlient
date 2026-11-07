@@ -80,7 +80,7 @@ function buildList(_preset = false): void {
         </div>
         <div class="xp-head-badges">
           <span class="chip green">● Modrinth</span>
-          <span class="chip ${state.curseforge ? "green" : "gray"}" title="${state.curseforge ? "Resmî API (anahtar var)" : "Genel ayna üzerinden"}">● CurseForge</span>
+          <span class="chip ${state.curseforge ? "green" : "gray"}" title="CurseForge (resmî API veya anahtarsız genel ayna)">● CurseForge</span>
         </div>
       </div>
 
@@ -365,6 +365,9 @@ function openProject(r: SearchResult): void {
 async function buildProject(r: SearchResult): Promise<void> {
   const root = kok!;
   const isContent = ["resourcepack", "shader", "world", "datapack"].includes(r.kind);
+  // Mod paketi HER ZAMAN yeni bir kurulum oluşturur; hedef kurulum seçimi anlamsız
+  // (mod paketi, mod paketinin içine kurulamaz).
+  const isPack = r.kind === "modpack";
   root.innerHTML = `
     <div class="page-wrap xp-wrap xp-detail">
       <button class="xp-back" id="xp-back">${icon("back")} Keşfet'e dön</button>
@@ -402,7 +405,10 @@ async function buildProject(r: SearchResult): Promise<void> {
         <aside class="xp-side">
           <div class="xp-panel xp-install">
             <div class="xp-panel-h">Kur</div>
-            ${state.instances.length ? `
+            ${isPack ? `
+              <p class="xp-note">Bu paket için <b>yeni bir kurulum</b> oluşturulacak. Paket kendi Minecraft sürümünü ve yükleyicisini getirir; hedef kurulum seçilmez.</p>
+              <div class="xp-ver-list" id="xp-vers"><div class="spinner" style="margin:22px auto"></div></div>
+            ` : state.instances.length ? `
               <label class="xp-field"><span>Hedef kurulum</span>
                 <select class="input" id="xp-inst">
                   ${state.instances.map((i) => `<option value="${i.id}">${i.name} · ${i.mod_loader} ${i.mc_version}</option>`).join("")}
@@ -487,40 +493,48 @@ async function buildProject(r: SearchResult): Promise<void> {
     }
   })();
 
-  if (!state.instances.length) return;
+  // Mod paketi hedef kurulum GEREKTİRMEZ (kendi kurulumunu oluşturur).
+  if (!isPack && !state.instances.length) return;
 
-  const instSel = root.querySelector("#xp-inst") as HTMLSelectElement;
-  const mcSel = root.querySelector("#xp-mc") as HTMLSelectElement;
-  const loadSel = root.querySelector("#xp-loader") as HTMLSelectElement;
+  const instSel = root.querySelector("#xp-inst") as HTMLSelectElement | null;
+  const mcSel = root.querySelector("#xp-mc") as HTMLSelectElement | null;
+  const loadSel = root.querySelector("#xp-loader") as HTMLSelectElement | null;
   const list = root.querySelector("#xp-vers") as HTMLElement;
 
   let tumVersiyonlar: RepoVersion[] = [];
   let lastVerSayfa = 8;
-  const inst = () => state.instances.find((i) => i.id === instSel.value) || state.instances[0];
+  const inst = () =>
+    isPack ? null : state.instances.find((i) => i.id === instSel?.value) || state.instances[0];
 
   // kurulum seçimi değişince sürüm/loader'ı o kuruluma otomatik çek
   const instUygula = () => {
     const i = inst();
     const mc = i?.mc_version || "";
     const ld = i?.mod_loader || "fabric";
-    if (![...mcSel.options].some((o) => o.value === mc)) {
-      mcSel.appendChild(new Option(mc, mc));
+    if (mcSel) {
+      if (![...mcSel.options].some((o) => o.value === mc)) {
+        mcSel.appendChild(new Option(mc, mc));
+      }
+      mcSel.value = mc;
     }
-    mcSel.value = mc;
-    if (![...loadSel.options].some((o) => o.value === ld)) {
-      loadSel.appendChild(new Option(ld, ld));
+    if (loadSel) {
+      if (![...loadSel.options].some((o) => o.value === ld)) {
+        loadSel.appendChild(new Option(ld, ld));
+      }
+      loadSel.value = ld;
     }
-    loadSel.value = ld;
     cizVers();
   };
-  instSel.addEventListener("change", instUygula);
-  mcSel.addEventListener("change", () => { lastVerSayfa = 8; cizVers(); });
-  loadSel.addEventListener("change", () => { lastVerSayfa = 8; cizVers(); });
+  instSel?.addEventListener("change", instUygula);
+  mcSel?.addEventListener("change", () => { lastVerSayfa = 8; cizVers(); });
+  loadSel?.addEventListener("change", () => { lastVerSayfa = 8; cizVers(); });
 
   function cizVers(): void {
     const i = inst();
-    const mc = mcSel.value || i?.mc_version || "";
-    const ld = isContent ? "" : (loadSel.value || i?.mod_loader || "");
+    // Mod paketinde sürüm listesi hedef kuruluma göre süzülmez; paket kendi
+    // Minecraft sürümünü getirir.
+    const mc = isPack ? "" : (mcSel?.value || i?.mc_version || "");
+    const ld = isPack ? "" : (isContent ? "" : (loadSel?.value || i?.mod_loader || ""));
     const uygun = tumVersiyonlar.filter((v) => uyumluMu(v, mc, ld, isContent));
     const digerleri = tumVersiyonlar.filter((v) => !uygun.includes(v));
 
@@ -563,7 +577,7 @@ async function buildProject(r: SearchResult): Promise<void> {
     list.querySelectorAll<HTMLButtonElement>(".xp-ver-kur").forEach((btn) => {
       btn.addEventListener("click", () => {
         const v = tumVersiyonlar.find((x) => x.id === btn.dataset.id);
-        if (v) void kurVersion(r, v, instSel.value, btn);
+        if (v) void kurVersion(r, v, instSel?.value || "", btn);
       });
     });
   }
@@ -600,18 +614,23 @@ async function buildProject(r: SearchResult): Promise<void> {
   }
 
   // oyun sürümü seçenekleri: projede olanlar + kurulumun sürümü
-  const surumler = new Set<string>();
-  for (const v of tumVersiyonlar) for (const g of v.game_versions || []) surumler.add(g);
-  const sirali = [...surumler].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-  mcSel.innerHTML = sirali.map((s) => `<option value="${s}">${s}</option>`).join("") || `<option value="">—</option>`;
+  if (mcSel) {
+    const surumler = new Set<string>();
+    for (const v of tumVersiyonlar) for (const g of v.game_versions || []) surumler.add(g);
+    const sirali = [...surumler].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+    mcSel.innerHTML = sirali.map((s) => `<option value="${s}">${s}</option>`).join("") || `<option value="">—</option>`;
+  }
 
-  const yukleyiciler = new Set<string>();
-  for (const v of tumVersiyonlar) for (const l of v.loaders || []) yukleyiciler.add(l);
-  const yl = ["fabric", "quilt", "forge", "neoforge", "rift"].filter((l) => yukleyiciler.has(l));
-  loadSel.innerHTML = (yl.length ? yl : [...yukleyiciler]).map((l) => `<option value="${l}">${l}</option>`).join("") ||
-    `<option value="">—</option>`;
+  if (loadSel) {
+    const yukleyiciler = new Set<string>();
+    for (const v of tumVersiyonlar) for (const l of v.loaders || []) yukleyiciler.add(l);
+    const yl = ["fabric", "quilt", "forge", "neoforge", "rift"].filter((l) => yukleyiciler.has(l));
+    loadSel.innerHTML = (yl.length ? yl : [...yukleyiciler]).map((l) => `<option value="${l}">${l}</option>`).join("") ||
+      `<option value="">—</option>`;
+  }
 
-  instUygula();
+  if (isPack) cizVers();
+  else instUygula();
 }
 
 function uyumluMu(v: RepoVersion, mc: string, loader: string, isContent: boolean): boolean {
@@ -629,13 +648,14 @@ function uyumluMu(v: RepoVersion, mc: string, loader: string, isContent: boolean
 }
 
 async function kurVersion(r: SearchResult, v: RepoVersion, instanceId: string, btn: HTMLButtonElement): Promise<void> {
+  // Mod paketi: hedef kurulum GEREKMEZ — her zaman yeni kurulum oluşturur.
+  if (r.kind === "modpack") {
+    await installPack(r, v);
+    return;
+  }
   if (!instanceId) {
     toast("Önce bir kurulum oluştur", "err");
     navigate("instances");
-    return;
-  }
-  if (r.kind === "modpack") {
-    await installPack(r, v);
     return;
   }
   const eski = btn.innerHTML;

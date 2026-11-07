@@ -295,6 +295,160 @@ pub async fn install_forge_profile(mc: &str, forge_ver: &str) -> Result<String, 
     Ok(vid)
 }
 
+// ---------- NeoForge ----------
+
+/// NeoForge maven sürüm serisi: MC 1.21.1 → "21.1", 1.21 → "21.0".
+/// 1.20.1 ve öncesi, NeoForge'un eski `net.neoforged:forge` biçimini kullanır
+/// (bu yüzden `None`).
+pub fn neoforge_series(mc: &str) -> Option<String> {
+    let p: Vec<&str> = mc.split('.').collect();
+    if p.first() != Some(&"1") || p.len() < 2 {
+        return None;
+    }
+    if p.get(2) == Some(&"1") && p[1] == "20" {
+        // 1.20.1 → NeoForge'un eski `net.neoforged:forge` biçimi
+        return None;
+    }
+    Some(format!("{}.{}", p[1], p.get(2).copied().unwrap_or("0")))
+}
+
+/// Kurulu sürüm kimliği: modern → "neoforge-21.1.80",
+/// eski (1.20.1) → "1.20.1-forge-47.1.106".
+pub fn neoforge_version_id(mc: &str, ver: &str) -> String {
+    let ver = ver.trim();
+    let ver = ver.strip_prefix("neoforge-").unwrap_or(ver);
+    match neoforge_series(mc) {
+        Some(_) => format!("neoforge-{ver}"),
+        None => {
+            let v = ver.strip_prefix(&format!("{mc}-")).unwrap_or(ver);
+            format!("{mc}-forge-{v}")
+        }
+    }
+}
+
+/// NeoForge'un en güncel kararlı build'i (beta/rc atlanır).
+pub async fn neoforge_latest_build(mc: &str) -> Result<String, String> {
+    let (url, onek) = match neoforge_series(mc) {
+        Some(seri) => (
+            "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml",
+            format!("{seri}."),
+        ),
+        None => (
+            "https://maven.neoforged.net/releases/net/neoforged/forge/maven-metadata.xml",
+            format!("{mc}-"),
+        ),
+    };
+    let resp = http_client().get(url).send().await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("neoforge metadata hatası: {}", resp.status()));
+    }
+    let xml = resp.text().await.map_err(|e| e.to_string())?;
+    let mut en_iyi: Option<String> = None;
+    for parca in xml.split("<version>").skip(1) {
+        let Some(son) = parca.split("</version>").next() else {
+            continue;
+        };
+        let v = son.trim();
+        if !v.starts_with(&onek) || v.contains("-beta") || v.contains("-rc") || v.contains("-alpha") {
+            continue;
+        }
+        if en_iyi
+            .as_deref()
+            .map(|e| loader_version_lt(e, v))
+            .unwrap_or(true)
+        {
+            en_iyi = Some(v.to_string());
+        }
+    }
+    en_iyi.ok_or_else(|| format!("NeoForge {mc} için build bulunamadı"))
+}
+
+/// NeoForge kurulumu: resmî installer jar + `--installClient <oyun_dizini>`.
+/// Installer kendi libraries'lerini ve versions/<id>.json'u yazar.
+pub async fn install_neoforge_profile(mc: &str, ver: &str) -> Result<String, String> {
+    let ver = ver.trim();
+    let ver = ver.strip_prefix("neoforge-").unwrap_or(ver);
+    let vid = neoforge_version_id(mc, ver);
+    let vers = versions_dir();
+    let profil = vers.join(&vid).join(format!("{vid}.json"));
+    if profil.exists() {
+        yikim_log(format!("neoforge profili hazır: {vid}"));
+        return Ok(vid);
+    }
+
+    // resmî maven: modern → neoforge/<ver>, eski → forge/<mc>-<ver>
+    let (url, dosya) = match neoforge_series(mc) {
+        Some(_) => (
+            format!(
+                "https://maven.neoforged.net/releases/net/neoforged/neoforge/{ver}/neoforge-{ver}-installer.jar"
+            ),
+            format!("neoforge-{ver}-installer.jar"),
+        ),
+        None => {
+            let tam = ver.strip_prefix(&format!("{mc}-")).unwrap_or(ver);
+            let tam = format!("{mc}-{tam}");
+            (
+                format!(
+                    "https://maven.neoforged.net/releases/net/neoforged/forge/{tam}/forge-{tam}-installer.jar"
+                ),
+                format!("forge-{tam}-installer.jar"),
+            )
+        }
+    };
+
+    // kurulum için java: vanilla sürümün javaVersion'ından çözülür
+    let vj = load_version_json_merged(mc).await?;
+    let component = vj["javaVersion"]["component"]
+        .as_str()
+        .unwrap_or("java-runtime-gamma")
+        .to_string();
+    let major = vj["javaVersion"]["majorVersion"].as_u64().unwrap_or(21) as u32;
+    let java_dir = resolve_java_dirs(&component, major, None).await?;
+    let java = java_exe(&java_dir);
+
+    let cache = app_dir().join("cache");
+    std::fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
+    let installer = cache.join(&dosya);
+    if !installer.exists() {
+        yikim_log(format!("neoforge installer indiriliyor: {url}"));
+        let resp = http_client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("neoforge installer indirilemedi: {e}"))?;
+        if !resp.status().is_success() {
+            return Err(format!("neoforge installer hatası: {}", resp.status()));
+        }
+        let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+        std::fs::write(&installer, &bytes).map_err(|e| e.to_string())?;
+    }
+
+    yikim_log(format!("neoforge kurulumu başlıyor: {vid}"));
+    let cikti = std::process::Command::new(&java)
+        .arg("-jar")
+        .arg(&installer)
+        .arg("--installClient")
+        .arg(app_dir())
+        .output()
+        .map_err(|e| format!("neoforge installer başlatılamadı: {e}"))?;
+    if !cikti.status.success() {
+        let log = String::from_utf8_lossy(&cikti.stderr);
+        yikim_log(format!(
+            "neoforge installer çıktı: {}",
+            log.chars().take(400).collect::<String>()
+        ));
+        return Err(format!(
+            "neoforge installer hata kodu {:?} — ayrıntı kayıtlarda",
+            cikti.status.code()
+        ));
+    }
+    if !profil.exists() {
+        return Err(format!("neoforge installer sürüm json'u yazmadı: {vid}"));
+    }
+    yikim_log(format!("neoforge profili kuruldu: {vid}"));
+    Ok(vid)
+}
+
 // ---------- Version json (inheritsFrom birleştirmeli) ----------
 
 pub async fn load_version_json_merged(id: &str) -> Result<serde_json::Value, String> {

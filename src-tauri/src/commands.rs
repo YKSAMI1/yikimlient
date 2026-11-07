@@ -1021,6 +1021,10 @@ pub async fn cmd_create_instance(
     if instance.mod_loader == "forge" && instance.loader_version.trim().is_empty() {
         instance.loader_version = launcher::forge_latest_build(&instance.mc_version).await.unwrap_or_default();
     }
+    // neoforge build'i boşsa en günceli al
+    if instance.mod_loader == "neoforge" && instance.loader_version.trim().is_empty() {
+        instance.loader_version = launcher::neoforge_latest_build(&instance.mc_version).await.unwrap_or_default();
+    }
     let created = instances::create(instance)?;
 
     // YIKIM çekirdeği — her kurulumda otomatik (yalnız Fabric + 1.21.x)
@@ -1927,10 +1931,15 @@ pub async fn cmd_route_dropped(path: String) -> Result<String, String> {
         "zip" => {
             // içinde ne var? paket indeksleri / dünya verisi
             if let Ok(f) = std::fs::File::open(&src) {
-                if let Ok(mut archive) = zip::ZipArchive::new(f) {
-                    if archive.by_name("modrinth.index.json").is_ok()
-                        || archive.by_name("manifest.json").is_ok()
-                    {
+                if let Ok(archive) = zip::ZipArchive::new(f) {
+                    let paket = archive.file_names().any(|n| {
+                        let n = n.replace('\\', "/");
+                        n == "modrinth.index.json"
+                            || n == "manifest.json"
+                            || n.ends_with("/modrinth.index.json")
+                            || n.ends_with("/manifest.json")
+                    });
+                    if paket {
                         return Ok("modpack".into());
                     }
                     let mut names: Vec<String> = archive
@@ -2080,6 +2089,10 @@ pub async fn cmd_install_pack_files(
                 if let Err(e) = launcher::install_forge_profile(&inst.mc_version, &inst.loader_version).await {
                     core::yikim_log(format!("forge önden kurulamadı (launch'ta tekrar denenir): {e}"));
                 }
+            } else if inst.mod_loader == "neoforge" && !inst.loader_version.is_empty() {
+                if let Err(e) = launcher::install_neoforge_profile(&inst.mc_version, &inst.loader_version).await {
+                    core::yikim_log(format!("neoforge önden kurulamadı (launch'ta tekrar denenir): {e}"));
+                }
             }
             inst.save()?;
             // YIKIM çekirdeği — paket kurulumlarında da otomatik
@@ -2126,15 +2139,27 @@ pub async fn cmd_import_pack_file(
     }
     let zipf = std::fs::File::open(&p).map_err(|e| format!("paket okunamadı: {e}"))?;
     let mut archive = zip::ZipArchive::new(zipf).map_err(|e| format!("paket açılamadı: {e}"))?;
-    let (fmt, inner_name): (String, String) = if archive.by_name("modrinth.index.json").is_ok() {
-        let mut idx = archive.by_name("modrinth.index.json").map_err(|e| e.to_string())?;
+    // İndeks dosyası kökte ya da (elle yeniden sıkıştırılmış zip'lerde) bir alt
+    // klasörde olabilir — ikisini de tara.
+    let adlar: Vec<String> = archive
+        .file_names()
+        .map(|s| s.replace('\\', "/"))
+        .collect();
+    let bul = |hedef: &str| {
+        adlar
+            .iter()
+            .find(|n| n.as_str() == hedef || n.ends_with(&format!("/{hedef}")))
+            .cloned()
+    };
+    let (fmt, inner_name): (String, String) = if let Some(ad) = bul("modrinth.index.json") {
+        let mut idx = archive.by_name(&ad).map_err(|e| e.to_string())?;
         let mut s = String::new();
         use std::io::Read;
         idx.read_to_string(&mut s).map_err(|e| e.to_string())?;
         let index: serde_json::Value = serde_json::from_str(&s).map_err(|e| e.to_string())?;
         ("modrinth".into(), index["name"].as_str().unwrap_or("").to_string())
-    } else if archive.by_name("manifest.json").is_ok() {
-        let mut m = archive.by_name("manifest.json").map_err(|e| e.to_string())?;
+    } else if let Some(ad) = bul("manifest.json") {
+        let mut m = archive.by_name(&ad).map_err(|e| e.to_string())?;
         let mut s = String::new();
         use std::io::Read;
         m.read_to_string(&mut s).map_err(|e| e.to_string())?;
@@ -2174,6 +2199,10 @@ pub async fn cmd_import_pack_file(
             } else if inst.mod_loader == "forge" && !inst.loader_version.is_empty() {
                 if let Err(e) = launcher::install_forge_profile(&inst.mc_version, &inst.loader_version).await {
                     core::yikim_log(format!("forge önden kurulamadı (launch'ta tekrar denenir): {e}"));
+                }
+            } else if inst.mod_loader == "neoforge" && !inst.loader_version.is_empty() {
+                if let Err(e) = launcher::install_neoforge_profile(&inst.mc_version, &inst.loader_version).await {
+                    core::yikim_log(format!("neoforge önden kurulamadı (launch'ta tekrar denenir): {e}"));
                 }
             }
             inst.save()?;
@@ -2423,6 +2452,23 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
             let vid = format!("{}-forge-{}", inst.mc_version, forge_ver);
             if !crate::core::versions_dir().join(&vid).join(format!("{vid}.json")).exists() {
                 launcher::install_forge_profile(&inst.mc_version, &forge_ver).await?;
+            }
+            vid
+        }
+        "neoforge" => {
+            if inst.loader_version.is_empty() {
+                inst.loader_version = launcher::neoforge_latest_build(&inst.mc_version).await?;
+                inst.save()?;
+            }
+            // paket bazen "neoforge-21.1.80" ya da tam kimlik yazar — ayıkla
+            let nf_ver = inst
+                .loader_version
+                .strip_prefix("neoforge-")
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| inst.loader_version.clone());
+            let vid = launcher::neoforge_version_id(&inst.mc_version, &nf_ver);
+            if !crate::core::versions_dir().join(&vid).join(format!("{vid}.json")).exists() {
+                launcher::install_neoforge_profile(&inst.mc_version, &nf_ver).await?;
             }
             vid
         }
