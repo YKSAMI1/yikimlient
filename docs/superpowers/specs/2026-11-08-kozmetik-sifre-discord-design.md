@@ -217,7 +217,84 @@ Mevcut davranış korunur (tag/rol otomasyonu, hoşgeldin/veda mesajı). Üzerin
 7. Panel: doğrulama iptal, limit değiştirme, duyuru imzalama.
 8. Herkese açılmadan ÖNCE: bot'un yalnızca sahip ID'sine mesaj attığını doğrula.
 
-## 15. Açık sorular (sahibin kararı)
+## 21. Güvenlik mimarisi — nihai kararlar (v4)
+
+**1) İstemci (launcher) hiçbir ortak sır tutmaz.**
+Açık kaynak olması bir dezavantaj değil, çünkü güvenlik kodu saklamaya değil sunucu
+yetkisine dayanır. İstemci ilk açılışta kendi **Ed25519 anahtar çiftini** üretir; özel
+anahtar yalnızca o cihazda kalır. Sunucuya kaydı (enrollment) Discord bağlama kodunun
+kabulü olur: kod, o kişinin o an o launcher'ı çalıştırdığını ve Discord'u yönettiğini
+kanıtlar. Böylece "herkese açık depoda sır var" sorunu tamamen kalkar.
+
+**2) Yetki sunucudadır (server-authoritative).**
+Kozmetik yayınlama, sıfırlama, rol, limit — hepsi sunucu sınırında. Sunucu yanıtlarını
+kendi Ed25519 anahtarıyla imzalar; launcher gömülü genel anahtarla doğrular. İmzasız/
+sahte sunucu yanıtı reddedilir.
+
+**3) Parola.**
+Sunucuda `Argon2id(tuz, pepper‖parola)`; pepper yalnızca Worker env'de (depoda, istemcide
+ve veritabanında yok). İstemci parolayı yalnız TLS üzerinden gönderir; türetme sunucuda.
+5 hatalı deneme → o hesap+cihaz 24 saat (sunucu sayar; yerel sayaç yalnızca arayüz
+bilgisidir, güvenlik sınırı sayılmaz).
+
+**4) Çevrimdışı oynama (fail-open play, fail-closed change).**
+Sunucu, her başarılı çevrimiçi girişte 7 günlük **çevrimdışı izin belgesi** (Ed25519 imzalı)
+verir; ayrıca istemcide yerel `Argon2id` parola hash'i tutulur. Belge + parola bilgisi
+varsa bot kapalıyken de giriş ve oyun çalışır; kozmetik/sunucu verisi **değiştirilemez**.
+Dosya çalınsa bile parola (Argon2id) ve sunucu imzası gerektiği için hesap ele geçirilemez.
+
+**5) Kozmetik aktarımı doğrulanmış.**
+Diğer oyuncuların gördüğü kozmetik **sunucudan imzalı indeks + sha256** ile gelir; yayınlama
+(cihaz imzası + rol kontrolü) sunucu kapısından geçer. Değiştirilmiş bir istemci başkasının
+ekranına sahte kozmetik sokamaz — çünkü içerik kaynağı sunucudur.
+
+**6) İptal.** Cihaz anahtarı, bağlantı veya kozmetik indeks satırı iptal edilebilir; hepsi
+anında sunucu tarafında etkili.
+
+**7) Yerel-only mod (belgelenen geri dönüş).**
+İnternet yoksa: hesap açılabilir, yerel kozmetik/skin korunur, Discord bağlantısı/rol/
+şifre oluşturma kapalıdır (bot kapalı uyarısı). Eşitleme sonraki çevrimiçi açılışta kendiliğinden.
+
+**8) Sunucun engelleyemediği tek şey (dürüstlük notu):**
+Kullanıcı kendi launcher'ını değiştirip kendi ekranında istediğini çizebilir. Bu yalnızca
+kendi ekranını etkiler; diğer oyuncular sunucudan doğrulanmış içeriği gördüğinden topluluk
+görünümü korunur. Bu nedenle "güvenlik" = sunucu tarafı yetki + doğrulanmış içerik.
+
+## 22. Açık kaynak politikası (v4)
+
+- Launcher ve bot **açık kaynak kalır**: istemcide saklanacak bir sır yoktur, bu yüzden
+  açık kaynak olmak güvenliği düşürmez.
+- **Yayınlanmayacak tek şer çalışma anındaki sırlardır** (depoya hiç girmeyen env değerleri):
+  Argon2 pepper, sunucu imzalama anahtarı, haber ed25519 anahtarı, bot token'i.
+  Kod açık, anahtarlar kapalı — klasik ve doğru model.
+
+## 23. Kullanıcı ekranları — en anlaşılır akış (v4)
+
+Tüm metinler Türkçe, tek ekranda tek iş, her adımda neden sorulduğu bir cümleyle yazılır.
+
+**Ekran 1 — "Hesaplarını güvene al" (ilk açılış, sırayla her hesap):**
+- Başlık + alt satır: "Bu launcher artık hesapları koruyor. Kozmetiklerinin ve rozetinin
+  başka cihazlarda da görünmesi için her hesabı bir kez doğrulaman yeterli."
+- Her hesap için sırayla: Microsoft hesapta "Microsoft ile doğrula"; çatlak hesapta
+  "Discord'u bağla" (8 haneli kod gösterilir + `/bagla <kod>` yazması söylenir).
+- Sonra "Şifre oluştur" (iki alan, göz ikonu, "en az 8 karakter").
+- "Şimdi değil" bağlantısı: "Hesabını kullanmaya devam edebilirsin. Kozmetik ve skin
+  değişikliği bu hesapta kapalı kalır; daha sonra Ayarlar > Güvenlik'ten bağlayabilirsin."
+
+**Ekran 2 — Kozmetik sayfası (doğrulanmamış hesap):**
+- Kilit simgesi + "Bu hesapta kozmetik değiştiremezsin."
+- "Hesabını doğrula" butonu → 1 adımlık akış (Discord bağla → şifre oluştur).
+
+**Ekran 3 — Bot kapalı uyarısı (açık bir rozet/biçiminde):**
+- "Discord bağlantısı şu an kapalı (bot çevrimdışı). Oyun ve mevcut kozmetiklerin çalışmaya
+  devam eder; bağlantı ve şifre işlemleri bot açılınca yapılabilir."
+
+**Ekran 4 — Giriş ekranı (doğrulanmamış hesap açıldığında):**
+- Hesap adının yanında: Y logosu, onun solunda küçük ✕ ve "doğrulanmadı" ipucu.
+
+**Ekran 5 — Şifremi unuttum:** "Discord ile doğrula" → bot DM'den gelen 8 karakterlik
+kodu gir → yeni şifre belirle. 5 hatalı denemede ekran kilitlenir ve "24 saat sonra
+tekrar dene" yazar.
 
 > v3: sorular sahip tarafından cevaplandı; kararlar §18-20'ye taşındı.
 > Yapıcının yerel kararları §17'de.
