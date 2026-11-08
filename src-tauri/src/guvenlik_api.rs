@@ -137,11 +137,19 @@ pub async fn api_cagir<T: DeserializeOwned>(
     // Sunucu imzası doğrula (açık anahtar biliniyorsa).
     if let (Some(pub_b64), Some(yanit_imza)) = (sunucu_pub_b64(), deger.get("yanit_imza").and_then(|v| v.as_str())) {
         let govde_str = deger
-            .get("govde")
-            .map(|g| g.to_string())
-            .unwrap_or_else(|| "null".to_string());
+            .get("govde_metin")
+            .and_then(|g| g.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                deger
+                    .get("govde")
+                    .map(|g| g.to_string())
+                    .unwrap_or_else(|| "null".to_string())
+            });
         if crate::guvenlik::imza_dogrula(&pub_b64, govde_str.as_bytes(), yanit_imza) {
-            serde_json::from_value(deger["govde"].clone()).map_err(|e| e.to_string())
+            let govde: serde_json::Value = serde_json::from_str(&govde_str)
+                .unwrap_or_else(|_| deger.get("govde").cloned().unwrap_or(serde_json::Value::Null));
+            serde_json::from_value(govde).map_err(|e| e.to_string())
         } else {
             Err("api_imza_gecersiz: sunucu yaniti dogrulanamadi".into())
         }
@@ -181,11 +189,32 @@ mod tests {
     // Testler gerçek API'ye yazar (cihaz, hesap, IP kaydı) — proje kapsamı.
 
     /// Her canlı test için TERTEMİZ uygulama dizini (cihaz kimliği yeniden üretilir).
+    /// Aynı zamanda sunucunun açık anahtarını buraya yazar: böylece test İMZA
+    /// DOĞRULAMASINI gerçekten yapar (eskiden anahtar dosyası olmadığı için
+    /// kontrol sessizce atlanıyor, bozuk imza yakalanmıyordu).
     fn canli_ortam() -> std::path::PathBuf {
         let d = std::env::temp_dir().join(format!("yk-canli-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         std::env::set_var("YIKIM_APP_DIR", &d);
+        let guv = d.join("guvenlik");
+        let _ = std::fs::create_dir_all(&guv);
+        // sunucunun açık anahtarını node ile sor (senkron, tokio bağlamı yok)
+        let adres = format!("{}/api/saglik", api_adresi());
+        if let Ok(cikti) = std::process::Command::new("node")
+            .args([
+                "-e",
+                &format!("fetch('{adres}').then(r=>r.json()).then(j=>console.log(JSON.stringify(j.govde)))"),
+            ])
+            .output()
+        {
+            let metin = String::from_utf8_lossy(&cikti.stdout).trim().to_string();
+            if let Ok(sag) = serde_json::from_str::<serde_json::Value>(&metin) {
+                if let Some(p) = sag.get("sunucu_genel_anahtar").and_then(|v| v.as_str()) {
+                    let _ = std::fs::write(guv.join("api-pub.txt"), p);
+                }
+            }
+        }
         d
     }
 
@@ -229,6 +258,37 @@ mod tests {
             .await
             .map_err(|e| format!("api_kapali: {e}"))?;
         Ok(r.status().as_u16())
+    }
+
+    /// İMZA DOĞRULAMASI gerçekten çalışıyor mu?
+    /// Sunucunun açık anahtarı BİLİNİYORSA bozuk istek reddedilmeli.
+    /// (Eskiden bu yol hiç denenmiyordu — anahtar dosyası olmadığı için
+    ///  doğrulama sessizce atlanıyordu; JS/Alfabetik sıra farkı bir süre
+    ///  görünmeden kalabilirdi.)
+    #[tokio::test]
+    #[ignore = "yerel API gerektirir (guvenlik-api)"]
+    async fn canli_imza_yolu_calisiyor() {
+        canli_ortam(); // sunucu açık anahtarını yazar
+        assert!(sunucu_pub_b64().is_some(), "sunucu acik anahtari okunamadi");
+
+        let c = cihaz_kimligi_al(true).expect("cihaz üretilemedi");
+        // Geçerli imzalı istek: kabul edilmeli.
+        let ok: serde_json::Value = api_cagir(
+            "/api/cihaz/kaydet",
+            serde_json::json!({ "cihaz_id": c.cihaz_id, "pub_key": c.pub_b64 }),
+        )
+        .await
+        .expect("imzali istek reddedildi (dogru davranis: kabul)");
+        assert_eq!(ok["tamam"], true);
+
+        // Aynı cihaz tekrar kaydolabilir (imza yine doğrulanır) — hata değil.
+        let ok2: serde_json::Value = api_cagir(
+            "/api/cihaz/kaydet",
+            serde_json::json!({ "cihaz_id": c.cihaz_id, "pub_key": c.pub_b64 }),
+        )
+        .await
+        .expect("ikinci kayit da kabul edilmeli");
+        assert_eq!(ok2["tamam"], true);
     }
 
     #[tokio::test]
@@ -354,7 +414,10 @@ mod tests {
         assert_eq!(kod.chars().count(), 8, "kod: {kod}");
 
         // 3) Bot kodu doğrular (Discord'da /bagla KOD) → bağlantı aktif.
-        let durum = bot_kodu_onayla(&kod, "123456789", true).await.expect("bot onayı başarısız");
+        // discord_id her koşumda FARKLI olmalı: aynı hesap 3 çatlak bağlantıdan
+        // sonra sunucu 429 (crack limiti) döner ve test bozulur.
+        let discord_id = format!("test-{}", c.cihaz_id);
+        let durum = bot_kodu_onayla(&kod, &discord_id, true).await.expect("bot onayı başarısız");
         assert_eq!(durum, 200, "bot bağlama onayı {durum} döndürdü");
 
         // 4) Parola kurulmadan giriş hâlâ kapalı.

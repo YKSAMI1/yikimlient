@@ -49,13 +49,21 @@ export function sunucuGizli() {
 
 const PKCS8_BASI = Buffer.from("302e020100300506032b657004220420", "hex");
 
-/** JSON gövdesini sunucu imzasıyla birlikte döndür. */
+/**
+ * JSON gövdesini sunucu imzasıyla birlikte döndür.
+ *
+ * ÖNEMLİ (v0.7.25): `govde_metin` = sunucunun İMZALADIĞI ham metin.
+ * Rust tarafı eskiden `serde_json::to_string(&govde)` ile yeniden üretip
+ * doğruluyordu; serde_json anahtarları ALFABETİK sıraya koyar, JS ise yazma
+ * sırasını korur → iki anahtarlı her yanıtta imza ASLA uyuşmuyordu
+ * ("api_imza_gecersiz"). Artık doğrulanacak metin olduğu gibi taşınıyor.
+ */
 export function imzaliYanit(govde) {
   const govdeMetni = JSON.stringify(govde);
   const gizli = sunucuGizli();
-  if (!gizli) return { govde, yanit_imza: null };
+  if (!gizli) return { govde, govde_metin: govdeMetni, yanit_imza: null };
   const imza = crypto.sign(null, Buffer.from(govdeMetni, "utf8"), gizli);
-  return { govde, yanit_imza: imza.toString(B64) };
+  return { govde, govde_metin: govdeMetni, yanit_imza: imza.toString(B64) };
 }
 
 /** Launcher'da gösterilecek genel anahtar (base64). */

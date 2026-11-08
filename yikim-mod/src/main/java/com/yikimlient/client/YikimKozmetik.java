@@ -88,6 +88,57 @@ public final class YikimKozmetik {
     private static volatile String pelerinKucuk = "";
     private static volatile String kanatKucuk = "";
 
+    /// v0.7.25 — başka oyuncuların doğrulama durumu (presence yanıtı).
+    private static volatile java.util.Map<String, Boolean> UZAK_DOGRULAMA =
+        java.util.Collections.emptyMap();
+
+    /// KENDİ doğrulama durumunu presence gövdesine ekle: aynı sunucudaki
+    /// diğer YIKIMLient oyuncuları da bu oyuncunun ✕'ini görsün.
+    public static synchronized String dogrulamaEk() {
+        if (!YikimDogrulama.kayitliMi()) {
+            return "";
+        }
+        return ",\"dv\":\"" + (YikimDogrulama.dogrulandiMi() ? "1" : "0") + "\"";
+    }
+
+    /// Yanıt metninden "dv" haritasını oku.
+    public static synchronized void uzakDogrulamaIsle(String json) {
+        if (json == null || json.isEmpty()) return;
+        try {
+            int d = json.indexOf("\"dv\"");
+            if (d < 0) return;
+            int sol = json.indexOf('{', d);
+            int sag = sol < 0 ? -1 : json.indexOf('}', sol);
+            if (sol < 0 || sag <= sol) return;
+            String ic = json.substring(sol + 1, sag);
+            java.util.Map<String, Boolean> yeni = new java.util.HashMap<String, Boolean>();
+            int t = 0;
+            while (t < ic.length()) {
+                int a1 = ic.indexOf('"', t);
+                if (a1 < 0) break;
+                int a2 = ic.indexOf('"', a1 + 1);
+                if (a2 < 0) break;
+                String anahtar = ic.substring(a1 + 1, a2).trim().toLowerCase(java.util.Locale.ROOT);
+                int vn = ic.indexOf(':', a2);
+                if (vn < 0) break;
+                boolean deger = ic.startsWith("1", vn + 1);
+                yeni.put(anahtar, Boolean.valueOf(deger));
+                t = ic.indexOf(',', a2);
+                if (t < 0) break;
+                t = t + 1;
+            }
+            if (!yeni.isEmpty()) UZAK_DOGRULAMA = yeni;
+        }
+        catch (Throwable ignored) { }
+    }
+
+    /// Bu oyuncu doğrulanmamış mı? (bilgi yoksa false — ✕ KONMAZ)
+    public static boolean uzakCarpli(String ad) {
+        if (ad == null || ad.isEmpty()) return false;
+        Boolean b = UZAK_DOGRULAMA.get(ad.trim().toLowerCase(java.util.Locale.ROOT));
+        return b != null && b.booleanValue() == false;
+    }
+
     /**
      * Yerel kozmetik dosyalarını tazele.
      *

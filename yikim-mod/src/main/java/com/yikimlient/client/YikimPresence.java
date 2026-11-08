@@ -304,7 +304,7 @@ public final class YikimPresence {
             // yükleme başlatılır — eskiden ters sıra yüzünden ilk tur boşa gidiyordu.
             String govde = "{\"v\":1,\"s\":\"" + kac(anahtar) + "\",\"u\":\"" + uuid
                 + "\",\"n\":\"" + kac(isim) + "\""
-                + YikimKozmetik.bildiklerimEk() + YikimKozmetik.govdeEk() + "}";
+                + YikimKozmetik.bildiklerimEk() + YikimKozmetik.govdeEk() + YikimKozmetik.dogrulamaEk() + "}";
             YikimKozmetik.yuklemeyiBaslat(ucak(), uuid);
             byte[] bayt = govde.getBytes(StandardCharsets.UTF_8);
             HttpURLConnection bag = (HttpURLConnection) new URL(ucak()).openConnection();
@@ -339,6 +339,9 @@ public final class YikimPresence {
             YikimKozmetik.uzaklariIsle(metin);
             // isimle rozet eşleşmesi ("pn"): proxy/offline UUID farkını kapatır
             YikimBadge.setKnownIsimler(metin);
+            // v0.7.25 — başka oyuncuların doğrulama durumu ("dv"): isim
+            // başlarındaki ✕ herkeste doğru görünsün.
+            YikimKozmetik.uzakDogrulamaIsle(metin);
             // çizim izin listesi (admin panel + atölye kapısı için)
             java.util.List<String> gelen = izinleriOku(metin);
             if (gelen != null) {

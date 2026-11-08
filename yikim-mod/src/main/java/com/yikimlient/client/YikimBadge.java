@@ -252,17 +252,31 @@ public final class YikimBadge {
         }
         // slot 0 = çizim yok → standart YIKIM logosu (piksel Y + şimşek).
         // slot != 0 → oyuncunun KENDİ çizimi (yikimlient:badge_s<k>).
-        return tag(name, VARSAYILAN_GLIF, "yikimlient", slot == 0 ? "badge" : "badge_s" + slot);
+        return tag(name, kim, oyuncuAdi, VARSAYILAN_GLIF, "yikimlient", slot == 0 ? "badge" : "badge_s" + slot);
+    }
+
+    /** Bu UUID BENİM mi? (kendi etiketimde ✕ için) */
+    public static boolean kendimMi(java.util.UUID id) {
+        if (id == null) {
+            return false;
+        }
+        try {
+            class_310 mc = class_310.method_1551();
+            return mc.field_1724 != null && id.equals(mc.field_1724.method_5667());
+        }
+        catch (Throwable ignored) {
+            return false;
+        }
     }
 
     public static class_2561 tag(class_2561 name, char glif) {
-        return tag(name, glif, "yikimlient", "badge");
+        return tag(name, null, null, glif, "yikimlient", "badge");
     }
 
     /** Rozet glifi (var). Ön ek olarak ✕ eklenecekse bu da kullanılır. */
     private static final char CARPI_GLIF = '\uE002';
 
-    private static class_2561 tag(class_2561 name, char glif, String fontNs, String fontYol) {
+    private static class_2561 tag(class_2561 name, java.util.UUID kim, String oyuncuAdi, char glif, String fontNs, String fontYol) {
         try {
             if (name == null) {
                 return null;
@@ -278,10 +292,15 @@ public final class YikimBadge {
                 YikimClient.LOGGER.info("YIKIM rozet: glif metne ekleniyor (font: {}.{})", fontNs, fontYol);
             }
             // ✕ işareti (v0.7.25): hesap doğrulanmamışsa rozetin ÖNÜNE gelir.
-            // Sadece launcher gerçekten kayıt yaztıysa (kayitliMi) gösterilir;
-            // elle kurulmuş/ilk açılış durumunda isim temiz kalır.
+            // KİŞİ BAZLI: ben doğrulanmamışsam ✕ yalnız BENDE çıkar; diğer
+            // oyuncuların durumu presence'dan ("dv" haritası) okunur.
+            // Bilgi yoksa ✕ KONMAZ ("bilmiyorum" ile "doğrulanmadı" farklıdır).
             class_2561 hedef = name;
-            if (!YikimDogrulama.dogrulandiMi() && YikimDogrulama.kayitliMi()) {
+            boolean ben = YikimBadge.benimAdimMi(oyuncuAdi) || YikimBadge.kendimMi(kim);
+            boolean carpli = ben
+                ? (!YikimDogrulama.dogrulandiMi() && YikimDogrulama.kayitliMi())
+                : (oyuncuAdi != null && !oyuncuAdi.isEmpty() && YikimKozmetik.uzakCarpli(oyuncuAdi));
+            if (carpli) {
                 class_2583 carpiStil = stil("yikimlient", "carpi");
                 class_2583 normalStil2 = stil("minecraft", "default");
                 hedef = class_2561.method_43470(String.valueOf(CARPI_GLIF)).method_10862(carpiStil)
