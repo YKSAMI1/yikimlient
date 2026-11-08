@@ -231,8 +231,15 @@
         { filename: "iris-1.8.0.jar", enabled: false, size: 2234567, modified: Date.now() },
         { filename: "yikimlient-1.22.1.jar", enabled: true, size: 334567, modified: Date.now() },
       ]);
-      if (cmd === "cmd_resolve_mod_icons") return new Promise(function () {});
-      if (cmd === "cmd_check_mod_updates") return new Promise(function () {});
+      if (cmd === "cmd_resolve_mod_icons") return Promise.resolve({
+        "sodium-0.6.0.jar": "https://cdn.modrinth.com/xyz/sodium.png",
+        "iris-1.8.0.jar": "",
+      });
+      // Mock güncelleme listesi (arayüz testi için sabit)
+      if (cmd === "cmd_check_mod_updates") return Promise.resolve([
+        { filename: "sodium-0.6.0.jar", yeni_ad: "sodium-0.7.0.jar", url: "https://x/sodium.jar", surum: "0.7.0" },
+        { filename: "iris-1.8.0.jar", yeni_ad: "iris-1.9.0.jar", url: "https://x/iris.jar", surum: "1.9.0" },
+      ]);
       if (cmd === "cmd_list_emotes") return Promise.resolve([
         { adi: "yerlesik-mambo-donus.json", baslik: "Mambo Dönüş", yerlesik: true, icerik: "{}" },
         { adi: "yerlesik-yaslanma.json", baslik: "Yaslanma", yerlesik: true, icerik: "{}" },
@@ -353,6 +360,10 @@
         return Promise.resolve({ dogrulandi: gvDog3, rol_yol: gvDog3, kozmetik_serbest: gvDog3, cizim_serbest: gvDog3, carpi: !gvDog3 });
       }
 
+      if (cmd === "cmd_update_mod") return Promise.resolve(String(args.yeniAd || "mod.jar"));
+      if (cmd === "cmd_update_all_mods") return Promise.resolve({
+        toplam: 3, basarili: 3, hata: 0, hatalar: [], bos: false,
+      });
       if (cmd === "cmd_skin_hub") return Promise.resolve(hub());
       if (cmd === "cmd_skin_giy") {
         var url = veriUrl(args.veri);

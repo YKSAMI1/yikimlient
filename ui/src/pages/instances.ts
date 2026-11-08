@@ -495,6 +495,7 @@ async function tabMods(content: HTMLElement, inst: any): Promise<void> {
     <div class="mods-toolbar">
       <input class="input search-in" id="mod-search" placeholder="Mod ara…" />
       <button class="btn primary" id="mod-add">${icon("plus")} Mod Ekle</button>
+      <button class="btn upd-all" id="mod-upd-all" hidden>${icon("refresh")} Tümünü Güncelle</button>
     </div>
     <div class="mod-list" id="mod-list"></div>
   `;
@@ -591,8 +592,58 @@ async function tabMods(content: HTMLElement, inst: any): Promise<void> {
     if (guncel) {
       updates = Object.fromEntries(guncel.map((u: any) => [u.filename, u]));
       render(filtre());
+      tumunuGuncelleBagla(updates, inst);
     }
   })();
+}
+
+/// "Tümünü Güncelle" düğmesi: yalnızca güncelleme VARSA görünür; çalışırken
+/// adım sayacı yazar (ör. "2/5 güncelleniyor…").
+function tumunuGuncelleBagla(updates: Record<string, any>, inst: any): void {
+  const sayac = () => Object.keys(updates).length;
+  const btn = document.querySelector<HTMLButtonElement>("#mod-upd-all");
+  if (!btn) return;
+  // DİKKAT: başlık HTML ikon içerir — textContent SVG'yi metin olarak basar.
+  const etiket = (n: number) => `${icon("refresh")} Tümünü Güncelle (${n})`;
+  btn.hidden = sayac() === 0;
+  if (btn.hidden) return;
+  btn.innerHTML = etiket(sayac());
+  btn.onclick = async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const ilk = btn.innerHTML;
+    document.querySelectorAll<HTMLButtonElement>(".upd-mod, #mod-add").forEach((b) => (b.disabled = true));
+    // İlerleme olayı (mock harness'ta sessizce yok sayılır).
+    let off: (() => void) | null = null;
+    try {
+      off = (await listen("mod-updates-progress", (e: any) => {
+        const p = e?.payload ?? {};
+        if (!p.total) return;
+        btn.innerHTML = p.done >= p.total
+          ? `${icon("refresh")} Bitiyor…`
+          : `${icon("refresh")} ${p.done + 1}/${p.total} güncelleniyor…`;
+      })) ?? null;
+    } catch { /* olay olmadan da çalışır */ }
+    try {
+      const sonuc: any = await invoke("cmd_update_all_mods", { instanceId: inst.id });
+      if (sonuc?.bos) {
+        toast("Güncellenecek mod yok");
+      } else if (sonuc?.hata > 0) {
+        toast(`${sonuc.basarili} mod güncellendi, ${sonuc.hata} mod başarısız`, "err");
+      } else {
+        toast(`${sonuc?.basarili ?? "?"} mod güncellendi ✓`);
+      }
+      const host = document.querySelector("#inst-content") as HTMLElement | null;
+      if (host) await tabMods(host, inst);
+    } catch (err) {
+      toast(`Güncellenemedi: ${err}`, "err");
+    } finally {
+      try { off?.(); } catch { /* yok */ }
+      btn.disabled = false;
+      btn.innerHTML = ilk;
+      document.querySelectorAll<HTMLButtonElement>(".upd-mod, #mod-add").forEach((b) => (b.disabled = false));
+    }
+  };
 }
 
 // ---------- Java & Args sekmesi ----------

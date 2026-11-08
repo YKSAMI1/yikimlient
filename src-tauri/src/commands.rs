@@ -1412,6 +1412,64 @@ pub async fn cmd_update_mod(
     repos::mod_guncelle(&inst, &filename, &url, &yeni_ad).await
 }
 
+/// TÜM modları güncelle (tek tık): önce güncelleme listesini Modrinth'ten
+/// alır, sonra sırayla uygular. Her adım için `mod-duello` olayı yayınlanır
+/// (kullanıcı "3/12 güncelleniyor..." görür). Bir mod hata verirse diğerleri
+/// yine denenir; sonuçta kaç tanesinin başarıldığı döner.
+#[tauri::command]
+pub async fn cmd_update_all_mods(handle: AppHandle, instance_id: String) -> Result<serde_json::Value, String> {
+    let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
+    let liste = repos::mod_guncellemeleri(&inst).await;
+    if liste.is_empty() {
+        return Ok(serde_json::json!({ "toplam": 0, "basarili": 0, "hata": 0, "bos": true }));
+    }
+
+    let toplam = liste.len();
+    let mut basarili = 0usize;
+    let mut hatalar: Vec<serde_json::Value> = Vec::new();
+
+    for (i, g) in liste.iter().enumerate() {
+        // Her adımda arayüzü tazele: "3/12 güncelleniyor… sodium"
+        let _ = handle.emit(
+            "mod-updates-progress",
+            &serde_json::json!({
+                "instance_id": inst.id,
+                "done": i,
+                "total": toplam,
+                "current": g.filename,
+                "surum": g.surum,
+            }),
+        );
+        match repos::mod_guncelle(&inst, &g.filename, &g.url, &g.yeni_ad).await {
+            Ok(yeni) => {
+                basarili += 1;
+                crate::core::yikim_log(format!("tümü güncellendi: {} → {yeni}", g.filename));
+            }
+            Err(e) => {
+                hatalar.push(serde_json::json!({ "mod": g.filename, "hata": e }));
+            }
+        }
+    }
+    let _ = handle.emit(
+        "mod-updates-progress",
+        &serde_json::json!({
+            "instance_id": inst.id,
+            "done": toplam,
+            "total": toplam,
+            "current": "",
+            "bitti": true,
+        }),
+    );
+
+    Ok(serde_json::json!({
+        "toplam": toplam,
+        "basarili": basarili,
+        "hata": hatalar.len(),
+        "hatalar": hatalar,
+        "bos": false,
+    }))
+}
+
 #[tauri::command]
 pub async fn cmd_set_instance_java_preset(id: String, preset_id: String) -> Result<Instance, String> {
     instances::update(&id, |i| i.java_preset_id = preset_id)
