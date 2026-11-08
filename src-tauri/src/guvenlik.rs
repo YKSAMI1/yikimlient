@@ -238,12 +238,28 @@ pub fn hesap_kozmetik_sil(anahtar: &str, ad: &str) {
 
 /// Aktif hesabı kurulumlara yaz: `<kurulum>/.yikim/aktif-hesap`.
 /// Mod bu dosyadan hangi hesabın açık olduğunu öğrenir (hesap bazlı kozmetik).
+///
+/// Aynı zamanda `<kurulum>/.yikim/dogrulandi` bayrağını da yazar: mod bu
+/// bayrağa bakıp oyuncunun adının başındaki ✕ işaretini doğru gösterir
+/// (launcher kapalıyken / çevrimdışıyken de doğru çalışır).
 pub fn aktif_hesap_yaz(anahtar: &str) -> usize {
+    let dogrulandi = hesaplari_oku()
+        .into_iter()
+        .find(|h| h.anahtar == anahtar)
+        .map(|h| h.dogrulandi)
+        .unwrap_or(false);
+    aktif_bayraklari_yaz(anahtar, dogrulandi)
+}
+
+/// Bayrakları kurulumlara yaz (doğrulama durumu ile).
+pub fn aktif_bayraklari_yaz(anahtar: &str, dogrulandi: bool) -> usize {
     let mut n = 0;
+    let bayrak = if dogrulandi { "1" } else { "0" };
     for inst in crate::instances::list() {
         let dir = inst.dir().join(".yikim");
         if std::fs::create_dir_all(&dir).is_ok()
             && std::fs::write(dir.join("aktif-hesap"), anahtar.as_bytes()).is_ok()
+            && std::fs::write(dir.join("dogrulandi"), bayrak.as_bytes()).is_ok()
         {
             n += 1;
         }

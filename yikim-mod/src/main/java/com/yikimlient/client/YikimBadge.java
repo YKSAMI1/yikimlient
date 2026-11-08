@@ -215,7 +215,9 @@ public final class YikimBadge {
             if (ad == null) {
                 return false;
             }
-            return ad.getString().indexOf(VARSAYILAN_GLIF) >= 0;
+            String metin = ad.getString();
+            // rozet glifi VEYA ✕ işareti varsa zaten işlenmiştir
+            return metin.indexOf(VARSAYILAN_GLIF) >= 0 || metin.indexOf(CARPI_GLIF) >= 0;
         }
         catch (Throwable ignored) {
             return false;
@@ -257,6 +259,9 @@ public final class YikimBadge {
         return tag(name, glif, "yikimlient", "badge");
     }
 
+    /** Rozet glifi (var). Ön ek olarak ✕ eklenecekse bu da kullanılır. */
+    private static final char CARPI_GLIF = '\uE002';
+
     private static class_2561 tag(class_2561 name, char glif, String fontNs, String fontYol) {
         try {
             if (name == null) {
@@ -272,7 +277,18 @@ public final class YikimBadge {
                 // canlı kanıt: mixin zinciri çalışıyor mu? (sunucu bağımsız teşhis)
                 YikimClient.LOGGER.info("YIKIM rozet: glif metne ekleniyor (font: {}.{})", fontNs, fontYol);
             }
-            String imza = fontYol + "|" + name.getString();
+            // ✕ işareti (v0.7.25): hesap doğrulanmamışsa rozetin ÖNÜNE gelir.
+            // Sadece launcher gerçekten kayıt yaztıysa (kayitliMi) gösterilir;
+            // elle kurulmuş/ilk açılış durumunda isim temiz kalır.
+            class_2561 hedef = name;
+            if (!YikimDogrulama.dogrulandiMi() && YikimDogrulama.kayitliMi()) {
+                class_2583 carpiStil = stil("yikimlient", "carpi");
+                class_2583 normalStil2 = stil("minecraft", "default");
+                hedef = class_2561.method_43470(String.valueOf(CARPI_GLIF)).method_10862(carpiStil)
+                    .method_10852(class_2561.method_43470(BOSLUK).method_10862(normalStil2))
+                    .method_10852(name);
+            }
+            String imza = fontYol + "|" + hedef.getString();
             class_2561 bekleyen = METIN_ONBELLEK.get(imza);
             if (bekleyen != null) {
                 return bekleyen;
@@ -282,7 +298,7 @@ public final class YikimBadge {
             // isim, açık default stilli bir sarmalın içine konur: kendi özel
             // stili (sunucu renkli isim vb.) korunur, fontu ise garanti default.
             class_2561 sarmal = class_2561.method_43470("")
-                .method_10862(normalStil).method_10852(name);
+                .method_10862(normalStil).method_10852(hedef);
             class_2561 var = class_2561.method_43470(String.valueOf(glif)).method_10862(glifStil)
                 .method_10852(class_2561.method_43470(BOSLUK).method_10862(normalStil))
                 .method_10852(sarmal);

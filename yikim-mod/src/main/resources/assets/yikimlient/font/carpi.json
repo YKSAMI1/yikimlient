@@ -1,0 +1,13 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "yikimlient:font/carpi.png",
+      "ascent": 7,
+      "height": 8,
+      "chars": [
+        "\uE002"
+      ]
+    }
+  ]
+}
