@@ -1,0 +1,12 @@
+{
+  "name": "guvenlik-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "YIKIMLient guvenlik API: hesap kaydi, Discord baglama, giris dogrulama, IP kaydi (yerel test + Cloudflare Worker uyumlu)",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/"
+  },
+  "engines": { "node": ">=20" }
+}

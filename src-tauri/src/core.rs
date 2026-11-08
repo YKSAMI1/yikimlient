@@ -66,6 +66,14 @@ pub fn arch_name() -> &'static str {
 /// Windows: %APPDATA%/.yikimlient  |  macOS: ~/Library/Application Support/.yikimlient
 /// Linux: ~/.local/share/.yikimlient
 pub fn app_dir() -> PathBuf {
+    // Testler ve özel kurulumlar için geçersiz kılma (yoksa normal yol).
+    if let Ok(v) = std::env::var("YIKIM_APP_DIR") {
+        if !v.trim().is_empty() {
+            let p = PathBuf::from(v);
+            let _ = std::fs::create_dir_all(&p);
+            return p;
+        }
+    }
     let base = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
     let p = base.join(".yikimlient");
     let _ = std::fs::create_dir_all(&p);

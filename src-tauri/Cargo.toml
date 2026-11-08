@@ -41,6 +41,7 @@ window-vibrancy = "0.5"
 open = "5"
 ed25519-dalek = "2.1.1"
 base64 = "0.23.1"
+argon2 = "0.5"
 fastnbt = "2"
 
 [target.'cfg(windows)'.dependencies]
