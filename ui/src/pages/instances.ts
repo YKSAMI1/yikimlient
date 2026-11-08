@@ -281,14 +281,16 @@ async function exportPackFile(instanceId: string, instAd?: string): Promise<void
       ultraHafif: ultra,
     };
     close();
-    packKartBaslat(`${instAd || inst.name} paketleniyor`);
+    // Kimlikli kart: paylaşım da kendi ilerleme kartına sahip (kurulum
+    // kartlarıyla çakışmasın).
+    packKartBaslat(`${instAd || inst.name} paketleniyor`, `aktar:${instanceId}`);
     try {
       const yol = await invoke("cmd_export_yikimpack", { instanceId, secenek }) as string;
-      packKartTamam();
+      packKartTamam(`aktar:${instanceId}`);
       bildirimEkle("kurulum", "Paylaşım paketi hazır", `${instAd || inst.name}.yikimpack — ${yol}`);
       toast(`Paket hazır: ${yol}`, "ok");
     } catch (e) {
-      packKartHata(String(e));
+      packKartHata(String(e), `aktar:${instanceId}`);
       bildirimEkle("sistem", "Paket oluşturulamadı", String(e));
     }
   });
@@ -1003,6 +1005,10 @@ async function tabSettings(content: HTMLElement, inst: any): Promise<void> {
           <button class="btn ghost" id="dup-inst">${icon("copy")} Kopyala</button>
           <button class="btn danger" id="del-inst">${icon("trash")} Kurulumu Sil</button>
         </div>
+        <div class="row-between">
+          <button class="btn primary" id="share-inst">${icon("box")} Paketi Paylaş (.yikimpack)</button>
+        </div>
+        <p class="set-sub">Bu kurulumu başkalarının çift tıklayıp YIKIMLient ile açabileceği tek dosya haline getirir.</p>
       </div>
     </div>
   `;
@@ -1054,6 +1060,11 @@ async function tabSettings(content: HTMLElement, inst: any): Promise<void> {
     selectedId = null;
     renderGrid(content.parentElement as HTMLElement);
     toast("Kurulum silindi");
+  });
+  // Paket ayarlarından da paylaşım: kullanıcı kart menüsüne gitmek
+  // zorunda kalmadan, kurulumun AYARLAR sekmesindeyken de paylaşabilsin.
+  content.querySelector("#share-inst")?.addEventListener("click", () => {
+    exportPackFile(inst.id, inst.name);
   });
 }
 

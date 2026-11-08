@@ -360,6 +360,10 @@
         return Promise.resolve({ dogrulandi: gvDog3, rol_yol: gvDog3, kozmetik_serbest: gvDog3, cizim_serbest: gvDog3, carpi: !gvDog3 });
       }
 
+      if (cmd === "cmd_export_yikimpack") {
+        // Paylaşım: masaustune yazar (mock - gercek dosya yok)
+        return Promise.resolve("C:\\Users\\USER\\Desktop\\Test Kurulum.yikimpack");
+      }
       if (cmd === "cmd_update_mod") return Promise.resolve(String(args.yeniAd || "mod.jar"));
       if (cmd === "cmd_update_all_mods") return Promise.resolve({
         toplam: 3, basarili: 3, hata: 0, hatalar: [], bos: false,
