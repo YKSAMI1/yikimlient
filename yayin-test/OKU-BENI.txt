@@ -1,0 +1,45 @@
+YIKIMLient TEST PAKETİ
+=====================
+
+Bu zip kendi bilgisayarında çalıştırmak içindir. Sırlar (.env) zip'e
+konulmadı — kendi bilgisayarında bir kez oluşturman gerekir.
+
+1) GÜVENLİK API'YI ÇALIŞTIR
+   - guvenlik-api-test.zip klasörünü aç
+   - içinde `.env.example` dosyası var; ona bak
+   - İçindeki değerleri üret:
+
+     node -e "console.log(require('crypto').randomBytes(24).toString('base64'))"   → YIKIM_PEPPER
+     node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"   → YIKIM_ANAHTAR
+     node -e "const d=require('crypto').generateKeyPairSync('ed25519').privateKey.export({format:'der',type:'pkcs8'});console.log(d.subarray(d.length-32).toString('hex'))"   → YIKIM_IMZA_GIZLI
+     node -e "console.log(require('crypto').randomBytes(24).toString('base64'))"   → YIKIM_BOT_ANAHTARI
+
+   - guvenlik-api klasörüne .env dosyası olarak yaz (YIKIM_DB için bir dosya
+     yolu yaz, ör: C:/Users/KULLANICI/AppData/Roaming/.yikimlient/guvenlik.db)
+   - npm install      (Node 22+ gerekir — node:sqlite kullanılıyor)
+   - node src/server.js
+     → "sunucu genel anahtari: ...." satırını kopyala
+
+2) LAUNCHER'AANAHTARI VER
+   - Kopyaladığın genel anahtarı şuraya yaz:
+     %APPDATA%\.yikimlient\guvenlik\api-pub.txt   (Windows)
+   - VEYA YIKIM_API_PUB ortam değişkeni olarak ver
+
+3) BOTU ÇALIŞTIR
+   - bot-yikimpack-test.zip içinden bot klasörü çıkar (node_modules DAHİL)
+   - bot/.env dosyası oluştur:
+       TOKEN=                     (veya TOKEN_ENCRYPTED + TOKEN_KEY)
+       GUILD_ID=...
+       CHANNEL_ID=...
+       ROLE_ID=...
+       YIKIM_API=http://127.0.0.1:8788
+       YIKIM_BOT_ANAHTARI=         (API ile AYNI değer!)
+   - node index.js
+
+4) LAUNCHER
+   - YIKIM_API=http://127.0.0.1:8788 ortam değişkeni ile aç
+   - Ayarlar → Hesap Doğrulama → Kod al
+   - Discord'da bota DM: /bagla KOD
+   - Şifreni oluştur
+
+NOT: Bot/API kapalıyken de oyun ve mevcut kozmetikler çalışmaya devam eder.
