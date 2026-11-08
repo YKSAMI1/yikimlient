@@ -127,9 +127,12 @@ async function ping(yanit) {
   json(yanit, 200, { tamam: true, zaman: db.simdi() });
 }
 
-async function cihazKaydet(is, yanit, govde, icerik) {
-  const { cihaz_id, pub_key } = icerik;
+async function cihazKaydet(is, yanit, govde, cihaz) {
+  // `cihaz` = istekDogrula'nın doğruladığı cihaz kaydı (imza bu anahtarla
+  // doğrulandı). Zarfın kökündeki alanlar okunmaz.
+  const { cihaz_id, pub_key } = cihaz ?? govde ?? {};
   if (!cihaz_id || !pub_key) return hata(yanit, 400, "cihaz_id/pub_key eksik");
+  if (!imza.pubCoz(pub_key)) return hata(yanit, 400, "pub_key gecersiz");
   db.cihazKaydet(cihaz_id, pub_key);
   db.olayKaydet("cihaz_kayit", null, cihaz_id, "kayit");
   json(yanit, 200, { tamam: true });
@@ -160,6 +163,10 @@ async function baglamaDurum(is, yanit, govde, cihaz) {
 
 async function baglamaDogrula(yanit, icerik) {
   const { kod, discord_id, discord_ad, rol_yol } = icerik;
+  // girdi doğrulama: eksik/bozuk alan bir daha sunucuyu düşürmemeli
+  if (!kod || typeof kod !== "string" || !discord_id || typeof discord_id !== "string") {
+    return hata(yanit, 400, "kod/discord_id eksik");
+  }
   const kayit = db.baglamaKodBul(kod);
   if (!kayit) return hata(yanit, 404, "kod bulunamadi");
   if (db.simdi() - kayit.olusturma > db.ON_DAKIKA) {
@@ -338,11 +345,11 @@ export function handle(is, yanit) {
   }
   if (url === "/api/baglama/dogrula") {
     if (!botMu(is)) return hata(yanit, 401, "bot anahtari gecersiz");
-    return govdeOku(is, (icerik) => baglamaDogrula(yanit, icerik));
+    return govdeOku(is, (icerik) => yurut(yanit, () => baglamaDogrula(yanit, icerik)));
   }
   if (url === "/api/sifirla/iste") {
     if (!botMu(is)) return hata(yanit, 401, "bot anahtari gecersiz");
-    return govdeOku(is, (icerik) => sifirlaKod(yanit, icerik));
+    return govdeOku(is, (icerik) => yurut(yanit, () => sifirlaKod(yanit, icerik)));
   }
 
   const hedef = CIHAZ_YOLLARI[url];
@@ -352,8 +359,24 @@ export function handle(is, yanit) {
     const govdeMetni = JSON.stringify(govde.govde ?? govde ?? {});
     const cihaz = istekDogrula(yanit, govde, govdeMetni);
     if (!cihaz) return;
-    hedef(is, yanit, govde, cihaz);
+    yurut(yanit, () => hedef(is, yanit, govde, cihaz));
   });
+}
+
+/** İstek işleyicisini güvenli çalıştır — tek bir hatalı istek sunucuyu düşürmez. */
+function yurut(yanit, is) {
+  try {
+    const sonuc = is();
+    if (sonuc && typeof sonuc.then === "function") {
+      sonuc.catch((e) => {
+        console.error("[guvenlik-api] istek hatasi:", e?.message || e);
+        hata(yanit, 500, "sunucu hatasi");
+      });
+    }
+  } catch (e) {
+    console.error("[guvenlik-api] istek hatasi:", e?.message || e);
+    hata(yanit, 500, "sunucu hatasi");
+  }
 }
 
 export function baslat() {
@@ -364,7 +387,7 @@ export function baslat() {
   const sunucu = http.createServer(handle);
   sunucu.listen(Number(PORT), HOST, () => {
     console.log(`[guvenlik-api] dinleniyor: http://${HOST}:${PORT}`);
-    console.log(`[guvenlik-api] db: ${db.DB_YOL}`);
+    console.log(`[guvenlik-api] db: ${db.DB_YOLU}`);
     if (imza.sunucuPubB64()) console.log(`[guvenlik-api] sunucu genel anahtari: ${imza.sunucuPubB64()}`);
     const silinen = db.ipTemizle();
     if (silinen) console.log(`[guvenlik-api] ${silinen} eski IP kaydi temizlendi`);

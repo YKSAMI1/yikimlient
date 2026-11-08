@@ -1,6 +1,7 @@
 ﻿import { test, before, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import fs from "node:fs";
 
 // --- test ortamÄ± (gizli anahtarlar ASLA kodda sabit deÄŸil; test iÃ§in Ã¼retilir) ---
 process.env.YIKIM_PEPPER = "test-pepper-en-az-16-karakter-uzunlugunda";
@@ -10,8 +11,10 @@ process.env.YIKIM_IMZA_GIZLI = crypto.generateKeyPairSync("ed25519").privateKey
   .subarray(-32)
   .toString("hex");
 process.env.YIKIM_DB = "./test/test.db";
-process.env.YIKIM_DINLE = "127.0.0.1:8788";
 process.env.YIKIM_BOT_ANAHTARI = "bot-test-anahtari";
+// Canlı API (npm start) 8788'i kullanır; testler ayrı portta koşar ki
+// API açıkken de test çalışsın.
+process.env.YIKIM_DINLE = "127.0.0.1:8790";
 
 const { baslat, kodUret, handle } = await import("../src/server.js");
 const sifre = await import("../src/sifre.js");
@@ -20,7 +23,7 @@ const imza = await import("../src/imza.js");
 const kapisi = await import("../src/kapisi.js");
 
 let sunucu;
-const ADRES = "http://127.0.0.1:8788";
+const ADRES = "http://127.0.0.1:8790";
 
 before(async () => {
   for (const f of ["test.db", "test.db-shm", "test.db-wal"]) {
@@ -202,6 +205,7 @@ test("giris: dogru parola â†’ yetki belgesi 7 gun", async () => {
   assert.equal(yanlis.durum, 401);
 
   const dogru = await cagir("/api/giris/dogrula", { hesap_anahtar: anahtar, hesap_ad: "Giris1", tur: "cracked", parola_hash: hash, ip: "10.0.0.9" });
+  assert.equal(dogru.durum, 200, JSON.stringify(dogru));
   assert.equal(dogru.govde.dogrulandi, true);
   assert.equal(dogru.govde.rol_yol, true);
   assert.ok(dogru.govde.yetki_bitis > Date.now());
@@ -292,6 +296,20 @@ test("parola/kur: bagli hesapta ilk parola kurulur, ikinci kez ezilmez", async (
     parola_hash: hash,
   });
   assert.equal(giris.govde.dogrulandi, true, JSON.stringify(giris));
+});
+
+// ---------- dayanıklılık: bozuk istek sunucuyu düşürmemeli ----------
+
+test("dayaniklilik: bot dogrulamada eksik kod 400 doner, sunucu ayakta kalir", async () => {
+  const r = await fetch(`${ADRES}/api/baglama/dogrula`, {
+    method: "POST",
+    headers: { "x-bot-anahtari": "bot-test-anahtari", "content-type": "application/json" },
+    body: JSON.stringify({ hesap_ad: "Kur2" }),
+  }).then(async (x) => ({ durum: x.status, govde: await x.json().catch(() => ({})) }));
+  assert.equal(r.durum, 400, JSON.stringify(r));
+
+  const sag = await fetch(`${ADRES}/api/saglik`).then((x) => x.json());
+  assert.equal(sag.govde.durum, "ok", "sunucu hala ayakta olmali");
 });
 
 test("sifirla/iste: baska discord kullaniciya kod verilmez", async () => {
