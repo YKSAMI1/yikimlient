@@ -66,11 +66,17 @@ export function renderSkins(root: HTMLElement): void {
   sonPelerin = null;
   koz = null;
   const acc = currentAccount();
-  if (!acc || acc.kind !== "microsoft") {
-    kapiCiz(root);
+  if (!acc) {
+    kapiCiz(root, false);
     return;
   }
-  root.innerHTML = iskelet(acc.name);
+  const yerel = acc.kind !== "microsoft";
+  if (yerel && !yerelModAcik) {
+    // Çatlak hesap: önce bilgi kartı; "Skin Çiz" ile yerel editöre geçilir.
+    kapiCiz(root, true);
+    return;
+  }
+  root.innerHTML = iskelet(acc.name, yerel);
   baglantilar(root, acc.id);
   canliKok = root;
   if (!canliDinleyici) {
@@ -86,37 +92,63 @@ export function renderSkins(root: HTMLElement): void {
   void hubYukle(root, acc.id, true);
 }
 
-/** Offline hesap: hiçbir ağ isteği yok, yalnız kapı. */
-function kapiCiz(root: HTMLElement): void {
+/**
+ * ÇATLAK (offline) hesap: artık KAPI değil — istemci tarafı skin.
+ * Mojang'a çıkmadığı için skin yalnız bu bilgisayarda görünür; doğrulanmış
+ * hesapta kitaplığa kalıcı kaydolur. Premium hesapta ağ özellikleri açılır.
+ */
+function kapiCiz(root: HTMLElement, yerel: boolean): void {
   root.innerHTML = `
     <div class="page-wrap skin-kapi-sar">
       <div class="skin-kapi">
         <div class="skin-kapi-ikon">${icon("lock")}</div>
-        <h1>Orijinal hesap ile girmen lazım</h1>
-        <p>Skin değiştirmek ve pelerin takmak için Microsoft hesabı gerekir.</p>
+        <h1>${yerel ? "Çatlak hesap · yerel skin" : "Orijinal hesap ile girmen lazım"}</h1>
+        <p>${yerel
+          ? "Skinini çizebilir ve bu bilgisayarda giyebilirsin. Sunucularda başkalarına görünmesi için Microsoft hesabı gerekir."
+          : "Skin değiştirmek ve pelerin takmak için Microsoft hesabı gerekir."}</p>
         <div class="skin-kapi-aksiyon">
-          <button class="btn primary lg" id="sk-ms">${icon("globe")} Microsoft ile Giriş</button>
+          ${yerel
+            ? `<button class="btn primary lg" id="sk-ciz">${icon("brush")} Skin Çiz</button>`
+            : `<button class="btn primary lg" id="sk-ms">${icon("globe")} Microsoft ile Giriş</button>`}
           <button class="btn" id="sk-hesap">Hesapları Yönet</button>
         </div>
       </div>
     </div>`;
+  root.querySelector("#sk-ciz")?.addEventListener("click", () => {
+    // Yerel skin modu: aynı sayfada editör açılır (ağ özellikleri kapalı)
+    const acc = currentAccount();
+    if (acc) yerelSkinModu(acc.id);
+  });
   root.querySelector("#sk-ms")?.addEventListener("click", () => {
     openLoginModal(() => renderSkins(root));
   });
   root.querySelector("#sk-hesap")?.addEventListener("click", () => navigate("settings"));
 }
 
-function iskelet(ad: string): string {
+/// Çatlak hesapta yerel skin modu (ağ isteği YOK, Mojang'a çıkmaz).
+let yerelModAcik = false;
+function yerelSkinModu(hesapId: string): void {
+  toast("Yerel skin: çizim kaydedince bu bilgisayarda görünür", "ok");
+  yerelModAcik = true;
+  void hesapId;
+  const kok = document.querySelector("#content") as HTMLElement | null;
+  if (kok) renderSkins(kok);
+}
+
+function iskelet(ad: string, yerel: boolean): string {
   return `
     <div class="page-wrap skin-sayfa">
       <div class="page-header skin-baslik">
         <div>
           <h1>Skin Merkezi</h1>
-          <p class="sub">Skinlerini seç, giy; pelerinini tak. Giyilen skin sunucularda görünür.</p>
+          <p class="sub">${yerel
+            ? "Çatlak hesap — skin yalnız bu bilgisayarda görünür."
+            : "Skinlerini seç, giy; pelerinini tak. Giyilen skin sunucularda görünür."}</p>
         </div>
         <div class="skin-ust-aksiyon">
-          <span class="skin-premium">${icon("check")} Orijinal hesap</span>
-          <button class="btn" id="sk-kozmetik">${icon("sparkle")} Kozmetikler</button>
+          ${yerel
+            ? `<span class="skin-premium" style="color:var(--warn)">${icon("user")} Yerel skin</span>`
+            : `<span class="skin-premium">${icon("check")} Orijinal hesap</span>`}
           <button class="btn primary" id="sk-duzenle">${icon("brush")} Skin Düzenle</button>
         </div>
       </div>

@@ -667,6 +667,54 @@ fn yedek_slim(acc: &crate::auth::Account) -> bool {
         .unwrap_or(false)
 }
 
+/// ÇATLAK (offline) hesap için İSTEMCİ TARAFI skin: Mojang'a çıkmaz,
+/// `.yikim/skins/<hesap>/skin.png` olarak kaydeder ve kurulumlara
+/// `.yikim/skin.png` + `skin-slim` bayrağını yazar. Mod bu dosyaları
+/// okuyarak oyunda yerel skin gösterir.
+///
+/// Doğrulanmış hesapta kütüphaneye de kaydolur; doğrulanmamışsa yalnızca
+/// yerel çizim olarak kalıp yine görünür (tasarım: "cracked istemci
+/// tarafında çizebilsin").
+pub fn skin_yerel_yaz(
+    acc: &crate::auth::Account,
+    veri: &[u8],
+    slim: bool,
+    kitaplik_kayit: bool,
+) -> Result<String, String> {
+    let png = dogrula_png(veri)?;
+    let key = hesap_anahtari(acc);
+    // hesap klasörü (güvenli ad)
+    let kok = crate::guvenlik::hesap_kozmetik_dir(&key).parent().map(|p| p.to_path_buf()).unwrap_or_else(cache_kok);
+    let _ = std::fs::create_dir_all(&kok);
+    atomik_yaz(&kok.join("skin.png"), &png)?;
+    atomik_yaz(&kok.join("skin-slim"), if slim { b"1" } else { b"0" })?;
+    // kütüphaneye de kaydet (doğrulanmış hesapta kalıcı olsun)
+    if kitaplik_kayit {
+        let _ = kayit_ekle(&kitaplik_kok(), "Yerel skin", &png, slim, "cracked");
+    }
+    // kurulumlara yaz (mod okuyacak):
+    //   skin.png  → çatlak hesapta oyuncunun GERÇEK skini (YikimKarakter)
+    //   skin-slim → ince (Alex) gövde mi
+    let mut n = 0usize;
+    for inst in crate::instances::list() {
+        let dir = inst.dir().join(".yikim");
+        if std::fs::create_dir_all(&dir).is_ok()
+            && atomik_yaz(&dir.join("skin.png"), &png).is_ok()
+            && atomik_yaz(&dir.join("skin-slim"), if slim { b"1" } else { b"0" }).is_ok()
+            // YikimKarakter.deriDoku() bu dosyayı oyuncunun GERÇEK skini olarak
+            // oyunda gösterir (çatlak hesapta Mojang yoktur).
+            && atomik_yaz(&dir.join("deri.png"), &png).is_ok()
+        {
+            n += 1;
+        }
+    }
+    crate::core::yikim_log(format!(
+        "çatlak skin kaydedildi ({} kurulum, slim={slim})",
+        n
+    ));
+    Ok(format!("{n} kurulum"))
+}
+
 /// Skini Mojang hesabına yükler; başarıda cache'i tazeler.
 pub async fn skin_uygula(
     acc: &crate::auth::Account,
@@ -833,6 +881,22 @@ pub async fn cmd_skin_giy(
 ) -> Result<SkinHub, String> {
     let acc = hesap_bul(&id)?;
     let png = dogrula_png(&veri)?;
+    // ÇATLAK (offline) hesap: Mojang'a çıkmaz, yerel skin yazılır.
+    if acc.kind != "microsoft" {
+        let yetki = crate::hesap_yetki::yerel_yetki(&crate::hesap_yetki::hesap_anahtari(
+            &acc.name,
+            "cracked",
+            &acc.uuid,
+        ));
+        let mut yeni_id = String::new();
+        if let Some(ad) = ad.as_deref() {
+            let k = kayit_ekle(&kitaplik_kok(), ad, &png, slim, "cracked")?;
+            yeni_id = k.id;
+        }
+        let n = skin_yerel_yaz(&acc, &veri, slim, yetki.dogrulandi)?;
+        crate::kozmetik_kopru::secili_deri_yaz_pub(&yeni_id);
+        return Ok(hub_cache(&acc));
+    }
     let mut yeni_id = String::new();
     if let Some(ad) = ad.as_deref() {
         let k = kayit_ekle(&kitaplik_kok(), ad, &png, slim, "editor")?;
