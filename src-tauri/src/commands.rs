@@ -329,6 +329,21 @@ pub fn cmd_delete_emote(adi: String) -> Result<bool, String> {
     }
 }
 
+
+/// Kozmetik ÇİZME / KATALOGTAN SEÇME kapısı (v0.7.25).
+///
+/// Kural: "Yol Silindiri" rolü olmayan hesap yalnız varsayılan YIKIM
+/// pelerin/elitrasını açıp kapatabilir — kendi tasarımını ÇİKEMEZ ve
+/// katalogdaki başka kayıtları seçemez.
+fn kozmetik_cizim_kapisi() -> Result<(String, String), String> {
+    let (anahtar, tur) = kozmetik_yetki_kapisi()?;
+    let yetki = crate::hesap_yetki::yerel_yetki(&anahtar);
+    if !crate::hesap_yetki::cizim_izinli(&yetki) {
+        return Err("rol_yok: kendi kozmetigini cizmek icin 'Yol Silindiri' rolu gerekir".into());
+    }
+    Ok((anahtar, tur))
+}
+
 // ---------- kozmetik (özel pelerin + elitra kanadı) ----------
 
 /// Kozmetik DEĞİŞTİRME yetkisi kapısı.
@@ -362,6 +377,7 @@ pub async fn cmd_kozmetik_kaydet(
     pelerin: Option<Vec<String>>,
     kanat: Option<Vec<String>>,
 ) -> Result<serde_json::Value, String> {
+let (hesap_anahtari, _tur) = kozmetik_cizim_kapisi()?;
     let (hesap_anahtari, _tur) = kozmetik_yetki_kapisi()?;
     let var_mi = |liste: &Option<Vec<String>>| -> bool {
         liste
@@ -474,6 +490,7 @@ pub async fn cmd_kozmetik_fotograf(
     png: String,
     duz: Option<bool>,
 ) -> Result<serde_json::Value, String> {
+let (hesap_anahtari, _tur) = kozmetik_cizim_kapisi()?;
     let (hesap_anahtari, _tur) = kozmetik_yetki_kapisi()?;
     let _duz = duz.unwrap_or(false);
     let ad = match tur.as_str() {
@@ -615,6 +632,8 @@ pub fn cmd_kozm_katalog() -> Result<serde_json::Value, String> {
 /// (oyunda vanilla/Mojang görünümü kalır; Mojang pelerini SEÇİLİ kalır).
 #[tauri::command]
 pub async fn cmd_kozm_sec(tur: String, id: Option<String>) -> Result<serde_json::Value, String> {
+    // Katalogdan seçim = çizim izni (rol) ister.
+    let (hesap_anahtari, _tur) = kozmetik_cizim_kapisi()?;
     if !crate::kozmetik_katalog::gecerli_tur(&tur) {
         return Err("bilinmeyen kozmetik türü".into());
     }

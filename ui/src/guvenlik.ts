@@ -161,6 +161,7 @@ export async function guvenlikKartiCiz(host: HTMLElement): Promise<void> {
         <div class="gv-kod-satir">
           <div class="gv-kod" id="gv-kod">···</div>
           <button class="btn primary sm" id="gv-kod-al">Kod al</button>
+          <button class="btn ghost sm" id="gv-kopyala" hidden title="Kodu kopyala">Kopyala</button>
           <button class="btn ghost sm" id="gv-kontrol">Kontrol et</button>
         </div>
         <p class="gv-mini" id="gv-kod-alt">Kod 10 dakika geçerlidir.</p>
@@ -215,6 +216,28 @@ export async function guvenlikKartiCiz(host: HTMLElement): Promise<void> {
       const v = (await invoke("cmd_guvenlik_baglama_kod")) as { kod?: string; kalan_sn?: number };
       if (kodEl()) kodEl()!.textContent = v.kod || "?";
       if (altEl()) altEl()!.textContent = `Discord'da bota yaz: /bagla ${v.kod || ""} · ${Math.ceil((v.kalan_sn || 600) / 60)} dk`;
+      const kopyala = host.querySelector<HTMLButtonElement>("#gv-kopyala");
+      if (kopyala) {
+        kopyala.hidden = !v.kod;
+        kopyala.onclick = async () => {
+          const kod = v.kod || "";
+          if (!kod) return;
+          try {
+            await navigator.clipboard.writeText(kod);
+            const eskiYazi = kopyala.textContent;
+            kopyala.textContent = "Kopyalandı ✓";
+            setTimeout(() => { kopyala.textContent = eskiYazi; }, 1600);
+          } catch {
+            // pano kapalıysa elle seçebilsin diye kodu seçili göster
+            const secim = window.getSelection();
+            const aralik = document.createRange();
+            aralik.selectNodeContents(host.querySelector("#gv-kod")!);
+            secim?.removeAllRanges();
+            secim?.addRange(aralik);
+            toast("Pano kapalı — kodu elle seçip kopyala", "err");
+          }
+        };
+      }
       // Kod alındıktan sonra bağlantıyı kendiliğinden yokla. Sayfadan
       // çıkıldıysa kart DOM'dan düşer; yoklama kendini durdurur.
       if (!yoklama) {

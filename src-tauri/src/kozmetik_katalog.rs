@@ -37,7 +37,22 @@ fn kok() -> PathBuf {
 }
 
 fn katalog_yol() -> PathBuf {
-    kok().join("katalog.json")
+    // v0.7.25: KATALOG da hesap bazlı — aynı bilgisayarda iki hesabın
+    // kayıtlı kozmetikleri birbirine KARIŞMASIN.
+    // Hesap yoksa eski (paylaşılan) yol kullanılır.
+    kok().join(format!("katalog-{}.json", katalog_anahtari()))
+}
+
+/// Katalogun hesap anahtarı (boşsa paylaşılan/ortaş katalog).
+fn katalog_anahtari() -> String {
+    let a = hesap_anahtari();
+    if a.is_empty() {
+        return "ortak".to_string();
+    }
+    // dosya adında kullanılabilecek güvenli kimlik
+    a.chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect()
 }
 
 /// Aktif hesabın kısa anahtarı ("" = hesap yok).
