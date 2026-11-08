@@ -157,6 +157,12 @@ export function hesapBul(anahtar) {
   return q1("SELECT * FROM hesap WHERE anahtar = ?", [anahtar]);
 }
 
+/// Görünen ad (Minecraft kullanıcı adı) ile hesap ara (büyük/küçük harf duyarsız).
+export function hesapAdBul(ad) {
+  if (!ad) return null;
+  return q1("SELECT * FROM hesap WHERE ad_kucuk = ?", [ad.toLowerCase().trim()]);
+}
+
 export function hesapOlustur({ anahtar, ad, tur, uuid = "", tuz = null, argon_veri = null, crack_limiti = 3 }) {
   x(
     `INSERT INTO hesap (anahtar, ad, ad_kucuk, tur, uuid, tuz, argon_veri, sifre_var, olusturma, crack_limiti)

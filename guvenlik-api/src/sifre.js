@@ -95,18 +95,19 @@ export function coz(sifreli) {
   }
 }
 
-/// Parola doğrulama: gelen hash'i DB'deki şifreli doğrulayıcıyla karşılaştır.
+/// Parola doğrulama: istemciden gelen hash'i, kayıtlı tuzla sunucu tarafında
+/// yeniden türetip DB'deki ŞİFRELİ doğrulayıcıyla karşılaştırır.
 /// `kayit` = hesap satırı (tuz, argon_veri şifreli).
 export function parolaDogruMu(kayit, gelen_hash) {
-  if (!kayit?.argon_veri) return false;
+  if (!kayit?.argon_veri || !kayit?.tuz) return false;
   const duz = coz(kayit.argon_veri);
   if (!duz) return false;
-  return dogrulayici_karsilastir(gelen_hash, duz);
+  return dogrulayici_karsilastir(parolaTuret(gelen_hash, kayit.tuz), duz);
 }
 
-/// Yeni şifre kaydı: tuz + türetilmiş hash → şifreli saklanacak biçim.
-export function sifreKaydiUret(parola) {
+/// Yeni parola kaydı: istemci hash'i → tuzla yeniden türet → şifreli sakla.
+/// Dönen alan adları DB sütunlarıyla aynıdır.
+export function sifreKaydiUret(gelen_hash) {
   const tuz = tuzUret();
-  const hash = parolaTuret(parola, tuz);
-  return { tuz, sifreli_veri: sifrele(hash) };
+  return { tuz, argon_veri: sifrele(parolaTuret(gelen_hash, tuz)) };
 }

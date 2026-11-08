@@ -1,12 +1,13 @@
 /* ============================================================
    İLK KURULUM SİHİRBAZI (onboarding).
    İlk defa indirenlerde — hesabı DA kurulumu DA olmayan kullanıcıda —
-   launcher ilk açılışta 4 adımlı bir kurulum provalarında geçirir:
-     1) Hoş geldin   2) Hesap bağla   3) İlk paketi oluştur   4) Hazır!
+   launcher ilk açılışta 5 adımlı bir kurulum provalarında geçirir:
+     1) Hoş geldin   2) Hesap bağla   3) Hesabı doğrula   4) İlk paketi oluştur   5) Hazır!
    Bu akış bir kez çalışır (onboarding_done); mevcut kullanıcılar
    hesap/kurulum sahibi oldukları için asla görmez.
    ============================================================ */
 import { invoke, navigate, refreshState, state } from "./main";
+import { guvenlikKartiCiz, guvenlikYoklamayiDurdur } from "./guvenlik";
 
 let overlay: HTMLElement | null = null;
 /** Adım 2'deki hesap yoklaması — adım değişince mutlaka temizlenir. */
@@ -58,7 +59,7 @@ export function maybeStartOnboarding(): boolean {
   const card = root.querySelector(".ob-card") as HTMLElement;
 
   const dots = (n: number): string =>
-    `<div class="ob-dots">${[0, 1, 2, 3].map((i) => `<i class="${i <= n ? "done" : ""}"></i>`).join("")}</div>`;
+    `<div class="ob-dots">${[0, 1, 2, 3, 4].map((i) => `<i class="${i <= n ? "done" : ""}"></i>`).join("")}</div>`;
 
   const actions = (opts: { back?: boolean; next?: string; nextId: string; skip?: string; skipId?: string }): string => `
     <div class="ob-actions">
@@ -75,7 +76,7 @@ export function maybeStartOnboarding(): boolean {
       <h2>YIKIMLient'e hoş geldin</h2>
       <p class="ob-sub">Ultra-hızlı Minecraft launcher — 60 saniyede oyundasın.<br />Üç kısa soru, hepsi bu.</p>
       ${dots(0)}
-      <div class="ob-step-label">1 / 4 — Hoş geldin</div>
+      <div class="ob-step-label">1 / 5 — Hoş geldin</div>
       <p style="text-align:center; color:var(--text-dim); font-size:12.5px; line-height:1.6">
         Bu sihirbaz hesabını bağlar ve ilk oyun paketini kurar.<br />Her istediğin zaman Ayarlar'dan değiştirebilirsin.
       </p>
@@ -90,7 +91,7 @@ export function maybeStartOnboarding(): boolean {
     temizleTik();
     card.innerHTML = `
       ${dots(1)}
-      <div class="ob-step-label">2 / 4 — Hesap</div>
+      <div class="ob-step-label">2 / 5 — Hesap</div>
       <h2 style="font-size:16px">Hesabını bağla</h2>
       <p class="ob-sub" style="margin-bottom:12px">Microsoft hesabıyla premium giriş ya da doğrudan çevrimdışı oyna.</p>
       <button class="btn primary lg" id="ob-ms" style="width:100%">Microsoft ile Giriş</button>
@@ -182,6 +183,37 @@ export function maybeStartOnboarding(): boolean {
 
     next.addEventListener("click", () => {
       temizleTik();
+      void stepDogrula();
+    });
+  }
+
+  // ---------- ADIM 3: hesabı doğrula (Discord + şifre) ----------
+  function stepDogrula(): void {
+    temizleTik();
+    guvenlikYoklamayiDurdur();
+    card.innerHTML = `
+      ${dots(2)}
+      <div class="ob-step-label">3 / 5 — Doğrulama</div>
+      <h2 style="font-size:16px">Hesabını doğrula</h2>
+      <p class="ob-sub" style="margin-bottom:10px">
+        Discord ile bağla, şifre oluştur. Doğrulanmayan hesap da oynar;
+        yalnız kozmetik/skin değiştiremez (adının başında ✕ görünür).
+      </p>
+      <div id="ob-gv"></div>
+      ${actions({ back: true, next: "İleri →", nextId: "ob-next", skip: "Şimdi değil", skipId: "ob-skip" })}
+    `;
+    const host = card.querySelector<HTMLElement>("#ob-gv");
+    if (host) void guvenlikKartiCiz(host);
+    card.querySelector("#ob-back")?.addEventListener("click", () => {
+      guvenlikYoklamayiDurdur();
+      step2();
+    });
+    card.querySelector("#ob-skip")?.addEventListener("click", () => {
+      guvenlikYoklamayiDurdur();
+      void step3();
+    });
+    card.querySelector("#ob-next")?.addEventListener("click", () => {
+      guvenlikYoklamayiDurdur();
       void step3();
     });
   }
@@ -195,8 +227,8 @@ export function maybeStartOnboarding(): boolean {
       versions = (resp as any).all?.slice(0, 80) ?? [];
     } catch { /* çevrimdışı — boş liste; sonradan Paketler'den seçer */ }
     card.innerHTML = `
-      ${dots(2)}
-      <div class="ob-step-label">3 / 4 — İlk paket</div>
+      ${dots(3)}
+      <div class="ob-step-label">4 / 5 — İlk paket</div>
       <h2 style="font-size:16px">İlk oyun dünyasını oluştur</h2>
       <p class="ob-sub" style="margin-bottom:8px">Fabric + YIKIM çekirdeği otomatik; standart FPS modları dahil.</p>
       <label class="ob-lab">Paket adı</label>
@@ -211,7 +243,7 @@ export function maybeStartOnboarding(): boolean {
         Ya da hazır mod paketi indir (Keşfet)
       </button>
     `;
-    card.querySelector("#ob-back")?.addEventListener("click", step2);
+    card.querySelector("#ob-back")?.addEventListener("click", stepDogrula);
     let created: any = null;
     card.querySelector("#ob-create")?.addEventListener("click", async (e) => {
       const btn = e.currentTarget as HTMLButtonElement;
@@ -251,8 +283,8 @@ export function maybeStartOnboarding(): boolean {
       <img class="ob-logo" alt="" draggable="false" src="/logo.png" />
       <h2>Her şey hazır! 🎉</h2>
       <p class="ob-sub">Hesabın bağlandı, ilk paketin kuruldu.</p>
-      ${dots(3)}
-      <div class="ob-step-label">4 / 4 — Hazır</div>
+      ${dots(4)}
+      <div class="ob-step-label">5 / 5 — Hazır</div>
       <p style="text-align:center; color:var(--text-dim); font-size:12.5px; line-height:1.7">
         Ana Sayfa'dan <b>Oyna</b>'ya bas — saniyeler içinde oyundasın.<br />
         Modları Paketler → modlar sekmesinden yönet; dosyayı<br />ekrana sürükleyip bırak, otomatik kurulur.

@@ -1,0 +1,58 @@
+YIKIMTAGBOT - Kurulum ve Token Ayarı
+=====================================
+
+ÖNEMLİ GÜVENLİK UYARISI
+-----------------------
+Eski config.js dosyasındaki token bu sohbette göründü.
+Discord Developer Portal'dan tokeni YENİLE (Reset Token) ve yeni tokeni kullan.
+
+
+1) Gereksinimler
+----------------
+- Node.js 18 veya üzeri
+- npm
+
+
+2) Kurulum
+----------
+1. Zip dosyasını bir klasöre çıkarın
+2. .env.example dosyasını kopyalayıp adını .env yapın
+3. Ek npm kurulumu gerekmez (node_modules zip içinde)
+
+
+3) Token Nasıl Konur? (2 yöntem)
+--------------------------------
+
+YÖNTEM A - Basit (düz token):
+  .env dosyasını açın ve şunu yazın:
+  TOKEN=buraya_yeni_discord_bot_tokeniniz
+
+YÖNTEM B - Şifreli token (önerilen):
+  1. Terminalde çalıştırın: node scripts/encrypt-token.js
+  2. Bot tokeninizi ve bir şifreleme anahtarını girin (anahtar en az 8 karakter)
+  3. Çıkan TOKEN_ENCRYPTED ve TOKEN_KEY değerlerini .env dosyasına yapıştırın
+  4. TOKEN satırını boş bırakın veya silin
+
+
+4) Sunucu Ayarları (.env)
+-------------------------
+GUILD_ID=Sunucu ID
+CHANNEL_ID=Hoşgeldin mesajı kanal ID
+ROLE_ID=Verilecek rol ID
+
+
+5) Botu Başlatma
+----------------
+node index.js
+
+
+6) Eklenen Güvenlik Özellikleri
+-------------------------------
+- Token artık kod içinde yok; .env veya şifreli token kullanılıyor
+- AES-256-GCM ile token şifreleme desteği
+- Sadece tanımlı sunucuda komut çalışır (guild whitelist)
+- Event spam koruması (kullanıcı cooldown)
+- Eşzamanlı işlem sınırı (kuyruk dolunca event atlanır)
+- Gereksiz intentler kapatıldı (MessageContent, GuildMessages)
+- Yakalanmamış hatalar botu çökertmez
+- Rol ekleme/çıkarma öncesi kontrol (gereksiz API çağrısı yok)

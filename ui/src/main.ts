@@ -15,6 +15,7 @@ import { bildirimAcKapa, bildirimKutuBaslat, bildirimZilIlkDurum } from "./bildi
 import { startDropWatcher } from "./drop";
 import { maybeStartTour } from "./tour";
 import { maybeStartOnboarding } from "./onboarding";
+import { guvenlikOzetYukle, hesapCarpi } from "./guvenlik";
 import { applyFx } from "./fx";
 import { applyCursor } from "./cursor";
 import { WINDOW_CONTROLS, icon, ICONS } from "./icons";
@@ -84,6 +85,7 @@ export async function refreshState(rerender = false): Promise<void> {  const s =
   state.curseforge = s.curseforge;
   state.sys = s.sys;
   applyWorld();
+  await guvenlikOzetYukle(true);
   renderAccountPill();
   if (rerender) navigate(currentPage); // açık sayfayı anında tazele (ikon/kapak vb.)
 }
@@ -413,7 +415,7 @@ export function renderAccountPill(): void {
   }
   pill.innerHTML = `
     <img class="ra-head" src="${headUrl(acc)}" draggable="false" ${headAttrs(acc)} />
-    <span class="ra-name">${acc.name}</span>
+    <span class="ra-name">${hesapCarpi(acc.id)}${acc.name}</span>
     <span class="pa-dot on"></span>`;
 }
 

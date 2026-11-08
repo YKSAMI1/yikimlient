@@ -331,6 +331,24 @@ pub fn cmd_delete_emote(adi: String) -> Result<bool, String> {
 
 // ---------- kozmetik (özel pelerin + elitra kanadı) ----------
 
+/// Kozmetik DEĞİŞTİRME yetkisi kapısı.
+///
+/// Kural: doğrulanmamış hesap kozmetik değiştiremez (tasarım §9). Hesabı
+/// kullanmaya devam eder, yalnız pelerin/elitra düzenlemesi kilitlidir.
+/// Dönen `(hesap_anahtari, tur)` ile kayıt hesap bazlı saklanır.
+fn kozmetik_yetki_kapisi() -> Result<(String, String), String> {
+    let acc = selected_account().map_err(|_| "hesap yok")?;
+    let tur = if acc.kind == "microsoft" { "microsoft" } else { "cracked" };
+    let anahtar = crate::hesap_yetki::hesap_anahtari(&acc.name, tur, &acc.uuid);
+    let yetki = crate::hesap_yetki::yerel_yetki(&anahtar);
+    if !crate::hesap_yetki::kozmetik_izinli(&yetki) {
+        return Err(
+            "kozmetik_kilidi: kozmetik degistirmek icin hesabini dogrula (Ayarlar → Guvenlik)".into(),
+        );
+    }
+    Ok((anahtar, tur.to_string()))
+}
+
 /// Özel pelerin ve/veya elitra atlasını kaydet.
 ///
 /// `pelerin` / `kanat`: 2048 renk (64×32, satır satır) — her girdi "#rrggbb"
@@ -344,6 +362,7 @@ pub async fn cmd_kozmetik_kaydet(
     pelerin: Option<Vec<String>>,
     kanat: Option<Vec<String>>,
 ) -> Result<serde_json::Value, String> {
+    let (hesap_anahtari, _tur) = kozmetik_yetki_kapisi()?;
     let var_mi = |liste: &Option<Vec<String>>| -> bool {
         liste
             .as_ref()
@@ -358,6 +377,7 @@ pub async fn cmd_kozmetik_kaydet(
         if var_mi(&pelerin) {
             let png = crate::kozmetik::atlas_png(liste)?;
             kurulum += crate::kozmetik::tum_kurulumlara_yaz("pelerin.png", &png);
+            crate::guvenlik::hesap_kozmetik_yaz(&hesap_anahtari, "pelerin.png", &png);
             let _ = crate::kozmetik_katalog::ekle_veya_guncelle(
                 crate::kozmetik_katalog::PELERIN,
                 &png,
@@ -365,6 +385,7 @@ pub async fn cmd_kozmetik_kaydet(
             yuklenen_pelerin = Some(crate::kozmetik::b64(&png));
         } else {
             crate::kozmetik::tum_kurulumlardan_sil("pelerin.png");
+            crate::guvenlik::hesap_kozmetik_sil(&hesap_anahtari, "pelerin.png");
             crate::kozmetik_katalog::aktif_yaz(crate::kozmetik_katalog::PELERIN, None);
             yuklenen_pelerin = Some(String::new());
         }
@@ -373,6 +394,7 @@ pub async fn cmd_kozmetik_kaydet(
         if var_mi(&kanat) {
             let png = crate::kozmetik::atlas_png(liste)?;
             kurulum += crate::kozmetik::tum_kurulumlara_yaz("elytra.png", &png);
+            crate::guvenlik::hesap_kozmetik_yaz(&hesap_anahtari, "elytra.png", &png);
             let _ = crate::kozmetik_katalog::ekle_veya_guncelle(
                 crate::kozmetik_katalog::KANAT,
                 &png,
@@ -380,6 +402,7 @@ pub async fn cmd_kozmetik_kaydet(
             yuklenen_kanat = Some(crate::kozmetik::b64(&png));
         } else {
             crate::kozmetik::tum_kurulumlardan_sil("elytra.png");
+            crate::guvenlik::hesap_kozmetik_sil(&hesap_anahtari, "elytra.png");
             crate::kozmetik_katalog::aktif_yaz(crate::kozmetik_katalog::KANAT, None);
             yuklenen_kanat = Some(String::new());
         }
@@ -451,6 +474,7 @@ pub async fn cmd_kozmetik_fotograf(
     png: String,
     duz: Option<bool>,
 ) -> Result<serde_json::Value, String> {
+    let (hesap_anahtari, _tur) = kozmetik_yetki_kapisi()?;
     let _duz = duz.unwrap_or(false);
     let ad = match tur.as_str() {
         "pelerin" => "pelerin.png",
@@ -470,6 +494,8 @@ pub async fn cmd_kozmetik_fotograf(
         return Err("görsel en az 64×32 olmalı".into());
     }
     let kurulum = crate::kozmetik::tum_kurulumlara_yaz(ad, &veri);
+    // Hesap bazlı depo: bu tasarım yalnız bu hesapta görünür.
+    crate::guvenlik::hesap_kozmetik_yaz(&hesap_anahtari, ad, &veri);
     // 64×32 kopya: mod bunu presence sunucusuna gönderir (gövde sınırı).
     crate::kozmetik::kucuk_yaz(ad, &veri);
     // KATALOG: her yüklenen fotoğraf AYRI bir kayıt olur (Skin Merkezi'nde
@@ -527,6 +553,7 @@ pub async fn cmd_kozmetik_aktif(
     pelerin: Option<bool>,
     kanat: Option<bool>,
 ) -> Result<serde_json::Value, String> {
+    let (_anahtar, _tur) = kozmetik_yetki_kapisi()?;
     if let Some(acik) = pelerin {
         crate::kozmetik::aktif_ayarla("pelerin.png", acik)?;
         kozmetik_aktif_esle(crate::kozmetik_katalog::PELERIN, acik);
@@ -591,6 +618,7 @@ pub async fn cmd_kozm_sec(tur: String, id: Option<String>) -> Result<serde_json:
     if !crate::kozmetik_katalog::gecerli_tur(&tur) {
         return Err("bilinmeyen kozmetik türü".into());
     }
+    let (hesap_anahtari, _tur) = kozmetik_yetki_kapisi()?;
     let dosya = if tur == crate::kozmetik_katalog::PELERIN {
         "pelerin.png"
     } else {
@@ -606,12 +634,14 @@ pub async fn cmd_kozm_sec(tur: String, id: Option<String>) -> Result<serde_json:
             // pasifken kurulumlara yazmıyor).
             crate::kozmetik::aktif_ayarla(dosya, true)?;
             crate::kozmetik::tum_kurulumlara_yaz(dosya, &png);
+            crate::guvenlik::hesap_kozmetik_yaz(&hesap_anahtari, dosya, &png);
             crate::kozmetik::kucuk_yaz(dosya, &png);
             crate::kozmetik_katalog::aktif_yaz(&tur, Some(kid));
             kucuk = crate::kozmetik::kucuk_png_b64(&png).unwrap_or_default();
         }
         None => {
             crate::kozmetik::aktif_ayarla(dosya, false)?;
+            crate::guvenlik::hesap_kozmetik_sil(&hesap_anahtari, dosya);
             crate::kozmetik_katalog::aktif_yaz(&tur, None);
         }
     }
@@ -977,6 +1007,23 @@ pub async fn cmd_select_account(account_id: String) -> Result<(), String> {
     cfg.last_selected_account = account_id;
     cfg.save()?;
     crate::hesap_kopru::tum_kurulumlara_yaz();
+    // Hesap bazlı kozmetik: önceki hesabın pelerin/elitrası kurulumlardan
+    // temizlenir, seçilen hesabın kendi kozmetiği uygulanır.
+    if let Ok(acc) = selected_account() {
+        let tur = if acc.kind == "microsoft" { "microsoft" } else { "cracked" };
+        let anahtar = crate::hesap_yetki::hesap_anahtari(&acc.name, tur, &acc.uuid);
+        for ad in ["pelerin.png", "elytra.png"] {
+            // Önceki hesabın tasarımı hem kurulumlardan hem ana kopyadan silinir.
+            crate::kozmetik::tum_kurulumlardan_sil(ad);
+            if let Some(png) = crate::guvenlik::hesap_kozmetik_oku(&anahtar, ad) {
+                crate::kozmetik::tum_kurulumlara_yaz(ad, &png);
+                crate::kozmetik::kucuk_yaz(ad, &png);
+            } else {
+                crate::kozmetik::kucuk_sil(ad);
+            }
+        }
+        crate::guvenlik::aktif_hesap_yaz(&anahtar);
+    }
     Ok(())
 }
 

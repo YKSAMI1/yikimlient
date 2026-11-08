@@ -1,4 +1,5 @@
 import { currentAccount, headAttrs, headUrl, icon, invoke, openModal, openLoginModal, state, toast, applyWorld, refreshState, openPath, openExternal, navigate } from "../main";
+import { guvenlikKartiCiz, guvenlikYoklamayiDurdur, hesapCarpi } from "../guvenlik";
 import { SAHNE_ARTLARI, sahneArkaCiz } from "../sahne/arkaplan";
 
 /* Beş dünya — her kart o dünyanın kendi zemininde mini önizleme taşır.
@@ -91,7 +92,7 @@ export function renderSettings(root: HTMLElement): void {
           <div class="acc-row ${active ? "active" : ""}" data-id="${a.id}">
             <img class="acc-head" src="${headUrl(a)}" ${headAttrs(a)} draggable="false" />
             <div class="acc-info">
-              <b>${a.name}</b>
+              <b>${hesapCarpi(a.id)}${a.name}</b>
               <span>${a.kind === "microsoft" ? "Microsoft · premium" : "Offline"}</span>
             </div>
             ${active ? `<span class="chip">aktif</span>` : `<button class="btn ghost sm acc-use">Seç</button>`}
@@ -104,6 +105,8 @@ export function renderSettings(root: HTMLElement): void {
         <button class="btn ghost" id="acc-add-off">${icon("user")} Çevrimdışı Ekle</button>
       </div>
     </div>
+
+    <div id="guvenlik-karti" class="anim-fade-up"></div>
 
     <div class="card set-card anim-fade-up">
       <h3>${icon("image")} Görsel Dünya</h3>
@@ -267,6 +270,9 @@ export function renderSettings(root: HTMLElement): void {
   // hesap yöneticisi
   root.querySelector("#acc-add-ms")?.addEventListener("click", () => openLoginModal());
   root.querySelector("#acc-add-off")?.addEventListener("click", () => openLoginModal());
+  // güvenlik kartı (doğrulama / Discord bağlama / şifre)
+  const gvHost = root.querySelector<HTMLElement>("#guvenlik-karti");
+  if (gvHost) void guvenlikKartiCiz(gvHost);
   root.querySelectorAll(".acc-row").forEach((row) => {
     const id = (row as HTMLElement).dataset.id!;
     row.querySelector(".acc-use")?.addEventListener("click", async (e) => {

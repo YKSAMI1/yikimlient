@@ -38,16 +38,51 @@ pub fn sunucu_pub_b64() -> Option<String> {
 
 /// API'nin ayakta olup olmadığını sor (2 sn zaman aşımı).
 pub async fn api_saglik() -> bool {
+    api_saglik_ayrinti().await.is_ok()
+}
+
+/// API sağlık yanıtının gövdesi (bot açık/kapalı, sunucu anahtarı).
+pub async fn api_saglik_ayrinti() -> Result<serde_json::Value, String> {
     let client = crate::core::http_client();
-    match client
+    let resp = client
         .get(format!("{}/api/saglik", api_adresi()))
         .timeout(Duration::from_secs(3))
         .send()
         .await
-    {
-        Ok(r) => r.status().is_success(),
-        Err(_) => false,
+        .map_err(|e| format!("api_kapali: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("api_hata {}", resp.status().as_u16()));
     }
+    let deger: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    Ok(deger.get("govde").cloned().unwrap_or(deger))
+}
+
+/// Genel (dış) IP adresi — giriş kaydı için. Süreç boyunca bir kez sorulur,
+/// ulaşılamazsa boş döner (giriş yine çalışır). Yayında Cloudflare Worker
+/// bağlantı IP'sini kendisi görür; bu yalnız yerel testte gerekir.
+pub async fn genel_ip() -> String {
+    use std::sync::OnceLock;
+    static ONBELLEK: OnceLock<String> = OnceLock::new();
+    if let Some(v) = ONBELLEK.get() {
+        return v.clone();
+    }
+    let mut bulunan = String::new();
+    let client = crate::core::http_client();
+    for adres in ["https://api.ipify.org", "https://ifconfig.me/ip"] {
+        if let Ok(r) = client.get(adres).timeout(Duration::from_secs(3)).send().await {
+            if r.status().is_success() {
+                if let Ok(t) = r.text().await {
+                    let t = t.trim().to_string();
+                    if !t.is_empty() && t.len() <= 60 && !t.contains(char::is_whitespace) {
+                        bulunan = t;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    let _ = ONBELLEK.set(bulunan.clone());
+    bulunan
 }
 
 /// API çağrısı: cihaz imzalı istek + sunucu imzalı yanıt doğrulaması.
@@ -65,6 +100,7 @@ pub async fn api_cagir<T: DeserializeOwned>(
 
     let istek = serde_json::json!({
         "cihaz_id": cihaz.cihaz_id,
+        "pub_key": cihaz.pub_b64,
         "ts": ts,
         "nonce": nonce,
         "imza": imza,

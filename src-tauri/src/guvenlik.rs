@@ -190,7 +190,65 @@ pub fn hesap_kaydet(k: &HesapYetkiKayit) {
 
 /// Hesabın kozmetik deposu: `.yikim/kosmetik/<anahtar>/`
 pub fn kozmetik_yerel_dir(inst_dir: &Path, anahtar: &str) -> PathBuf {
-    inst_dir.join(".yikim").join("kosmetik").join(anahtar)
+    inst_dir.join(".yikim").join("kosmetik").join(anahtar_dosya(anahtar))
+}
+
+/// Hesap anahtarını güvenli dosya adına çevir.
+/// Windows dosya adlarında `:` yasaktır; `offline:<uuid>` → `offline_<uuid>`.
+pub fn anahtar_dosya(anahtar: &str) -> String {
+    anahtar
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+/// Hesabın kendi kozmetik deposu (launcher tarafı, kurulumdan bağımsız).
+pub fn hesap_kozmetik_dir(anahtar: &str) -> PathBuf {
+    guvenlik_dir().join("kozmetik").join(anahtar_dosya(anahtar))
+}
+
+/// Hesabın kozmetik dosyasını sakla (`pelerin.png` / `elytra.png`).
+pub fn hesap_kozmetik_yaz(anahtar: &str, ad: &str, png: &[u8]) -> bool {
+    let dir = hesap_kozmetik_dir(anahtar);
+    if std::fs::create_dir_all(&dir).is_err() {
+        return false;
+    }
+    // Yol bileşeni olarak kullanılan `ad` güvenli olmalı
+    let ad = ad.replace(['/', '\\'], "_");
+    std::fs::write(dir.join(ad), png).is_ok()
+}
+
+/// Hesabın kozmetik dosyasını oku.
+pub fn hesap_kozmetik_oku(anahtar: &str, ad: &str) -> Option<Vec<u8>> {
+    let ad = ad.replace(['/', '\\'], "_");
+    std::fs::read(hesap_kozmetik_dir(anahtar).join(ad)).ok()
+}
+
+/// Hesabın kozmetik dosyasını sil.
+pub fn hesap_kozmetik_sil(anahtar: &str, ad: &str) {
+    let ad = ad.replace(['/', '\\'], "_");
+    let _ = std::fs::remove_file(hesap_kozmetik_dir(anahtar).join(ad));
+}
+
+/// Aktif hesabı kurulumlara yaz: `<kurulum>/.yikim/aktif-hesap`.
+/// Mod bu dosyadan hangi hesabın açık olduğunu öğrenir (hesap bazlı kozmetik).
+pub fn aktif_hesap_yaz(anahtar: &str) -> usize {
+    let mut n = 0;
+    for inst in crate::instances::list() {
+        let dir = inst.dir().join(".yikim");
+        if std::fs::create_dir_all(&dir).is_ok()
+            && std::fs::write(dir.join("aktif-hesap"), anahtar.as_bytes()).is_ok()
+        {
+            n += 1;
+        }
+    }
+    n
 }
 
 #[cfg(test)]
@@ -252,6 +310,15 @@ mod tests {
         let d = PathBuf::from("C:/kur/inst-1");
         let p = kozmetik_yerel_dir(&d, "offline:abc");
         assert!(p.to_string_lossy().contains(".yikim"));
-        assert!(p.to_string_lossy().contains("offline:abc"));
+        assert!(p.to_string_lossy().contains("offline_abc"), "windows'ta ':' dosya adinda olamaz");
+    }
+
+    #[test]
+    fn hesap_kozmetik_deposu_ayri() {
+        let a = anahtar_dosya("offline:abc");
+        let b = anahtar_dosya("ms:def");
+        assert_eq!(a, "offline_abc");
+        assert_eq!(b, "ms_def");
+        assert_ne!(a, b);
     }
 }

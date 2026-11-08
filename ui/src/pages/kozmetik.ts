@@ -10,7 +10,8 @@
 // Aynı anda YALNIZ seçili kozmetik gösterilir (üst üste binmez).
 // "3D Çiz" ile doğrudan modelin her yüzüne boyanır; "2D'ye geç" ile dönülür.
 
-import { currentAccount, fileSrc, icon, invoke, toast } from "../main";
+import { currentAccount, fileSrc, icon, invoke, navigate, toast } from "../main";
+import { hesapDogrulandi } from "../guvenlik";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import {
   ATLAS_PIKSEL,
@@ -159,7 +160,32 @@ export function renderKozmetik(root: HTMLElement): void {
   kanatOnizleme = null;
   vurgular.clear();
   root.innerHTML = iskelet();
+  kozmetikKilidiCiz(root);
   void yukle(root);
+}
+
+/// Doğrulanmamış hesapta kozmetik kaydı kilitli: çizmek serbest, kaydetmek
+/// değil. Uyarı şeridi + kaydet düğmeleri kapalı (tasarım §9).
+function kozmetikKilidiCiz(root: HTMLElement): void {
+  const acc = currentAccount();
+  if (!acc || hesapDogrulandi(acc.id)) return;
+  const bas = root.querySelector(".page-header");
+  if (!bas) return;
+  const kutu = document.createElement("div");
+  kutu.className = "kz-kilit";
+  kutu.innerHTML = `<span class="gv-carpi">✕</span>
+    <div><b>Kozmetikler kilitli</b>
+    <small>Çizebilirsin ama kaydetmek için hesabını doğrula. Doğrulanmayan hesapta tasarım yalnız bu cihazda kalır.</small></div>
+    <button class="btn primary sm" id="kz-dogrula">Doğrula</button>`;
+  bas.after(kutu);
+  kutu.querySelector("#kz-dogrula")?.addEventListener("click", () => navigate("settings"));
+  for (const tur of ["pelerin", "kanat"]) {
+    const b = root.querySelector<HTMLButtonElement>(`#kz-${tur}-kaydet`);
+    if (b) {
+      b.disabled = true;
+      b.title = "Önce hesabını doğrula (Ayarlar → Güvenlik)";
+    }
+  }
 }
 
 function iskelet(): string {

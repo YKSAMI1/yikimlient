@@ -157,7 +157,7 @@ pub fn tum_kurulumlara_yaz(ad: &str, png: &[u8]) -> usize {
 }
 
 /// PNG'yi yalnız kurulumların `.yikim/` klasörüne yaz (ana kopya dokunulmaz).
-fn kurulumlara_yaz(ad: &str, png: &[u8]) -> usize {
+pub fn kurulumlara_yaz(ad: &str, png: &[u8]) -> usize {
     let mut sayi = 0usize;
     for inst in crate::instances::list() {
         let dir = inst.dir().join(".yikim");

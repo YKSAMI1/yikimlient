@@ -1,4 +1,5 @@
 import { $, currentAccount, el, fileSrc, fmtDuration, headAttrs, headUrl, icon, invoke, lamp, launch, navigate, openLoginModal, state } from "../main";
+import { hesapCarpi } from "../guvenlik";
 import { enterRows, switchPress } from "../motion";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import { emoteParca } from "../sahne/emote";
@@ -44,7 +45,7 @@ function impHome(root: HTMLElement): void {
         <div class="imp-banner${sel?.cover ? " kapakli" : ""}"${sel?.cover ? ` style="background-image:url('${fileSrc(sel.cover)}')"` : ""}>
           <div class="vitrin"><canvas id="sahne-arka" class="sahne-arka"></canvas><canvas id="sahne-katman"></canvas></div>
           <button class="imp-ad-chip" id="i-ad" title="Hesap yönetimi">
-            ${acc?.name ? `<img src="${headUrl(acc)}" alt="" draggable="false" ${headAttrs(acc)}><b>${acc.name}</b><small>hesabı yönet</small>` : `<b>hesap yok</b><small>giriş yap</small>`}
+            ${acc?.name ? `<img src="${headUrl(acc)}" alt="" draggable="false" ${headAttrs(acc)}><b>${hesapCarpi(acc.id)}${acc.name}</b><small>hesabı yönet</small>` : `<b>hesap yok</b><small>giriş yap</small>`}
           </button>
           ${sel ? `<button class="imp-buyut" id="i-menu" title="${sel.name}">${icon("gear")}</button>` : ""}
         </div>

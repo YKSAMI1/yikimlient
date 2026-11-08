@@ -22,6 +22,7 @@ pub mod stats;
 pub mod util;
 pub mod guvenlik;
 pub mod guvenlik_api;
+pub mod guvenlik_komut;
 pub mod hesap_yetki;
 pub mod yikim_mod;
 pub mod yikim_sicak;
@@ -177,6 +178,15 @@ pub fn run() {
             commands::cmd_route_dropped,
             commands::cmd_delete_content_file,
             commands::cmd_open_content_folder,
+            guvenlik_komut::cmd_guvenlik_durum,
+            guvenlik_komut::cmd_guvenlik_baglama_kod,
+            guvenlik_komut::cmd_guvenlik_baglama_durum,
+            guvenlik_komut::cmd_guvenlik_giris,
+            guvenlik_komut::cmd_guvenlik_sifirla,
+            guvenlik_komut::cmd_guvenlik_parola_kur,
+            guvenlik_komut::cmd_guvenlik_ozet,
+            guvenlik_komut::cmd_hesap_yetki,
+            guvenlik_komut::cmd_hesap_kozmetik_uygula,
             skins::cmd_skin_hub,
             skins::cmd_skin_giy,
             skins::cmd_skin_giy_kitaplik,

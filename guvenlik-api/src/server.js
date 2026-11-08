@@ -1,6 +1,9 @@
 // SUNUCU — HTTP rotaları (Express yok, node:http).
 // Cloudflare Worker'a taşımada `handle(yol, istek)` doğrudan taşınır.
 
+// DİKKAT: env.js İLK import olmalı — diğer modüller ortam değişkeni okuyor.
+import "./env.js";
+
 import http from "node:http";
 import { randomInt } from "node:crypto";
 
@@ -156,7 +159,7 @@ async function baglamaDurum(is, yanit, govde, cihaz) {
 }
 
 async function baglamaDogrula(yanit, icerik) {
-  const { kod, discord_id, discord_ad } = icerik;
+  const { kod, discord_id, discord_ad, rol_yol } = icerik;
   const kayit = db.baglamaKodBul(kod);
   if (!kayit) return hata(yanit, 404, "kod bulunamadi");
   if (db.simdi() - kayit.olusturma > db.ON_DAKIKA) {
@@ -171,18 +174,30 @@ async function baglamaDogrula(yanit, icerik) {
     if (n >= hesap.crack_limiti) return hata(yanit, 429, `crack siniri (${n}/${hesap.crack_limiti})`);
   }
   db.baglamaKodKullan(kod);
-  db.baglantiKaydet(kayit.hesap_anahtar, kayit.tur, discord_id, discord_ad, false);
+  db.baglantiKaydet(kayit.hesap_anahtar, kayit.tur, discord_id, discord_ad, !!rol_yol);
   db.olayKaydet("baglama", kayit.hesap_anahtar, kayit.cihaz_id, `discord ${discord_id}`);
   json(yanit, 200, { tamam: true, hesap_anahtar: kayit.hesap_anahtar });
 }
 
 async function sifirlaKod(yanit, icerik) {
-  const { hesap_anahtar } = icerik;
-  if (!hesap_anahtar) return hata(yanit, 400, "hesap_anahtar eksik");
+  const { hesap_anahtar, hesap_ad, discord_id } = icerik;
+  if (!discord_id) return hata(yanit, 400, "discord_id eksik");
+
+  // Hesabı anahtar ya da görünen ad ile bul
+  let hesap = hesap_anahtar ? db.hesapBul(hesap_anahtar) : null;
+  if (!hesap && hesap_ad) hesap = db.hesapAdBul(hesap_ad);
+  if (!hesap) return hata(yanit, 404, "hesap bulunamadi");
+
+  // Yalnızca hesabın bağlı olduğu Discord kullanıcısı kod isteyebilir
+  const b = db.baglantiBul(hesap.anahtar);
+  if (!b || b.durum !== "aktif") return hata(yanit, 409, "baglanti_yok");
+  if (b.discord_id !== discord_id) return hata(yanit, 403, "hesap baska bir discord hesabina bagli");
+
   const kod = kodUret();
-  db.sifreKodSilAnahtar(hesap_anahtar);
-  db.sifreKodKaydet(kod, hesap_anahtar);
-  json(yanit, 200, { kod, kalan_sn: 600 });
+  db.sifreKodSilAnahtar(hesap.anahtar);
+  db.sifreKodKaydet(kod, hesap.anahtar);
+  db.olayKaydet("sifre_kod", hesap.anahtar, null, `discord ${discord_id} kod istedi`);
+  json(yanit, 200, { kod, kalan_sn: 600, hesap_ad: hesap.ad });
 }
 
 async function sifirlaDogrula(is, yanit, govde, cihaz) {
@@ -198,23 +213,43 @@ async function sifirlaDogrula(is, yanit, govde, cihaz) {
   }
   const hesap = db.hesapBul(kayit.hesap_anahtar);
   if (!hesap) return hata(yanit, 404, "hesap yok");
-  const tuz = sifre.tuzUret();
-  const hash = sifre.parolaTuret(parola_hash, tuz);
-  db.sifreKaydetVar(kayit.hesap_anahtar, tuz, sifre.sifrele(hash));
+  const yeni = sifre.sifreKaydiUret(parola_hash);
+  db.sifreKaydetVar(kayit.hesap_anahtar, yeni.tuz, yeni.argon_veri);
   db.sifreKodKullan(kod);
   db.denemeSifirla(kayit.hesap_anahtar, cihaz.cihaz_id);
   db.olayKaydet("sifre_sifirla", kayit.hesap_anahtar, cihaz.cihaz_id, "yeni parola");
   json(yanit, 200, { tamam: true });
 }
 
+async function parolaKur(is, yanit, govde, cihaz) {
+  const { hesap_anahtar, parola_hash } = govde.govde ?? govde ?? {};
+  if (!hesap_anahtar || !parola_hash) return hata(yanit, 400, "hesap/parola eksik");
+  const hesap = db.hesapBul(hesap_anahtar);
+  if (!hesap) return hata(yanit, 404, "hesap yok");
+  // İlk parola yalnız Discord bağı doğrulandıktan sonra kurulabilir.
+  const b = db.baglantiBul(hesap_anahtar);
+  if (!b || b.durum !== "aktif") return hata(yanit, 409, "baglanti_yok");
+  // Mevcut parolanın üzerine yazılmaz: giriş ya da şifre sıfırlama gerekir.
+  if (hesap.sifre_var) return hata(yanit, 409, "parola_var");
+  const yeni = sifre.sifreKaydiUret(parola_hash);
+  db.sifreKaydetVar(hesap_anahtar, yeni.tuz, yeni.argon_veri);
+  db.denemeSifirla(hesap_anahtar, cihaz.cihaz_id);
+  db.olayKaydet("parola_kur", hesap_anahtar, cihaz.cihaz_id, "ilk parola");
+  json(yanit, 200, { tamam: true });
+}
+
 async function girisDogrula(is, yanit, govde, cihaz) {
-  const { hesap_anahtar, hesap_ad, tur, parola_hash, ip } = govde.govde ?? govde ?? {};
+  const { hesap_anahtar, hesap_ad, tur, parola_hash, ip: istemciIp } = govde.govde ?? govde ?? {};
   if (!hesap_anahtar || !hesap_ad || !tur) return hata(yanit, 400, "hesap bilgisi eksik");
   const hesap = db.hesapYoksaOlusturGetir(hesap_anahtar, hesap_ad, tur, "");
   if (db.kilitVar(hesap_anahtar, cihaz.cihaz_id)) {
     return hata(yanit, 423, "24 saat kilitli (cok fazla hatali deneme)");
   }
-  if (ip) db.ipKaydet(cihaz.cihaz_id, ip);
+  // IP kaydı: istemci gerçek IP'yi bildirir (yerel testte 127.0.0.1 işe
+  // yaramaz); yayında bağlantı IP'si (Cloudflare) önceliklidir.
+  const baglantiIp = ip(is);
+  const kayitIp = baglantiIp && baglantiIp !== "127.0.0.1" && baglantiIp !== "::1" ? baglantiIp : String(istemciIp || "").trim();
+  if (kayitIp) db.ipKaydet(cihaz.cihaz_id, kayitIp);
 
   if (!hesap.sifre_var) {
     if (tur !== "microsoft") return hata(yanit, 409, "parola_yok");
@@ -228,7 +263,7 @@ async function girisDogrula(is, yanit, govde, cihaz) {
 
   const duz = sifre.coz(hesap.argon_veri);
   if (!duz) return hata(yanit, 500, "dogrulayici cozulemedi (anahtar hatasi)");
-  if (!sifre.dogrulayici_karsilastir(parola_hash, duz)) {
+  if (!sifre.parolaDogruMu(hesap, parola_hash)) {
     const deneme = db.denemeSay(hesap_anahtar, cihaz.cihaz_id) + 1;
     db.denemeArtir(hesap_anahtar, cihaz.cihaz_id);
     if (deneme >= 5) db.kilitKoy(hesap_anahtar, cihaz.cihaz_id, 24, "5 hatali parola");
@@ -276,6 +311,7 @@ const CIHAZ_YOLLARI = {
   "/api/cihaz/kaydet": cihazKaydet,
   "/api/baglama/kod": baglamaKodIste,
   "/api/baglama/durum": baglamaDurum,
+  "/api/parola/kur": parolaKur,
   "/api/giris/dogrula": girisDogrula,
   "/api/sifirla/dogrula": sifirlaDogrula,
   "/api/olay/kaydet": olayKaydet,
@@ -304,7 +340,7 @@ export function handle(is, yanit) {
     if (!botMu(is)) return hata(yanit, 401, "bot anahtari gecersiz");
     return govdeOku(is, (icerik) => baglamaDogrula(yanit, icerik));
   }
-  if (url === "/api/sifirla/kod") {
+  if (url === "/api/sifirla/iste") {
     if (!botMu(is)) return hata(yanit, 401, "bot anahtari gecersiz");
     return govdeOku(is, (icerik) => sifirlaKod(yanit, icerik));
   }
