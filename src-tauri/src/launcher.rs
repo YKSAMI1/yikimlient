@@ -712,14 +712,7 @@ pub async fn download_all_for_version(
                 &LaunchProgress { stage: "download".into(), percent: pct, detail: detail.clone() },
             );
             if let Some(adim) = pack_adim {
-                crate::repos::pack_adim(
-                    &handle2,
-                    adim,
-                    if p.done_files >= p.total_files { "bitti" } else { "aktif" },
-                    p.done_files,
-                    p.total_files,
-                    &detail,
-                );
+                crate::repos::pack_adim_k(&handle2, "", adim, if p.done_files >= p.total_files { "bitti" } else { "aktif" }, p.done_files, p.total_files, &detail);
             }
         },
     )

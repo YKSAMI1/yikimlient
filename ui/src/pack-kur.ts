@@ -26,6 +26,7 @@ const ADIMLAR: { adim: number; ad: string; aciklama: string }[] = [
 
 interface KartDurum {
   root: HTMLElement;
+  kimlik: string;
   satirlar: Map<number, HTMLElement>;
   detaylar: Map<number, HTMLElement>;
   bar: HTMLElement;
@@ -36,9 +37,14 @@ interface KartDurum {
   bitti: boolean;
 }
 
-let kart: KartDurum | null = null;
+/// Açık kartlar — kimlikle eşlenir. AYNI ANDA birden fazla farklı paket
+/// kurulabilir: her biri kendi kartını alır. Aynı kimlik iki kez çağrılırsa
+/// yeni kart ÜRETİLMEZ, var olan kart devam eder.
+const kartlar = new Map<string, KartDurum>();
 let dinleyiciOff: (() => void) | null = null;
 let sonKapatlayici: number | null = null;
+/// Aynı anda en fazla bu kadar açık kart tutulur (eskisi gizlenir).
+const MAKS_KART = 4;
 
 function detayMetni(done: number, total: number, ayrinti: string): string {
   const sayac = total > 0 ? `${done}/${total}` : "";
@@ -47,7 +53,10 @@ function detayMetni(done: number, total: number, ayrinti: string): string {
 }
 
 /// Kartı (yoksa oluştur) gösterir ve durumu sıfırlar.
-export function packKartBaslat(ad: string): void {
+/// `kimlik` aynı anda birden fazla paket kurulabilsin diye kartı belirler;
+/// boş bırakılırsa "varsayılan" kart kullanılır (eski akış).
+export function packKartBaslat(ad: string, kimlik = ""): void {
+  let kart = kartlar.get(kimlik);
   if (kart) {
     kart.kapandi = false;
     kart.bitti = false;
@@ -56,8 +65,20 @@ export function packKartBaslat(ad: string): void {
       s.classList.add("pk-bekliyor");
     }
     kart.root.classList.remove("pk-gizli", "pk-acik", "pk-bitti");
+    kart.root.style.order = "0";
   } else {
-    kart = yeniKart();
+    kart = yeniKart(kimlik);
+    kartlar.set(kimlik, kart);
+    kart.root.classList.remove("pk-gizli");
+    kart.root.style.order = "0";
+    // Çok kart açılırsa eskilerini gizle (en yeni en üstte).
+    while (kartlar.size > MAKS_KART) {
+      const enEski = [...kartlar.entries()].find(([, k]) => k !== kart && k.bitti);
+      if (!enEski) break;
+      enEski[1].kapandi = true;
+      enEski[1].root.classList.add("pk-gizli");
+      kartlar.delete(enEski[0]);
+    }
   }
   const baslikEl = kart.root.querySelector(".pk-baslik") as HTMLElement;
   baslikEl.textContent = ad;
@@ -69,8 +90,17 @@ export function packKartBaslat(ad: string): void {
     // yalnızca kart yaşarken dinle (üretim olayları @tauri-apps/api/event kanalı)
     void listen("pack-step", (e: any) => {
       const p = e?.payload;
-      if (!kart || !p) return;
-      adimUygula(p.adim, p.durum, p.done || 0, p.total || 0, p.ayrinti || "", p.percent || 0);
+      if (!p) return;
+      // Olay kimlikli gelirse YALNIZ o karta düşer; kimliksiz (eski akış)
+      // ise tüm açık kartlara yansıtılır.
+      const kimlik = typeof p.kimlik === "string" ? p.kimlik : "";
+      const hedefler = kimlik
+        ? [kartlar.get(kimlik)]
+        : [...kartlar.values()];
+      for (const k of hedefler) {
+        if (!k) continue;
+        adimUygula(k, p.adim, p.durum, p.done || 0, p.total || 0, p.ayrinti || "", p.percent || 0);
+      }
     }).then((off: () => void) => { dinleyiciOff = off; });
   }
   zilGuncelle("kurulum");
@@ -78,13 +108,15 @@ export function packKartBaslat(ad: string): void {
 }
 
 /// Tam listeyi aç/kapa (kart kafası + başlık çubuğu zili aynı işi yapar).
-export function packKartDegistir(): void {
+export function packKartDegistir(kimlik = ""): void {
+  const kart = kartlar.get(kimlik);
   if (!kart) return;
   kart.root.classList.toggle("pk-acik");
 }
 
 /// Kurulum tamam: kalan adımları kapat, hazır işaretle, X sn sonra gizle.
-export function packKartTamam(): void {
+export function packKartTamam(kimlik = ""): void {
+  const kart = kartlar.get(kimlik);
   if (!kart) return;
   for (const [adim, s] of kart.satirlar) {
     if (s.classList.contains("pk-bekliyor") && adim < 8) {
@@ -109,8 +141,21 @@ export function packKartTamam(): void {
   if (sonKapatlayici === null) kapatZamanlayiciBaslat();
 }
 
+/// Paket hazır (sunucu `pack-hazir` yayınladı): kartı kapat + özel ses.
+export function packKartBitti(instanceId?: string): void {
+  for (const [kimlik, k] of kartlar) {
+    if (instanceId && !kimlik.includes(instanceId)) continue;
+    if (k.bitti) continue;
+    k.bitti = true;
+    k.kapatZamani = Date.now() + 4000;
+    k.root.classList.add("pk-bitti");
+    if (sonKapatlayici === null) kapatZamanlayiciBaslat();
+  }
+}
+
 /// Hata: kart açık kalır ve hata adımı kırmızıya döner.
-export function packKartHata(mesaj: string): void {
+export function packKartHata(mesaj: string, kimlik = ""): void {
+  const kart = kartlar.get(kimlik);
   if (!kart) return;
   const ozet = kart.root.querySelector(".pk-ozet") as HTMLElement;
   ozet.textContent = `Kurulum durdu: ${mesaj}`;
@@ -132,9 +177,11 @@ export function packKartTest(
   done: number,
   total: number,
   ayrinti: string,
+  kimlik = "",
 ): void {
+  const kart = kartlar.get(kimlik);
   if (!kart) return;
-  adimUygula(adim, durum, done, total, ayrinti, 0);
+  adimUygula(kart, adim, durum, done, total, ayrinti, 0);
 }
 
 /// Zil durumu: kurulum sürüyorsa nokta canlı, bittiyse gri, yoksa soluk.
@@ -150,6 +197,7 @@ function zilGuncelle(durum: "yok" | "kurulum" | "bitti"): void {
 }
 
 function adimUygula(
+  kart: KartDurum,
   adim: number,
   durum: Durum,
   done: number,
@@ -157,7 +205,7 @@ function adimUygula(
   ayrinti: string,
   percent: number,
 ): void {
-  if (!kart || !kart.satirlar.has(adim)) return;
+  if (!kart.satirlar.has(adim)) return;
   const satir = kart.satirlar.get(adim)!;
   satir.classList.remove("pk-bekliyor", "pk-aktif", "pk-bitti", "pk-hata", "pk-atlandi");
   satir.classList.add(`pk-${durum}`);
@@ -170,7 +218,8 @@ function adimUygula(
   ozet.style.removeProperty("color");
   ozet.textContent = ayrinti ? `${adAdi(adim)} · ${ayrinti}` : adAdi(adim);
   if (adim === 8 && (durum === "bitti" || durum === "hata")) {
-    packKartTamam();
+    if (durum === "bitti") packKartTamam(kart.kimlik);
+    else packKartHata(ozet.textContent, kart.kimlik);
   }
 }
 
@@ -178,9 +227,10 @@ function adAdi(adim: number): string {
   return ADIMLAR.find((a) => a.adim === adim)?.ad || `Adım ${adim}`;
 }
 
-function yeniKart(): KartDurum {
+function yeniKart(kimlik: string): KartDurum {
   const root = document.createElement("div");
   root.className = "pk-kart pk-gizli";
+  root.dataset.kimlik = kimlik;
   root.setAttribute("role", "status");
   root.setAttribute("aria-live", "polite");
   root.innerHTML = `
@@ -215,6 +265,7 @@ function yeniKart(): KartDurum {
   }
   const kart: KartDurum = {
     root,
+    kimlik,
     satirlar,
     detaylar,
     bar: root.querySelector(".pk-bar > div") as HTMLElement,
@@ -224,7 +275,7 @@ function yeniKart(): KartDurum {
     kapatZamani: 0,
     bitti: false,
   };
-  (root.querySelector(".pk-kafa") as HTMLElement).addEventListener("click", () => packKartDegistir());
+  (root.querySelector(".pk-kafa") as HTMLElement).addEventListener("click", () => packKartDegistir(kimlik));
   root.querySelector(".pk-kapat")?.addEventListener("click", (e) => {
     e.stopPropagation();
     kart.kapandi = true;
@@ -238,17 +289,32 @@ function yeniKart(): KartDurum {
 /// Bitişten 6 sn sonra gizlenir (kullanıcı tıklayıp listeyi açtıysa bekler).
 function kapatZamanlayiciBaslat(): void {
   const iv = setInterval(() => {
-    if (!kart) { clearInterval(iv); sonKapatlayici = null; return; }
-    if (kart.kapandi) { clearInterval(iv); sonKapatlayici = null; return; }
-    if (kart.bitti && Date.now() > kart.kapatZamani) {
-      kart.kapandi = true;
-      kart.root.classList.add("pk-gizli");
+    const aciklar = [...kartlar.values()].filter((k) => !k.kapandi);
+    if (aciklar.length === 0) {
       clearInterval(iv);
       sonKapatlayici = null;
+      return;
+    }
+    for (const kart of aciklar) {
+      if (kart.bitti && Date.now() > kart.kapatZamani) {
+        kart.kapandi = true;
+        kart.root.classList.add("pk-gizli");
+        kartlar.delete(kart.kimlik);
+      }
     }
   }, 1200);
   sonKapatlayici = iv as unknown as number;
 }
 
+/// Tüm açık kartları zorla kapat (test/mock sıfırlama).
+export function packKartlariKapat(): void {
+  for (const [, k] of kartlar) {
+    k.kapandi = true;
+    k.root.classList.add("pk-gizli");
+  }
+  kartlar.clear();
+}
+
 /// Debug/test kanalı: mock harness dış yollar buradan adım sayabilir.
 (window as any).__PACK_KART_TEST__ = packKartTest;
+(window as any).__PACK_KART_KAPAT__ = packKartlariKapat;

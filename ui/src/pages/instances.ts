@@ -48,15 +48,23 @@ function zamanAsimi<T>(p: Promise<T>, ms: number): Promise<T | null> {
 }
 
 export function renderInstances(root: HTMLElement): void {
-  // "Kurulumu Yönet" gibi dış bağlantılarla gelindiyse hedefi al
+  // "Kurulumu Yönet" / "paket hazır → log sayfası" gibi dış bağlantılarla
+  // gelindiyse hedefi al. Hedef "kimlik|sekme" biçiminde olabilir:
+  // paket kurulumu bitince launcher doğrudan LOG sekmesini açar.
+  let ilkSekme: TabId | undefined;
+  if (nav.param && nav.param.includes("|")) {
+    const [kimlik, sekme] = nav.param.split("|");
+    nav.param = kimlik;
+    ilkSekme = sekme as TabId;
+  }
   if (nav.param && state.instances.find((i) => i.id === nav.param)) {
     selectedId = nav.param;
     nav.param = undefined;
-    renderDetail(root, selectedId);
+    renderDetail(root, selectedId, ilkSekme);
     return;
   }
   if (selectedId && state.instances.find((i) => i.id === selectedId)) {
-    renderDetail(root, selectedId);
+    renderDetail(root, selectedId, ilkSekme);
     return;
   }
   renderGrid(root);
@@ -326,7 +334,7 @@ function loaderName(l: string): string {
 
 type TabId = "mods" | "content" | "java" | "log" | "analytics" | "settings";
 
-function renderDetail(root: HTMLElement, id: string): void {
+function renderDetail(root: HTMLElement, id: string, ilkSekme?: TabId): void {
   const inst = state.instances.find((i) => i.id === id);
   if (!inst) { selectedId = null; renderGrid(root); return; }
   const iconIsFile = inst.icon && (inst.icon.includes("/") || inst.icon.includes("\\"));
@@ -373,6 +381,7 @@ function renderDetail(root: HTMLElement, id: string): void {
     const { refreshState } = await import("../main");
     await refreshState(true);
   });
+  const SEKME_SIRA: TabId[] = ["mods", "content", "java", "log", "analytics", "settings"];
   root.querySelectorAll(".tab").forEach((t) => {
     t.addEventListener("click", () => {
       root.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
@@ -382,8 +391,12 @@ function renderDetail(root: HTMLElement, id: string): void {
       ({ mods: tabMods, content: tabContent, java: tabJava, log: tabLog, analytics: tabAnalytics, settings: tabSettings })[tab](content, inst);
     });
   });
-  (root.querySelector("#tab-content") as HTMLElement);
-  (root.querySelectorAll(".tab")[0] as HTMLElement).click();
+  // Paket yeni kurulduysa LOG sekmesi açılsın (kullanıcı "ne oldu?" diye
+  // sekmeleri tek tek açmak zorunda kalmasın).
+  const hedefSekme = ilkSekme && SEKME_SIRA.includes(ilkSekme) ? ilkSekme : "mods";
+  const hedef = [...root.querySelectorAll<HTMLElement>(".tab")].find((t) => t.dataset.tab === hedefSekme)
+    ?? (root.querySelectorAll(".tab")[0] as HTMLElement);
+  hedef.click();
 }
 
 // ---------- Doku & Dünya sekmesi ----------

@@ -2155,6 +2155,25 @@ pub async fn cmd_repos_install(
     repos::install_mod_into(&app, &source, &project_id, version_id.as_deref(), &inst, &inst.mods_dir()).await
 }
 
+/// Aynı anda ÇALIŞAN paket kurulumları (aynı paket iki kez başlamasın diye).
+/// Anahtar: `modrinth:<project>` / `curseforge:<project>` / `dosya:<tam-yol>`.
+/// Kurulum bitince (başarılı ya da hatalı) kilit kalkar.
+static KURULUM_KILIDI: std::sync::LazyLock<std::sync::Mutex<std::collections::HashSet<String>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashSet::new()));
+
+fn kilidi_al(anahtar: &str) -> Result<(), String> {
+    let mut k = KURULUM_KILIDI.lock().unwrap();
+    if !k.insert(anahtar.to_string()) {
+        return Err(format!("paket_zaten_kuruluyor:{anahtar}"));
+    }
+    Ok(())
+}
+
+fn kilidi_birak(anahtar: &str) {
+    let mut k = KURULUM_KILIDI.lock().unwrap();
+    k.remove(anahtar);
+}
+
 /// Mod paketi kur: yeni instance üretir, paketi açar, dosyaları indirir.
 /// Kaynağın (Modrinth/CF) logosunu indirip kurulum ikonu yapar — kartlarda foto görünür.
 #[tauri::command]
@@ -2174,6 +2193,9 @@ pub async fn cmd_install_pack_files(
         source_pack: Some(format!("{source}:{project_id}")),
         ..Default::default()
     };
+    // aynı paket aynı anda iki kez kurulmasın (farklı paketler serbest)
+    let kilit = format!("{source}:{project_id}");
+    kilidi_al(&kilit)?;
     // önce dizinleri oluştur ki installer yazabilsin
     instances::create(inst.clone())?;
     // paket logosunu media/icon.png'ye indir (aranabilirse)
@@ -2183,32 +2205,44 @@ pub async fn cmd_install_pack_files(
             Err(e) => core::yikim_log(format!("paket ikonu indirilemedi: {e}")),
         }
     }
-    match repos::install_modpack(&app, &source, &project_id, &version_id, &mut inst).await {
-        Ok(()) => {
-            // Yükleyici profili + oyun dosyaları + Java + YIKIM modu — adım adım
-            // canlı ilerleme (pack-step olayları). "Yarım kalmış gibi" hissinin
-            // nedeni buydu: paket açıldıktan sonra sessizce uzun indirmeler
-            // sürdürüyordu ve kullanıcı hiçbir ilerleme görmeden bekliyordu.
-            if let Err(e) = paket_sonrasi_hazirla(&app, &mut inst).await {
-                let _ = repos::pack_adim(
-                    &app,
-                    repos::ADIM_SURUM,
-                    "hata",
-                    0,
-                    0,
-                    &format!("kurulum hazırlığı durdu: {e}"),
+    let kimlik = inst.id.clone();
+    let sonuc = async {
+        match repos::install_modpack(&app, &kimlik, &source, &project_id, &version_id, &mut inst).await {
+            Ok(()) => {
+                // Yükleyici profili + oyun dosyaları + Java + YIKIM modu — adım adım
+                // canlı ilerleme (pack-step olayları). "Yarım kalmış gibi" hissinin
+                // nedeni buydu: paket açıldıktan sonra sessizce uzun indirmeler
+                // sürdürüyordu ve kullanıcı hiçbir ilerleme görmeden bekliyordu.
+                if let Err(e) = paket_sonrasi_hazirla(&app, &kimlik, &mut inst).await {
+                    let _ = repos::pack_adim_k(
+                        &app,
+                        &kimlik,
+                        repos::ADIM_SURUM,
+                        "hata",
+                        0,
+                        0,
+                        &format!("kurulum hazırlığı durdu: {e}"),
+                    );
+                    inst.save().ok();
+                    return Err(e);
+                }
+                inst.save()?;
+                // Paket hazır: arayüz kendi kurulumunun LOG sayfasını açsın.
+                let _ = app.emit(
+                    "pack-hazir",
+                    &serde_json::json!({ "instance_id": inst.id, "ad": inst.name }),
                 );
-                inst.save().ok();
-                return Err(e);
+                Ok(inst.clone())
             }
-            inst.save()?;
-            Ok(inst)
-        }
-        Err(e) => {
-            let _ = instances::delete(&inst.id);
-            Err(e)
+            Err(e) => {
+                let _ = instances::delete(&inst.id);
+                Err(e)
+            }
         }
     }
+    .await;
+    kilidi_birak(&kilit);
+    sonuc
 }
 
 // ---------- haberler & istatistik & sistem ----------
@@ -2291,37 +2325,52 @@ pub async fn cmd_import_pack_file(
         source_pack: Some(format!("{fmt}:local")),
         ..Default::default()
     };
+    // aynı paket dosyası aynı anda iki kez açılmasın
+    let kilit = format!("dosya:{}", p.display());
+    kilidi_al(&kilit)?;
     instances::create(inst.clone())?;
+    let kimlik = inst.id.clone();
     let result = if crate::yikimpack::uzanti_mi(&p) {
-        crate::commands::yikimpack_yukle(&app, &p, &mut inst).await
+        crate::commands::yikimpack_yukle(&app, &p, &kimlik, &mut inst).await
     } else if fmt.as_str() == "modrinth" {
-        repos::install_mrpack(&app, &p, &mut inst).await
+        repos::install_mrpack(&app, &kimlik, &p, &mut inst).await
     } else {
-        repos::install_cfpack(&app, &p, &mut inst).await
+        repos::install_cfpack(&app, &kimlik, &p, &mut inst).await
     };
-    match result {
-        Ok(()) => {
-            // yerel zip: kurulum adımları 5-8 (yükleyici, oyun dosyaları, YIKIM modu)
-            if let Err(e) = paket_sonrasi_hazirla(&app, &mut inst).await {
-                let _ = repos::pack_adim(
-                    &app,
-                    repos::ADIM_SURUM,
-                    "hata",
-                    0,
-                    0,
-                    &format!("kurulum hazırlığı durdu: {e}"),
+    let sonuc = async {
+        match result {
+            Ok(()) => {
+                // yerel zip: kurulum adımları 5-8 (yükleyici, oyun dosyaları, YIKIM modu)
+                if let Err(e) = paket_sonrasi_hazirla(&app, &kimlik, &mut inst).await {
+                    let _ = repos::pack_adim_k(
+                        &app,
+                        &kimlik,
+                        repos::ADIM_SURUM,
+                        "hata",
+                        0,
+                        0,
+                        &format!("kurulum hazırlığı durdu: {e}"),
+                    );
+                    inst.save().ok();
+                    return Err(e);
+                }
+                inst.save()?;
+                // Paket hazır: arayüz bu kurulumun LOG sayfasını açsın.
+                let _ = app.emit(
+                    "pack-hazir",
+                    &serde_json::json!({ "instance_id": inst.id, "ad": inst.name }),
                 );
-                inst.save().ok();
-                return Err(e);
+                Ok(inst.clone())
             }
-            inst.save()?;
-            Ok(inst)
-        }
-        Err(e) => {
-            let _ = instances::delete(&inst.id);
-            Err(e)
+            Err(e) => {
+                let _ = instances::delete(&inst.id);
+                Err(e)
+            }
         }
     }
+    .await;
+    kilidi_birak(&kilit);
+    sonuc
 }
 
 /// Keşfet'ten içerik indirme: doku paketi / shader / datapack / dünya.
@@ -2563,10 +2612,8 @@ pub(crate) async fn surum_kimligi_coz(inst: &mut Instance) -> Result<String, Str
 /// kalmaz; sürüm kurulumu kurulum ekranında canlı görünür.
 /// Hata veren adımlar (profil hariç) kurulumu düşürür; profil hatası yalnız
 /// not edilir çünkü başlatma yolunda tekrar denenir.
-pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Result<(), String> {
-    use repos::{
-        pack_adim, ADIM_HAZIR, ADIM_LOADER, ADIM_MOD, ADIM_SURUM,
-    };
+pub async fn paket_sonrasi_hazirla(app: &AppHandle, kimlik: &str, inst: &mut Instance) -> Result<(), String> {
+    use repos::{pack_adim_k, ADIM_HAZIR, ADIM_LOADER, ADIM_MOD, ADIM_SURUM};
     // ---- 5) yükleyici ----
     let yukleyici_adi = match inst.mod_loader.as_str() {
         "fabric" => "Fabric",
@@ -2574,8 +2621,7 @@ pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Resu
         "neoforge" => "NeoForge",
         _ => "Vanilla",
     };
-    pack_adim(
-        app,
+    pack_adim_k(app, kimlik,
         ADIM_LOADER,
         "aktif",
         0,
@@ -2584,8 +2630,7 @@ pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Resu
     );
     let vid = match surum_kimligi_coz(inst).await {
         Ok(vid) => {
-            pack_adim(
-                app,
+            pack_adim_k(app, kimlik,
                 ADIM_LOADER,
                 "bitti",
                 1,
@@ -2597,8 +2642,7 @@ pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Resu
         Err(e) => {
             // profil kurulamazsa oyun ilk açılışta yeniden dener — kurulumu düşürme
             core::yikim_log(format!("yükleyici profili kurulamadı (başlatmada tekrar denenir): {e}"));
-            pack_adim(
-                app,
+            pack_adim_k(app, kimlik,
                 ADIM_LOADER,
                 "hata",
                 0,
@@ -2611,8 +2655,7 @@ pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Resu
     };
 
     // ---- 6) oyun dosyaları (sürüm kurulumu) ----
-    pack_adim(
-        app,
+    pack_adim_k(app, kimlik,
         ADIM_SURUM,
         "aktif",
         0,
@@ -2620,8 +2663,7 @@ pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Resu
         "Sürüm bilgisi alınıyor",
     );
     let vj = launcher::load_version_json_merged(&vid).await?;
-    pack_adim(
-        app,
+    pack_adim_k(app, kimlik,
         ADIM_SURUM,
         "aktif",
         0,
@@ -2637,13 +2679,12 @@ pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Resu
         .to_string();
     let major = vj["javaVersion"]["majorVersion"].as_u64().unwrap_or(17) as u32;
     let cfg = YikimConfig::load_or_default();
-    pack_adim(app, ADIM_SURUM, "aktif", 0, 0, "Java hazırlanıyor");
+    pack_adim_k(app, kimlik, ADIM_SURUM, "aktif", 0, 0, "Java hazırlanıyor");
     match launcher::resolve_java_dirs(&component, major, cfg.java_dir.clone()).await {
-        Ok(_) => pack_adim(app, ADIM_SURUM, "bitti", 1, 1, "Oyun dosyaları ve Java hazır"),
+        Ok(_) => pack_adim_k(app, kimlik, ADIM_SURUM, "bitti", 1, 1, "Oyun dosyaları ve Java hazır"),
         Err(e) => {
             core::yikim_log(format!("java paket kurulumunda hazırlanamadı (başlatmada denenir): {e}"));
-            pack_adim(
-                app,
+            pack_adim_k(app, kimlik,
                 ADIM_SURUM,
                 "bitti",
                 1,
@@ -2654,13 +2695,12 @@ pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Resu
     }
 
     // ---- 7) YIKIM modu ----
-    pack_adim(app, ADIM_MOD, "aktif", 0, 0, "YIKIM çekirdeği kuruluyor");
+    pack_adim_k(app, kimlik, ADIM_MOD, "aktif", 0, 0, "YIKIM çekirdeği kuruluyor");
     match yikim_mod::ensure_installed(app, inst) {
-        Ok(_) => pack_adim(app, ADIM_MOD, "bitti", 1, 1, "YIKIM çekirdeği hazır"),
+        Ok(_) => pack_adim_k(app, kimlik, ADIM_MOD, "bitti", 1, 1, "YIKIM çekirdeği hazır"),
         Err(e) => {
             core::yikim_log(format!("YIKIM modu kurulamadı (kurulum engellenmedi): {e}"));
-            pack_adim(
-                app,
+            pack_adim_k(app, kimlik,
                 ADIM_MOD,
                 "hata",
                 0,
@@ -2671,7 +2711,7 @@ pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Resu
     }
 
     // ---- 8) hazır ----
-    pack_adim(app, ADIM_HAZIR, "bitti", 1, 1, "Kurulum tamamlandı");
+    pack_adim_k(app, kimlik, ADIM_HAZIR, "bitti", 1, 1, "Kurulum tamamlandı");
     Ok(())
 }
 
@@ -2682,9 +2722,10 @@ pub async fn paket_sonrasi_hazirla(app: &AppHandle, inst: &mut Instance) -> Resu
 pub async fn yikimpack_yukle(
     app: &AppHandle,
     paket: &std::path::Path,
+    kimlik: &str,
     inst: &mut Instance,
 ) -> Result<(), String> {
-    use repos::{pack_adim, ADIM_ACMA, ADIM_MODLAR, ADIM_OVERRIDE};
+    use repos::{pack_adim_k, ADIM_ACMA, ADIM_MODLAR, ADIM_OVERRIDE};
     // 1) manifest
     let okuyucu = crate::yikimpack::oku(paket)?;
     let mf = okuyucu.manifest;
@@ -2708,13 +2749,12 @@ pub async fn yikimpack_yukle(
     }
 
     // 3) içeriği aç (adım adım)
-    pack_adim(app, ADIM_ACMA, "bitti", 1, 1, &format!("{} · MC {}", inst.name, inst.mc_version));
+    pack_adim_k(app, kimlik, ADIM_ACMA, "bitti", 1, 1, &format!("{} · MC {}", inst.name, inst.mc_version));
     let inst_dir = inst.dir();
     let _ = inst_dir.join("mods");
     let kopyalanan = crate::yikimpack::ac(paket, &inst_dir, |n, toplam, ad| {
-        pack_adim(app, ADIM_OVERRIDE, "bitti", 0, 0, "paket içeriği yazılıyor");
-        pack_adim(
-            app,
+        pack_adim_k(app, kimlik, ADIM_OVERRIDE, "bitti", 0, 0, "paket içeriği yazılıyor");
+        pack_adim_k(app, kimlik,
             ADIM_MODLAR,
             "bitti",
             n as u32,
@@ -2723,7 +2763,7 @@ pub async fn yikimpack_yukle(
         );
     })
     .map_err(|e| {
-        let _ = pack_adim(app, ADIM_MODLAR, "hata", 0, 0, &e);
+        let _ = pack_adim_k(app, kimlik, ADIM_MODLAR, "hata", 0, 0, &e);
         e
     })?;
     crate::core::yikim_log(format!(
@@ -2763,8 +2803,10 @@ pub async fn cmd_export_yikimpack(
     instance_id: String,
     secenek: Option<ExportSecenekJson>,
 ) -> Result<String, String> {
-    use repos::{pack_adim, ADIM_MODLAR, ADIM_OVERRIDE, ADIM_HAZIR};
+    use repos::{pack_adim_k, ADIM_MODLAR, ADIM_OVERRIDE, ADIM_HAZIR};
     let inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
+    // Paylaşım/aktarma da bir kurulum gibi ilerleme gösterir: kimlik = kurulum.
+    let kimlik = format!("aktar:{}", inst.id);
     let s = secenek.unwrap_or(ExportSecenekJson {
         config: true,
         saves: false,
@@ -2797,10 +2839,9 @@ pub async fn cmd_export_yikimpack(
         loader_version: inst.loader_version.clone(),
         hedef_klasor: hedef,
     };
-    pack_adim(&app, ADIM_MODLAR, "aktif", 0, 0, "paket hazırlanıyor");
+    pack_adim_k(&app, &kimlik, ADIM_MODLAR, "aktif", 0, 0, "paket hazırlanıyor");
     let yol = crate::yikimpack::yaz(&inst.dir(), bilgi, &secenek, |n, toplam, _ad| {
-        pack_adim(
-            &app,
+        pack_adim_k(&app, &kimlik,
             ADIM_MODLAR,
             "aktif",
             n as u32,
@@ -2809,9 +2850,8 @@ pub async fn cmd_export_yikimpack(
         );
     })
     .await?;
-    let _ = pack_adim(&app, ADIM_OVERRIDE, "bitti", 1, 1, "paket oluşturuldu");
-    let _ = pack_adim(
-        &app,
+    let _ = pack_adim_k(&app, &kimlik, ADIM_OVERRIDE, "bitti", 1, 1, "paket oluşturuldu");
+    let _ = pack_adim_k(&app, &kimlik,
         ADIM_HAZIR,
         "bitti",
         1,

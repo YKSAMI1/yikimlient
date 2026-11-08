@@ -11,7 +11,7 @@ import "@fontsource/pixelify-sans/700.css";
 import "@fontsource/pixelify-sans/latin-ext-400.css";
 import "@fontsource/pixelify-sans/latin-ext-700.css";
 import { registerPages } from "./pages";
-import { bildirimAcKapa, bildirimKutuBaslat, bildirimZilIlkDurum } from "./bildirim";
+import { bildirimAcKapa, bildirimEkle, bildirimKutuBaslat, bildirimZilIlkDurum } from "./bildirim";
 import { startDropWatcher } from "./drop";
 import { maybeStartTour } from "./tour";
 import { maybeStartOnboarding } from "./onboarding";
@@ -673,6 +673,7 @@ export async function boot(): Promise<void> {
     // .yikimpack çift tıklama: uygulama dışarıdan bir paketle açıldıysa
     // doğrudan "Paketler" sayfasına geç ve kurulumu kendiliğinden başlat.
     dinleYikimpackAc();
+    dinlePaketHazir();
   } catch (e) {
     fatalBoot(e);
   }
@@ -686,22 +687,75 @@ const refreshStateRef = refreshState;
 /// Uygulama kapalıysa açılır ve paketi kendiliğinden kurar; açıksa doğrudan
 /// "Paketler" sayfasına geçip yüklemeyi başlatır. Arayüzü MEŞGUL ETMEZ —
 /// kurulum durumu sağ alttaki adım kartında canlı görünür.
+///
+/// Aynı anda BİRDEN FAZLA farklı paket kurulabilir: her kurulum kendi
+/// kartını alır (`kimlik` = kurulum kimliği). Aynı paket iki kez açılırsa
+/// sunucu reddeder (`paket_zaten_kuruluyor`) ve kullanıcıya söylenir.
 async function dinleYikimpackAc(): Promise<void> {
   const { packKartBaslat, packKartHata, packKartTamam } = await import("./pack-kur");
   await listen("yikimpack-ac", async (e: any) => {
     const yol: string | undefined = e?.payload;
     if (!yol) return;
-    packKartBaslat("Paket açıldı — kurulum başlıyor");
+    const kimlik = `dosya:${yol}`;
+    packKartBaslat("Paket açıldı — kurulum başlıyor", kimlik);
     navigate("instances");
     try {
       const inst = await invoke("cmd_import_pack_file", { path: yol, name: null });
       await refreshStateRef();
-      packKartTamam();
+      packKartTamam(kimlik);
       toast(`${(inst as any).name || "Paket"} kuruldu ✓`, "ok");
     } catch (err) {
-      packKartHata(String(err));
+      const m = String(err);
+      if (m.includes("paket_zaten_kuruluyor")) {
+        toast("Bu paket şu anda zaten kuruluyor", "err");
+        return;
+      }
+      packKartHata(m, kimlik);
     }
   });
+}
+
+/// Paket kurulumu BİTTİĞİNDE: o kurulumun LOG sayfasını kendiliğinden aç
+/// + özel bildirim sesi çal (kullanıcı "ne oldu, indi mi?" diye sormasın).
+async function dinlePaketHazir(): Promise<void> {
+  const { packKartBitti } = await import("./pack-kur");
+  await listen("pack-hazir", async (e: any) => {
+    const instId: string | undefined = e?.payload?.instance_id;
+    const ad: string = e?.payload?.ad || "paket";
+    bitisSesi();
+    bildirimEkle("kurulum", `${ad} hazır`, "Kurulum tamamlandı — log sayfası açıldı");
+    packKartBitti(instId);
+    if (instId) navigate("instances", `${instId}|log`);
+    toast(`${ad} kuruldu — log sayfası açıldı`, "ok");
+  });
+}
+
+/// İndirme/kurulum bitiş sesi (kısa, iki nota). Tarayıcı/launcher sesi kapalıysa
+/// sessizce geçer — ses zorunlu DEĞİL, bildirim her zaman görünür.
+function bitisSesi(): void {
+  try {
+    const Ctor = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!Ctor) return;
+    const ctx = new Ctor();
+    const cal = (t: number, frekans: number) => {
+      const os = ctx.createOscillator();
+      const kazanc = ctx.createGain();
+      os.type = "sine";
+      os.frequency.value = frekans;
+      kazanc.gain.setValueAtTime(0.0001, t);
+      kazanc.gain.exponentialRampToValueAtTime(0.14, t + 0.02);
+      kazanc.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+      os.connect(kazanc).connect(ctx.destination);
+      os.start(t);
+      os.stop(t + 0.34);
+    };
+    const simdi = ctx.currentTime;
+    cal(simdi, 660); // mi
+    cal(simdi + 0.16, 990); // la
+    setTimeout(() => ctx.close(), 900);
+  } catch {
+    // ses yoksa sorun değil
+  }
 }
 
 /// GitHub'dan yeni sürüm kontrolü → varsa "indir ve kur" onayı.

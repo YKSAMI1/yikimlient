@@ -364,6 +364,22 @@
       if (cmd === "cmd_update_all_mods") return Promise.resolve({
         toplam: 3, basarili: 3, hata: 0, hatalar: [], bos: false,
       });
+      // ---------- çoklu mod paketi kurulumu (mock) ----------
+      // Aynı paket iki kez: sunucu reddeder (Rust kilidi).
+      if (cmd === "cmd_install_pack_files") {
+        var kilitAnahtar = "kurulum:" + String(args.projectId || "x");
+        if (sessionStorage.getItem(kilitAnahtar) === "1") {
+          return Promise.reject("paket_zaten_kuruluyor:" + kilitAnahtar);
+        }
+        sessionStorage.setItem(kilitAnahtar, "1");
+        setTimeout(function () { sessionStorage.removeItem(kilitAnahtar); }, 4000);
+        state.instances.unshift({
+          id: "ip" + Date.now(), name: String(args.packName || "Yeni Paket"), mc_version: "1.21.1",
+          mod_loader: "fabric", ram_mb: 4096, icon: args.icon || "📦", playtime_ms: 0,
+        });
+        window.__PAKET_HAZIR__ = { instance_id: state.instances[0].id, ad: state.instances[0].name };
+        return Promise.resolve(state.instances[0]);
+      }
       if (cmd === "cmd_skin_hub") return Promise.resolve(hub());
       if (cmd === "cmd_skin_giy") {
         var url = veriUrl(args.veri);
@@ -475,12 +491,23 @@
       },
       transformCallback: function (cb) { return cb; },
     };
+    // Mock event kanalı: "pack-hazir" ve "yikimpack-ac" gerçekten tetiklenebilsin.
+    var mockDinleyiciler = window.__MOCK_DINLEYICI__ = window.__MOCK_DINLEYICI__ || {};
+    window.__MOCK_YAYIN__ = function (olay, veri) {
+      if (window.__TAURI_OLAY__) window.__TAURI_OLAY__(olay, veri);
+    };
+    window.__TAURI_OLAY__ = null;
     window.__TAURI__ = {
       core: { invoke: invoke },
       event: {
-        listen: function () { return Promise.resolve(function () {}); },
-        once: function () { return Promise.resolve(function () {}); },
-        emit: function () { return Promise.resolve(); },
+        listen: function (olay, f) {
+          (mockDinleyiciler[olay] = mockDinleyiciler[olay] || []).push(f);
+          return Promise.resolve(function () {
+            mockDinleyiciler[olay] = (mockDinleyiciler[olay] || []).filter(function (x) { return x !== f; });
+          });
+        },
+        once: function (olay, f) { return window.__TAURI__.event.listen(olay, f); },
+        emit: function (olay, veri) { window.__MOCK_YAYIN__(olay, veri); return Promise.resolve(); },
       },
       window: {
         getCurrentWindow: function () {
@@ -521,5 +548,6 @@
 <body>
   <div id="app"></div>
   <script type="module" src="/src/main.ts"></script>
+<script type="module" src="/mock-pak-test.js"></script>
 </body>
 </html>

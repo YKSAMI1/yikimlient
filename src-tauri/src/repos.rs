@@ -1,4 +1,4 @@
-﻿use crate::core::{http_client, yikim_log};
+use crate::core::{http_client, yikim_log};
 use serde::Serialize;
 
 /// Modrinth v2 + CurseForge v1 (beta) API entegrasyonu.
@@ -95,6 +95,44 @@ pub struct PackStep {
     /// kümülatif yüzde (0..100)
     pub percent: u8,
     pub baslik: String,
+    /// Hangi kurulumun adımı? (aynı anda birden fazla paket kurulabilsin diye)
+    /// Boş ise arayüz adımı TÜM açık paket kartlarına yansıtır (eski akış).
+    #[serde(default)]
+    pub kimlik: String,
+}
+
+/// Kurulum adımını KİMLİKLE yayınla (aynı anda birden fazla paket).
+pub fn pack_adim_k(
+    handle: &tauri::AppHandle,
+    kimlik: &str,
+    adim: u8,
+    durum: &str,
+    done: u32,
+    total: u32,
+    ayrinti: &str,
+) {
+    use tauri::Emitter;
+    let (bas, ucluk) = adim_araligi(adim);
+    let percent = if total > 0 && done <= total {
+        bas + ((done as f32 / total as f32) * ucluk as f32) as u8
+    } else if durum == "bitti" {
+        bas + ucluk
+    } else {
+        bas
+    };
+    let _ = handle.emit(
+        "pack-step",
+        &PackStep {
+            adim,
+            durum: durum.into(),
+            done,
+            total,
+            ayrinti: ayrinti.into(),
+            percent: percent.min(100),
+            baslik: adim_adi(adim).into(),
+            kimlik: kimlik.into(),
+        },
+    );
 }
 
 pub const ADIM_PAKET: u8 = 1;
@@ -135,8 +173,7 @@ fn adim_araligi(adim: u8) -> (u8, u8) {
     }
 }
 
-/// Tek adım olayı yayınla (hem `pack-step` hem de eski `launch-progress`
-/// dinleyicileri için `modpack` aşaması — eski akış bozulmasın).
+/// Eski imza: kimlik boş. Yeni akış `pack_adim_k` kullanır.
 pub fn pack_adim(
     handle: &tauri::AppHandle,
     adim: u8,
@@ -154,18 +191,7 @@ pub fn pack_adim(
     } else {
         bas
     };
-    let _ = handle.emit(
-        "pack-step",
-        &PackStep {
-            adim,
-            durum: durum.into(),
-            done,
-            total,
-            ayrinti: ayrinti.into(),
-            percent: percent.min(100),
-            baslik: adim_adi(adim).into(),
-        },
-    );
+    pack_adim_k(handle, "", adim, durum, done, total, ayrinti);
     // eski dinleyiciler (launch-progress stage=modpack) canlı kalsın
     let _ = handle.emit(
         "launch-progress",
@@ -1388,6 +1414,7 @@ pub async fn latest_release_tag(owner: &str, repo: &str) -> String {
 /// Modrinth (.mrpack) ve CurseForge (zip) destekler.
 pub async fn install_modpack(
     handle: &tauri::AppHandle,
+    kimlik: &str,
     source: &str,
     project_id: &str,
     version_id: &str,
@@ -1414,8 +1441,7 @@ pub async fn install_modpack(
     let _ = std::fs::create_dir_all(&tmp);
     let pack_file = tmp.join(&file.filename);
 
-    pack_adim(
-        handle,
+    pack_adim_k(handle, kimlik,
         ADIM_PAKET,
         "aktif",
         0,
@@ -1423,8 +1449,7 @@ pub async fn install_modpack(
         &format!("{} ({:.1} MB)", file.filename, file.size as f64 / 1_048_576.0),
     );
     download_file(&file.url, &pack_file, "modpack").await?;
-    pack_adim(
-        handle,
+    pack_adim_k(handle, kimlik,
         ADIM_PAKET,
         "bitti",
         1,
@@ -1433,8 +1458,8 @@ pub async fn install_modpack(
     );
 
     match source {
-        "modrinth" => install_mrpack(handle, &pack_file, inst).await,
-        "curseforge" => install_cfpack(handle, &pack_file, inst).await,
+        "modrinth" => install_mrpack(handle, kimlik, &pack_file, inst).await,
+        "curseforge" => install_cfpack(handle, kimlik, &pack_file, inst).await,
         _ => Err("bilinmeyen paket kaynağı".into()),
     }
 }
@@ -1454,6 +1479,7 @@ fn zip_find(archive: &zip::ZipArchive<std::fs::File>, hedef: &str) -> Option<Str
 /// Modrinth .mrpack: index.json → files[].downloads + overrides
 pub async fn install_mrpack(
     handle: &tauri::AppHandle,
+    kimlik: &str,
     pack_file: &std::path::Path,
     inst: &mut crate::instances::Instance,
 ) -> Result<(), String> {
@@ -1473,8 +1499,7 @@ pub async fn install_mrpack(
     };
     let d = index["dependencies"].as_object().cloned().unwrap_or_default();
     inst.mc_version = d.get("minecraft").and_then(|v| v.as_str()).unwrap_or("1.21.1").into();
-    pack_adim(
-        handle,
+    pack_adim_k(handle, kimlik,
         ADIM_ACMA,
         "bitti",
         1,
@@ -1523,8 +1548,7 @@ pub async fn install_mrpack(
             std::io::copy(&mut zf, &mut of).map_err(|e| e.to_string())?;
             count += 1;
             // canlı adım: yazılan her dosya durağan değil, akıyor
-            pack_adim(
-                handle,
+            pack_adim_k(handle, kimlik,
                 ADIM_OVERRIDE,
                 if count >= over_toplam { "bitti" } else { "aktif" },
                 count,
@@ -1534,7 +1558,7 @@ pub async fn install_mrpack(
         }
     }
     if over_toplam == 0 {
-        pack_adim(handle, ADIM_OVERRIDE, "bitti", 0, 0, "yapılandırma dosyası yok");
+        pack_adim_k(handle, kimlik, ADIM_OVERRIDE, "bitti", 0, 0, "yapılandırma dosyası yok");
     }
 
     // indirilecek dosyalar
@@ -1568,8 +1592,7 @@ pub async fn install_mrpack(
     } else {
         format!("{toplam} dosya kuyruğa alındı")
     };
-    pack_adim(
-        handle,
+    pack_adim_k(handle, kimlik,
         ADIM_MODLAR,
         if toplam == 0 { "bitti" } else { "aktif" },
         0,
@@ -1585,8 +1608,9 @@ pub async fn install_mrpack(
             crate::util::DlOpts { concurrency: 24, retries: 3 },
             move |p| {
                 let hiz = hiz_metni(p.bytes_per_sec);
-                pack_adim(
+                pack_adim_k(
                     &h,
+                    kimlik,
                     ADIM_MODLAR,
                     if p.done_files >= p.total_files { "bitti" } else { "aktif" },
                     p.done_files,
@@ -1603,13 +1627,12 @@ pub async fn install_mrpack(
             let inen = std::fs::read_dir(inst_dir.join("mods"))
                 .map(|d| d.count())
                 .unwrap_or(0);
-            pack_adim(handle, ADIM_MODLAR, "hata", toplam as u32, toplam as u32, &e);
+            pack_adim_k(handle, kimlik, ADIM_MODLAR, "hata", toplam as u32, toplam as u32, &e);
             if inen == 0 {
                 return Err(format!("paket dosyaları indirilemedi: {e}"));
             }
         } else {
-            pack_adim(
-                handle,
+            pack_adim_k(handle, kimlik,
                 ADIM_MODLAR,
                 "bitti",
                 toplam as u32,
@@ -1681,6 +1704,7 @@ async fn cf_resolve_file(pid: u64, fid: u64) -> Option<(String, String)> {
 /// Dönüş: (başarılı, hatalar).
 async fn indir_esnek(
     handle: &tauri::AppHandle,
+    kimlik: &str,
     adim: u8,
     jobs: Vec<(String, std::path::PathBuf)>,
     eszamanli: usize,
@@ -1692,11 +1716,13 @@ async fn indir_esnek(
     let bayt = std::sync::Arc::new(AtomicU64::new(0));
     let hiz = std::sync::Arc::new(HizOlcer::default());
     let h = handle.clone();
+    let kimlik = std::sync::Arc::new(kimlik.to_string());
     let akis = stream::iter(jobs.into_iter().map(|(url, dest)| {
         let biten = biten.clone();
         let bayt = bayt.clone();
         let hiz = hiz.clone();
         let h = h.clone();
+        let kimlik = kimlik.clone();
         async move {
             let ad = dest
                 .file_name()
@@ -1711,8 +1737,9 @@ async fn indir_esnek(
                             dest.metadata().map(|m| m.len()).unwrap_or(0),
                             Ordering::Relaxed,
                         ) + dest.metadata().map(|m| m.len()).unwrap_or(0);
-                        pack_adim(
+                        pack_adim_k(
                             &h,
+                            &kimlik,
                             adim,
                             if n >= toplam { "bitti" } else { "aktif" },
                             n as u32,
@@ -1778,6 +1805,7 @@ impl HizOlcer {
 /// CurseForge pack zip: manifest.json → files[] {projectID,fileID} + overrides/
 pub async fn install_cfpack(
     handle: &tauri::AppHandle,
+    kimlik: &str,
     pack_file: &std::path::Path,
     inst: &mut crate::instances::Instance,
 ) -> Result<(), String> {
@@ -1801,8 +1829,7 @@ pub async fn install_cfpack(
         .as_str()
         .unwrap_or("1.21.1")
         .into();
-    pack_adim(
-        handle,
+    pack_adim_k(handle, kimlik,
         ADIM_ACMA,
         "bitti",
         1,
@@ -1863,8 +1890,7 @@ pub async fn install_cfpack(
             let mut of = std::fs::File::create(&out).map_err(|e| e.to_string())?;
             std::io::copy(&mut zf, &mut of).map_err(|e| e.to_string())?;
             over_sayac += 1;
-            pack_adim(
-                handle,
+            pack_adim_k(handle, kimlik,
                 ADIM_OVERRIDE,
                 if over_sayac >= over_toplam { "bitti" } else { "aktif" },
                 over_sayac,
@@ -1874,7 +1900,7 @@ pub async fn install_cfpack(
         }
     }
     if over_toplam == 0 {
-        pack_adim(handle, ADIM_OVERRIDE, "bitti", 0, 0, "yapılandırma dosyası yok");
+        pack_adim_k(handle, kimlik, ADIM_OVERRIDE, "bitti", 0, 0, "yapılandırma dosyası yok");
     }
 
     // dosyaları EŞZAMANLI çöz (sıralı çözüm 300+ modlu paketlerde dakikalar
@@ -1921,8 +1947,7 @@ pub async fn install_cfpack(
         ));
     }
 
-    pack_adim(
-        handle,
+    pack_adim_k(handle, kimlik,
         ADIM_MODLAR,
         if jobs.is_empty() { "bitti" } else { "aktif" },
         0,
@@ -1931,7 +1956,7 @@ pub async fn install_cfpack(
     );
     let mut package_err: Option<String> = None;
     if !jobs.is_empty() {
-        let (ok, hatalar) = indir_esnek(handle, ADIM_MODLAR, jobs, 16).await;
+        let (ok, hatalar) = indir_esnek(handle, kimlik, ADIM_MODLAR, jobs, 16).await;
         if !hatalar.is_empty() {
             crate::core::yikim_log(format!(
                 "CurseForge paketi: {} dosya indirilemedi (paket yine de kuruldu). İlk hata: {}",
@@ -1941,7 +1966,7 @@ pub async fn install_cfpack(
         }
         if ok == 0 {
             let hata = "paket dosyaları indirilemedi — internet/CurseForge erişimini kontrol et".to_string();
-            pack_adim(handle, ADIM_MODLAR, "hata", 0, total as u32, &hata);
+            pack_adim_k(handle, kimlik, ADIM_MODLAR, "hata", 0, total as u32, &hata);
             return Err(hata);
         }
         if !hatalar.is_empty() {
@@ -1951,8 +1976,7 @@ pub async fn install_cfpack(
                 total
             ));
         }
-        pack_adim(
-            handle,
+        pack_adim_k(handle, kimlik,
             ADIM_MODLAR,
             "bitti",
             ok as u32,
@@ -1961,7 +1985,7 @@ pub async fn install_cfpack(
         );
     }
     if let Some(not) = package_err {
-        pack_adim(handle, ADIM_MODLAR, "bitti", 1, 1, &not);
+        pack_adim_k(handle, kimlik, ADIM_MODLAR, "bitti", 1, 1, &not);
     }
     // NOT: "Hazır" (ADIM_HAZIR) burada DEĞİL — kurulum komutunda
     // yükleyici/oyun dosyalı/YIKIM modu adımları bittikten sonra yayınlanır.
