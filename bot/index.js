@@ -219,8 +219,21 @@ async function duyuruGonder() {
   }
 }
 
-client.once('ready', async () => {
-  logger.success(`Bot başarıyla Discord'a giriş yaptı: ${client.user.tag}`);
+// Bot "hazır" olayı: Discord.js 14 hem `ready` (eski) hem `clientReady` (yeni)
+// yayar; her iki adı da dinleyip TEK kez çalışmasını sağlıyoruz — aksi halde
+// komutlar iki kez yüklenir, duyuru iki kez DM gider.
+let hazirCalisti = false;
+function hazirOl(kaynak, ...args) {
+  if (hazirCalisti) return;
+  hazirCalisti = true;
+  return hazirCalistir(kaynak, ...args);
+}
+
+client.once('ready', (...args) => hazirOl('ready', ...args));
+client.once('clientReady', (...args) => hazirOl('clientReady', ...args));
+
+async function hazirCalistir(kaynak, client) {
+  logger.success(`Bot başarıyla Discord'a giriş yaptı: ${client.user.tag} (${kaynak})`);
 
   await deployCommands();
 
@@ -246,7 +259,7 @@ client.once('ready', async () => {
   // haber ver. Şimdilik yalnız sahibe gider; YIKIM_DM_ROLE=1 olunca rol
   // sahiplerine de gönderilir.
   await duyuruGonder();
-});
+}
 
 try {
   const botToken = resolveToken(config);
