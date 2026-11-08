@@ -86,6 +86,27 @@ NOT: Bot/API kapalıyken de oyun ve mevcut kozmetikler çalışmaya devam eder.
 fs.writeFileSync(path.join(CIKIS, "OKU-BENI.txt"), bilgi);
 adim("OKU-BENI.txt yazildi");
 
+// ---------- 3) TEST LAUNCHER (kurulum dosyası) ----------
+const setupKaynak = path.join(
+  KOK,
+  "src-tauri/target/release/bundle/nsis/YIKIMLient_0.7.25_x64-setup.exe"
+);
+if (fs.existsSync(setupKaynak)) {
+  fs.copyFileSync(setupKaynak, path.join(CIKIS, "YIKIMLient_0.7.25_x64-setup.exe"));
+  console.log(
+    `   OK YIKIMLient_0.7.25_x64-setup.exe (${(fs.statSync(setupKaynak).size / 1048576).toFixed(1)} MB)`
+  );
+} else {
+  console.log("   ! kurulum dosyasi bulunamadi (npm run dist gerekli)");
+}
+
+// ---------- 4) OYUN İÇİ MOD JAR ----------
+const modJar = path.join(KOK, "yikim-mod/derleme/yikimlient-1.13.4+1.21.11.jar");
+if (fs.existsSync(modJar)) {
+  fs.copyFileSync(modJar, path.join(CIKIS, "yikimlient-mod-1.13.4.jar"));
+  console.log(`   OK yikimlient-mod-1.13.4.jar (${(fs.statSync(modJar).size / 1024).toFixed(0)} KB)`);
+}
+
 adim("BİTTİ — " + CIKIS);
 for (const f of fs.readdirSync(CIKIS)) {
   const s = fs.statSync(path.join(CIKIS, f)).size;
