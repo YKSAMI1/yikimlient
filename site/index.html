@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YIKIMLient — Ultra hafif Minecraft launcher</title>
+  <meta name="description" content="YIKIMLient: ultra hafif Minecraft launcher ve oyun içi mod. Çatlak ve Microsoft hesaplar, hesap bazlı kozmetikler, mod paketleri. Ücretsiz, reklamsız, açık kaynak." />
+  <meta name="theme-color" content="#08080b" />
+  <meta property="og:title" content="YIKIMLient — Ultra hafif Minecraft launcher" />
+  <meta property="og:description" content="Yüksek FPS, mod paketleri, hesap bazlı kozmetikler. Ücretsiz ve reklamsız." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <script>document.documentElement.classList.add("js");
+    // main.js yüklenemezse içerik gizli kalmasın
+    setTimeout(function () { if (!window.__ykHazir) document.documentElement.classList.remove("js"); }, 3500);
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="bg" aria-hidden="true">
+    <div class="bg-glow g1"></div>
+    <div class="bg-glow g2"></div>
+    <div class="bg-glow g3"></div>
+    <div class="bg-grid"></div>
+    <div class="bg-noise"></div>
+  </div>
+
+  <header class="nav" id="nav">
+    <div class="nav-inner">
+      <a class="brand" href="#top" aria-label="YIKIMLient">
+        <img src="/logo.png" alt="" width="34" height="34" />
+        <span>YIKIM<span class="brand-a">Lient</span></span>
+      </a>
+      <nav class="nav-links" aria-label="Ana menü">
+        <a href="#ozellikler">Özellikler</a>
+        <a href="#guvenlik">Güvenlik</a>
+        <a href="#ekranlar">Ekranlar</a>
+        <a href="#sss">S.S.S.</a>
+      </nav>
+      <a class="btn btn-ghost nav-cta" href="#indir">İndir</a>
+      <button class="nav-toggle" id="navToggle" aria-label="Menüyü aç" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- ============ HERO ============ -->
+    <section class="hero">
+      <div class="hero-inner">
+        <div class="pill reveal">
+          <span class="dot"></span>
+          <span id="verPill">v0.7.25</span>
+          <span class="sep">·</span>
+          <span>Ücretsiz &amp; reklamsız</span>
+        </div>
+
+        <h1 class="reveal">
+          Minecraft'ı<br />
+          <span class="grad">en yüksek FPS</span> ile oynat.
+        </h1>
+
+        <p class="lede reveal">
+          Ultra hafif bir launcher, tek tıkla mod paketleri ve hesap bazlı kozmetikler.
+          Çatlak ve Microsoft hesaplar birlikte, aynı sunucuda, aynı kurallarla.
+        </p>
+
+        <!-- İNDİRME KUTUSU -->
+        <div class="download reveal" id="indir">
+          <div class="dl-tabs" role="tablist" aria-label="İşletim sistemi">
+            <button class="dl-tab is-active" data-os="windows" role="tab" aria-selected="true">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3zM11.6 4.2 21 3v8.5h-9.4zM3 12.6h7.5v7.1L3 18.6zM11.6 12.6H21V21l-9.4-1.3z"/></svg>
+              Windows
+            </button>
+            <button class="dl-tab" data-os="appimage" role="tab" aria-selected="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c2.6 0 4.2 2.2 4.2 5 0 1.9-.6 3.3-.6 4.6 0 1.2.6 2.1.6 3.3 0 2.1-1.8 3.6-4.2 3.6s-4.2-1.5-4.2-3.6c0-1.2.6-2.1.6-3.3 0-1.3-.6-2.7-.6-4.6C7.8 4.2 9.4 2 12 2Zm0 1.8c-1.5 0-2.4 1.4-2.4 3.2 0 1.6.5 3 .5 4.6 0 1.7-.6 2.4-.6 3.4 0 1.1.9 1.9 2.5 1.9s2.5-.8 2.5-1.9c0-1-.6-1.7-.6-3.4 0-1.6.5-3 .5-4.6 0-1.8-.9-3.2-2.4-3.2Z"/></svg>
+              Linux (.AppImage)
+            </button>
+            <button class="dl-tab" data-os="deb" role="tab" aria-selected="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 6.2v5.6c0 5 3.8 8.7 9 10.2 5.2-1.5 9-5.2 9-10.2V6.2L12 2Zm0 2.2 7 3.3v4.3c0 3.9-2.9 6.9-7 8.1-4.1-1.2-7-4.2-7-8.1V7.5l7-3.3Z"/></svg>
+              Debian / .deb
+            </button>
+          </div>
+
+          <div class="dl-main">
+            <a class="btn btn-primary btn-lg" id="dlBtn" href="https://github.com/YKSAMI1/yikimlient/releases/latest" rel="noopener">
+              <span class="dl-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 3a1 1 0 0 1 1 1v9.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.4L11 13.6V4a1 1 0 0 1 1-1Z"/><path d="M4 17a1 1 0 0 1 1 1v1h14v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
+              </span>
+              <span class="dl-text">
+                <b id="dlLabel">Windows için indir</b>
+                <small id="dlSub">Son sürüm · GitHub'dan güvenli indirme</small>
+              </span>
+            </a>
+            <p class="dl-note">
+              Kurulum dosyası doğrudan GitHub sürümlerinden gelir. Reklam yok, üçüncü taraf yok.
+            </p>
+          </div>
+
+          <ul class="dl-meta">
+            <li><b id="statSurum">0.7.25</b><span>sürüm</span></li>
+            <li><b id="statBoyut">~7 MB</b><span id="statBoyutEtiket">Kurulum</span></li>
+            <li><b>Windows 10/11</b><span>64-bit</span></li>
+          </ul>
+        </div>
+
+        <div class="hero-mock reveal" aria-hidden="true">
+          <div class="mock-bar">
+            <i></i><i></i><i></i>
+            <span>YIKIMLient</span>
+            <em id="mockFps">312 FPS</em>
+          </div>
+          <div class="mock-body">
+            <div class="mock-side">
+              <span class="m-s on"></span><span class="m-s"></span><span class="m-s"></span><span class="m-s"></span>
+            </div>
+            <div class="mock-main">
+              <div class="mock-row"><span class="m-thumb"></span><span class="m-line w70"></span><span class="m-badge">Hazır</span></div>
+              <div class="mock-row"><span class="m-thumb t2"></span><span class="m-line w50"></span><span class="m-badge alt">İndiriliyor</span></div>
+              <div class="mock-row"><span class="m-thumb t3"></span><span class="m-line w60"></span><span class="m-badge">Hazır</span></div>
+              <div class="mock-progress"><span></span></div>
+              <div class="mock-log">
+                <div><em>›</em> mod paketi çözümleniyor…</div>
+                <div><em>›</em> 48 mod indirildi</div>
+                <div><em>›</em> oyun hazır <b>✓</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SAYILAR ============ -->
+    <section class="stats reveal" aria-label="Kısa bilgiler">
+      <div class="stat"><b data-count="70" data-suffix="+">0</b><span>desteklenen mod paketi kurulumu</span></div>
+      <div class="stat"><b data-count="3" data-suffix="x">0</b><span>daha yüksek FPS (testlerde)</span></div>
+      <div class="stat"><b data-count="0" data-suffix="₺">0</b><span>ücret, abonelik, reklam</span></div>
+      <div class="stat"><b data-count="100" data-suffix="%">0</b><span>açık kaynak</span></div>
+    </section>
+
+    <!-- ============ ÖZELLİKLER ============ -->
+    <section class="section" id="ozellikler">
+      <div class="sec-head reveal">
+        <span class="kicker">Neler var?</span>
+        <h2>Launcher'ın yaptığı her şey</h2>
+        <p>Sadece "oyunu açar" demiyoruz. Mod yönetiminden kozmetiğe kadar her şey tek yerde.</p>
+      </div>
+
+      <div class="cards">
+        <article class="card reveal">
+          <div class="ico">⚡</div>
+          <h3>Hafif ve hızlı</h3>
+          <p>Gereksiz arka plan servisi yok. Oyun açılırken de, oyun içinde de FPS'in düşmez. Bellek kullanımı düşük tutulur.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="ico">📦</div>
+          <h3>Tek tıkla mod paketi</h3>
+          <p>Modrinth ve CurseForge paketleri doğrudan kurulur. Aynı anda birden fazla paket indirebilir, ilerlemeyi canlı izleyebilirsin.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="ico">🎒</div>
+          <h3>.yikimpack paylaşımı</h3>
+          <p>Kurulumunu bir dosyaya dönüştür: modlar, dünyalar, dokular ve ayarlar. Çift tıklayan herkes aynı paketi kurar.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="ico">🖌️</div>
+          <h3>Kendi pelerinini çiz</h3>
+          <p>Piksel piksel pelerin ve elitra tasarla, fotoğrafını dokuya dönüştür. Tasarımlar hesabına bağlı kalır.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="ico">🪪</div>
+          <h3>Hesap bazlı kozmetik</h3>
+          <p>Her hesabın kendi görünümü. Aynı bilgisayarda bile hesaplar birbirinin tasarımını görmez.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="ico">🔔</div>
+          <h3>Canlı bildirimler</h3>
+          <p>İndirme bittiğinde sesli bildirim, rozet zili ve otomatik log ekranı. Ne olduğunu tahmin etmen gerekmez.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="ico">🧩</div>
+          <h3>NeoForge &amp; Fabric</h3>
+          <p>Forge, Fabric, Quilt ve NeoForge. Sürüm algılama otomatik; yanlış loader derdi yok.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="ico">🛡️</div>
+          <h3>Hesap doğrulama</h3>
+          <p>Discord ile bağla, cihazına bağlı bir anahtar üret. Şifren sunucuda bile okunabilir halde durmaz.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ GÜVENLİK ============ -->
+    <section class="section section-alt" id="guvenlik">
+      <div class="sec-head reveal">
+        <span class="kicker">Güven</span>
+        <h2>Güvenlik abartı değil, tasarım</h2>
+        <p>Launcher'ın hesap sistemini baştan bu iş için yazdık. "Sonra ekleriz" dediğimiz bir şey yok.</p>
+      </div>
+
+      <div class="trust">
+        <div class="trust-item reveal">
+          <div class="trust-ico">🔐</div>
+          <div>
+            <h3>Şifreler geri çevrilemez</h3>
+            <p>Parolalar scrypt ile tuzlanır; sunucudaki kopya AES-256-GCM ile şifrelenir. Veritabanı çalınsa bile şifreler okunamaz.</p>
+          </div>
+        </div>
+        <div class="trust-item reveal">
+          <div class="trust-ico">📡</div>
+          <div>
+            <h3>Telemetri yok</h3>
+            <p>Oyun alışkanlıkların, ekran görüntülerin, dosyaların hiçbir yere gönderilmez. Yalnızca doğrulama için gereken en az veri.</p>
+          </div>
+        </div>
+        <div class="trust-item reveal">
+          <div class="trust-ico">🧹</div>
+          <div>
+            <h3>IP kaydı kendini siler</h3>
+            <p>Yeni bir yerden giriş yaparsan IP bir kez yazılır ve 7 gün sonra gerçekten silinir. Süresi geçen kayıt okunmaz, temizlenir.</p>
+          </div>
+        </div>
+        <div class="trust-item reveal">
+          <div class="trust-ico">🔑</div>
+          <div>
+            <h3>Cihaz imzası</h3>
+            <p>Her cihaz kendi Ed25519 anahtarını üretir. İstekler cihaz tarafından imzalanır, yanıtlar sunucu tarafından. Arada oturum çalınamaz.</p>
+          </div>
+        </div>
+        <div class="trust-item reveal">
+          <div class="trust-ico">👁️</div>
+          <div>
+            <h3>Şeffaf kaynak</h3>
+            <p>Kod açık. Ne yaptığını görmek için bize güvenmen gerekmiyor; okuyabilirsin.</p>
+          </div>
+        </div>
+        <div class="trust-item reveal">
+          <div class="trust-ico">🚫</div>
+          <div>
+            <h3>Reklamsız</h3>
+            <p>Hiçbir ekran, düğme veya bildirim reklam değildir. Satılan bir şey, kilitli bir özellik yok.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="veri">
+        <div class="veri-kart reveal">
+          <h3><span class="v-ok">✓</span> Sunucuya giden veriler</h3>
+          <ul>
+            <li>Hesap adı ve <b>scrypt ile tuzlanmış</b> parola özeti</li>
+            <li>Discord kullanıcı kimliği (yalnızca bağlarsan)</li>
+            <li>Cihazının açık anahtarı (Ed25519) — özel anahtar cihazda kalır</li>
+            <li>Kozmetik tasarımların (pelerin / elitra dokuları)</li>
+            <li>Yeni bir yerden girişte IP adresi — <b>7 gün sonra silinir</b></li>
+          </ul>
+        </div>
+        <div class="veri-kart reveal">
+          <h3><span class="v-no">✕</span> Asla toplanmayanlar</h3>
+          <ul>
+            <li>Oyun alışkanlıkların, oynadığın sunucular, oturum süreleri</li>
+            <li>Ekran görüntüleri, dosyaların veya klasör listelerin</li>
+            <li>Mikrofon, kamera, konum, kişi listesi</li>
+            <li>Reklam kimliği, cihaz parmak izi, üçüncü taraf analitik</li>
+            <li>Minecraft hesap şifren (Microsoft girişi doğrudan Microsoft'ta yapılır)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ EKRANLAR ============ -->
+    <section class="section" id="ekranlar">
+      <div class="sec-head reveal">
+        <span class="kicker">İçeriden</span>
+        <h2>Bir bakışta launcher</h2>
+        <p>Kozmetik atölyesi, kurulum yönetimi ve mod paketi ilerlemesi.</p>
+      </div>
+      <div class="shots">
+        <figure class="shot shot-genis reveal">
+          <img src="/shots/kozmetik.png" alt="Kozmetik atölyesi ve pelerin kataloğu ekranı" loading="lazy" />
+          <figcaption><b>Kozmetik atölyesi</b><span>Pelerin ve elitra kataloğu, hesabına bağlı tasarımlar</span></figcaption>
+        </figure>
+        <figure class="shot reveal">
+          <img src="/shots/katalog.png" alt="Pelerin kataloğu ekranı" loading="lazy" />
+          <figcaption><b>Kendi tasarımların</b><span>Piksel çizim veya fotoğraftan doku</span></figcaption>
+        </figure>
+        <figure class="shot reveal">
+          <img src="/shots/modlar.png" alt="Kurulumdaki mod listesi ekranı" loading="lazy" />
+          <figcaption><b>Mod yönetimi</b><span>Kurulum bazlı modlar, tek tıkla güncelleme</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ============ NASIL ÇALIŞIR ============ -->
+    <section class="section section-alt" id="nasil">
+      <div class="sec-head reveal">
+        <span class="kicker">3 adım</span>
+        <h2>Kur, giriş yap, oyna</h2>
+      </div>
+      <ol class="steps">
+        <li class="reveal"><span class="step-no">01</span><h3>İndir ve kur</h3><p>Setup dosyasını çalıştır. Windows Defender uyarısı çıkarsa "Daha fazla bilgi → Yine de çalıştır" deyin; kod imzası henüz alınmadı.</p></li>
+        <li class="reveal"><span class="step-no">02</span><h3>Hesabını seç</h3><p>Microsoft hesabınla giriş yap ya da çatlak bir profil oluştur. Doğrulama isteğe bağlı, ama kozmetikler için gerekli.</p></li>
+        <li class="reveal"><span class="step-no">03</span><h3>Oyna</h3><p>Sürümü seç, mod paketini kur, başlat. Launcher gerisini halleder.</p></li>
+      </ol>
+    </section>
+
+    <!-- ============ SSS ============ -->
+    <section class="section" id="sss">
+      <div class="sec-head reveal">
+        <span class="kicker">S.S.S.</span>
+        <h2>Sık sorulanlar</h2>
+      </div>
+      <div class="faq">
+        <details class="reveal">
+          <summary>YIKIMLient ücretli mi? Reklam var mı?</summary>
+          <p>Hayır. Tamamen ücretsiz, reklamsız ve aboneliksiz. Hiçbir özellik parayla açılmaz. Proje açık kaynak olarak geliştiriliyor.</p>
+        </details>
+        <details class="reveal">
+          <summary>Çatlak hesapla oynayabilir miyim?</summary>
+          <p>Evet. Çatlak ve Microsoft hesaplar aynı launcher'da çalışır. Çatlak hesaplar sunucudan gelen izinle açılır; doğrulanmamış hesapların adının başında ✕ görünür ve kozmetiklerini değiştiremezler.</p>
+        </details>
+        <details class="reveal">
+          <summary>Windows "bilinmeyen yayıncı" uyarısı veriyor, güvenli mi?</summary>
+          <p>Kurulum dosyası kod imzalı değil (sertifika ücretli), bu yüzden SmartScreen uyarır. Dosyayı yalnızca resmî GitHub sürümlerinden indirin; kaynağı bu site ve GitHub deposudur.</p>
+        </details>
+        <details class="reveal">
+          <summary>Linux'ta nasıl kurulur?</summary>
+          <p>AppImage indirdiysen dosyayı çalıştırılabilir yapıp çift tıkla: <code>chmod +x YIKIMLient*.AppImage</code>. Debian/Ubuntu için <code>.deb</code> paketini <code>sudo dpkg -i</code> ile kurabilirsin.</p>
+        </details>
+        <details class="reveal">
+          <summary>Hesabım çalınırsa ne yapmalıyım?</summary>
+          <p>Discord bağlantını kaldır, cihazları sıfırla ve bize ulaş. Şifre sıfırlama tek kullanımlık kodla yapılır; 5 hatalı denemede o cihaz 24 saat kilitlenir.</p>
+        </details>
+        <details class="reveal">
+          <summary>Sistem gereksinimleri neler?</summary>
+          <p>Windows 10/11 64-bit veya modern bir Linux dağıtımı, en az 4 GB RAM, Java 17+ (launcher gerekli sürümü kurar), Minecraft'ı çalıştırabilen bir ekran kartı.</p>
+        </details>
+        <details class="reveal">
+          <summary>Verilerim nerede tutuluyor?</summary>
+          <p>Oyun dosyaları ve ayarlar kendi bilgisayarında, <code>%APPDATA%\.yikimlient</code> altında. Sunucuya yalnızca hesap doğrulama ve kozmetik senkronizasyonu için gereken veri gider.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ============ SON CTA ============ -->
+    <section class="cta reveal">
+      <h2>Denemek ücretsiz. Kalıcı olarak.</h2>
+      <p>Kur, beğen, kullan. Beğenmezsen kaldırırsın — geride hiçbir şey bırakmaz.</p>
+      <div class="cta-actions">
+        <a class="btn btn-primary btn-lg" id="dlBtn2" href="https://github.com/YKSAMI1/yikimlient/releases/latest" rel="noopener">Son sürümü indir</a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/YKSAMI1/yikimlient" rel="noopener">GitHub'da kaynak</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-in">
+      <div class="foot-brand">
+        <img src="/logo.png" alt="" width="28" height="28" />
+        <span>YIKIMLient</span>
+        <small id="footVer">v0.7.25</small>
+      </div>
+      <div class="foot-links">
+        <a href="https://github.com/YKSAMI1/yikimlient" rel="noopener">GitHub</a>
+        <a href="https://github.com/YKSAMI1/yikimlient/releases" rel="noopener">Sürümler</a>
+        <a href="https://github.com/YKSAMI1/yikimlient/issues" rel="noopener">Sorun bildir</a>
+        <a href="#sss">S.S.S.</a>
+      </div>
+    </div>
+
+    <div class="legal">
+      <p>
+        YIKIMLient bağımsız, ücretsiz ve açık kaynak bir topluluk projesidir. <b>Mojang Studios, Microsoft
+        veya herhangi bir resmî Minecraft ürünüyle bağlantılı değildir</b> ve onlar tarafından onaylanmamıştır.
+        "Minecraft" ilgili hak sahiplerinin ticari markasıdır.
+      </p>
+      <p>
+        Bu site hiçbir dosya barındırmaz; indirme bağlantıları doğrudan projenin GitHub deposuna gider.
+        Proje ticari gelir elde etmez, reklam yayınlamaz ve hiçbir içerik satmaz. Oyunu yalnızca
+        kullanım hakkına sahip olduğunuz biçimde kullanın. Launcher'ı kullanarak oluşabilecek veri
+        kaybı veya hesap sorunlarından kullanıcı sorumludur. 6698 sayılı KVKK kapsamındaki erişim,
+        düzeltme ve silme taleplerinizi GitHub üzerinden iletebilirsiniz; hesabınızı silmek için
+        Discord bağlantınızı kaldırıp bir sorun kaydı açmanız yeterlidir.
+      </p>
+      <p class="copy">© <span id="yil">2026</span> YIKIMLient · Topluluk tarafından geliştiriliyor.</p>
+    </div>
+  </footer>
+
+  <script src="/main.js" type="module"></script>
+</body>
+</html>

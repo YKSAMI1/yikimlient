@@ -82,6 +82,14 @@ konulmadı — kendi bilgisayarında bir kez oluşturman gerekir.
    - Şifreni oluştur
 
 NOT: Bot/API kapalıyken de oyun ve mevcut kozmetikler çalışmaya devam eder.
+
+5) TANITIM SİTESİ (site-test.zip)
+   - Klasörü çıkar, içinde index.html / style.css / main.js var
+   - Kök-göreli yollar kullanıldığı için çift tıklamak yerine bir sunucuyla aç:
+       npx serve .
+     veya
+       python -m http.server 8899
+   - Yayına alma adımları site/README.md içinde (Vercel / Netlify)
 `;
 fs.writeFileSync(path.join(CIKIS, "OKU-BENI.txt"), bilgi);
 adim("OKU-BENI.txt yazildi");
@@ -105,6 +113,14 @@ const modJar = path.join(KOK, "yikim-mod/derleme/yikimlient-1.13.5+1.21.11.jar")
 if (fs.existsSync(modJar)) {
   fs.copyFileSync(modJar, path.join(CIKIS, "yikimlient-mod-1.13.5.jar"));
   console.log(`   OK yikimlient-mod-1.13.5.jar (${(fs.statSync(modJar).size / 1024).toFixed(0)} KB)`);
+}
+
+// ---------- 5) TANITIM SİTESİ (statik) ----------
+const siteDizin = path.join(KOK, "site");
+if (fs.existsSync(path.join(siteDizin, "index.html"))) {
+  const siteZip = path.join(CIKIS, "site-test.zip");
+  ziple(siteDizin, siteZip, [".git"]);
+  console.log(`   OK site-test.zip (${(fs.statSync(siteZip).size / 1024).toFixed(0)} KB)`);
 }
 
 adim("BİTTİ — " + CIKIS);

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+# Kapalı alan yok. İndirme bağlantıları GitHub sürümlerine gider.
