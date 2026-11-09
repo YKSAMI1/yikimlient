@@ -674,6 +674,7 @@ h1 {
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.022);
   position: relative;
+  text-align: center;
 }
 .step-no {
   display: block;
@@ -685,7 +686,7 @@ h1 {
   margin-bottom: 10px;
 }
 .steps h3 { margin: 0 0 7px; font-size: 1.02rem; font-weight: 700; }
-.steps p { margin: 0; font-size: 0.89rem; color: var(--txt-dim); line-height: 1.62; }
+.steps p { margin: 0 auto; max-width: 34ch; font-size: 0.89rem; color: var(--txt-dim); line-height: 1.62; }
 .steps p a, .faq p a { color: var(--accent-2); text-decoration: underline; text-underline-offset: 2px; }
 .steps p a:hover, .faq p a:hover { color: var(--accent); }
 

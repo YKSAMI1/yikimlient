@@ -95,17 +95,20 @@ fs.writeFileSync(path.join(CIKIS, "OKU-BENI.txt"), bilgi);
 adim("OKU-BENI.txt yazildi");
 
 // ---------- 3) TEST LAUNCHER (kurulum dosyası) ----------
+// Sürüm package.json'dan okunur: elle düzeltme gerekmez (0.7.x artışında
+// eski dosya adı yüzünden paket boş çıkıyordu).
+const SURUM = JSON.parse(fs.readFileSync(path.join(KOK, "package.json"), "utf8")).version;
 const setupKaynak = path.join(
   KOK,
-  "src-tauri/target/release/bundle/nsis/YIKIMLient_0.7.25_x64-setup.exe"
+  `src-tauri/target/release/bundle/nsis/YIKIMLient_${SURUM}_x64-setup.exe`
 );
 if (fs.existsSync(setupKaynak)) {
-  fs.copyFileSync(setupKaynak, path.join(CIKIS, "YIKIMLient_0.7.25_x64-setup.exe"));
+  fs.copyFileSync(setupKaynak, path.join(CIKIS, `YIKIMLient_${SURUM}_x64-setup.exe`));
   console.log(
-    `   OK YIKIMLient_0.7.25_x64-setup.exe (${(fs.statSync(setupKaynak).size / 1048576).toFixed(1)} MB)`
+    `   OK YIKIMLient_${SURUM}_x64-setup.exe (${(fs.statSync(setupKaynak).size / 1048576).toFixed(1)} MB)`
   );
 } else {
-  console.log("   ! kurulum dosyasi bulunamadi (npm run dist gerekli)");
+  console.log(`   ! kurulum dosyasi bulunamadi (npm run dist gerekli): ${setupKaynak}`);
 }
 
 // ---------- 4) OYUN İÇİ MOD JAR ----------

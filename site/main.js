@@ -4,9 +4,9 @@ const YEDEK_SURUM = "0.7.25";
 const CACHE_MS = 10 * 60 * 1000;
 
 const OS_ETIKET = {
-  windows: { ikon: "Windows için indir", uzanti: [".exe", ".msi"], boyutEtiket: "Kurulum" },
-  appimage: { ikon: "Linux için indir (.AppImage)", uzanti: [".appimage"], boyutEtiket: "AppImage" },
-  deb: { ikon: "Debian paketini indir (.deb)", uzanti: [".deb"], boyutEtiket: "Debian paketi" },
+  windows: { ikon: "Windows için indir", uzanti: [".exe", ".msi"], boyutEtiket: "Kurulum", sistem: "Windows 10/11", sistemAlt: "64-bit" },
+  appimage: { ikon: "Linux için indir (.AppImage)", uzanti: [".appimage"], boyutEtiket: "AppImage", sistem: "Linux 64-bit", sistemAlt: "glibc 2.31+" },
+  deb: { ikon: "Debian paketini indir (.deb)", uzanti: [".deb"], boyutEtiket: "Debian paketi", sistem: "Debian / Ubuntu", sistemAlt: "amd64" },
 };
 
 let secili = "windows";
@@ -64,6 +64,12 @@ function platformSec(os) {
 
   const boyutBaslik = document.getElementById("statBoyutEtiket");
   if (boyutBaslik) boyutBaslik.textContent = OS_ETIKET[os].boyutEtiket;
+
+  // Üçüncü kutu seçili platforma göre değişir (eskiden hep "Windows 10/11").
+  const sistem = document.getElementById("statSistem");
+  const sistemAlt = document.getElementById("statSistemAlt");
+  if (sistem) sistem.textContent = OS_ETIKET[os].sistem;
+  if (sistemAlt) sistemAlt.textContent = OS_ETIKET[os].sistemAlt;
 
   const v = varlik(os);
   const sb = document.getElementById("statBoyut");

@@ -61,17 +61,43 @@ Depo → Settings → Pages → Source: **GitHub Actions** yerine **Deploy from 
 Branch: `main`, Folder: `/site`. Adres: `https://yksami1.github.io/yikimlient/`.
 Not: `vercel.json` GitHub Pages'te yok sayılır; güvenlik başlıkları uygulanmaz.
 
-## Ücretsiz alan adı seçenekleri
+## Ücretsiz / neredeyse ücretsiz alan adı seçenekleri
+
+Not: hem `rdap.org` ile müsaitlik kontrolü yapıldı (2026-11-09). Gerçek TLD'de
+"hemen ücretsiz hem süresiz" olmaz; en gerçekçi üç yol aşağıda.
+
+### 1) Hiç para ödemeyeceksek (ücret 0, süre sınırsız)
 
 | Seçenek | Adres örneği | Not |
 |---|---|---|
-| Vercel alt alan adı | `yikimlient.vercel.app` | Anında, ücretsiz, yeterli |
-| Netlify alt alan adı | `yikimlient.netlify.app` | Anında, ücretsiz |
-| is-a.dev | `yikimlient.is-a.dev` | GitHub PR ile ücretsiz; DNS Vercel'e yönlendirilir |
-| js.org | `yikimlient.js.org` | npm paketi gerektirir; proje için uygun değil |
-| eu.org | `yikimlient.eu.org` | Ücretsiz ama onay haftalar sürebilir |
+| Vercel alt alan adı | `yikimlient.vercel.app` | Anında, ücretsiz, süresiz. Zaten `vercel.json` hazır — hiçbir ayar gerekmez |
+| Cloudflare Pages | `yikimlient.pages.dev` | Anında, ücretsiz, süresiz (Vercel alternatifi) |
+| eu.org | `yikim.eu.org` | Ücretsiz + süresiz ama insan onayı: günler–hafta sürer, gerçek adres/telefon ister |
 
-Alan adı alındığında `index.html` içindeki `og:image` ve canonical adresleri güncellenmeli.
+### 2) Gerçek domain, yılda birkaç dolar (en mantıklısı)
+
+`yikim.icu` ve `yikimlient.icu` şu an MUStT (RDAP kontrolü yapıldı). `.icu`
+Namecheap'te yılda ~$2.79 ve Vercel'e bağlanır. Diğer ucuz uzantılar:
+`.click` (~$3/yenileme), `.space`, `.online` (ilk yıl ~$2, yenileme ~$10).
+
+| Alan adı | Durum | Tahmini |
+|---|---|---|
+| `yikimlient.vercel.app` | Anında alınır | 0 |
+| `yikim.icu` | **Müsait** | ~$3/yıl |
+| `yikimlient.icu` | **Müsait** | ~$3/yıl |
+| `yikim.xyz` | Dolu (RDAP: kayıtlı) | — |
+| `yikimlient.xyz` | Müsait (Porkbun ilk yıl ~$2, yenileme ~$14) | bakımı pahalı |
+
+Tavsiye: önce `yikimlient.vercel.app` ile yayına al (ücretsiz, dakikalar
+sürer), para/kart ayarladığında `yikim.icu` alıp Vercel → Domains'a ekle.
+
+### 3) Öğrenciysen (ücretsiz gerçek domain)
+
+GitHub Student Developer Pack → Namecheap üzerinden 1 yıl ücretsiz `.me` /
+`.tech` / `.live`. 12 ayda bir yenilenir; ondan sonra normal ücret.
+
+Alan adı alındığında `index.html` içindeki `og:image` ve canonical adresler
+güncellenmeli.
 
 ## Yayın öncesi kontrol listesi
 
