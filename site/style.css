@@ -669,12 +669,18 @@ h1 {
   counter-reset: s;
 }
 .steps li {
+  /* Kart içeriği TAM ORTADA: kısa kartlar (04) ile uzun kartlar (03) aynı
+     eksende hizalanır — metin sola yapışıp "yarım ortalanmış" görünmesin. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   padding: 26px 22px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.022);
   position: relative;
-  text-align: center;
 }
 .step-no {
   display: block;
