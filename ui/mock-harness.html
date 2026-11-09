@@ -39,7 +39,12 @@
       if (q.get("gvdog") !== null) sessionStorage.setItem("mock-gv-dogrulandi", q.get("gvdog") === "1" ? "1" : "0");
       if (q.get("gvrol") !== null) sessionStorage.setItem("mock-gv-rol", q.get("gvrol") === "1" ? "1" : "0");
       if (q.get("gvbagli") !== null) sessionStorage.setItem("mock-gv-bagli", q.get("gvbagli") === "1" ? "1" : "0");
+      if (q.get("gvsifre") !== null) sessionStorage.setItem("mock-gv-sifreyok", q.get("gvsifre") === "yok" ? "1" : "0");
       if (q.get("gvdog") === "1" && q.get("gvbagli") === null) sessionStorage.setItem("mock-gv-bagli", "1");
+      // Şifre durumu bilinmiyorsa varsayılan: VAR (başka cihazda oluşturulmuş).
+      if (q.get("gvsifre") === null && sessionStorage.getItem("mock-gv-sifreyok") === null) {
+        sessionStorage.setItem("mock-gv-sifreyok", "0");
+      }
     } catch (e) {}
 
     /* ---- sahte skin / pelerin dokuları (data: URL) ---- */
@@ -362,7 +367,19 @@
       }
       if (cmd === "cmd_guvenlik_giris") {
         sessionStorage.setItem("mock-gv-dogrulandi", "1");
+        // Şifresi olmayan hesapta giriş reddedilir (gerçek API gibi).
+        if (sessionStorage.getItem("mock-gv-sifreyok") === "1") {
+          return Promise.reject("parola_yok");
+        }
         return Promise.resolve({ dogrulandi: true, rol_yol: sessionStorage.getItem("mock-gv-rol") === "1", yetki_bitis: Date.now() + 604800000 });
+      }
+      if (cmd === "cmd_guvenlik_parola_kur") {
+        if (sessionStorage.getItem("mock-gv-sifreyok") !== "1") {
+          return Promise.reject("parola_var");
+        }
+        sessionStorage.setItem("mock-gv-sifreyok", "0");
+        sessionStorage.setItem("mock-gv-dogrulandi", "1");
+        return Promise.resolve({ tamam: true });
       }
       if (cmd === "cmd_guvenlik_sifirla") {
         sessionStorage.setItem("mock-gv-dogrulandi", "1");

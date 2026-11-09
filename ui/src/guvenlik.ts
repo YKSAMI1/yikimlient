@@ -212,7 +212,7 @@ export async function guvenlikKartiCiz(host: HTMLElement): Promise<void> {
         : "Kozmetik ve skin değiştirme açık. Kendi tasarımını çizmek için Discord sunucusundaki YIKIM etiketi (\"Yol Silindiri\" rolü) gerekir — etiketi bırakırsan çizme izni kendiliğinden kapanır.",
     );
   } else if (d.baglandi) {
-    durum = durumSatiri("uyari", "Discord bağlı — şifre eksik", "Şifre oluştur, kozmetiklerin hesabına bağlansın.");
+    durum = durumSatiri("uyari", "Discord bağlı — bu cihazda giriş yapmadın", "Şifreni gir; kozmetiklerin ve çizme iznin bu cihaza açılsın.");
   } else {
     durum = durumSatiri(
       "uyari",
@@ -251,9 +251,23 @@ export async function guvenlikKartiCiz(host: HTMLElement): Promise<void> {
   }
 
   if (d.api_acik && hesapVar && d.baglandi && !d.dogrulandi) {
+    // 3) GİRİŞ YAP — birincil yol. Hesabın şifresi başka cihazda
+    //    oluşturulmuş olabilir; "şifre oluştur" yalnız şifresi YOKSA geçerli.
     govde += `
       <div class="gv-adim">
-        <div class="gv-adim-bas"><span class="gv-no">3</span><b>Şifre oluştur</b></div>
+        <div class="gv-adim-bas"><span class="gv-no">3</span><b>Giriş yap</b></div>
+        <p class="gv-mini">Hesabının şifresini gir — kozmetiklerin ve çizme iznin bu cihaza açılır. Şifre her cihazda aynıdır.</p>
+        <div class="gv-izgara">
+          ${sifreAlani("gv-giris-sifre", "Şifre")}
+        </div>
+        <div class="gv-alt-satir">
+          <button class="btn primary" id="gv-giris">Giriş yap</button>
+          <button class="btn ghost sm" id="gv-olustur-ac">Hesabımın şifresi yok</button>
+        </div>
+      </div>
+
+      <div class="gv-adim" id="gv-olustur-blok" hidden>
+        <div class="gv-adim-bas"><span class="gv-no">4</span><b>Şifre oluştur</b></div>
         <p class="gv-mini">Bu şifre hesabını korur; her cihazda aynı şifreyle doğrulanırsın.</p>
         <div class="gv-izgara">
           ${sifreAlani("gv-p1", "Yeni şifre")}
@@ -355,6 +369,43 @@ export async function guvenlikKartiCiz(host: HTMLElement): Promise<void> {
   host.querySelector("#gv-kontrol")?.addEventListener("click", () => void kontrol(false));
   host.querySelector("#gv-discord")?.addEventListener("click", () => discordAc());
 
+  // ---- Şifreyle GİRİŞ (birincil yol) ----
+  const girisYap = async (): Promise<void> => {
+    const sifre = host.querySelector<HTMLInputElement>("#gv-giris-sifre")?.value || "";
+    if (sifre.length < 8) return toast("Şifreni gir (en az 8 karakter)", "err");
+    const btn = host.querySelector<HTMLButtonElement>("#gv-giris");
+    if (btn) btn.disabled = true;
+    try {
+      const h = await parolaHash(sifre);
+      const v = (await invoke("cmd_guvenlik_giris", { parolaHash: h })) as { dogrulandi?: boolean };
+      if (v?.dogrulandi) {
+        await guvenlikOzetYukle(true);
+        toast("Giriş yapıldı ✓ kozmetikler açıldı");
+        await guvenlikKartiCiz(host);
+      }
+    } catch (e) {
+      const m = String(e).replace(/^Error:\s*/, "");
+      if (m.includes("parola_yok")) {
+        // Hesabın şifresi yok → oluşturma bloğunu aç (kullanıcı "şifre oluştur"
+        // diye diretsin ya da "şifren var" uyarısına takılmasın).
+        const blok = host.querySelector<HTMLElement>("#gv-olustur-blok");
+        if (blok) blok.hidden = false;
+        toast("Bu hesabın şifresi yok — aşağıdan oluşturabilirsin.", "err");
+      } else {
+        toast(m.includes("baglanti_yok") ? "Önce Discord'da /bagla ile bağla" : `Giriş olmadı: ${m}`, "err");
+      }
+      if (btn) btn.disabled = false;
+    }
+  };
+  host.querySelector("#gv-giris")?.addEventListener("click", () => void girisYap());
+  host.querySelector<HTMLInputElement>("#gv-giris-sifre")?.addEventListener("keydown", (e) => {
+    if ((e as KeyboardEvent).key === "Enter") void girisYap();
+  });
+  host.querySelector("#gv-olustur-ac")?.addEventListener("click", () => {
+    const blok = host.querySelector<HTMLElement>("#gv-olustur-blok");
+    if (blok) blok.hidden = false;
+  });
+
   host.querySelector("#gv-parola-kur")?.addEventListener("click", async () => {
     const p1 = host.querySelector<HTMLInputElement>("#gv-p1")?.value || "";
     const p2 = host.querySelector<HTMLInputElement>("#gv-p2")?.value || "";
@@ -372,10 +423,15 @@ export async function guvenlikKartiCiz(host: HTMLElement): Promise<void> {
       await guvenlikKartiCiz(host);
     } catch (e) {
       const m = String(e).replace(/^Error:\s*/, "");
-      toast(
-        m.includes("parola_var") ? "Bu hesabın şifresi zaten var — 'Şifremi unuttum' kullan." : `Olmadı: ${m}`,
-        "err",
-      );
+      if (m.includes("parola_var")) {
+        // Şifre zaten VAR (başka cihazda oluşturulmuş): "unuttum"a yollama,
+        // DOĞRUDAN giriş ekranına dön.
+        const blok = host.querySelector<HTMLElement>("#gv-olustur-blok");
+        if (blok) blok.hidden = true;
+        toast("Bu hesabın şifresi zaten var — yukarıdan giriş yap.", "err");
+      } else {
+        toast(`Olmadı: ${m}`, "err");
+      }
       if (btn) btn.disabled = false;
     }
   });
