@@ -760,22 +760,52 @@ function bitisSesi(): void {
 
 /// GitHub'dan yeni sürüm kontrolü → varsa "indir ve kur" onayı.
 /// İmza doğrulaması Tauri updater içinde: geçersiz imza = kurulum REDDEDİLİR.
+///
+/// ZORUNLU GÜNCELLEME: `latest.json` içinde `minimum` alanı varsa ve kurulu
+/// sürüm onun altındaysa "Sonra" düğmesi çıkmaz — kullanıcı güncellemeden
+/// launcher'ı kullanamaz (kapatma tuşu da kapalıdır). Eski sürümler bu alanı
+/// tanımaz; onlar için normal (isteğe bağlı) güncelleme penceresi görünür.
 async function checkForUpdate(): Promise<void> {
   try {
     const mod = await import("@tauri-apps/plugin-updater");
     const update = await mod.check();
     if (!update?.available) return;
+    const raw = (update as any)?.rawJson ?? {};
+    const min = String(raw?.minimum ?? "").trim();
+    const surumKarsilastir = (a: string, b: string): number => {
+      const p = (s: string) => s.replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
+      const x = p(a);
+      const y = p(b);
+      for (let i = 0; i < Math.max(x.length, y.length); i++) {
+        const f = (x[i] ?? 0) - (y[i] ?? 0);
+        if (f !== 0) return f;
+      }
+      return 0;
+    };
+    const mevcut = String((update as any)?.currentVersion ?? "");
+    const zorunlu = !!min && surumKarsilastir(mevcut, min) < 0;
+    const baslik = zorunlu
+      ? "Zorunlu Güncelleme"
+      : "Güncelleme Var";
+    const aciklama = zorunlu
+      ? `Eski sürümdesin (v${mevcut}). Bu güncelleme zorunlu — launcher'ı kullanmaya devam etmek için v${update.version} olmalısın.`
+      : `YIKIMLient <b>v${update.version}</b> hazır. Değişiklik notları:`;
     const { root, close } = openModal(`
-      <h2>Güncelleme Var</h2>
-      <div class="sub">YIKIMLient <b>v${update.version}</b> hazır. Değişiklik notları:</div>
+      <h2>${baslik}</h2>
+      <div class="sub">${aciklama}</div>
       <div style="margin:12px 0; max-height:180px; overflow-y:auto; user-select:text; color:var(--text-dim); font-size:12.5px; line-height:1.55">
         ${(update.body || "Değişiklik notu yok.").split("\n").map((l: string) => `<div>${l}</div>`).join("")}
       </div>
       <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:6px">
-        <button class="btn ghost" id="upd-later">Sonra</button>
-        <button class="btn primary" id="upd-go">İndir ve Kur</button>
+        ${zorunlu ? "" : `<button class="btn ghost" id="upd-later">Sonra</button>`}
+        <button class="btn ${zorunlu ? "danger" : "primary"}" id="upd-go">${zorunlu ? "Şimdi güncelle (zorunlu)" : "İndir ve Kur"}</button>
       </div>
+      ${zorunlu ? `<p class="gv-mini" style="margin:8px 0 0; color:var(--text-faint)">Güncelleme indirilip kurulana kadar launcher kullanılamaz.</p>` : ""}
     `);
+    // Zorunlu güncellemede modal kapatılamaz (boş alan / Esc tıklaması işe yaramaz).
+    if (zorunlu) {
+      root.addEventListener("click", (e) => e.stopPropagation());
+    }
     root.querySelector("#upd-later")?.addEventListener("click", () => close());
     root.querySelector("#upd-go")?.addEventListener("click", async () => {
       const btn = root.querySelector("#upd-go") as HTMLButtonElement;

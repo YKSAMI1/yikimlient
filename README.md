@@ -3,9 +3,14 @@
 # ⚡ YIKIMLient
 
 **Ultra-hafif, ultra-hızlı Minecraft launcher + oyun içi mod.**
-Electron'suz. Cracked oyunculara eşit, ücretsiz ve sınırsız.
+Electron'suz. Çatlak (offline) oyunculara eşit — ücretsiz ve sınırsız.
 
-> "Minecraft'ı en yüksek kare hızında, en düşük gecikmeyle ve hiçbir ayarla uğraşmadan oynatan istemci."
+[![Sürüm](https://img.shields.io/github/v/release/YKSAMI1/yikimlient?style=flat-square)](https://github.com/YKSAMI1/yikimlient/releases/latest)
+[![İndir](https://img.shields.io/github/downloads/YKSAMI1/yikimlient/total?style=flat-square)](https://github.com/YKSAMI1/yikimlient/releases)
+[![Site](https://img.shields.io/badge/site-yikimlient.vercel.app-orange?style=flat-square)](https://yikimlient.vercel.app)
+[![Discord](https://img.shields.io/badge/Discord-kat%C4%B1l-5865F2?style=flat-square)](https://discord.gg/3zTCpMzeNq)
+
+[🌐 Site](https://yikimlient.vercel.app) · [⬇️ İndir](https://github.com/YKSAMI1/yikimlient/releases/latest) · [💬 Discord](https://discord.gg/3zTCpMzeNq) · [🐞 Sorun bildir](https://github.com/YKSAMI1/yikimlient/issues)
 
 </div>
 
@@ -13,241 +18,223 @@ Electron'suz. Cracked oyunculara eşit, ücretsiz ve sınırsız.
 
 ## Neden YIKIMLient?
 
-| | YIKIMLient | Electron launcher'lar |
+| | YIKIMLient | Electron tabanlı launcher |
 |---|---|---|
 | RAM (boşta) | ~100–150 MB | 300–700 MB |
-| Kurulum boyutu | ~5 MB | 150–250 MB |
-| Açılış süresi | <1 sn | 3–8 sn |
+| Kurulum boyutu | ~7 MB | 150–250 MB |
+| Açılış | <1 sn | 3–8 sn |
 | Motor | Tauri 2 + Rust + sistem WebView | Paketli Chromium + Node |
 | Oyun içi mod | ✅ YIKIM çekirdek modu | ❌ yok |
 
-**Ve en önemlisi:** hesap şifresi, Discord doğrulaması, hesap bazlı kozmetikler ve
-güvenli paylaşım sistemi **herkeste**, çatlak (cracked) hesapta da çalışıyor.
-Premium olmayan hesap kimseye kapı gösterilmiyor.
+**Hesap sistemi çatlak hesaplarda da çalışır.** Şifre, Discord doğrulama, hesap bazlı
+kozmetik ve güvenli paylaşım premium olmayan hesapta da tam çalışır. Hiçbir kapı yok.
 
 ---
 
-## 🚀 Özellikler
+## İçerik
 
-### 🎮 Oyun Yönetimi
+Bu depo dört ayrı parçadan oluşur:
+
+| Klasör | Ne işe yarar |
+|---|---|
+| `ui/` | Arayüz (TypeScript + Vite + Three.js 3B önizleme) |
+| `src-tauri/` | Launcher çekirdeği (Rust) + Tauri komutları |
+| `yikim-mod/` | Oyun içi Fabric modu (Java) |
+| `bot/` | Discord botu (Node) — doğrulama, şifre sıfırlama, rol yönetimi |
+| `guvenlik-api/` | Güvenlik sunucusu (Node) — hesap, şifre, cihaz imzası |
+| `site/` | Tanıtım sitesi (statik) — `yikimlient.vercel.app` |
+
+---
+
+## Özellikler
+
+### 🎮 Oyun
 - **Offline + Microsoft girişi** — resmî device-code akışı (Xbox → XSTS → Minecraft), çoklu hesap
-- **Hesap bazlı geçiş** — her hesabın kendi kozmetiği, kendi skini, kendi rozeti
-- **Tek tıkla optimize mod paketi** — Sodium, Lithium, FerriteCore, Krypton, ModernFix, EntityCulling, ImmediatelyFast, Noisium, Dynamic FPS, FastQuit ve 40+ mod
-- **Oyun içi mod yönetimi** — Sağ Shift panelinden mod aç/kapa, oyun otomatik yeniden başlar
-- **Modrinth + CurseForge kataloğu** — oyunu KAPATMADAN mod ara, kur, logoyu gör
-- **Otomatik Java** — Mojang resmî runtime'ları her MC sürümü için doğru Java'yı indirir
+- **Otomatik Java** — Mojang resmî runtime'ları, her MC sürümü için doğru Java
+- **Fabric / Quilt / Forge / NeoForge** — sürüm algılama otomatik
 - **JVM profilleri** — Dengeli / Yüksek FPS / Ultra FPS / Düşük RAM / Düşük Gecikme / Agresif
-- **Tümünü Güncelle** — kurulumdaki bütün modları tek tıkla güncelle (adım sayacıyla)
+- **Kesfet** — Modrinth + CurseForge kataloğu, oyunu kapatmadan mod ara–kur
+- **Tümünü Güncelle** — kurulumdaki bütün modları tek tıkla (adım sayacıyla)
+- **Ayarlar bekçisi** — her açılışta Türkçe arayüz, sınırsız FPS, VSync kapalı
 
-### 📦 Mod Paketleri
-- **Canlı kurulum** — paket kurulurken adım adım canlı ilerleme kartı, ekranı kaplamaz
-- **Aynı anda birden fazla paket** — her paket kendi ilerleme kartını alır, ilerlemeler birbirine karışmaz
-- **Aynı paket iki kez kurulmaz** — ikinci deneme `paket_zaten_kuruluyor` ile reddedilir
-- **Kurulum bitince otomatik Log sayfası** + özel bildirim sesi
-- **`.yikimpack` paylaşım** — logolu, seçilebilir içerikli (modlar / dünyalar / dokular / ayarlar),
-  birkaç MB (ultra-hafif modda modlar Modrinth bağlantısıyla çözülür). Çift tıklayınca kurulur.
-- **CurseForge tam desteği** — anahtarsız ayna sayesinde API anahtarı gerekmez
+### 📦 Mod paketleri
+- **Canlı kurulum** — adım adım ilerleme kartı, ekranı kaplamaz
+- **Aynı anda birden fazla paket** — her paket kendi kartını alır
+- **Aynı paket iki kez kurulmaz** — ikinci deneme reddedilir
+- **`.yikimpack` paylaşım** — modlar, dünyalar, dokular, ayarlar; çift tıklayınca kurulur
 
-### 🔐 Hesap Güvenliği
+### 🎨 Kozmetikler (pelerin + elitra)
+- **64×32 piksel editörü** + **3B modelin üzerine doğrudan boyama**
+- **Fotoğraf / Pafta yükleme** — HD dokusu ve maske (eliptik silüet) desteğiyle
+- **Katalog** — her kayıt ayrı saklanır, listeden giyilir
+- **Hesap bazlı** — aynı bilgisayarda iki hesabın tasarımı karışmaz
+- **Sunucudaki herkeste görünür** — YIKIMLient kullanan oyuncular tasarımınızı görür
+
+### 🔐 Hesap güvenliği
 - **Şifre** — sunucuda `scrypt` (tuz + biber) ile türetilir, veritabaninde **şifreli** saklanır (AES-256-GCM)
-- **Discord doğrulama** — hesabı Discord hesabına bağla; kozmetikler hesaba bağlanır, cihaz değişince kaybolmaz
-- **Tüm sırlar ortam değişkeninden** — kodda hiçbir anahtar sabit yazılmaz
-- **Cihaz imzalı istekler** — her cihaz kendi Ed25519 anahtarını üretir, istekler imzalı, yanıtlar sunucu imzalı
-- **Çevrimdışı çalışma** — bot/API kapalıyken oyun ve mevcut kozmetikler çalışmaya devam eder
-- **Giriş kaydı** — IP + hesap adıyla loglanır, IP kaydı 7 gün sonra gerçekten silinir
+- **Discord doğrulama** — hesabı Discord hesabına bağla; kozmetikler hesaba bağlanır
+- **Cihaz imzalı istekler** — her cihaz kendi Ed25519 anahtarını üretir; istekler imzalı, yanıtlar sunucu imzalı
+- **Doğrulanmamış hesap** — oynayabilir, kozmetik değiştiremez; adının başında **✕**
 - **Koruma** — 5 hatalı şifrede o hesap o cihazda 24 saat kilitlenir
-- **"Şifremi unuttum"** — bot DM'den tek seferlik kod, 5 hatalı denemede kilit
-- **Doğrulanmamış hesap** — oynayabilir, kozmetik/skin değiştiremez; adının başında **✕** görünür
-  (launcher'da ve oyun içinde isim etiketinde + TAB listesinde)
+- **"Şifremi unuttum"** — bot DM'den tek seferlik kod
+- **Çevrimdışı çalışma** — bot/API kapalıyken oyun ve mevcut kozmetikler çalışmaya devam eder
 
-### 🎨 Kozmetikler
-- **Hesap bazlı** — her hesabın pelerin/elitrası ayrı; hesap değiştirince o hesabın tasarımı gelir
-- **Tam 64×32 atlas editörü** — ön/arka/yan/üst/alt bütün yüzler doğrudan çizilir
-- **2D ve 3D çizim** — aynı karakter sahnesinde canlı önizleme
-- **HD fotoğraf kozmetiği** — yüksek çözünürlüklü görsel, maskeli yerleşim
-- **Katalog** — her kayıtlı tasarım ayrı; "YIKIM Pelerin" ve "YIKIM Elitra" hazır gelir
-- **Yol Silindiri** rolü olanlar kendi pelerin/elitrasını çizebilir; diğerleri YIKIM varsayılanını açıp kapatabilir
-- **Sunucudaki diğer YIKIMLient oyuncuları** da pelerin/elitranı görür (presence)
+### 🏷️ Çizme izni ("Yol Silindiri")
+Kendi pelerin/elitranı çizebilmek için Discord sunucusundaki **YIKIM etiketini**
+("Yol Silindiri" rolü) taşıman gerekir. Doğrulama tek başına kozmetikleri hesaba bağlar;
+etiketi taşımayan hesaplarda yalnız aç/kapa anahtarları çalışır. Etiketi bırakırsan
+bot bunu fark eder ve **çizme iznini otomatik geri alır**.
 
-### 🧍 Skin Merkezi
-- **Microsoft hesap** — skin/pelerin Mojang hesabına yüklenir, sunucularda herkes görür
-- **Çatlak hesap** — istemci tarafı skin: Mojang'a çıkmaz, bu bilgisayarda görünür, doğrulanmışsa kitaplığa kaydolur
-- **Kitaplık** — kayıtlı skinler, silme, yeniden adlandırma, yedek geri yükleme
-- **Dışa/içe aktarma** — PNG olarak kaydet, dosyadan yükle
-
-### 🛡️ Performans Sistemi
-- **Ayar profili** — her açılışta Türkçe arayüz, sınırsız FPS, VSync kapalı, tüm sarsıntı efektleri kapalı
-- **Performans bekçisi** — oyun açıkken profil değerlerini korur, başka bir mod bozarsa geri alır
-- **Düşük FPS danışmanı** — FPS < 60 sürekli 10 sn → otomatik öneri
-- **AFK sınırlayıcı kapalı** — oyun içinde dururken bile sınırsız FPS
-- **Bellek boşaltma** — pencere odakta değilse / sistem boşsa çalışma kümeleri boşaltılır
-- **Mod çakışma temizliği** — Zoomify, FastNoise, Ixeris gibi çakışanlar otomatik emekliye ayrılır
-- **A/B performans testi** — oyun içinde HUD açık/kapalı FPS ölçümü
-
-### 🎨 Arayüz
-- **5 tema dünyası** — Pano / Söküm / Anons / Standart / Özel
-- **Özel vurgu rengi** — Ayarlar'dan herhangi bir renk
-- **Tema senkronu** — launcher teması oyuna canlı yansır
-- **Animasyonlu kapaklar** — MP4, GIF, PNG, JPG; ekranda değilse video otomatik durur
-- **Canlı ikonlar** — her mod için gerçek Modrinth ikonu (WebP→PNG dahil)
-- **Tam ekran HUD editörü** — Sağ Shift → HUD → matris ızgaralı editör
-- **Bildirim kutusu** — sağ üstteki zil; kurulum, mod güncelleme, paket hazır haberleri burada
-
-### 🔄 Otomasyon
-- **İmzalı otomatik güncelleme** — minisign imzalı; geçersiz imza kurulamaz
-- **Mod paketi tamamlayıcı** — yeni mod eklenirse mevcut kurulumlara otomatik düşer
-- **Discord Rich Presence** — "YIKIMLient oynuyor" + logo + indirme butonu
-- **Kozmetik duyurusu** — "Yol Silindiri" rolüne DM ile haber
+### 🔄 Güncelleme
+- **Otomatik güncelleme** — GitHub Releases'ten, imzalı (geçersiz imza kurulamaz)
+- **Zorunlu güncelleme** — sunucu `minimum` sürümü belirlerse eski sürüm güncellemeden kullanılamaz
+- **Sıcak arayüz** — site teması/sayfaları exe yeniden derlemeden güncellenir
 
 ---
 
-## 🔒 Veri Şeffaflığı
-
-### Toplanan ve yerel kalan veriler
-| Veri | Nerede | Dışarı çıkar mı? |
-|---|---|---|
-| Hesap adı + UUID | `accounts.json` | ❌ HAYIR |
-| Oynanış istatistikleri | `sessions.jsonl` | ❌ HAYIR |
-| Kurulum ayarları | `yikimlient.json` | ❌ HAYIR |
-| Kozmetik tasarımları | `kozmetik/` (hesap bazlı) | ❌ HAYIR |
-
-### Sadece doğrulama için giden veriler (kullanıcı onayıyla)
-| Ne | Neden | Nasıl korunur |
-|---|---|---|
-| Hesap anahtarı + görünen ad | Doğrulama eşleştirme | Cihaz imzalı istek |
-| Paroladan türetilmiş hash | Şifre doğrulama (düz parola **asla** gitmez) | PBKDF2-SHA256, 210k tur |
-| Genel IP | Yeni yerden giriş kaydı | 7 gün sonra otomatik silinir |
-
-**Şifreler, parolalar ve tüm anahtarlar sunucuda şifreli saklanır. Açık kaynak olsa bile
-veritabanı sızdırıldığında parolalar kurtarılamaz.**
-
-### Ağ bağlantıları
-1. **Modrinth / CurseForge** — mod arama, indirme, ikon, güncelleme
-2. **Güvenlik API** — hesap doğrulama, parola, kozmetik yetkisi (kullanıcı onayıyla)
-3. **GitHub** — duyurular + güncelleme kontrolü
-4. **Discord IPC / bot** — Rich Presence ve `/bagla` doğrulama
-
-**Telemetri YOK.** Analitik, izleme, reklam, veri satışı yok.
-
----
-
-## 📥 Kurulum
+## Kurulum
 
 ### Windows
-1. [Releases](https://github.com/YKSAMI1/yikimlient/releases) sayfasından `YIKIMLient_x64-setup.exe` indir
-2. Kur → aç → oyna. Java dahil her şey otomatik.
-
-> **"Windows kişisel bilgisayarınızı korudu" uyarısı:** kurulum dosyası bir kod imzalama
-> sertifikasıyla imzalanmadığı için Windows "bilinmeyen yayıncı" der. **Ek bilgi → Yine de
-> çalıştır.** Dosyanın bozulmadığını aynı sürümdeki `SHA256SUMS.txt` ile doğrulayabilirsin.
+`YIKIMLient_<sürüm>_x64-setup.exe` indir → kur → oyna.
+(Windows Defender "bilinmeyen yayıncı" uyarabilir: *Daha fazla bilgi → Yine de çalıştır*.
+Kod imzalı sertifika alınmadı; dosya kaynağı bu repo'dur.)
 
 ### Linux
 ```bash
-chmod +x yikimlient_amd64.AppImage   # veya: sudo dpkg -i yikimlient_amd64.deb
-sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0   # Ubuntu/Debian
+chmod +x YIKIMLient_<sürüm>_amd64.AppImage
+./YIKIMLient_<sürüm>_amd64.AppImage
 ```
-
-### İlk açılışta
-1. **Hesap** — Microsoft ile giriş yap veya çevrimdışı (çatlak) hesap ekle
-2. **Doğrulama** — Ayarlar → Hesap Doğrulama → Discord'da `/bagla KOD`
-3. **Şifre** — bağlantı doğrulanınca şifreni oluştur
-4. **Paket** — mod paketini kur veya boş kurulum aç
-5. **Oyna** — hazırsın
-
----
-
-## 🤖 Bot kurulumu (sahip için)
-
+Debian / Ubuntu:
 ```bash
-cd bot
-npm install
-node scripts/encrypt-token.js   # token'ı şifrele (TOKEN_ENCRYPTED + TOKEN_KEY)
-# .env dosyasını doldur: GUILD_ID, CHANNEL_ID, ROLE_ID, YIKIM_API, YIKIM_BOT_ANAHTARI
-node index.js
+sudo dpkg -i YIKIMLient_<sürüm>_amd64.deb
 ```
 
-Güvenlik API'yi çalıştırmak için:
-```bash
-cd guvenlik-api
-# .env dosyasını doldur (YIKIM_DB, YIKIM_PEPPER, YIKIM_ANAHTAR, YIKIM_IMZA_GIZLI, YIKIM_ADMIN_ID)
-node src/server.js
-node --test test/api.test.js    # 25 test
-```
-
-**Tüm sırlar `.env` dosyasından okunur; depoda hiçbiri yoktur.**
-
----
-
-## 🛠️ Geliştirme
-
+### Kaynaktan derleme
 ```bash
 npm install
-npm run app          # tauri dev — geliştirme modu
-npm run dist         # kurulum paketi üret
-npm run check        # TypeScript tip kontrolü
-npm run build        # arayüz üretim derlemesi
-
-cd src-tauri
-cargo test --lib     # 52 Rust testi
-cargo test --lib -- --ignored --test-threads=1   # 4 canlı API testi (API açıkken)
-
-cd ../yikim-mod
-powershell -File araclar\derle-1.21.11.ps1       # oyun içi modu derle
-
-cd ../guvenlik-api
-node --test test/api.test.js                     # 25 API testi
-```
-
-### Mimari
-```
-samiclient/
-├── src-tauri/            # Rust çekirdeği — launcher mantığı
-│   ├── src/guvenlik.rs       # cihaz kimliği, hesap yetkileri, hesap bazlı kozmetik
-│   ├── src/guvenlik_api.rs   # imzalı API istemcisi + canlı testler
-│   ├── src/guvenlik_komut.rs # Tauri güvenlik komutları
-│   ├── src/hesap_yetki.rs    # kozmetik kilidi, çizim izni, ✕ kuralı
-│   ├── src/launcher.rs       # oyun indirme + başlatma motoru
-│   ├── src/yikimpack.rs      # .yikimpack paylaşım biçimi
-│   ├── src/kozmetik_katalog.rs # hesap bazlı kozmetik kataloğu
-│   ├── src/skins.rs          # Skin Merkezi (Mojang + istemci tarafı)
-│   └── src/bellek.rs         # çalışma kümesi boşaltma
-├── ui/                   # TypeScript arayüz (Vite)
-│   └── src/guvenlik.ts   # doğrulama kartı, parola KDF, ✕ yardımcıları
-├── yikim-mod/            # Oyun içi Fabric mod (Java 21)
-│   └── src/main/java/com/yikimlient/client/
-│       ├── YikimBadge.java       # rozet + ✕ glifi
-│       ├── YikimDogrulama.java   # .yikim/dogrulandi bayrağı
-│       ├── YikimKozmetik.java    # görünür kozmetik uygulama
-│       └── YikimKarakter.java    # oyuncunun kendi skini (deri.png)
-├── guvenlik-api/         # Node güvenlik API'si (Cloudflare Worker'a taşınabilir)
-├── bot/                  # Discord bot (/bagla, /sifirla, /ping)
-└── news/                 # imzalı duyuru feed'i
+npm run dist          # src-tauri/target/release/bundle/ altına çıkar
 ```
 
 ---
 
-## 🗺️ Yol Haritası
+## 💾 Veri şeffaflığı
 
-- [x] Hesap şifresi + Discord doğrulama
-- [x] Hesap bazlı kozmetikler + oyun içi ✕
-- [x] Çatlak hesapta istemci tarafı skin
-- [x] Aynı anda birden fazla mod paketi
-- [x] YIKIM pelerin + elitra tasarımları
-- [ ] Güvenlik API'nin Cloudflare Worker'a taşınması (üretim)
-- [ ] Diğer MC sürümlerine mod port'u (1.21.1 – 1.21.10)
-- [ ] Sunucu eklentisi: YIKIM kullanıcı algılama
+**Sunucuya giden veriler** (hesap doğrulama + kozmetik senkronizasyonu için):
+
+| Veri | Neden | Ne kadar |
+|---|---|---|
+| Hesap adı + UUID | Kozmetiklerin hesaba bağlanması | Hesap kaydı |
+| hesap_anahtar (`ms:` / `offline:` + UUID) | Kimlik | Hesap kaydı |
+| Discord kimliği + adın | Doğrulama | Bağlantı kaydı |
+| Şifre türevi (hash) | Giriş | Şifreli (AES-256-GCM) |
+| Cihaz genel anahtarı (Ed25519) | İstek imzası | Kayıt |
+| IP | Yeni cihazdan giriş bildirimi | 7 gün sonra **silinir** |
+
+**Hiç toplanmayanlar:**
+- Düz (okunabilir) şifre — sadece türevi gider
+- Ekran görüntüsü, kamera, mikrofon, dosya erişimi
+- Oyun alışkanlıkları / istatistik — **tamamen yerel** (`sessions.jsonl`), hiçbir yere gönderilmez
+- Reklam, analitik, çerez tanımlama, üçüncü taraf izleme
+
+**İstemcide paylaşılan sır yok.** Her cihaz kendi anahtar çiftini üretir, sunucu yalnız
+genel anahtarı bilir._Kaynak kodaçık — bu tabloyu `src-tauri/src/guvenlik.rs` ve
+`guvenlik-api/src/db.js` içinde teyit edebilirsin.
 
 ---
 
-## 🐞 Sorun Bildir
+## Sürüm çıkarma (geliştirici)
 
-- **GitHub Issues**: https://github.com/YKSAMI1/yikimlient/issues
-- **Log dosyası**: `%APPDATA%\.yikimlient\logs\yikimlient.log`
+```bash
+# 1) Sürümü yükselt: package.json + src-tauri/tauri.conf.json + src-tauri/Cargo.toml
+# 2) İmzalı derleme + latest.json + zorunlu güncelleme eşiği:
+powershell -ExecutionPolicy Bypass -File tools\yayimla.ps1
 
-Her hata bildirimi YIKIMLient'ı herkes için daha iyi yapar! 🔥
+# 3) Çıkan klasörü (yayin/v<sürüm>) GitHub Release'ine yükle
+#    Etiket: v<sürüm>
+```
+`latest.json` içindeki `minimum` alanı **zorunlu güncelleme eşiğini** belirler:
+bu sürümün altındaki bütün launcher'lar güncellemeden çalışmaz.
+
+> `tools/updater-private.key` **ASLA** repoya veya Release'e girmez.
+> Bu anahtar olmadan imzalı yeni sürüm yayınlanamaz — yedeğini sakla.
+
+### Güncelleme zinciri
+```
+v0.8.0 yayınlanır → eski launcher açılışta latest.json'ı okur
+→ "Zorunlu Güncelleme" penceresi (Sonra düğmesi YOK) → indir → kur → yeniden aç
+```
 
 ---
 
-## 📄 Lisans
+## Duyuru yayınlama
 
-Kod MIT. "YIKIMLient" markası ve dokümanlar sahibine aittir.
+Haberler sadece geliştiricinin imzalı feed'inden gelir (Ed25519). İmzasız içerik
+reddedilir; repo ele geçirilse bile sahte duyuru yayınlanamaz.
+
+```bash
+1. news/feed.json dosyasını düzenle
+2. node tools/news-sign.mjs sign
+3. news/feed.json + news/feed.json.sig → https://github.com/YKSAMI1/news reposuna push
+```
+
+---
+
+## Güvenlik API + Bot
+
+Yerel test için:
+```powershell
+cd guvenlik-api; $env:YIKIM_PEPPER = "<16+ karakter>"; $env:YIKIM_ANAHTAR = "<base64 32 bayt>"; npm start
+cd bot;          npm start
+```
+Bot, rol verilme/alınma olaylarını `/api/rol/guncelle` ile API'ye bildirir; böylece
+etiket bırakıldığında çizme izni anında kapanır. Testler:
+```bash
+node --test guvenlik-api/test/api.test.js    # 27 test
+```
+
+---
+
+## Komutlar
+
+| Komut | Anlamı |
+|---|---|
+| `npm run dev` | Geliştirme (Vite + Tauri) |
+| `npm run check` | TypeScript kontrolü |
+| `npm run dist` | İmzasız derleme |
+| `node tools/ui-dist.mjs` | Arayüzü `resources/ui`'ye kopyala |
+| `node tools/bot-zip.mjs` | Bot dağıtım zippi (token hariç) |
+| `node tools/test-paketi.mjs` | Test paketi (bot + API + launcher + mod) |
+| `cargo test --lib --manifest-path src-tauri/Cargo.toml` | Rust testleri |
+
+---
+
+## Sık sorulanlar
+
+**Çatlak hesapla oynayabilir miyim?**
+Evet. Offline (cracked) ve Microsoft hesaplar aynı launcher'da çalışır. Doğrulanmamış
+hesabın adının başında ✕ görünür ve kozmetiklerini değiştiremezsin.
+
+**Hesabımı nasıl doğrularım?**
+[Discord sunucusuna katıl](https://discord.gg/3zTCpMzeNq) → **bot komut kanalına** git →
+launcher'ın verdiği kodu yaz: `/bagla KOD`. Sonra şifreni gir.
+
+**Doğruladım ama kendi pelerinimi çizemiyorum?**
+Discord sunucusundaki YIKIM etiketini ("Yol Silindiri" rolü) taşıman gerekir. Etiketi
+bırakırsan çizme izni otomatik geri alınır.
+
+**Verilerim nerede?**
+Oyun dosyaları ve ayarlar kendi bilgisayarında (`%APPDATA%\.yikimlient`). Sunucuya
+yalnızca doğrulama ve kozmetik senkronizasyonu için gereken veri gider (tablo yukarıda).
+
+**Otomatik güncelleme neden çalışmıyor?**
+Açılışta GitHub Releases'teki `latest.json` okunur. Sunucuya ulaşılamazsa sessizce
+atlanır; elle kurulum daima mümkündür.
+
+---
+
+## Lisans
+
+[LICENSE](LICENSE)
+
+*YIKIMLient bir Minecraft istemcisidir. Mojang ile bağlantısı yoktur; Minecraft Java
+Edition'ın resmî kurallarına uyun.*
