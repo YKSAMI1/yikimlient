@@ -173,12 +173,9 @@ pub fn hesaplari_oku() -> Vec<HesapYetkiKayit> {
     }
 }
 
-/// Bir hesabın kaydını güncelle/ekle (atomik yazma).
-pub fn hesap_kaydet(k: &HesapYetkiKayit) {
-    let mut liste = hesaplari_oku();
-    liste.retain(|x| x.anahtar != k.anahtar);
-    liste.push(k.clone());
-    if let Ok(json) = serde_json::to_string_pretty(&liste) {
+/// Hesap kayıtlarını atomik yaz (yarım dosya asla okunmasın).
+fn hesaplari_yaz(liste: &[HesapYetkiKayit]) {
+    if let Ok(json) = serde_json::to_string_pretty(liste) {
         let _ = std::fs::create_dir_all(guvenlik_dir());
         let yol = hesaplar_yolu();
         let tmp = yol.with_extension("yari");
@@ -186,6 +183,37 @@ pub fn hesap_kaydet(k: &HesapYetkiKayit) {
             let _ = std::fs::rename(&tmp, &yol);
         }
     }
+}
+
+/// Bir hesabın kaydını güncelle/ekle (atomik yazma).
+pub fn hesap_kaydet(k: &HesapYetkiKayit) {
+    let mut liste = hesaplari_oku();
+    liste.retain(|x| x.anahtar != k.anahtar);
+    liste.push(k.clone());
+    hesaplari_yaz(&liste);
+}
+
+/// Yalnız "Yol Silindiri" rolünü yerel kayda yaz (doğrulama durumu ve
+/// kozmetik izni korunur). Kayıt yoksa `false` — rol, hesap bir kez
+/// doğrulandıktan/yeniden giriş yaptıktan sonra kaydedilir.
+///
+/// Rol VERİLİP ALINDIĞINDA da çalışır: hesaplar.json API'dan dönen son
+/// bilinen rolü taşıdığı için kapılar (`cizim_izinli`) çevrimdışıyken de
+/// doğru çalışır. Değer değiştiyse `true` döner.
+pub fn rol_yol_yaz(anahtar: &str, rol: bool) -> bool {
+    let mut liste = hesaplari_oku();
+    let Some(kayit) = liste.iter_mut().find(|k| k.anahtar == anahtar) else {
+        return false;
+    };
+    if kayit.rol_yol == rol {
+        return false;
+    }
+    kayit.rol_yol = rol;
+    kayit.guncellendi = crate::core::now_millis();
+    let yeni = liste.clone();
+    drop(liste);
+    hesaplari_yaz(&yeni);
+    true
 }
 
 /// Hesabın kozmetik deposu: `.yikim/kosmetik/<anahtar>/`
@@ -336,5 +364,47 @@ mod tests {
         assert_eq!(a, "offline_abc");
         assert_eq!(b, "ms_def");
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn rol_yol_yaz_yerel_kaydi_gunceller() {
+        let dir = gecici_dir();
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::env::set_var("YIKIM_APP_DIR", &dir);
+
+        let anahtar = "offline:rol-test";
+        hesap_kaydet(&HesapYetkiKayit {
+            anahtar: anahtar.to_string(),
+            ad: "Test".into(),
+            tur: "cracked".into(),
+            dogrulandi: true,
+            rol_yol: false,
+            kozmetik_serbest: true,
+            sahip_kilidi: false,
+            offline_izin_bitis: 0,
+            guncellendi: 0,
+        });
+        assert!(
+            !crate::hesap_yetki::yerel_yetki(anahtar).rol_yol,
+            "başta rol yok"
+        );
+
+        assert!(rol_yol_yaz(anahtar, true), "rol eklendi");
+        assert!(
+            crate::hesap_yetki::yerel_yetki(anahtar).rol_yol,
+            "yerel kayda rol yazılmalı — aksi hâlde HD fotoğraf/maske yükleme reddedilir"
+        );
+        // Doğrulama durumu korunmalı: rol yazmak hesabı doğrulanmamış yapmaz.
+        assert!(crate::hesap_yetki::yerel_yetki(anahtar).dogrulandi);
+        assert!(crate::hesap_yetki::cizim_izinli(&crate::hesap_yetki::yerel_yetki(anahtar)));
+
+        assert!(!rol_yol_yaz(anahtar, true), "aynı değer tekrar yazılmaz");
+        assert!(rol_yol_yaz(anahtar, false), "rol ALINDIĞINDA da yazılmalı");
+        assert!(!crate::hesap_yetki::yerel_yetki(anahtar).rol_yol);
+
+        // Kaydı olmayan hesap: sessizce geçilir (hata değil)
+        assert!(!rol_yol_yaz("offline:yok", true));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

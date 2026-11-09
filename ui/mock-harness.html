@@ -31,6 +31,17 @@
     var onboarding = q.get("onboarding") === "1";
     var sayfa = q.get("sayfa") || "";
 
+    // Güvenlik durumu — ekran görüntüsü/deneme için URL'den de verilebilir:
+    //   ?gvdog=1&gvrol=1   → doğrulandı + "Yol Silindiri" (tam kozmetik)
+    //   ?gvdog=1&gvrol=0   → doğrulandı, rol yok (kısıtlı görünüm)
+    //   ?gvdog=0           → doğrulanmadı (kısıtlı görünüm)
+    try {
+      if (q.get("gvdog") !== null) sessionStorage.setItem("mock-gv-dogrulandi", q.get("gvdog") === "1" ? "1" : "0");
+      if (q.get("gvrol") !== null) sessionStorage.setItem("mock-gv-rol", q.get("gvrol") === "1" ? "1" : "0");
+      if (q.get("gvbagli") !== null) sessionStorage.setItem("mock-gv-bagli", q.get("gvbagli") === "1" ? "1" : "0");
+      if (q.get("gvdog") === "1" && q.get("gvbagli") === null) sessionStorage.setItem("mock-gv-bagli", "1");
+    } catch (e) {}
+
     /* ---- sahte skin / pelerin dokuları (data: URL) ---- */
     function bosTuval(w, h) {
       var c = document.createElement("canvas");
@@ -313,12 +324,13 @@
       // ---------- güvenlik (mock) ----------
       if (cmd === "cmd_guvenlik_ozet") {
         var gvDog = sessionStorage.getItem("mock-gv-dogrulandi") === "1";
+        var gvRol = sessionStorage.getItem("mock-gv-rol") === "1";
         return Promise.resolve({
           hesaplar: (state.accounts || []).map(function (a) {
             return {
               id: a.id, anahtar: (a.kind === "microsoft" ? "ms:" : "offline:") + a.uuid,
-              ad: a.name, dogrulandi: gvDog, rol_yol: gvDog, carpi: !gvDog,
-              kozmetik_serbest: gvDog, cizim_serbest: gvDog,
+              ad: a.name, dogrulandi: gvDog, rol_yol: gvDog && gvRol, carpi: !gvDog,
+              kozmetik_serbest: gvDog, cizim_serbest: gvDog && gvRol,
             };
           }),
         });
@@ -326,6 +338,7 @@
       if (cmd === "cmd_guvenlik_durum") {
         var gvBagli = sessionStorage.getItem("mock-gv-bagli") === "1";
         var gvDog2 = sessionStorage.getItem("mock-gv-dogrulandi") === "1";
+        var gvRol2 = sessionStorage.getItem("mock-gv-rol") === "1";
         var gvKapali = sessionStorage.getItem("mock-gv-kapali") === "1";
         var gvAcc = state.accounts && state.accounts[0];
         return Promise.resolve({
@@ -333,8 +346,8 @@
           bot_acik: !gvKapali && gvBagli, sunucu_anahtar: "mock",
           hesap: gvAcc ? { anahtar: (gvAcc.kind === "microsoft" ? "ms:" : "offline:") + gvAcc.uuid, ad: gvAcc.name, tur: gvAcc.kind, uuid: gvAcc.uuid } : null,
           baglandi: gvBagli, dogrulandi: gvDog2, discord_ad: gvBagli ? "sami" : "", neden: gvBagli ? "" : "baglanti_yok",
-          yetki: { dogrulandi: gvDog2, rol_yol: gvDog2, sahip_kilidi: false },
-          kozmetik_serbest: gvDog2, cizim_serbest: gvDog2, carpi: !gvDog2,
+          yetki: { dogrulandi: gvDog2, rol_yol: gvDog2 && gvRol2, sahip_kilidi: false },
+          kozmetik_serbest: gvDog2, cizim_serbest: gvDog2 && gvRol2, carpi: !gvDog2,
         });
       }
       if (cmd === "cmd_guvenlik_baglama_kod") return Promise.resolve({ kod: "K7M2P9QX", kalan_sn: 600 });
@@ -349,7 +362,7 @@
       }
       if (cmd === "cmd_guvenlik_giris") {
         sessionStorage.setItem("mock-gv-dogrulandi", "1");
-        return Promise.resolve({ dogrulandi: true, rol_yol: false, yetki_bitis: Date.now() + 604800000 });
+        return Promise.resolve({ dogrulandi: true, rol_yol: sessionStorage.getItem("mock-gv-rol") === "1", yetki_bitis: Date.now() + 604800000 });
       }
       if (cmd === "cmd_guvenlik_sifirla") {
         sessionStorage.setItem("mock-gv-dogrulandi", "1");

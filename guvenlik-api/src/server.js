@@ -292,6 +292,16 @@ async function girisDogrula(is, yanit, govde, cihaz) {
   });
 }
 
+async function rolGuncelle(yanit, icerik) {
+  const { discord_id, rol_yol } = icerik;
+  if (!discord_id || typeof discord_id !== "string") {
+    return hata(yanit, 400, "discord_id eksik");
+  }
+  db.rolYazDiscord(discord_id, !!rol_yol);
+  db.olayKaydet(!!rol_yol ? "rol_verildi" : "rol_alindi", null, null, `discord ${discord_id} rol_yol=${!!rol_yol}`);
+  json(yanit, 200, { tamam: true, discord_id, rol_yol: !!rol_yol });
+}
+
 async function olayKaydet(is, yanit, govde, cihaz) {
   const { ip: ipv4 } = govde.govde ?? govde ?? {};
   if (!ipv4) return hata(yanit, 400, "ip eksik");
@@ -350,6 +360,10 @@ export function handle(is, yanit) {
   if (url === "/api/sifirla/iste") {
     if (!botMu(is)) return hata(yanit, 401, "bot anahtari gecersiz");
     return govdeOku(is, (icerik) => yurut(yanit, () => sifirlaKod(yanit, icerik)));
+  }
+  if (url === "/api/rol/guncelle") {
+    if (!botMu(is)) return hata(yanit, 401, "bot anahtari gecersiz");
+    return govdeOku(is, (icerik) => yurut(yanit, () => rolGuncelle(yanit, icerik)));
   }
 
   const hedef = CIHAZ_YOLLARI[url];

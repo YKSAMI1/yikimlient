@@ -377,8 +377,10 @@ pub async fn cmd_kozmetik_kaydet(
     pelerin: Option<Vec<String>>,
     kanat: Option<Vec<String>>,
 ) -> Result<serde_json::Value, String> {
-let (hesap_anahtari, _tur) = kozmetik_cizim_kapisi()?;
-    let (hesap_anahtari, _tur) = kozmetik_yetki_kapisi()?;
+    // Rol Discord'da yeni verilmiş/alınmış olabilir: kapı SUNUCU yetkisine
+    // bakmalı (yerel kayıt eskimiş kalırsa yükleme reddediliyordu).
+    crate::guvenlik_komut::rol_tazele().await;
+    let (hesap_anahtari, _tur) = kozmetik_cizim_kapisi()?;
     let var_mi = |liste: &Option<Vec<String>>| -> bool {
         liste
             .as_ref()
@@ -490,8 +492,9 @@ pub async fn cmd_kozmetik_fotograf(
     png: String,
     duz: Option<bool>,
 ) -> Result<serde_json::Value, String> {
-let (hesap_anahtari, _tur) = kozmetik_cizim_kapisi()?;
-    let (hesap_anahtari, _tur) = kozmetik_yetki_kapisi()?;
+    // HD fotoğraf / maske yükleme de çizim kapısı: rolü sunucudan tazele.
+    crate::guvenlik_komut::rol_tazele().await;
+    let (hesap_anahtari, _tur) = kozmetik_cizim_kapisi()?;
     let _duz = duz.unwrap_or(false);
     let ad = match tur.as_str() {
         "pelerin" => "pelerin.png",
@@ -632,12 +635,13 @@ pub fn cmd_kozm_katalog() -> Result<serde_json::Value, String> {
 /// (oyunda vanilla/Mojang görünümü kalır; Mojang pelerini SEÇİLİ kalır).
 #[tauri::command]
 pub async fn cmd_kozm_sec(tur: String, id: Option<String>) -> Result<serde_json::Value, String> {
-    // Katalogdan seçim = çizim izni (rol) ister.
-    let (hesap_anahtari, _tur) = kozmetik_cizim_kapisi()?;
+    // Kapatma yalnız kozmetik izni ister; başka kayıt GİYMEK "Yol Silindiri"
+    // rolü ister (aşağıda ayrı kontrol).
+    crate::guvenlik_komut::rol_tazele().await;
+    let (hesap_anahtari, _tur) = kozmetik_yetki_kapisi()?;
     if !crate::kozmetik_katalog::gecerli_tur(&tur) {
         return Err("bilinmeyen kozmetik türü".into());
     }
-    let (hesap_anahtari, _tur) = kozmetik_yetki_kapisi()?;
     let dosya = if tur == crate::kozmetik_katalog::PELERIN {
         "pelerin.png"
     } else {
@@ -645,9 +649,19 @@ pub async fn cmd_kozm_sec(tur: String, id: Option<String>) -> Result<serde_json:
     };
     let secili = id.as_deref().map(str::trim).filter(|s| !s.is_empty());
 
+    // "KAPAT" (kayıt seçmeden boşaltma) yalnız kozmetik izni ister: rolü
+    // olmayan hesap taşıdığı YIKIM kozmetiğini kapatabilir. Baska bir kaydı
+    // GIYMEK ise çizim kapısı (Yol Silindiri) ister.
     let mut kucuk = String::new();
     match secili {
         Some(kid) => {
+            // Baska bir kaydı GİYMEK çizme kapısı: "Yol Silindiri" rolü.
+            if !crate::hesap_yetki::cizim_izinli(&crate::hesap_yetki::yerel_yetki(&hesap_anahtari)) {
+                return Err(
+                    "rol_yok: katalogdan baska bir kozmetik giymek icin 'Yol Silindiri' rolu gerekir"
+                        .into(),
+                );
+            }
             let png = crate::kozmetik_katalog::icerik(&tur, kid).ok_or("kayıt bulunamadı")?;
             // Önce "kapalı" işaretini kaldır, sonra yaz (tum_kurulumlara_yaz
             // pasifken kurulumlara yazmıyor).

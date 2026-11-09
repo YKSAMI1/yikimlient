@@ -5,6 +5,7 @@ const path = require('path');
 const config = require('./config.js');
 const { resolveToken } = require('./utils/token');
 const api = require('./utils/api');
+const { rolDurumlariniSenkron } = require('./utils/rol-senkron');
 const {
   rejectUnauthorizedGuild,
   installProcessGuards,
@@ -252,6 +253,15 @@ async function hazirCalistir(kaynak, client) {
     logger.info(`Güvenlik API: ${api.adres()}`);
   } else {
     logger.warn('YIKIM_BOT_ANAHTARI tanımlı değil - güvenlik API çağrıları kapalı.');
+  }
+
+  // ---- rol senkronu ("Yol Silindiri") ----
+  // Rol verilmiş/alınmış ama API'ye hiç bildirilmemiş olabilir. Bot her
+  // açılışta sunucudaki gerçek rol durumunu API'ye yazar; launcher çizme
+  // izni bu bilgiye bakar (HD fotoğraf/maske yükleme bununla açılır).
+  const rolId = (process.env.ROLE_YOL_ID || process.env.ROLE_ID || '').trim();
+  if (rolId) {
+    await rolDurumlariniSenkron(client, db, logger, config, rolId);
   }
 
   // ---- kozmetik duyurusu ----

@@ -82,6 +82,17 @@ function sifirlaKodIste({ hesapAd, hesapAnahtar, discordId }) {
   });
 }
 
+/**
+ * "Yol Silindiri" rolünün verildi/alındığını API'ye bildir.
+ * API, bağlı TÜM hesapların rolünü günceller → launcher çizme izni takip eder.
+ */
+function rolGuncelle({ discordId, rolYol = false }) {
+  return cagir('/api/rol/guncelle', {
+    discord_id: discordId,
+    rol_yol: !!rolYol,
+  });
+}
+
 module.exports = {
   adres,
   hazirMi,
@@ -89,4 +100,5 @@ module.exports = {
   ping,
   bagla,
   sifirlaKodIste,
+  rolGuncelle,
 };

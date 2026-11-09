@@ -2,6 +2,7 @@ const {
   Colors,
   userMention,
 } = require('discord.js');
+const { rolDurumuBildir } = require('../utils/rol-senkron');
 const {
   isUserOnCooldown,
   isAllowedGuild,
@@ -69,6 +70,11 @@ module.exports = {
         return;
       }
 
+      // Yol rolü değiştiyse API'ye bildir (verildi/alındı) — launcher kapısı
+      // bu bilgiye bakar.
+      const rolVar = !!(role?.id && member?.roles.cache.has(role.id));
+      await rolDurumuBildir(userId, rolVar, db, logger);
+
       const guildId = pkg.d.user?.primary_guild?.identity_guild_id;
       const badgeId = pkg.d.user?.primary_guild?.badge;
       const badgeImage = badgeId
@@ -83,6 +89,7 @@ module.exports = {
         try {
           if (role?.id && member && !member.roles.cache.has(role.id)) {
             await member.roles.add(role.id);
+            db.set(`rol.${userId}`, true);
           }
         } catch (error) {
           logger.error(`Rol verilirken hata: ${error.message}`);
@@ -118,10 +125,15 @@ module.exports = {
         try {
           if (role?.id && member?.roles.cache.has(role.id)) {
             await member.roles.remove(role.id);
+            db.set(`rol.${userId}`, false);
           }
         } catch (error) {
           logger.error(`Rol kaldırılırken hata: ${error.message}`);
         }
+
+        // Etiket bırakıldı = rol gitti: API'ye de bildir, launcher çizme
+        // iznini kaldırır.
+        await rolDurumuBildir(userId, false, db, logger);
 
         try {
           const embed = BaseEmbed()

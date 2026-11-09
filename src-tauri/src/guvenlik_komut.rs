@@ -29,6 +29,28 @@ pub fn secili_hesap() -> Option<HesapKimlik> {
     })
 }
 
+/// Çizme/katalog kapısı ÖNCESİ rolü sunucudan tazele.
+///
+/// Rol Discord'da verilip alınabilir: bot rol değişimini API'ye yazar, ama
+/// launcher açıkken bunu duymaz. Bu yüzden HD fotoğraf / maske yükleme ve
+/// katalog seçimi gibi kapılar, yerel kayda değil SUNUCUNUN rolüne bakar
+/// (ulaşılamazsa yerel kayıt korunur — oyun ve mevcut kozmetik devam eder).
+pub async fn rol_tazele() {
+    let Some(h) = secili_hesap() else {
+        return;
+    };
+    let Ok(v) = guvenlik_api::api_cagir::<serde_json::Value>(
+        "/api/baglama/durum",
+        json!({ "hesap_anahtar": h.anahtar }),
+    )
+    .await
+    else {
+        return;
+    };
+    let rol = v.get("rol_yol").and_then(|x| x.as_bool()).unwrap_or(false);
+    let _ = guvenlik::rol_yol_yaz(&h.anahtar, rol);
+}
+
 /// Yerel yetki kaydını API yanıtından güncelle.
 fn yerel_kaydet(h: &HesapKimlik, dogrulandi: bool, rol_yol: bool, bitis: i64) {
     guvenlik::hesap_kaydet(&guvenlik::HesapYetkiKayit {
@@ -63,12 +85,22 @@ pub async fn cmd_guvenlik_durum() -> Result<serde_json::Value, String> {
             .to_string();
     }
 
+    let yerel = hesap
+        .as_ref()
+        .map(|h| hesap_yetki::yerel_yetki(&h.anahtar))
+        .unwrap_or_default();
+
     let mut baglandi = false;
     let mut discord_ad = String::new();
-    let mut rol_yol = false;
+    // Rol bilgisi API'den UZAKTAN yetkilidir: sunucuya ulaşılıyorsa yerel
+    // kayıt "rol var" dese bile, rol oyuncu arasında kaldırılmış olabileceği
+    // gibi, API'nin döndürdüğü değer geçerlidir ve diske yazılır (HD fotoğraf /
+    // maske yükleme bu kapıya bakıyor — eskiden rol yalnızca girişte
+    // kaydedildiği için "rol var ama yükleme reddediliyor" durumu çıkıyordu).
+    let mut rol_yol = yerel.rol_yol;
     let mut neden = String::new();
 
-    // Bağlantı durumunu API'den tazele (ulaşılamazsa yerel kayıt kullanılır)
+    // Bağlantı/rol durumunu API'den tazele (ulaşılamazsa yerel kayıt korunur)
     if api_acik {
         if let Some(h) = hesap.as_ref() {
             if let Ok(v) = guvenlik_api::api_cagir::<serde_json::Value>(
@@ -84,14 +116,13 @@ pub async fn cmd_guvenlik_durum() -> Result<serde_json::Value, String> {
                     .and_then(|x| x.as_str())
                     .unwrap_or_default()
                     .to_string();
+                // Rol değiştiyse (verildi / kaldırıldı) yerel kaydı güncelle.
+                if yerel.rol_yol != rol_yol {
+                    guvenlik::rol_yol_yaz(&h.anahtar, rol_yol);
+                }
             }
         }
     }
-
-    let yerel = hesap
-        .as_ref()
-        .map(|h| hesap_yetki::yerel_yetki(&h.anahtar))
-        .unwrap_or_default();
 
     // Bağlantı varsa ama şifre yoksa kozmetik kapalı kalır: giriş yapılmadıysa
     // `dogrulandi` yalnızca yerel kayıttan gelir.
@@ -107,7 +138,7 @@ pub async fn cmd_guvenlik_durum() -> Result<serde_json::Value, String> {
         ad: yerel.ad.clone(),
         tur: yerel.tur.clone(),
         dogrulandi,
-        rol_yol: rol_yol || yerel.rol_yol,
+        rol_yol,
         kozmetik_serbest: dogrulandi,
         offline_izin_bitis: yerel.offline_izin_bitis,
         sahip_kilidi: yerel.sahip_kilidi,

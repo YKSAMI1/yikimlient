@@ -1354,6 +1354,17 @@ input.search-in.input, .search-in.input {
 .kozmetik-sayfa.cizim3d .kz-oniz3d { position: static; }
 .kozmetik-sayfa.cizim3d .kz-oniz3d canvas { height: min(66vh, 560px); }
 
+/* Kısıtlı kozmetik görünümü (doğrulanmadı / "Yol Silindiri" rolü yok):
+   editör ve fotoğraf yükleme kapalı — yalnız 3B önizleme, pelerin/elitra
+   seçimi (sekmeler) ve aç/kapa anahtarları kalır. */
+.kozmetik-sayfa.kz-kisitli .kz-kartlar { display: none; }
+.kozmetik-sayfa.kz-kisitli .kz-yerlesim { grid-template-columns: minmax(0, 1fr); }
+.kozmetik-sayfa.kz-kisitli .kz-oniz3d { position: static; }
+.kozmetik-sayfa.kz-kisitli .kz-oniz3d canvas { height: min(56vh, 460px); }
+.kozmetik-sayfa.kz-kisitli .kz-cizim-arac,
+.kozmetik-sayfa.kz-kisitli .kz-alt { display: none; }
+.kozmetik-sayfa.kz-kisitli .kz-sekme-sag { color: var(--text-dim); }
+
 @media (max-width: 1120px) {
   .kz-calisma { grid-template-columns: minmax(0, 1fr); }
   .kz-arac-panel { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
@@ -1674,6 +1685,12 @@ input.search-in.input, .search-in.input {
   border: 1px solid rgba(255, 92, 92, 0.35);
   border-radius: 10px; padding: 10px 14px; margin-bottom: 14px;
 }
+/* "Yol Silindiri" rolü bekleniyor: kırmızı yerine sarı/turuncu uyarı */
+.kz-kilit.kz-kilit-rol {
+  background: rgba(255, 176, 32, 0.09);
+  border-color: rgba(255, 176, 32, 0.4);
+}
+.kz-kilit.kz-kilit-rol small { color: var(--text-dim); }
 .kz-kilit > div { flex: 1; }
 .kz-kilit b { font-size: 13px; }
 .kz-kilit small { display: block; color: var(--text-dim); font-size: 11.5px; margin-top: 2px; line-height: 1.45; }

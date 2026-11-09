@@ -686,6 +686,8 @@ h1 {
 }
 .steps h3 { margin: 0 0 7px; font-size: 1.02rem; font-weight: 700; }
 .steps p { margin: 0; font-size: 0.89rem; color: var(--txt-dim); line-height: 1.62; }
+.steps p a, .faq p a { color: var(--accent-2); text-decoration: underline; text-underline-offset: 2px; }
+.steps p a:hover, .faq p a:hover { color: var(--accent); }
 
 /* ---------- sss ---------- */
 .faq { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }

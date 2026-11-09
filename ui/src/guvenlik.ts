@@ -11,6 +11,9 @@
    ============================================================ */
 import { currentAccount, invoke, openExternal, openModal, state, toast } from "./main";
 
+/** Topluluk Discord sunucusu — doğrulama burada yapılır. */
+export const DISCORD_DAVET = "https://discord.gg/3zTCpMzeNq";
+
 /** Launcher'ın bildiği hesap doğrulama özeti (yerel kayıttan, çevrimdışı güvenli). */
 export interface HesapGuvenlik {
   id: string;
@@ -50,6 +53,70 @@ export async function guvenlikOzetYukle(zorla = false): Promise<void> {
 
 export function hesapDogrulandi(accId: string): boolean {
   return ozet[accId]?.dogrulandi ?? false;
+}
+
+/** Hesabın "Yol Silindiri" rolü var mı? (özel pelerin/elitra çizme izni) */
+export function hesapRolYol(accId: string): boolean {
+  return ozet[accId]?.rol_yol ?? false;
+}
+
+/** Kozmetik değiştirme izni (doğrulandı + sunucu kilidi kapalı). */
+export function hesapKozmetikSerbest(accId: string): boolean {
+  return ozet[accId]?.kozmetik_serbest ?? false;
+}
+
+/** Kozmetik sayfası için yetki özeti — "kısıtlı görünüm" kararı bundan çıkar. */
+export interface KozmetikErisim {
+  cizimSerbest: boolean;
+  dogrulandi: boolean;
+  rolYol: boolean;
+}
+
+/**
+ * Seçili hesabın rol/doğrulama durumunu SUNUCU yetkisine göre tazele.
+ *
+ * `cmd_guvenlik_durum` rolü API'den sorar ve yerel kayda yazar; bu çağrı
+ * yapılmadan kozmetik sayfasında yükleme düğmeleri eski (yetkisiz) durumda
+ * kalıyordu — HD fotoğraf ve maske yükleme bu yüzden reddediliyordu.
+ */
+export async function guvenlikYetkiTazele(): Promise<KozmetikErisim | null> {
+  let d: any = null;
+  try {
+    d = await invoke("cmd_guvenlik_durum");
+  } catch {
+    return null;
+  }
+  const anahtar: string = d?.hesap?.anahtar ?? "";
+  const accId = state.accounts?.find((a) => hesapAnahtar(a) === anahtar)?.id;
+  const erisim: KozmetikErisim | null = accId
+    ? {
+        cizimSerbest: !!d?.cizim_serbest,
+        dogrulandi: !!d?.dogrulandi,
+        rolYol: !!d?.yetki?.rol_yol,
+      }
+    : null;
+  if (!accId) return erisim;
+  const eski = ozet[accId];
+  ozet[accId] = {
+    id: accId,
+    anahtar,
+    ad: String(d?.hesap?.ad ?? eski?.ad ?? ""),
+    dogrulandi: !!d?.dogrulandi,
+    rol_yol: !!d?.yetki?.rol_yol,
+    carpi: !!d?.carpi,
+    kozmetik_serbest: !!d?.kozmetik_serbest,
+    cizim_serbest: !!d?.cizim_serbest,
+  };
+  ozetZaman = Date.now();
+  return erisim;
+}
+
+/** Hesap listesindeki kayıttan yerel güvenlik anahtarını üret. */
+function hesapAnahtar(acc: { id: string; uuid?: string; kind?: string; name?: string }): string {
+  // Launcher içindeki anahtar üretimi Rust ile aynı: ms:<uuid> / offline:<uuid>
+  const tur = acc.kind === "microsoft" ? "ms" : "offline";
+  const uuid = acc.uuid || "";
+  return uuid ? `${tur}:${uuid}` : `${tur}:${(acc.name || acc.id).toLowerCase()}`;
 }
 
 /** Hesap adının başına konan ✕ işareti (doğrulanmamış hesap). */
@@ -141,13 +208,17 @@ export async function guvenlikKartiCiz(host: HTMLElement): Promise<void> {
       "ok",
       `Doğrulandı${d.discord_ad ? ` · ${d.discord_ad}` : ""}`,
       d.yetki?.rol_yol
-        ? "Kendi pelerin/elitranı çizebilirsin (Yol Silindiri)."
-        : "Kozmetik ve skin değiştirme açık.",
+        ? "Kendi pelerin/elitranı çizebilir, fotoğraf (HD) ve maske yükleyebilirsin (Yol Silindiri)."
+        : "Kozmetik ve skin değiştirme açık. Kendi tasarımını çizmek için Discord sunucusundaki YIKIM etiketi (\"Yol Silindiri\" rolü) gerekir — etiketi bırakırsan çizme izni kendiliğinden kapanır.",
     );
   } else if (d.baglandi) {
     durum = durumSatiri("uyari", "Discord bağlı — şifre eksik", "Şifre oluştur, kozmetiklerin hesabına bağlansın.");
   } else {
-    durum = durumSatiri("uyari", "Hesap doğrulanmadı", "Oynayabilirsin; kozmetik değiştirmek için doğrula.");
+    durum = durumSatiri(
+      "uyari",
+      "Hesap doğrulanmadı",
+      "Oynayabilirsin; kozmetik değiştirmek için Discord'da doğrula.",
+    );
   }
 
   // ---- Gövde: duruma göre adımlar
@@ -156,8 +227,19 @@ export async function guvenlikKartiCiz(host: HTMLElement): Promise<void> {
   if (d.api_acik && hesapVar && !d.baglandi) {
     govde += `
       <div class="gv-adim">
-        <div class="gv-adim-bas"><span class="gv-no">1</span><b>Discord hesabını bağla</b></div>
-        <p class="gv-mini">Aşağıdaki kodu Discord'da bota yaz: <code>/bagla KOD</code></p>
+        <div class="gv-adim-bas"><span class="gv-no">1</span><b>Discord sunucusuna katıl</b></div>
+        <p class="gv-mini">
+          Doğrulama Discord üzerinden yapılır. Sunucuya katıl, <b>bot komut kanalına</b> git ve
+          aşağıdaki kodu oraya yaz. Bot nerede diye arama — komut kanalı sunucunun en üstünde.
+        </p>
+        <div class="gv-alt-satir" style="margin:10px 0 4px">
+          <button class="btn ghost sm" id="gv-discord">Discord sunucusuna katıl ↗</button>
+          <span class="gv-mini" style="margin:0">discord.gg/3zTCpMzeNq</span>
+        </div>
+      </div>
+      <div class="gv-adim">
+        <div class="gv-adim-bas"><span class="gv-no">2</span><b>Hesabını bağla</b></div>
+        <p class="gv-mini">Kodu al, sonra bot komut kanalında yaz: <code>/bagla KOD</code></p>
         <div class="gv-kod-satir">
           <div class="gv-kod" id="gv-kod">···</div>
           <button class="btn primary sm" id="gv-kod-al">Kod al</button>
@@ -171,7 +253,7 @@ export async function guvenlikKartiCiz(host: HTMLElement): Promise<void> {
   if (d.api_acik && hesapVar && d.baglandi && !d.dogrulandi) {
     govde += `
       <div class="gv-adim">
-        <div class="gv-adim-bas"><span class="gv-no">2</span><b>Şifre oluştur</b></div>
+        <div class="gv-adim-bas"><span class="gv-no">3</span><b>Şifre oluştur</b></div>
         <p class="gv-mini">Bu şifre hesabını korur; her cihazda aynı şifreyle doğrulanırsın.</p>
         <div class="gv-izgara">
           ${sifreAlani("gv-p1", "Yeni şifre")}
@@ -271,6 +353,7 @@ export async function guvenlikKartiCiz(host: HTMLElement): Promise<void> {
   };
 
   host.querySelector("#gv-kontrol")?.addEventListener("click", () => void kontrol(false));
+  host.querySelector("#gv-discord")?.addEventListener("click", () => discordAc());
 
   host.querySelector("#gv-parola-kur")?.addEventListener("click", async () => {
     const p1 = host.querySelector<HTMLInputElement>("#gv-p1")?.value || "";
@@ -305,7 +388,7 @@ export async function guvenlikKartiCiz(host: HTMLElement): Promise<void> {
 function sifirlaModalAc(host: HTMLElement): void {
   const m = openModal(`
     <h2>Şifremi unuttum</h2>
-    <div class="sub">Discord'da <code>/sifirla</code> yaz; bot sana tek seferlik kod gönderir.</div>
+    <div class="sub">Sunucudaki <b>bot komut kanalında</b> <code>/sifirla</code> yaz; bot sana tek seferlik kod gönderir.</div>
     <div style="display:flex; flex-direction:column; gap:12px; margin-top:14px">
       <div>
         <label class="gv-etiket" for="gv-sif-kod">Kod</label>
@@ -344,7 +427,7 @@ function sifirlaModalAc(host: HTMLElement): void {
 
 /** Discord davet bağlantısını dış tarayıcıda aç (panellerde kullanılır). */
 export function discordAc(): void {
-  void openExternal("https://discord.gg/").catch(() => {});
+  void openExternal(DISCORD_DAVET).catch(() => toast("Discord açılamadı", "err"));
 }
 
 /** Hesap durumunu tek satırda özetle (onboarding vb.). */

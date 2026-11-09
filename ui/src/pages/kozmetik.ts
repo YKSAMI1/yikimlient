@@ -11,7 +11,15 @@
 // "3D Çiz" ile doğrudan modelin her yüzüne boyanır; "2D'ye geç" ile dönülür.
 
 import { currentAccount, fileSrc, icon, invoke, navigate, toast } from "../main";
-import { hesapDogrulandi } from "../guvenlik";
+import {
+  discordAc,
+  guvenlikOzetYukle,
+  guvenlikYetkiTazele,
+  hesapDogrulandi,
+  hesapKozmetikSerbest,
+  hesapRolYol,
+  type KozmetikErisim,
+} from "../guvenlik";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import {
   ATLAS_PIKSEL,
@@ -160,32 +168,89 @@ export function renderKozmetik(root: HTMLElement): void {
   kanatOnizleme = null;
   vurgular.clear();
   root.innerHTML = iskelet();
-  kozmetikKilidiCiz(root);
+  kozmetikKisitliCiz(root);
+  // Yerel bilgiyle ANINDA karar verilir, sonra sunucudaki rol/doğrulama
+  // durumu tazelenir (rol yeni verildiyse kısıtlı görünüm kalkar).
+  void yetkiTazele(root);
   void yukle(root);
 }
 
-/// Doğrulanmamış hesapta kozmetik kaydı kilitli: çizmek serbest, kaydetmek
-/// değil. Uyarı şeridi + kaydet düğmeleri kapalı (tasarım §9).
-function kozmetikKilidiCiz(root: HTMLElement): void {
+/** Kozmetik sayfasındaki erişim düzeyi. */
+type Erisim = "tam" | "dogrulanmamis" | "rol_yok";
+
+/** Yerel bilgiden erişim düzeyi: bilgi yoksa KISITLI (güvenli taraf). */
+function kozmetikErisim(): Erisim {
   const acc = currentAccount();
-  if (!acc || hesapDogrulandi(acc.id)) return;
+  if (!acc) return "dogrulanmamis";
+  if (!hesapDogrulandi(acc.id) || !hesapKozmetikSerbest(acc.id)) return "dogrulanmamis";
+  if (!hesapRolYol(acc.id)) return "rol_yok";
+  return "tam";
+}
+
+/**
+ * Kısıtlı görünüm (tasarım §9 / Yol Silindiri kuralı).
+ *
+ *  - Doğrulanmamış hesap: editör ve fotoğraf yükleme YOK. Yalnız 3B önizleme,
+ *    pelerin/elitra seçimi ve aç/kapa anahtarları kalır.
+ *  - Doğrulandı ama "Yol Silindiri" rolü yok: kendi tasarımını çizemez ve
+ *    katalogdaki başka kayıtları seçemez — yalnız varsayılan YIKIM pelerin/
+ *    elitrasını açıp kapatır.
+ *
+ * Sunucu yetkisi (`guvenlikYetkiTazele`) sonraki tazelemede gelince görünüm
+ * güncellenir — bu yüzden her açılışta sunucu sorulur.
+ */
+function kozmetikKisitliCiz(root: HTMLElement, erisimOverride?: Erisim): void {
+  const erisim = erisimOverride ?? kozmetikErisim();
+  const kisitli = erisim !== "tam";
+  const sayfa = root.querySelector<HTMLElement>("#kz-sayfa");
+  sayfa?.classList.toggle("kz-kisitli", kisitli);
+  // Sağ üstteki çizim ipucu kısıtlı görünümde yanıltıcı olmasın.
+  const ipucu = root.querySelector<HTMLElement>("#kz-sekme-ipucu");
+  if (ipucu) {
+    if (kisitli) ipucu.textContent = "Bu sayfada yalnız önizleme ve aç/kapa var";
+    else ipucu.textContent = "Atlasta ya da 3D modelin üstünde çiz";
+  }
+  root.querySelector("#kz-kisitli")?.remove();
+  if (erisim === "tam") return;
+
   const bas = root.querySelector(".page-header");
   if (!bas) return;
   const kutu = document.createElement("div");
-  kutu.className = "kz-kilit";
-  kutu.innerHTML = `<span class="gv-carpi">✕</span>
-    <div><b>Kozmetikler kilitli</b>
-    <small>Çizebilirsin ama kaydetmek için hesabını doğrula. Doğrulanmayan hesapta tasarım yalnız bu cihazda kalır.</small></div>
-    <button class="btn primary sm" id="kz-dogrula">Doğrula</button>`;
-  bas.after(kutu);
-  kutu.querySelector("#kz-dogrula")?.addEventListener("click", () => navigate("settings"));
-  for (const tur of ["pelerin", "kanat"]) {
-    const b = root.querySelector<HTMLButtonElement>(`#kz-${tur}-kaydet`);
-    if (b) {
-      b.disabled = true;
-      b.title = "Önce hesabını doğrula (Ayarlar → Güvenlik)";
-    }
+  kutu.id = "kz-kisitli";
+  kutu.className = "kz-kilit" + (erisim === "rol_yok" ? " kz-kilit-rol" : "");
+  if (erisim === "dogrulanmamis") {
+    kutu.innerHTML = `<span class="gv-carpi">✕</span>
+      <div><b>Kozmetikler kilitli</b>
+      <small>Pelerinini/elitranı çizebilmen ve fotoğraf yükleyebilmen için hesabını doğrula.
+         Bu sayfada yalnız önizleme, pelerin/elitra seçimi ve aç/kapa anahtarları var.</small></div>
+      <button class="btn primary sm" id="kz-kisitli-eski">Doğrula</button>`;
+  } else {
+    kutu.innerHTML = `<span aria-hidden="true">🔒</span>
+      <div><b>Kendi tasarımını çizmek için "Yol Silindiri" rolü gerekir</b>
+      <small>Discord sunucusundaki YIKIM etiketini/rolünü al; rolü taşıdığın sürece kendi pelerin ve
+         elitranı çizebilir, fotoğraf (HD) ve maske yükleyebilirsin. Etiketi bırakırsan çizme izni
+         otomatik geri alınır — bu sayfada yalnız aç/kapa kalır.</small></div>
+      <button class="btn ghost sm" id="kz-kisitli-eski">Discord'a katıl ↗</button>`;
   }
+  bas.after(kutu);
+  root.querySelector<HTMLButtonElement>("#kz-kisitli-eski")?.addEventListener("click", () => {
+    if (erisim === "dogrulanmamis") navigate("settings");
+    else discordAc();
+  });
+}
+
+/** Sunucudan güncel rol/doğrulama durumunu çek ve kısıtlı görünümü tazele. */
+async function yetkiTazele(root: HTMLElement): Promise<void> {
+  await guvenlikOzetYukle(true);
+  const taze: KozmetikErisim | null = await guvenlikYetkiTazele();
+  const erisim: Erisim = !taze
+    ? kozmetikErisim()
+    : !taze.dogrulandi
+      ? "dogrulanmamis"
+      : taze.cizimSerbest
+        ? "tam"
+        : "rol_yok";
+  kozmetikKisitliCiz(root, erisim);
 }
 
 function iskelet(): string {

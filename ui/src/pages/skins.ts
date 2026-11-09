@@ -5,6 +5,7 @@
 // Pelerin kartına tıklandığında anında uygulanır (geri alınabilir).
 
 import { currentAccount, fileSrc, icon, invoke, navigate, openLoginModal, openModal, toast } from "../main";
+import { hesapDogrulandi, hesapRolYol } from "../guvenlik";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import { PikselPafta } from "../sahne/piksel-pafta";
 import { PELERIN_DIS, PELERIN_IC } from "../sahne/skin-bolgeler";
@@ -102,7 +103,7 @@ function kapiCiz(root: HTMLElement, yerel: boolean): void {
     <div class="page-wrap skin-kapi-sar">
       <div class="skin-kapi">
         <div class="skin-kapi-ikon">${icon("lock")}</div>
-        <h1>${yerel ? "Çatlak hesap · yerel skin" : "Orijinal hesap ile girmen lazım"}</h1>
+        <h1>${yerel ? "Offline (cracked) hesap · yerel skin" : "Orijinal hesap ile girmen lazım"}</h1>
         <p>${yerel
           ? "Skinini çizebilir ve bu bilgisayarda giyebilirsin. Sunucularda başkalarına görünmesi için Microsoft hesabı gerekir."
           : "Skin değiştirmek ve pelerin takmak için Microsoft hesabı gerekir."}</p>
@@ -142,7 +143,7 @@ function iskelet(ad: string, yerel: boolean): string {
         <div>
           <h1>Skin Merkezi</h1>
           <p class="sub">${yerel
-            ? "Çatlak hesap — skin yalnız bu bilgisayarda görünür."
+            ? "Offline (cracked) hesap — skin yalnız bu bilgisayarda görünür."
             : "Skinlerini seç, giy; pelerinini tak. Giyilen skin sunucularda görünür."}</p>
         </div>
         <div class="skin-ust-aksiyon">
@@ -390,6 +391,29 @@ function ciz(root: HTMLElement): void {
 
   pelerinSeritCiz(root);
   kozCiz(root);
+
+  // "Yol Silindiri" rolü olmayan hesap katalogdan BAŞKA kayıt giyemez
+  // (yalnız aç/kapa). Rust kapısı da aynı kuralı uygular; burada görsel
+  // olarak da belirtilsin ki kullanıcı hatayla karşılaşmasın.
+  const acc = currentAccount();
+  const rolsuz = !!acc && hesapDogrulandi(acc.id) && !hesapRolYol(acc.id);
+  const kozSerit = root.querySelector("#sk-koz-pelerin")?.previousElementSibling;
+  let not = root.querySelector("#sk-koz-rol-not") as HTMLElement | null;
+  if (rolsuz) {
+    if (!not) {
+      not = document.createElement("p");
+      not.id = "sk-koz-rol-not";
+      not.className = "skin-bos";
+      not.textContent = "Başka bir pelerin/elitra giymek için Discord sunucusundaki YIKIM etiketi (\"Yol Silindiri\") gerekir — şimdilik yalnız aç/kapa yapabilirsin.";
+      kozSerit?.after(not);
+    }
+    root.querySelectorAll<HTMLButtonElement>(".skin-pelerin[data-id]:not(.cikar)").forEach((b) => {
+      b.disabled = true;
+      b.title = "Yol Silindiri rolü gerekir";
+    });
+  } else {
+    not?.remove();
+  }
 
   // sahne alt bilgisi / butonlar
   const aktifAd = root.querySelector("#sk-aktif-ad") as HTMLElement;

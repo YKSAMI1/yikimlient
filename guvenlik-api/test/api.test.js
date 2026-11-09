@@ -226,6 +226,47 @@ test("giris: 5 hatali parola â†’ 24 saat kilit", async () => {
   assert.equal(r.durum, 423);
 });
 
+test("rol guncelle (bot): discord bagli hesaplarin rolu degisir", async () => {
+  const anahtar = "offline:roltest";
+  const kod = (await cagir("/api/baglama/kod", { hesap_anahtar: anahtar, hesap_ad: "RolTest", tur: "cracked" })).govde.kod;
+  await fetch(`${ADRES}/api/baglama/dogrula`, {
+    method: "POST",
+    headers: { "x-bot-anahtari": "bot-test-anahtari", "content-type": "application/json" },
+    body: JSON.stringify({ kod, discord_id: "discord-rol", rol_yol: false }),
+  }).then((x) => x.json());
+  const once = await cagir("/api/baglama/durum", { hesap_anahtar: anahtar });
+  assert.equal(once.govde.rol_yol, false, "baglama aninda rol yok");
+
+  // Rol VERILDI
+  const verildi = await fetch(`${ADRES}/api/rol/guncelle`, {
+    method: "POST",
+    headers: { "x-bot-anahtari": "bot-test-anahtari", "content-type": "application/json" },
+    body: JSON.stringify({ discord_id: "discord-rol", rol_yol: true }),
+  }).then(async (x) => ({ durum: x.status, ...(await x.json()) }));
+  assert.equal(verildi.durum, 200);
+  assert.equal(verildi.govde.tamam, true);
+  const sonra = await cagir("/api/baglama/durum", { hesap_anahtar: anahtar });
+  assert.equal(sonra.govde.rol_yol, true, "launcher bu degeri gorur");
+
+  // Rol ALINDI (etiket kaldirildi)
+  await fetch(`${ADRES}/api/rol/guncelle`, {
+    method: "POST",
+    headers: { "x-bot-anahtari": "bot-test-anahtari", "content-type": "application/json" },
+    body: JSON.stringify({ discord_id: "discord-rol", rol_yol: false }),
+  }).then((x) => x.json());
+  const alindi = await cagir("/api/baglama/durum", { hesap_anahtar: anahtar });
+  assert.equal(alindi.govde.rol_yol, false, "rol alindiginda cizim izni kapanir");
+});
+
+test("rol guncelle: bot anahtari olmadan reddedilir", async () => {
+  const r = await fetch(`${ADRES}/api/rol/guncelle`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ discord_id: "discord-rol", rol_yol: true }),
+  }).then(async (x) => ({ durum: x.status, ...(await x.json()) }));
+  assert.equal(r.durum, 401);
+});
+
 test("IP kaydi: 7 gun sonra GERCEKTEN silinir", async () => {
   const t0 = Date.now();
   db.db.prepare("INSERT INTO ip_kaydi (cihaz_id, ip, silme_zamani) VALUES (?, ?, ?)").run("cihaz-ip", "10.9.9.9", t0 + 6 * 24 * 3600 * 1000);

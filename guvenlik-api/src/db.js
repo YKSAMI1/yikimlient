@@ -304,6 +304,12 @@ export function rolYaz(hesap_anahtar, rol_yol) {
   x("UPDATE baglanti SET rol_yol = ? WHERE hesap_anahtar = ?", [rol_yol ? 1 : 0, hesap_anahtar]);
 }
 
+export function rolYazDiscord(discord_id, rol_yol) {
+  // Bot "Yol Silindiri" rolü verildi/alındı olayını bildirir: bağlı TÜM
+  // hesapların rolü güncellenir (aynı hesap başka cihazda da güncel kalır).
+  x("UPDATE baglanti SET rol_yol = ? WHERE discord_id = ?", [rol_yol ? 1 : 0, discord_id]);
+}
+
 export function crackBaglantiSayisi(discord_id) {
   const r = q1(
     `SELECT COUNT(DISTINCT g.hesap_anahtar) AS n
