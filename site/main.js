@@ -177,10 +177,21 @@ function gozlemci() {
 
 /* ---------- sayı sayacı ---------- */
 function sayaclar() {
-  const ogeler = document.querySelectorAll("[data-count]");
-  if (!ogeler.length || !("IntersectionObserver" in window)) return;
+  const ogeler = [...document.querySelectorAll("[data-count]")];
+  if (!ogeler.length) return;
 
   const azHareket = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  const bitir = (el) => {
+    if (el.dataset.sayildi) return;
+    el.dataset.sayildi = "1";
+    el.textContent = Number(el.dataset.count || 0) + (el.dataset.suffix || "");
+  };
+
+  if (!("IntersectionObserver" in window) || azHareket) {
+    ogeler.forEach(bitir);
+    return;
+  }
 
   const io = new IntersectionObserver(
     (girisler) => {
@@ -188,14 +199,11 @@ function sayaclar() {
         if (!g.isIntersecting) return;
         const el = g.target;
         io.unobserve(el);
+        if (el.dataset.sayildi) return;
+        el.dataset.sayildi = "1";
+
         const hedef = Number(el.dataset.count || 0);
         const son = el.dataset.suffix || "";
-
-        if (azHareket) {
-          el.textContent = hedef + son;
-          return;
-        }
-
         const bas = performance.now();
         const sure = 1200;
         const adim = (t) => {
@@ -208,7 +216,18 @@ function sayaclar() {
     },
     { threshold: 0.4 },
   );
+
   ogeler.forEach((e) => io.observe(e));
+
+  // Görünür alanın üstünde kalanlar (sayfa ortasında açılış / hızlı kaydırma)
+  // 0'da takılı kalmasın: hedef değeri hemen yaz.
+  const yukaridakiler = () =>
+    ogeler.forEach((el) => {
+      if (el.getBoundingClientRect().bottom < 0) bitir(el);
+    });
+
+  yukaridakiler();
+  window.addEventListener("scroll", yukaridakiler, { passive: true });
 }
 
 /* ---------- menü ---------- */
