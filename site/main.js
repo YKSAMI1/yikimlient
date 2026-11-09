@@ -180,6 +180,8 @@ function sayaclar() {
   const ogeler = document.querySelectorAll("[data-count]");
   if (!ogeler.length || !("IntersectionObserver" in window)) return;
 
+  const azHareket = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
   const io = new IntersectionObserver(
     (girisler) => {
       girisler.forEach((g) => {
@@ -188,6 +190,12 @@ function sayaclar() {
         io.unobserve(el);
         const hedef = Number(el.dataset.count || 0);
         const son = el.dataset.suffix || "";
+
+        if (azHareket) {
+          el.textContent = hedef + son;
+          return;
+        }
+
         const bas = performance.now();
         const sure = 1200;
         const adim = (t) => {
