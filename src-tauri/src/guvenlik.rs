@@ -264,6 +264,27 @@ pub fn hesap_kozmetik_sil(anahtar: &str, ad: &str) {
     let _ = std::fs::remove_file(hesap_kozmetik_dir(anahtar).join(ad));
 }
 
+/// Hesap bu kozmetiği kapattı mı? (işaret dosyası varsa kapalı)
+pub fn hesap_kozmetik_kapali(anahtar: &str, ad: &str) -> bool {
+    let ad = ad.replace(['/', '\\'], "_");
+    hesap_kozmetik_dir(anahtar)
+        .join(format!("{ad}.kapali"))
+        .is_file()
+}
+
+/// Hesabın kozmetik "kapalı" işaretini yaz/sil.
+pub fn hesap_kozmetik_kapali_yaz(anahtar: &str, ad: &str, kapali: bool) {
+    let dir = hesap_kozmetik_dir(anahtar);
+    let ad = ad.replace(['/', '\\'], "_");
+    if kapali {
+        if std::fs::create_dir_all(&dir).is_ok() {
+            let _ = std::fs::write(dir.join(format!("{ad}.kapali")), b"");
+        }
+    } else {
+        let _ = std::fs::remove_file(dir.join(format!("{ad}.kapali")));
+    }
+}
+
 /// Aktif hesabı kurulumlara yaz: `<kurulum>/.yikim/aktif-hesap`.
 /// Mod bu dosyadan hangi hesabın açık olduğunu öğrenir (hesap bazlı kozmetik).
 ///

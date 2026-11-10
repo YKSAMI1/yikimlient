@@ -87,6 +87,13 @@ public final class YikimKozmetik {
     /// `pelerin.kucuk.png` yazar; presence gövdesi ~32 KB ile sınırlı).
     private static volatile String pelerinKucuk = "";
     private static volatile String kanatKucuk = "";
+    /// Launcher kurulum klasörüne "kapalı" işareti yazdıysa oyunda vanilla
+    /// görünüm kullanılır. Dosya okuma her karede değil, saniyede bir yapılır.
+    private static volatile boolean pelerinKapali;
+    private static volatile boolean kanatKapali;
+    /// Gömülü varsayılan YIKIM tasarımı (mod kaynaklarında durur).
+    private static volatile class_2960 varsayilanPelerin;
+    private static volatile class_2960 varsayilanKanat;
 
     /// v0.7.25 — başka oyuncuların doğrulama durumu (presence yanıtı).
     private static volatile java.util.Map<String, Boolean> UZAK_DOGRULAMA =
@@ -154,6 +161,8 @@ public final class YikimKozmetik {
             return;
         }
         YikimKozmetik.sonKontrol = simdi;
+        YikimKozmetik.pelerinKapali = YikimKozmetik.imVar("pelerin.png.kapali");
+        YikimKozmetik.kanatKapali = YikimKozmetik.imVar("elytra.png.kapali");
         String oncekiPelerin = YikimKozmetik.pelerinYerel;
         String oncekiKanat = YikimKozmetik.kanatYerel;
         YikimKozmetik.pelerinYerel = YikimKozmetik.imzaliOku("pelerin.png", 0);
@@ -171,6 +180,16 @@ public final class YikimKozmetik {
     /** Dosya imzası (mtime ^ boyut) → base64 önbelleği. Değişmeyen dosya okunmaz. */
     private static final long[] DOSYA_DAMGA = new long[] {Long.MIN_VALUE, Long.MIN_VALUE};
     private static final String[] DOSYA_B64 = new String[] {"", ""};
+
+    /** Bu kurulumda `.yikim/<ad>` işaret dosyası var mı? */
+    private static boolean imVar(String ad) {
+        try {
+            return Files.isRegularFile(YikimKozmetik.stateDir().resolve(ad));
+        }
+        catch (Throwable ignored) {
+            return false;
+        }
+    }
 
     private static String imzaliOku(String ad, int yuva) {
         try {
@@ -245,11 +264,15 @@ public final class YikimKozmetik {
     public static boolean etkinMi() {
         YikimKozmetik.dosyalariTazele(); // saniyede en fazla bir dosya kontrolü
         YikimKozmetikSecim.tazele();      // menüden seçilmiş deri var mı?
+        // Varsayılan YIKIM tasarımı da bir kozmetiktir: kullanıcı kapatmadıysa
+        // (ve elytra da kapalı değilse) çizim yolu açık kalmalı.
         return !YikimKozmetikSecim.aktifId(YikimKozmetikSecim.DERI).isEmpty()
             || !YikimKozmetik.pelerinYerel.isEmpty()
             || !YikimKozmetik.kanatYerel.isEmpty()
             || !YikimKozmetik.UZAK_PELERIN.isEmpty()
-            || !YikimKozmetik.UZAK_KANAT.isEmpty();
+            || !YikimKozmetik.UZAK_KANAT.isEmpty()
+            || !YikimKozmetik.pelerinKapali
+            || !YikimKozmetik.kanatKapali;
     }
 
     /** Presence gövdesine eklenecek alanlar: yalnız DEĞİŞEN kozmetik gönderilir. */
@@ -729,6 +752,11 @@ public final class YikimKozmetik {
             String b64;
             boolean kendi = YikimKozmetik.kendim(id);
             if (kendi) {
+                YikimKozmetik.dosyalariTazele();
+                // Kullanıcı kapatmışsa hiçbir doku (uzak kopya dahil) gösterilmez.
+                if (YikimKozmetik.pelerinKapali) {
+                    return null;
+                }
                 // KENDİ oyuncu: launcher'ın yazdığı yerel dosya. Dosya yoksa
                 // (launcher bu kuruluma yazamadı / oyun klasörü farklı)
                 // presence sunucusundaki KENDİ tasarımımıza düşeriz —
@@ -748,6 +776,10 @@ public final class YikimKozmetik {
                 d = YikimKozmetik.doku("pelerin-k-" + id,
                     YikimKozmetik.kucukDosya("pelerin.kucuk.png", ""));
             }
+            if (d == null && kendi) {
+                // Ne tasarım ne uzak kopya var: gömülü varsayılan YIKIM pelerini.
+                d = YikimKozmetik.varsayilanDoku(false);
+            }
             return d;
         }
         catch (Throwable ignored) {
@@ -761,6 +793,10 @@ public final class YikimKozmetik {
             String b64;
             boolean kendi = YikimKozmetik.kendim(id);
             if (kendi) {
+                YikimKozmetik.dosyalariTazele();
+                if (YikimKozmetik.kanatKapali) {
+                    return null;
+                }
                 b64 = YikimKozmetik.dosyaB64("elytra.png");
                 if (b64 == null || b64.isEmpty()) {
                     b64 = YikimKozmetik.UZAK_KANAT.get(id);
@@ -774,7 +810,34 @@ public final class YikimKozmetik {
                 d = YikimKozmetik.doku("kanat-k-" + id,
                     YikimKozmetik.kucukDosya("elytra.kucuk.png", ""));
             }
+            if (d == null && kendi) {
+                // Gömülü varsayılan YIKIM elitrası.
+                d = YikimKozmetik.varsayilanDoku(true);
+            }
             return d;
+        }
+        catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /** Gömülü varsayılan tasarımın doku kimliği (mod kaynaklarından yüklenir). */
+    private static class_2960 varsayilanDoku(boolean kanat) {
+        class_2960 var = kanat ? YikimKozmetik.varsayilanKanat : YikimKozmetik.varsayilanPelerin;
+        if (var != null) {
+            return var;
+        }
+        try {
+            var = class_2960.method_43902(
+                "yikimlient",
+                kanat ? "textures/entity/elytra.png" : "textures/entity/pelerin.png");
+            if (kanat) {
+                YikimKozmetik.varsayilanKanat = var;
+            }
+            else {
+                YikimKozmetik.varsayilanPelerin = var;
+            }
+            return var;
         }
         catch (Throwable ignored) {
             return null;

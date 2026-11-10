@@ -89,7 +89,12 @@ pub fn atlas_png(pikseller: &[String]) -> Result<Vec<u8>, String> {
 
 /// Bir 64×32 PNG dosyasını renk listesine geri oku. Farklı boyut → None.
 fn paftadan_atlas(yol: &std::path::Path) -> Option<Vec<String>> {
-    let img = image::open(yol).ok()?.to_rgba8();
+    bayttan_atlas(&std::fs::read(yol).ok()?)
+}
+
+/// Bellekteki PNG → 64×32 renk listesi. Farklı boyut → None.
+fn bayttan_atlas(bayt: &[u8]) -> Option<Vec<String>> {
+    let img = image::load_from_memory(bayt).ok()?.to_rgba8();
     if img.width() != DOKU_G || img.height() != DOKU_Y {
         return None;
     }
@@ -133,6 +138,101 @@ pub fn yerel_pelerin() -> Option<Vec<String>> {
 /// Kayıtlı elitra atlası (2048 renk).
 pub fn yerel_kanat() -> Option<Vec<String>> {
     dosyadan_atlas("elytra.png")
+}
+
+// ---------------------------------------------------------------- varsayılan
+//
+// Gömülü YIKIM pelerin/elitrası. Hiç tasarım kaydedilmemişse (yeni hesap,
+// doğrulanmamış hesap) oyunda bu görünür; kullanıcı aç/kapa ile kapatabilir.
+// Aynı PNG'ler modun kaynaklarında da durur (dosya hiç yazılamazsa mod
+// gömülü dokuyu kullanır). `tools/varsayilan-kozmetik.mjs` üretir.
+
+pub const VARSAYILAN_PELERIN: &[u8] = include_bytes!("../resources/kozmetik/pelerin.png");
+pub const VARSAYILAN_KANAT: &[u8] = include_bytes!("../resources/kozmetik/elytra.png");
+
+/// Gömülü varsayılan PNG (ad → bayt).
+pub fn varsayilan_png(ad: &str) -> Option<&'static [u8]> {
+    match ad {
+        "pelerin.png" => Some(VARSAYILAN_PELERIN),
+        "elytra.png" => Some(VARSAYILAN_KANAT),
+        _ => None,
+    }
+}
+
+/// Gömülü varsayılan atlas (UI önizlemesi için renk listesi).
+pub fn varsayilan_atlas(kanat: bool) -> Option<Vec<String>> {
+    bayttan_atlas(if kanat { VARSAYILAN_KANAT } else { VARSAYILAN_PELERIN })
+}
+
+/// Ana kopya yoksa gömülü varsayılanı yaz; kozmetik etkinse kurulumlara da
+/// yaz. Zaten var olan tasarıma ASLA dokunmaz.
+pub fn varsayilani_kur(ad: &str) -> usize {
+    let Some(png) = varsayilan_png(ad) else {
+        return 0;
+    };
+    let yol = ana_yol(ad);
+    if !yol.is_file() {
+        if let Some(ust) = yol.parent() {
+            let _ = std::fs::create_dir_all(ust);
+        }
+        if std::fs::write(&yol, png).is_err() {
+            return 0;
+        }
+    }
+    if aktif(ad) {
+        kurulumlara_yaz(ad, png)
+    } else {
+        0
+    }
+}
+
+/// Kurulumdaki "kapalı" işareti (mod: dosya yok ama kozmetik de kapalı).
+fn kurulum_kapali_yolu(inst: &crate::instances::Instance, ad: &str) -> std::path::PathBuf {
+    inst.dir().join(".yikim").join(format!("{ad}.kapali"))
+}
+
+/// "Kapalı" işaretini tüm kurulumlara yaz (mod vanilla görünüm kullanır).
+pub fn kapali_imleri_yaz(ad: &str) -> usize {
+    let mut sayi = 0usize;
+    for inst in crate::instances::list() {
+        let dir = inst.dir().join(".yikim");
+        if std::fs::create_dir_all(&dir).is_err() {
+            continue;
+        }
+        if std::fs::write(kurulum_kapali_yolu(&inst, ad), b"").is_ok() {
+            sayi += 1;
+        }
+    }
+    sayi
+}
+
+/// Kurulumlardaki "kapalı" işaretlerini sil.
+pub fn kapali_imleri_sil(ad: &str) {
+    for inst in crate::instances::list() {
+        let _ = std::fs::remove_file(kurulum_kapali_yolu(&inst, ad));
+    }
+}
+
+/// Bir hesabın kozmetik durumunu kurulumlara uygula (hesap değişince).
+///
+/// Sıra: önceki hesabın dosya/işaretleri temizlenir → hesap "kapalı" dediyse
+/// yalnız işaret yazılır → tasarım varsa yazılır → hiçbiri yoksa mod gömülü
+/// varsayılanı gösterir.
+pub fn hesap_durumunu_uygula(anahtar: &str) -> usize {
+    let mut yazilan = 0usize;
+    for ad in ["pelerin.png", "elytra.png"] {
+        tum_kurulumlardan_sil(ad);
+        kapali_imleri_sil(ad);
+        if crate::guvenlik::hesap_kozmetik_kapali(anahtar, ad) {
+            kapali_imleri_yaz(ad);
+            continue;
+        }
+        if let Some(png) = crate::guvenlik::hesap_kozmetik_oku(anahtar, ad) {
+            yazilan += tum_kurulumlara_yaz(ad, &png);
+            kucuk_yaz(ad, &png);
+        }
+    }
+    yazilan
 }
 
 /// PNG'yi ana kopyaya + tüm kurulumların `.yikim/` klasörüne yaz.
@@ -197,6 +297,10 @@ pub fn aktif(ad: &str) -> bool {
 pub fn aktif_ayarla(ad: &str, acik: bool) -> Result<(), String> {
     if acik {
         let _ = std::fs::remove_file(kapali_yol(ad));
+        kapali_imleri_sil(ad);
+        // Tasarım hiç yoksa gömülü varsayılan yazılır: anahtar "açık"
+        // görünürken oyunda hiçbir şey görünmemesi hatası buradan geliyordu.
+        varsayilani_kur(ad);
         if let Ok(png) = std::fs::read(ana_yol(ad)) {
             kurulumlara_yaz(ad, &png);
             // küçük (sunucu) kopya da geri gelsin — yoksa diğer oyuncular
@@ -209,6 +313,8 @@ pub fn aktif_ayarla(ad: &str, acik: bool) -> Result<(), String> {
         }
     } else {
         std::fs::write(kapali_yol(ad), b"").map_err(|e| format!("işaret yazılamadı: {e}"))?;
+        // Mod, ana klasörü göremez: kurulum klasörüne de işaret yazılır.
+        kapali_imleri_yaz(ad);
         kurulumlardan_sil(ad);
     }
     Ok(())

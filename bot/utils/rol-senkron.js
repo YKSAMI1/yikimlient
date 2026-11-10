@@ -53,15 +53,48 @@ async function rolDurumlariniSenkron(client, db, logger, config, rolId) {
   }
 
   let gonderilen = 0;
+  let duzeltilen = 0;
   for (const [, uye] of uyeler) {
     if (uye.user?.bot) continue;
-    const rolVar = rolId ? uye.roles.cache.has(rolId) : false;
+
+    let rolVar = rolId ? uye.roles.cache.has(rolId) : false;
+
+    // AÇILIŞ ONARIMI: Discord üye listesinde etiket bilgisi (`primaryGuild`)
+    // geldiyse rolü etikete göre düzelt. Bot kapalıyken etiket bırakılmış
+    // olabilir; bu durumda rol açılışta kaldırılır. Bilgi YOKSA dokunulmaz —
+    // REST yanıtı bu alanı her zaman içermeyebilir.
+    if (rolId && uye.user && 'primaryGuild' in uye.user) {
+      const pg = uye.user.primaryGuild;
+      const etiketVar = !!(pg && String(pg.identityGuildId || '') === String(config.guild.id));
+      if (etiketVar !== rolVar) {
+        try {
+          if (etiketVar) {
+            await uye.roles.add(rolId, 'YIKIM etiketi (açılış senkronu)');
+          } else {
+            await uye.roles.remove(rolId, 'YIKIM etiketi yok (açılış senkronu)');
+          }
+          rolVar = etiketVar;
+          duzeltilen += 1;
+          if (logger) {
+            logger.info(`Açılışta rol düzeltildi: ${uye.user.tag} → ${etiketVar ? 'verildi' : 'kaldırıldı'}`);
+          }
+        } catch (error) {
+          if (logger) logger.warn(`Rol düzeltilemedi (${uye.user.tag}): ${error.message}`);
+        }
+      }
+    }
+
     const anahtar = `rol.${uye.id}`;
     if (db.get(anahtar) === rolVar) continue;
     await rolDurumuBildir(uye.id, rolVar, db, logger);
     gonderilen += 1;
   }
-  if (logger) logger.info(`Rol senkronu tamamlandı: ${gonderilen} kullanıcı güncellendi.`);
+  if (logger) {
+    logger.info(
+      `Rol senkronu tamamlandı: ${gonderilen} kullanıcı API'ye yazıldı, ` +
+        `${duzeltilen} rol etikete göre düzeltildi.`,
+    );
+  }
 }
 
 module.exports = { rolDurumuBildir, rolDurumlariniSenkron };

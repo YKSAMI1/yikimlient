@@ -1,6 +1,6 @@
 /* YIKIMLient site — etkileşimler */
 const REPO = "YKSAMI1/yikimlient";
-const YEDEK_SURUM = "0.8.0";
+const YEDEK_SURUM = "0.8.1";
 const CACHE_MS = 10 * 60 * 1000;
 
 const OS_ETIKET = {
@@ -161,15 +161,19 @@ function gozlemci() {
 
   // Yukarıda kalan öğeler asla gizli kalmasın: sayfa ortasında açıldıysa,
   // hızlı kaydırıldıysa veya gözlemci kaçırdıysa hemen görünür yap.
+  //
+  // v0.8.1 — MOBİL: burada eskiden `scroll` dinleyicisi vardı ve her kaydırma
+  // karesinde görünmeyen TÜM öğeler için getBoundingClientRect() çağırıyordu
+  // (zorunlu layout → telefonlarda kaydırma takılması). Artık yalnız açılışta
+  // bir kez + 4 sn emniyet zamanlayıcısı çalışır; IntersectionObserver
+  // görünür alana girenleri zaten yakalar.
   const yukaridakileriAc = () => {
     document.querySelectorAll(".reveal:not(.is-in)").forEach((e) => {
-      const b = e.getBoundingClientRect();
-      if (b.bottom < 0) e.classList.add("is-in");
+      if (e.getBoundingClientRect().bottom < 0) e.classList.add("is-in");
     });
   };
 
   yukaridakileriAc();
-  window.addEventListener("scroll", yukaridakileriAc, { passive: true });
 
   // emniyet: 4 sn içinde görünür alanda kalan hiçbir öğe gizli kalmasın
   setTimeout(() => {
@@ -227,13 +231,17 @@ function sayaclar() {
 
   // Görünür alanın üstünde kalanlar (sayfa ortasında açılış / hızlı kaydırma)
   // 0'da takılı kalmasın: hedef değeri hemen yaz.
+  //
+  // v0.8.1 — MOBİL: burada eskiden `scroll` dinleyicisi vardı; her karede tüm
+  // sayaçlar için layout okuması yapıyordu. Artık açılışta bir kez + 4 sn
+  // sonra bir kez (tek layout) çalışır.
   const yukaridakiler = () =>
     ogeler.forEach((el) => {
-      if (el.getBoundingClientRect().bottom < 0) bitir(el);
+      if (!el.dataset.sayildi && el.getBoundingClientRect().bottom < 0) bitir(el);
     });
 
   yukaridakiler();
-  window.addEventListener("scroll", yukaridakiler, { passive: true });
+  setTimeout(yukaridakiler, 4000);
 }
 
 /* ---------- menü ---------- */
@@ -242,9 +250,27 @@ function navKur() {
   const toggle = document.getElementById("navToggle");
   if (!nav) return;
 
-  const durum = () => nav.classList.toggle("is-stuck", window.scrollY > 12);
+  let kare = 0;
+  const durum = () => {
+    const takildi = window.scrollY > 12;
+    if (nav.classList.contains("is-stuck") !== takildi) {
+      nav.classList.toggle("is-stuck", takildi);
+    }
+  };
   durum();
-  window.addEventListener("scroll", durum, { passive: true });
+  // rAF ile tekilleştir: kaydırma sırasında saniyede onlarca kez değil,
+  // kare başına bir kez ve yalnız durum gerçekten değişince DOM'a dokunur.
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (kare) return;
+      kare = requestAnimationFrame(() => {
+        kare = 0;
+        durum();
+      });
+    },
+    { passive: true },
+  );
 
   toggle?.addEventListener("click", () => {
     const acik = nav.classList.toggle("is-open");

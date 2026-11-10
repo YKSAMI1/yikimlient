@@ -262,6 +262,24 @@ async function hazirCalistir(kaynak, client) {
   const rolId = (process.env.ROLE_YOL_ID || process.env.ROLE_ID || '').trim();
   if (rolId) {
     await rolDurumlariniSenkron(client, db, logger, config, rolId);
+
+    // ---- PERİYODİK ROLLÜ SENKRON (güvenlik ağı) ----
+    // `GUILD_MEMBER_UPDATE` bazen kaçırılabiliyor: bot minik bir restart
+    // geçiriyor, Discord olayı göndermiyor ya da kullanıcı endpoint'te
+    // "primary guild" alanını göndermiyor. Sonuç: etiket bırakılmış ama rol
+    // duruyordu (binlerce kullanıcıda yaşandı). Bunu güvenlik ağı olarak
+    // 10 dakikada bir çalıştırır: etiket yok → rol kalkar (eger rolu varsa).
+    // Ağır değil: tek seferlik member fetch + sadece farklı olanlara dokunma.
+    const PERIYOT_MS = 10 * 60_000;
+    const periyodikTara = async () => {
+      try {
+        await rolDurumlariniSenkron(client, db, logger, config, rolId);
+      } catch (error) {
+        logger.warn(`Periyodik rol taraması başarısız: ${error.message}`);
+      }
+    };
+    setInterval(periyodikTara, PERIYOT_MS).unref?.();
+    logger.info(`Periyodik rol senkronu açık (${PERIYOT_MS / 60000} dakikada bir).`);
   }
 
   // ---- kozmetik duyurusu ----

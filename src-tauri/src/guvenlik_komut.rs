@@ -293,12 +293,7 @@ pub async fn cmd_hesap_yetki() -> Result<serde_json::Value, String> {
 /// Bir hesabın kozmetiğini kurulumlara uygula (hesap değişince çağrılır).
 #[tauri::command]
 pub fn cmd_hesap_kozmetik_uygula(anahtar: String) -> Result<serde_json::Value, String> {
-    let mut yazilan = 0usize;
-    for ad in ["pelerin.png", "elytra.png"] {
-        if let Some(png) = guvenlik::hesap_kozmetik_oku(&anahtar, ad) {
-            yazilan += crate::kozmetik::kurulumlara_yaz(ad, &png);
-        }
-    }
+    let yazilan = crate::kozmetik::hesap_durumunu_uygula(&anahtar);
     guvenlik::aktif_hesap_yaz(&anahtar);
     Ok(json!({ "tamam": true, "yazilan": yazilan }))
 }

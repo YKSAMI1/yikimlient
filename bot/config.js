@@ -39,6 +39,8 @@ module.exports = {
   guild: {
     id: process.env.GUILD_ID || '',
     channel: process.env.CHANNEL_ID || '',
-    role: process.env.ROLE_ID || '',
+    // "Yol Silindiri" rolü. ROLE_YOL_ID öncelikli: .env'de yalnız o
+    // doldurulduysa eski ROLE_ID boş kalıp rol senkronu hiç çalışmıyordu.
+    role: (process.env.ROLE_YOL_ID || process.env.ROLE_ID || '').trim(),
   },
 };

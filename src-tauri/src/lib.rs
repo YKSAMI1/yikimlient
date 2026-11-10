@@ -105,6 +105,7 @@ pub fn run() {
             commands::cmd_kozmetik_oku,
             commands::cmd_kozmetik_fotograf,
             commands::cmd_kozmetik_aktif,
+            commands::cmd_guncelleme_bilgi,
             commands::cmd_kozm_katalog,
             commands::cmd_kozm_sec,
             commands::cmd_kozm_sil,

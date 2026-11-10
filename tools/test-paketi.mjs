@@ -112,10 +112,22 @@ if (fs.existsSync(setupKaynak)) {
 }
 
 // ---------- 4) OYUN İÇİ MOD JAR ----------
-const modJar = path.join(KOK, "yikim-mod/derleme/yikimlient-1.13.5+1.21.11.jar");
-if (fs.existsSync(modJar)) {
-  fs.copyFileSync(modJar, path.join(CIKIS, "yikimlient-mod-1.13.5.jar"));
-  console.log(`   OK yikimlient-mod-1.13.5.jar (${(fs.statSync(modJar).size / 1024).toFixed(0)} KB)`);
+// Derleme klasöründeki EN YENİ jar alınır: sürüm elle güncellenmez
+// (eskiden sabit "1.13.5" yazdığı için yeni jar pakete hiç girmiyordu).
+const modDerleme = path.join(KOK, "yikim-mod/derleme");
+const modJar = fs.existsSync(modDerleme)
+  ? fs
+      .readdirSync(modDerleme)
+      .filter((f) => f.endsWith(".jar"))
+      .map((f) => path.join(modDerleme, f))
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0]
+  : undefined;
+if (modJar) {
+  const ad = `yikimlient-mod-${path.basename(modJar).split("+")[0].replace("yikimlient-", "")}.jar`;
+  fs.copyFileSync(modJar, path.join(CIKIS, ad));
+  console.log(`   OK ${ad} (${(fs.statSync(modJar).size / 1024).toFixed(0)} KB)`);
+} else {
+  console.log("   ! mod jar bulunamadi (yikim-mod/araclar/derle-1.21.11.ps1 gerekli)");
 }
 
 // ---------- 5) TANITIM SİTESİ (statik) ----------

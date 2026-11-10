@@ -438,6 +438,48 @@ export function renderSettings(root: HTMLElement): void {
       const mod = await import("@tauri-apps/plugin-updater");
       const update = await mod.check();
       if (update?.available) {
+        // Linux .deb/.rpm kendini güncelleyemez → paketi indirme yolu.
+        let bilgi: { os?: string; bundle?: string } = {};
+        try {
+          bilgi = (await invoke("cmd_guncelleme_bilgi")) as { os?: string; bundle?: string };
+        } catch { /* eski çekirdek */ }
+        const paketYonetimli =
+          bilgi.os === "linux" && (bilgi.bundle === "deb" || bilgi.bundle === "rpm");
+        if (paketYonetimli) {
+          const rpm = bilgi.bundle === "rpm";
+          const raw = (update as any)?.rawJson ?? {};
+          const platform =
+            raw?.platforms?.[rpm ? "linux-x86_64-rpm" : "linux-x86_64-deb"] ??
+            raw?.platforms?.["linux-x86_64-deb"] ??
+            raw?.platforms?.["linux-x86_64"];
+          const url = String(
+            platform?.url ||
+              `https://github.com/YKSAMI1/yikimlient/releases/tag/v${update.version}`,
+          );
+          const { root: mRoot, close } = openModal(`
+            <h2>Güncelleme Var</h2>
+            <div class="sub">YIKIMLient <b>v${update.version}</b> hazır.</div>
+            <p class="gv-mini" style="margin:10px 0; color:var(--text-dim); line-height:1.6">
+              Kurulumun <b>${rpm ? ".rpm" : ".deb"}</b> paketiyle yapıldı. Paket yöneticisi yönetici
+              izni istediği için launcher kendini sessizce güncelleyemiyor. Yeni paketi indirip
+              dosyayı çift tıkla — ayarların ve hesapların korunur.
+            </p>
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:6px">
+              <button class="btn ghost" id="upd-later">Sonra</button>
+              <button class="btn primary" id="upd-indir">Paketi indir (${rpm ? ".rpm" : ".deb"})</button>
+            </div>
+          `);
+          mRoot.querySelector("#upd-later")?.addEventListener("click", () => close());
+          mRoot.querySelector("#upd-indir")?.addEventListener("click", async () => {
+            try {
+              await openExternal(url);
+              close();
+            } catch (e) {
+              toast(`Bağlantı açılamadı: ${e}`, "err");
+            }
+          });
+          return;
+        }
         const { root: mRoot, close } = openModal(`
           <h2>Güncelleme Var</h2>
           <div class="sub">YIKIMLient <b>v${update.version}</b> hazır. Değişiklik notları:</div>

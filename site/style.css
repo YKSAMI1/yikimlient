@@ -843,3 +843,39 @@ h1 {
   .reveal { opacity: 1; transform: none; }
   html { scroll-behavior: auto; }
 }
+
+/* ---------- mobil performans ----------
+   Telefonda en pahalı üç şey: 90 px blur'lu dev daireler, sürekli dönen
+   ızgara ve backdrop-filter (her karede arka planı yeniden bulanıklaştırır).
+   Hepsi mobilde kapatılır; görünüm bozulmaz çünkü radial gradient zaten
+   yumuşak, ızgara da desen olarak durur. */
+@media (max-width: 860px) {
+  .bg-glow { filter: none; animation: none; opacity: 0.16; }
+  .bg-grid { animation: none; opacity: 0.34; }
+  .bg-noise { opacity: 0.02; }
+
+  .nav::before,
+  .download,
+  .nav.is-open .nav-links {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .nav::before { background: rgba(8, 8, 11, 0.97); }
+  .download { background: rgba(14, 14, 19, 0.94); }
+
+  .grad,
+  .pill .dot,
+  .mock-progress span { animation: none; }
+  .grad { background-position: 0% 50%; }
+  .mock-progress span { width: 62%; }
+
+  /* Her düğmede kalıcı katman açmak mobilde GPU belleğini şişirir. */
+  .btn { will-change: auto; }
+}
+
+/* Dokunmatik + dar ekran: hover dönüşümleri takılmaya yol açmasın. */
+@media (hover: none) {
+  .btn-primary:hover { transform: none; }
+  .shot:hover img, .shot:hover { transform: none; }
+}
+

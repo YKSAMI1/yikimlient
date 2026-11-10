@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.13.5";
+    public static final String MOD_VERSION = "1.13.6";
     /** Arayüz teması seçim sürümü: config'teki değer bundan küçükse ilk açılışta sorulur. */
     public static final int TEMA_SURUM = 1;
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");

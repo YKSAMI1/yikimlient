@@ -344,6 +344,33 @@ fn kozmetik_cizim_kapisi() -> Result<(String, String), String> {
     Ok((anahtar, tur))
 }
 
+/// Güncelleme davranışı için platform / paket türü.
+///
+/// Linux'ta `.deb` / `.rpm` kurulumları kendini güncelleyemez: dpkg/rpm
+/// yönetici izni ister, masaüstünden açılan GUI'de `sudo` terminali yoktur.
+/// UI bu bilgiyle "paketi indir" yolunu gösterir. AppImage kendini günceller.
+#[tauri::command]
+pub fn cmd_guncelleme_bilgi() -> serde_json::Value {
+    use tauri::utils::config::BundleType;
+    let os = std::env::consts::OS;
+    let bundle = match tauri::utils::platform::bundle_type() {
+        Some(BundleType::Deb) => "deb",
+        Some(BundleType::Rpm) => "rpm",
+        Some(BundleType::AppImage) => "appimage",
+        Some(BundleType::Nsis) | Some(BundleType::Msi) => "windows",
+        Some(BundleType::App) | Some(BundleType::Dmg) => "macos",
+        _ => {
+            // Geliştirme derlemesi / tanınmayan paket: AppImage ortam değişkeni.
+            if os == "linux" && std::env::var_os("APPIMAGE").is_some() {
+                "appimage"
+            } else {
+                ""
+            }
+        }
+    };
+    serde_json::json!({ "os": os, "bundle": bundle })
+}
+
 // ---------- kozmetik (özel pelerin + elitra kanadı) ----------
 
 /// Kozmetik DEĞİŞTİRME yetkisi kapısı.
@@ -467,6 +494,9 @@ fn kozmetik_aktif_esle(tur: &str, acik: bool) {
 }
 
 /// Kayıtlı kozmetik atlaslarını oku + sahne önizlemesi için dosya yolları.
+///
+/// `*_varsayilan`: gömülü YIKIM tasarımı. Hiç kayıt yoksa editör/önizleme
+/// boş tuval yerine bunu gösterir (ve "kayıtlı" sayılmaz).
 #[tauri::command]
 pub fn cmd_kozmetik_oku() -> Result<serde_json::Value, String> {
     let pelerin_yol = crate::core::app_dir().join("pelerin.png");
@@ -474,6 +504,8 @@ pub fn cmd_kozmetik_oku() -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({
         "pelerin": crate::kozmetik::yerel_pelerin(),
         "kanat": crate::kozmetik::yerel_kanat(),
+        "pelerin_varsayilan": crate::kozmetik::varsayilan_atlas(false),
+        "kanat_varsayilan": crate::kozmetik::varsayilan_atlas(true),
         "pelerin_dosya": pelerin_yol.is_file().then(|| pelerin_yol.to_string_lossy().to_string()),
         "kanat_dosya": kanat_yol.is_file().then(|| kanat_yol.to_string_lossy().to_string()),
         "pelerin_aktif": crate::kozmetik::aktif("pelerin.png"),
@@ -565,21 +597,44 @@ pub async fn cmd_kozmetik_fotograf(
 
 /// Özel pelerin / elitrayı oyunda etkinleştir ya da pasife al.
 ///
-/// Pasifken kurulumlardaki dosya kaldırılır (oyunda vanilla pelerin/elitra
-/// görünür) ama ana kopya korunur — tekrar açınca aynı tasarım geri gelir.
-/// `None` → o kozmetiğe dokunma.
+/// KURAL: varsayılan YIKIM pelerini/elitrası DOĞRULANMAMIŞ hesaba da açıktır.
+/// Bu yüzden burada doğrulama/rol aranmaz — yalnız seçili hesap gerekir.
+/// (Eski kod `kozmetik_yetki_kapisi` kullandığı için doğrulanmamış hesapta
+/// anahtar hiç çalışmıyordu.)
+///
+/// Pasifken kurulumlara "kapalı" işareti yazılır (mod vanilla görünüm kullanır);
+/// ana kopya ve hesabın tasarımı korunur — tekrar açınca aynı tasarım gelir.
 #[tauri::command]
 pub async fn cmd_kozmetik_aktif(
     pelerin: Option<bool>,
     kanat: Option<bool>,
 ) -> Result<serde_json::Value, String> {
-    let (_anahtar, _tur) = kozmetik_yetki_kapisi()?;
+    let acc = selected_account().map_err(|_| "hesap yok")?;
+    let tur = if acc.kind == "microsoft" { "microsoft" } else { "cracked" };
+    let anahtar = crate::hesap_yetki::hesap_anahtari(&acc.name, tur, &acc.uuid);
+
+    // Kapalı durumu HESAP BAZLI saklanır: bir hesapta kapatmak diğerini etkilemez.
     if let Some(acik) = pelerin {
+        crate::guvenlik::hesap_kozmetik_kapali_yaz(&anahtar, "pelerin.png", !acik);
         crate::kozmetik::aktif_ayarla("pelerin.png", acik)?;
+        if acik {
+            // Hesabın kendi tasarımı varsa onu geri yaz (varsayılanın üstüne).
+            if let Some(png) = crate::guvenlik::hesap_kozmetik_oku(&anahtar, "pelerin.png") {
+                crate::kozmetik::tum_kurulumlara_yaz("pelerin.png", &png);
+                crate::kozmetik::kucuk_yaz("pelerin.png", &png);
+            }
+        }
         kozmetik_aktif_esle(crate::kozmetik_katalog::PELERIN, acik);
     }
     if let Some(acik) = kanat {
+        crate::guvenlik::hesap_kozmetik_kapali_yaz(&anahtar, "elytra.png", !acik);
         crate::kozmetik::aktif_ayarla("elytra.png", acik)?;
+        if acik {
+            if let Some(png) = crate::guvenlik::hesap_kozmetik_oku(&anahtar, "elytra.png") {
+                crate::kozmetik::tum_kurulumlara_yaz("elytra.png", &png);
+                crate::kozmetik::kucuk_yaz("elytra.png", &png);
+            }
+        }
         kozmetik_aktif_esle(crate::kozmetik_katalog::KANAT, acik);
     }
 
@@ -1041,20 +1096,12 @@ pub async fn cmd_select_account(account_id: String) -> Result<(), String> {
     cfg.save()?;
     crate::hesap_kopru::tum_kurulumlara_yaz();
     // Hesap bazlı kozmetik: önceki hesabın pelerin/elitrası kurulumlardan
-    // temizlenir, seçilen hesabın kendi kozmetiği uygulanır.
+    // temizlenir, seçilen hesabın kendi kozmetiği + aç/kapa durumu uygulanır.
+    // Tasarımı yoksa mod gömülü varsayılan YIKIM tasarımını gösterir.
     if let Ok(acc) = selected_account() {
         let tur = if acc.kind == "microsoft" { "microsoft" } else { "cracked" };
         let anahtar = crate::hesap_yetki::hesap_anahtari(&acc.name, tur, &acc.uuid);
-        for ad in ["pelerin.png", "elytra.png"] {
-            // Önceki hesabın tasarımı hem kurulumlardan hem ana kopyadan silinir.
-            crate::kozmetik::tum_kurulumlardan_sil(ad);
-            if let Some(png) = crate::guvenlik::hesap_kozmetik_oku(&anahtar, ad) {
-                crate::kozmetik::tum_kurulumlara_yaz(ad, &png);
-                crate::kozmetik::kucuk_yaz(ad, &png);
-            } else {
-                crate::kozmetik::kucuk_sil(ad);
-            }
-        }
+        crate::kozmetik::hesap_durumunu_uygula(&anahtar);
         crate::guvenlik::aktif_hesap_yaz(&anahtar);
     }
     Ok(())

@@ -783,7 +783,63 @@ async function checkForUpdate(): Promise<void> {
       return 0;
     };
     const mevcut = String((update as any)?.currentVersion ?? "");
-    const zorunlu = !!min && surumKarsilastir(mevcut, min) < 0;
+    const zorunluHam = !!min && surumKarsilastir(mevcut, min) < 0;
+
+    // Linux .deb / .rpm: paket yöneticisi yönetici izni ister, GUI'den çalışan
+    // `sudo` çoğu masaüstünde başarısız olur → kendini güncelleyemez.
+    // Bu yüzden ZORUNLU kilidi uygulanmaz (yoksa kullanıcı ne güncelleyebilir
+    // ne de launcher'ı kullanabilir — kilitlenip kalırdı).
+    let bilgi: { os?: string; bundle?: string } = {};
+    try {
+      bilgi = (await invoke("cmd_guncelleme_bilgi")) as { os?: string; bundle?: string };
+    } catch {
+      /* eski çekirdek: bilgi yok sayılır */
+    }
+    const paketYonetimli =
+      bilgi.os === "linux" && (bilgi.bundle === "deb" || bilgi.bundle === "rpm");
+    const zorunlu = zorunluHam && !paketYonetimli;
+
+    if (paketYonetimli) {
+      const rpm = bilgi.bundle === "rpm";
+      const anahtar = rpm ? "linux-x86_64-rpm" : "linux-x86_64-deb";
+      const platform =
+        raw?.platforms?.[anahtar] ??
+        raw?.platforms?.["linux-x86_64-deb"] ??
+        raw?.platforms?.["linux-x86_64"];
+      const url = String(
+        platform?.url ||
+          `https://github.com/YKSAMI1/yikimlient/releases/tag/v${update.version}`,
+      );
+      const { root, close } = openModal(`
+        <h2>Güncelleme Var</h2>
+        <div class="sub">YIKIMLient <b>v${update.version}</b> hazır. Değişiklik notları:</div>
+        <div style="margin:12px 0; max-height:160px; overflow-y:auto; user-select:text; color:var(--text-dim); font-size:12.5px; line-height:1.55">
+          ${(update.body || "Değişiklik notu yok.").split("\n").map((l: string) => `<div>${l}</div>`).join("")}
+        </div>
+        <p class="gv-mini" style="margin:0 0 10px; color:var(--text-dim); line-height:1.6">
+          Bu kurulum <b>${rpm ? ".rpm" : ".deb"}</b> paketiyle yapıldı. Paket yöneticisi
+          yönetici izni istediği için launcher kendini sessizce güncelleyemiyor.
+          Yeni paketi indirip dosyayı çift tıkla (ya da
+          <code>sudo ${rpm ? "rpm -U" : "dpkg -i"} dosya.${rpm ? "rpm" : "deb"}</code>) —
+          ayarların ve hesapların korunur.
+        </p>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:6px">
+          <button class="btn ghost" id="upd-later">Sonra</button>
+          <button class="btn primary" id="upd-indir">Paketi indir (${rpm ? ".rpm" : ".deb"})</button>
+        </div>
+      `);
+      root.querySelector("#upd-later")?.addEventListener("click", () => close());
+      root.querySelector("#upd-indir")?.addEventListener("click", async () => {
+        try {
+          await openExternal(url);
+          close();
+        } catch (e) {
+          toast(`Bağlantı açılamadı: ${e}`, "err");
+        }
+      });
+      return;
+    }
+
     const baslik = zorunlu
       ? "Zorunlu Güncelleme"
       : "Güncelleme Var";

@@ -47,6 +47,9 @@ const TURLER: Tur[] = ["pelerin", "kanat"];
 interface KozmetikDurum {
   pelerin: string[] | null;
   kanat: string[] | null;
+  /** Gömülü varsayılan YIKIM tasarımı (kayıt yoksa gösterilir). */
+  pelerin_varsayilan?: string[] | null;
+  kanat_varsayilan?: string[] | null;
   pelerin_dosya?: string | null;
   kanat_dosya?: string | null;
   /** Özel kozmetik oyunda etkin mi? Kapalıysa vanilla pelerin/elitra görünür. */
@@ -465,13 +468,21 @@ async function yukle(root: HTMLElement): Promise<void> {
   // böylece anahtarı açınca eski tasarım aynen yazılır.
   const kayitliPelerin = gecerli(durum.pelerin, "pelerin");
   const kayitliKanat = gecerli(durum.kanat, "kanat");
+  // Gömülü varsayılan YIKIM tasarımı: hiç kayıt yoksa editör/önizleme boş
+  // tuval yerine bunu gösterir. "Kayıtlı" sayılmaz → Kaydet düğmesi yanıltmaz.
+  const varsayilanPelerin = gecerli(durum.pelerin_varsayilan, "pelerin");
+  const varsayilanKanat = gecerli(durum.kanat_varsayilan, "kanat");
 
   const pelerinDolu = !!kayitliPelerin && !atlasBosMu(kayitliPelerin);
-  pelerin = pelerinDolu ? kayitliPelerin! : (yedekOku("pelerin") ?? kayitliPelerin ?? bosAtlas());
-  // Elitra kayıtlı değilse vanilla benzeri şablonla başla — kullanıcı hazır
-  // bir tabandan düzenler; "Temizle" ile boşaltınca oyunda normal elitra görünür.
+  pelerin = pelerinDolu
+    ? kayitliPelerin!
+    : (yedekOku("pelerin") ?? varsayilanPelerin ?? kayitliPelerin ?? bosAtlas());
+  // Elitra kayıtlı değilse varsayılan YIKIM elitrasıyla başla — "boş kanat"
+  // yerine oyunda görünen tasarımın aynısı düzenlenir.
   const kanatDolu = !!kayitliKanat && !atlasBosMu(kayitliKanat);
-  kanat = kanatDolu ? kayitliKanat! : (yedekOku("kanat") ?? kayitliKanat ?? elitraSablonu());
+  kanat = kanatDolu
+    ? kayitliKanat!
+    : (yedekOku("kanat") ?? varsayilanKanat ?? kayitliKanat ?? elitraSablonu());
   pelerinKayitli = !!kayitliPelerin && !atlasBosMu(kayitliPelerin);
   kanatKayitli = !!kayitliKanat && !atlasBosMu(kayitliKanat);
 

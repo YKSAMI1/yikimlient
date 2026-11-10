@@ -3,166 +3,149 @@ const {
   userMention,
 } = require('discord.js');
 const { rolDurumuBildir } = require('../utils/rol-senkron');
+const { etiketKarari } = require('../utils/etiket-karar');
 const {
   isUserOnCooldown,
   isAllowedGuild,
   withOperationLimit,
 } = require('../utils/security');
 
+/**
+ * Etiket (tag) → "Yol Silindiri" rolü senkronu.
+ *
+ * KURAL: Etiket varsa rol verilir, etiket bırakıldığı AN rol kaldırılır.
+ * Rol kaldırma hiçbir yerel kayda ("base") bağlı DEĞİLDİR: bot yeniden
+ * kurulsa, veritabanı silinse veya rol elle verilmiş olsa bile etiket yoksa
+ * rol gider. (Eski kod `base` kaydı yoksa erken çıkıyordu — sahibin yaşadığı
+ * "etiketi bıraktım ama rolüm kaldı" hatasının kök nedeni.)
+ */
 module.exports = {
   name: 'raw',
   once: false,
   async execute(client, db, logger, getCache, BaseEmbed, config, pkg) {
-    if (pkg.t !== 'GUILD_MEMBER_UPDATE') return;
+    const karar = etiketKarari(pkg, config.guild.id, config.guild.role);
+    if (!karar) return;
+    // Yalnız kendi sunucumuzdaki güncellemeler. Başka sunucuda etiket
+    // bırakılması bizim rolümüzü etkilememeli.
+    if (!karar.bizimSunucu) return;
 
-    const userId = pkg.d.user?.id;
-    if (!userId) return;
+    const { userId, etiketVar, rolVar } = karar;
 
-    if (isUserOnCooldown(userId)) {
+    let guild;
+    let channel = null;
+    let role = null;
+    let member = null;
+    try {
+      guild = getCache({ cacheType: 'Guild', id: config.guild.id });
+      if (!isAllowedGuild(guild.id)) {
+        logger.warn(`Yetkisiz sunucu erişimi engellendi: ${guild.id}`);
+        return;
+      }
+      role = getCache({ cacheType: 'Role', id: config.guild.role, guild });
+    } catch (error) {
+      logger.error('Rol/sunucu okunamadı: ' + error.message);
       return;
     }
 
-    if (pkg.d.user?.primary_guild?.badge?.identity_enabled === false) {
-      return db.set('base', {});
-    }
-
-    const result = await withOperationLimit(async () => {
-      let guild, channel, role, member;
-
+    // ---- 1) ROL SENKRONU (mesajdan bağımsız, bekleme kuyruğuna takılmaz) ----
+    if (etiketVar !== rolVar) {
       try {
-        guild = getCache({
-          cacheType: 'Guild',
-          id: config.guild.id,
-        });
+        member = guild.members.cache.get(userId)
+          || (await guild.members.fetch({ user: userId, cache: true }));
+      } catch (error) {
+        logger.error(`Üye alınamadı: ${userId} - ${error.message}`);
+        member = null;
+      }
 
-        if (!isAllowedGuild(guild.id)) {
-          logger.warn(`Yetkisiz sunucu erişimi engellendi: ${guild.id}`);
-          return;
-        }
-
-        channel = getCache({
-          cacheType: 'Channel',
-          id: config.guild.channel,
-          guild,
-        });
-
-        role = getCache({
-          cacheType: 'Role',
-          id: config.guild.role,
-          guild,
-        });
-
+      if (member) {
         try {
-          member = guild.members.cache.get(userId);
-          if (!member) {
-            member = await guild.members.fetch({
-              user: userId,
-              cache: true,
-              force: false,
-            });
+          if (etiketVar) {
+            await member.roles.add(role.id, 'YIKIM etiketi alındı');
+            logger.info(`Rol verildi: ${member.user.tag}`);
+          } else {
+            await member.roles.remove(role.id, 'YIKIM etiketi bırakıldı');
+            logger.info(`Rol kaldırıldı: ${member.user.tag}`);
           }
         } catch (error) {
-          logger.error(`Member bulunamadı: ${userId} - ${error.message}`);
-          return;
+          logger.error(`Rol ${etiketVar ? 'verilirken' : 'kaldırılırken'} hata: ${error.message}`);
         }
+      }
+    }
+
+    // ---- 2) API'ye GERÇEK durumu bildir ----
+    // Sunucu yetkisi etiketin kendisidir; rol ekleme izin hatasıyla
+    // başarısız olsa bile çizim kapısı etikete göre kapanır/açılır.
+    await rolDurumuBildir(userId, etiketVar, db, logger);
+
+    // ---- 3) Duyuru mesajları (hız sınırına tabi) ----
+    if (isUserOnCooldown(userId)) return;
+
+    const sonuc = await withOperationLimit(async () => {
+      try {
+        channel = getCache({ cacheType: 'Channel', id: config.guild.channel, guild });
       } catch (error) {
-        logger.error('Cache yüklenemedi: ' + error.message);
+        logger.error('Duyuru kanalı okunamadı: ' + error.message);
         return;
       }
 
-      // Yol rolü değiştiyse API'ye bildir (verildi/alındı) — launcher kapısı
-      // bu bilgiye bakar.
-      const rolVar = !!(role?.id && member?.roles.cache.has(role.id));
-      await rolDurumuBildir(userId, rolVar, db, logger);
+      if (!member) {
+        try {
+          member = guild.members.cache.get(userId)
+            || (await guild.members.fetch({ user: userId, cache: true }));
+        } catch (error) {
+          logger.error(`Üye bulunamadı: ${userId} - ${error.message}`);
+          return;
+        }
+      }
 
-      const guildId = pkg.d.user?.primary_guild?.identity_guild_id;
-      const badgeId = pkg.d.user?.primary_guild?.badge;
+      const badge = pkg.d.user?.primary_guild?.badge;
+      const badgeId = badge && typeof badge === 'object' ? badge.id : badge;
       const badgeImage = badgeId
-        ? `https://cdn.discordapp.com/clan-badges/${guild?.id}/${badgeId}.png?size=256`
+        ? `https://cdn.discordapp.com/clan-badges/${guild.id}/${badgeId}.png?size=256`
         : null;
 
-      if (guildId === config.guild.id) {
-        if (db.has(`base.${member?.id}`)) return;
+      if (etiketVar) {
+        // Aynı etiket için ikinci kez hoş geldin mesajı atma.
+        if (db.has(`base.${userId}`)) return;
+        db.set(`base.${userId}`, Date.now());
 
-        db.set(`base.${member?.id}`, Date.now());
+        const embed = BaseEmbed()
+          .setAuthor({
+            name: `Hoşgeldin ${member.user.displayName}!`,
+            iconURL: member.displayAvatarURL(),
+          })
+          .setTitle('Bizi Desteklediğin İçin Teşekkürler!')
+          .setDescription(
+            "> Sunucumuzun etiketini (tag'ini) aldığın için teşekkürler! Artık topluluğumuzu temsil ediyorsun. Bu etiketi taşıdığın sürece bu özel role sahip olacaksın."
+          );
+        if (badgeImage) embed.setThumbnail(badgeImage);
 
-        try {
-          if (role?.id && member && !member.roles.cache.has(role.id)) {
-            await member.roles.add(role.id);
-            db.set(`rol.${userId}`, true);
-          }
-        } catch (error) {
-          logger.error(`Rol verilirken hata: ${error.message}`);
-        }
-
-        try {
-          const embed = BaseEmbed()
-            .setAuthor({
-              name: `Hoşgeldin ${member?.user.displayName}!`,
-              iconURL: member?.displayAvatarURL(),
-            })
-            .setTitle('Bizi Desteklediğin İçin Teşekkürler!')
-            .setDescription(
-              "> Sunucumuzun etiketini (tag'ini)  aldığın için teşekkürler! Artık topluluğumuzu temsil ediyorsun. Bu etiketi taşıdığın sürece bu özel role sahip olacaksın."
-            );
-
-          if (badgeImage) {
-            embed.setThumbnail(badgeImage);
-          }
-
-          await channel?.send({
-            content: userMention(member?.id ?? ''),
-            embeds: [embed],
-          });
-        } catch (error) {
-          logger.error(`Hoşgeldin mesajı gönderilirken hata: ${error.message}`);
-        }
+        await channel?.send({ content: userMention(userId), embeds: [embed] });
       } else {
-        if (!db.has(`base.${member?.id}`)) return;
+        // Etiket yok: rol zaten yukarıda kaldırıldı. Veda mesajı yalnız
+        // gerçekten etiketliyken ayrılanlara gider (rol sahibi olması yeter).
+        const etiketliydi = db.has(`base.${userId}`) || rolVar;
+        db.delete(`base.${userId}`);
+        if (!etiketliydi) return;
 
-        db.delete(`base.${member?.id}`);
+        const embed = BaseEmbed()
+          .setColor(Colors.Red)
+          .setAuthor({
+            name: `Görüşürüz ${member.user.displayName}!`,
+            iconURL: member.displayAvatarURL(),
+          })
+          .setTitle('Seni Özleyeceğiz.')
+          .setDescription(
+            "> Sunucu etiketini ismindeki kaldırdığın için temsilci rolün de kaldırıldı. Yeniden topluluğu temsil etmek istersen, etiketi ismine eklemen yeterli!"
+          );
+        if (badgeImage) embed.setThumbnail(badgeImage);
 
-        try {
-          if (role?.id && member?.roles.cache.has(role.id)) {
-            await member.roles.remove(role.id);
-            db.set(`rol.${userId}`, false);
-          }
-        } catch (error) {
-          logger.error(`Rol kaldırılırken hata: ${error.message}`);
-        }
-
-        // Etiket bırakıldı = rol gitti: API'ye de bildir, launcher çizme
-        // iznini kaldırır.
-        await rolDurumuBildir(userId, false, db, logger);
-
-        try {
-          const embed = BaseEmbed()
-            .setColor(Colors.Red)
-            .setAuthor({
-              name: `Görüşürüz ${member?.user.displayName}!`,
-              iconURL: member?.displayAvatarURL(),
-            })
-            .setTitle('Seni Özleyeceğiz.')
-            .setDescription(
-              '> Sunucu etiketini ismindeki kaldırdığın için temsilci rolün de kaldırıldı. Yeniden topluluğu temsil etmek istersen, etiketi ismine eklemen yeterli!'
-            );
-
-          if (badgeImage) {
-            embed.setThumbnail(badgeImage);
-          }
-
-          await channel?.send({
-            content: userMention(member?.id ?? ''),
-            embeds: [embed],
-          });
-        } catch (error) {
-          logger.error(`Veda mesajı gönderilirken hata: ${error.message}`);
-        }
+        await channel?.send({ content: userMention(userId), embeds: [embed] });
       }
     });
 
-    if (result === null) {
-      logger.warn(`İşlem kuyruğu dolu, ${userId} için event atlandı.`);
+    if (sonuc === null) {
+      logger.warn(`İşlem kuyruğu dolu, ${userId} için duyuru atlandı (rol senkronu yapıldı).`);
     }
   },
 };
