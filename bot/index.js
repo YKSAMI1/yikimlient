@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, Collection, EmbedBuilder, REST, Routes } = re
 const db = require('croxydb');
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 const config = require('./config.js');
 const { resolveToken } = require('./utils/token');
 const api = require('./utils/api');
@@ -172,6 +173,86 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ---- kozmetik duyurusu (Yol Silindiri) ----
+/**
+ * Güvenlik API erişilebilir mi? Değilse VE yanında `guvenlik-api/src/server.js`
+ * varsa onu başlat (detached: bot kapansın da API açık kalsın — bot sık sık
+ * yeniden başlatılır, API'nin her seferinde kapanmasını istemeyiz).
+ *
+ * Uzak API (YIKIM_API başka adres) için başlatma DENENMEZ: sunucu zaten
+ * başka makinede çalışıyor olabilir, burada başlatmak işe yaramaz.
+ *
+ * Döner: API şu an yanıt veriyor mu?
+ */
+async function apiGerekirseAc(logger) {
+  const ilk = await api.ping();
+  if (ilk.ok) return true;
+
+  // Yanıt geldi ama yetki reddedildi → anahtar hatası: API atağı durdurma,
+  // kullanıcı iki .env'deki YIKIM_BOT_ANAHTARI'nı aynı yapmalı.
+  if (ilk.durum === 401) {
+    logger.warn(
+      'Güvenlik API anahtarı reddedildi (401). bot/.env ve guvenlik-api/.env ' +
+        'içindeki YIKIM_BOT_ANAHTARI değerleri BİREBİR aynı olmalı.',
+    );
+    return false;
+  }
+
+  // Erişilemedi. Uzak adres değilse yanındaki klasörden başlatmayı dene.
+  const adres = api.adres();
+  const yerel = /^http:\/\/(127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1\])/i.test(adres);
+  if (!yerel) return false;
+
+  const kok = path.join(__dirname, '..', 'guvenlik-api');
+  const giris = path.join(kok, 'src', 'server.js');
+  if (!fs.existsSync(giris)) return false;
+
+  const logDizin = path.join(__dirname, 'logs');
+  let akis = 'ignore';
+  try {
+    fs.mkdirSync(logDizin, { recursive: true });
+    // Windows'ta spawn, WriteStream nesnesini stdio olarak kabul etmiyor
+    // ("The argument 'stdio' is invalid") — gerçek bir DOSYA TANITLAYICISI
+    // (fd) gerekir. Bu yüzden dosyayı senkron açıp fd numarasını veriyoruz.
+    akis = fs.openSync(path.join(logDizin, 'guvenlik-api.log'), 'a');
+  } catch {
+    akis = 'ignore'; // yazılamazsa sessizce geç — API çalışması bunu engellemez
+  }
+
+  logger.info('Güvenlik API kapalı — yanındaki guvenlik-api başlatılıyor…');
+  try {
+    const cocuk = spawn(process.execPath, ['src/server.js'], {
+      cwd: kok,
+      stdio: ['ignore', akis, akis],
+      detached: true,
+      env: process.env,
+    });
+    cocuk.unref();
+  } catch (error) {
+    logger.warn(`Güvenlik API başlatılamadı: ${error.message}`);
+    return false;
+  } finally {
+    if (typeof akis === 'number') {
+      try {
+        fs.closeSync(akis);
+      } catch {
+        /* zaten kapalı */
+      }
+    }
+  }
+
+  // Açılmasını bekle (kondisyon bazlı: sabit bekleme değil, ping'e bakılır).
+  for (let deneme = 0; deneme < 24; deneme++) {
+    await new Promise((r) => setTimeout(r, 500));
+    const sonuc = await api.ping();
+    if (sonuc.ok) {
+      logger.info('Güvenlik API açıldı: ' + api.adres());
+      return true;
+    }
+  }
+  logger.warn('Güvenlik API başlatıldı ama yanıt vermedi — logs/guvenlik-api.log dosyasına bak.');
+  return false;
+}
+
 // Bot açıldığında bir kez gönderilir. Alıcı yoksa sessizce geçer.
 async function duyuruGonder() {
   const sahipId = (process.env.YIKIM_ADMIN_ID || '').trim();
@@ -244,13 +325,25 @@ async function hazirCalistir(kaynak, client) {
   // Panelde "bot açık" göstergesi için dakikada bir ping atılır.
   // API kapalıysa bot çalışmaya devam eder (yalnızca uyarı yazılır).
   if (api.hazirMi()) {
-    const pingAt = async () => {
-      const sonuc = await api.ping();
-      if (!sonuc.ok) logger.warn(`API ping başarısız: ${sonuc.hata || sonuc.durum}`);
-    };
-    pingAt();
-    setInterval(pingAt, 60_000).unref?.();
-    logger.info(`Güvenlik API: ${api.adres()}`);
+    // v0.8.2 — OTOMATIK BAŞLATMA: API kapalıysa (en sık görülen "API ping
+    // başarısız" hatasının nedeni buydu) bot, yanındaki guvenlik-api klasörünü
+    // kendisi açar. Uzak sunucuda API çalışıyorsa (YIKIM_API başka adres)
+    // hiçbir şey başlatılmaz, yalnızca kullanıcı uyarılır.
+    const apiAcik = await apiGerekirseAc(logger);
+    if (apiAcik) {
+      const pingAt = async () => {
+        const sonuc = await api.ping();
+        if (!sonuc.ok) logger.warn(`API ping başarısız: ${sonuc.hata || sonuc.durum}`);
+      };
+      pingAt();
+      setInterval(pingAt, 60_000).unref?.();
+      logger.info(`Güvenlik API: ${api.adres()}`);
+    } else {
+      logger.warn(
+        `Güvenlik API kapalı (${api.adres()}) — /bagla doğrulama ve rol senkronu çalışmaz. ` +
+          'Açmak için yeni terminal: cd ../guvenlik-api && npm start',
+      );
+    }
   } else {
     logger.warn('YIKIM_BOT_ANAHTARI tanımlı değil - güvenlik API çağrıları kapalı.');
   }
