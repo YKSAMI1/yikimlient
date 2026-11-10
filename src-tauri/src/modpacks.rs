@@ -60,6 +60,27 @@ pub fn java_presets() -> Vec<JavaPreset> {
             ],
         },
         JavaPreset {
+            id: "kayit".into(),
+            name: "Kayıt / OBS (video çekim)".into(),
+            description: "Video çekimi ve yayın için: ZGC (generational) ile milisaniye altı duraklamalar, AlwaysPreTouch ile sabit kare zamanı, OBS'un ek yüküne karşı pay bırakan tutarlı FPS. Kapatma/OBS açarken takılma yaşayanlar için.".into(),
+            recommended_ram_mb: 8192,
+            args: vec![
+                "-Xms{ram_mb}M".into(),
+                "-Xmx{ram_mb}M".into(),
+                // ZGC: duraklamaları ~1 ms'in altında tutar → kare zamanı sabit,
+                // kayıtta "shutter"/titreme yapmaz. Çok çekirdekli sistemlerde G1'den iyi.
+                "-XX:+UseZGC".into(),
+                "-XX:+ZGenerational".into(),
+                "-XX:+DisableExplicitGC".into(),
+                // Sayfaları baştan dokun: oyun açıldıktan sonra ilk dakikada
+                // işletim sisteminin sayfa verdikten kaynaklı takılmaları siler.
+                "-XX:+AlwaysPreTouch".into(),
+                "-XX:+PerfDisableSharedMem".into(),
+                // Minecraft milyonlarca tekrar eden dizgi üretir; ZGC bunu tekilleştirir.
+                "-XX:+UseStringDeduplication".into(),
+            ],
+        },
+        JavaPreset {
             id: "ultra_fps".into(),
             name: "Ultra FPS (Eski PC)".into(),
             description: "Zayıf/eski makineler için: küçük heap, kısa GC duraklamaları, minimum arka plan yükü. Entegre grafikli ve 8 GB RAM'li sistemlerde en yüksek kare hızı.".into(),

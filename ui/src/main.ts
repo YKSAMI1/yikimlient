@@ -664,9 +664,11 @@ export async function boot(): Promise<void> {
     // Sürükle-bırak + ilk kurulum sihirbazı + (o oynanmadıysa) rehber tur
     startDropWatcher();
     if (!maybeStartOnboarding()) maybeStartTour();
-    // Otomatik güncelleme kontrolü (imzalı; GitHub releases'ten) — sessiz kontrol,
-    // güncelleme varsa kullanıcıya sorar, hata asla açılışı bozmaz.
-    void checkForUpdate();
+    // Otomatik güncelleme (v0.8.2): açılışta SESSİZ — güncelleme varsa kullanıcıya
+    // sorulmaz, arka planda indirilip kurulur ve launcher kendini yeniden başlatır.
+    // Linux .deb/.rpm kurulumlarında bu yapılamaz (paket yöneticisi izin ister) →
+    // orada mevcut "paketi indir" akışına düşülür.
+    void sessizGuncelleme();
     // Bildirim kutusu: zilin geçmişinden yeni-var noktası ilk açılışta dursun.
     bildirimKutuBaslat();
     bildirimZilIlkDurum();
@@ -755,6 +757,70 @@ function bitisSesi(): void {
     setTimeout(() => ctx.close(), 900);
   } catch {
     // ses yoksa sorun değil
+  }
+}
+
+/**
+ * SESSİZ GÜNCELLEME (v0.8.2) — açılışta çalışır.
+ *
+ * KULLANICI İSTEĞİ: "Linux/Windows fark etmeksizin herkes anında, sormadan
+ * güncellensin". Eski akış önce modal gösterip "İndir ve Kur"ü bekliyordu;
+ * bu sayede güncellemeyen kullanıcı kalıyordu (ör. "Sonra"ya basıp
+ * unutanlar). Artık:
+ *
+ *   Windows / macOS        → indir + kur + launcher'ı yeniden başlat (sormadan)
+ *   Linux AppImage         → aynı şekilde sessiz
+ *   Linux .deb / .rpm      → paket yöneticisi izin istediğinden kendini
+ *                            güncelleyemez → sessiz yolda "paketi indir" akışına
+ *                            devam eder (çünkü orada hiçbir seçenek yok)
+ *   Zorunlu (minimum)      → aynı şekilde sessiz (kilit zaten vardı ama artık
+ *                            onay da istenmiyor)
+ *
+ * Hata olursa SESSİZCE geçilir: güncelleme kontrolü açılışı asla bozmaz.
+ */
+async function sessizGuncelleme(): Promise<void> {
+  try {
+    const mod = await import("@tauri-apps/plugin-updater");
+    const update = await mod.check();
+    if (!update?.available) return;
+
+    let bilgi: { os?: string; bundle?: string } = {};
+    try {
+      bilgi = (await invoke("cmd_guncelleme_bilgi")) as { os?: string; bundle?: string };
+    } catch {
+      /* eski çekirdek: bilgi yok sayılır */
+    }
+    const paketYonetimli =
+      bilgi.os === "linux" && (bilgi.bundle === "deb" || bilgi.bundle === "rpm");
+    if (paketYonetimli) {
+      // Sessiz güncelleme mümkün değil → mevcut "paketi indir" penceresi.
+      void checkForUpdate();
+      return;
+    }
+
+    const surum = String((update as any)?.version ?? "");
+    toast(`Yeni sürüm bulundu${surum ? ` (v${surum})` : ""} — arka planda indiriliyor…`);
+
+    let yuzde = 0;
+    await update.download((event: any) => {
+      if (event.event === "Started") yuzde = 0;
+      else if (event.event === "Progress") yuzde = Math.min(99, yuzde + 1);
+      if (yuzde % 25 === 0) toast(`Güncelleme indiriliyor… %${yuzde}`);
+    });
+    toast("Güncelleme kuruluyor — launcher yeniden başlıyor…");
+    await update.install();
+    // NSIS kurulumu exe'yi değiştirir; çağıran (biz) kapanmalı. Oyun ayrı süreç
+    // olduğu için kesintiye uğramaz.
+    setTimeout(() => {
+      try {
+        T.process.exit(0);
+      } catch {
+        window.location.reload();
+      }
+    }, 900);
+  } catch {
+    // çevrimdışı / endpoint yok / imza sorunu — sessizce geç, elle güncelleme
+    // Ayarlar sayfasından yapılabilir.
   }
 }
 

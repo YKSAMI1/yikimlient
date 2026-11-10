@@ -150,8 +150,13 @@ public final class YikimKozmetikSecim {
             // v1.33.0 — FPS: bu metot getSkinTextures üzerinden her karede
             // çağrılır. Kapı (zaman kontrolü) İLK olmalı; yoksa her karede
             // disk syscall'ı yapılıyordu.
+            // v1.29.3 — FPS: kapı aralığı 800 ms → 2000 ms. Bu metot her karede
+            // çağrılır; 800 ms'de bir render thread'inde 2-4 dosya sorgusu
+            // (isRegularFile + getLastModifiedTime) yapılıyordu. Menüden seçim
+            // kullanıcıya ANINDA görünmeli ama 2 sn'lik gecikme hiç hissedilmiyor;
+            // OBS gibi ek yük altında bu syscall'lar görünür takılma yapıyordu.
             long simdi = System.currentTimeMillis();
-            if (simdi - YikimKozmetikSecim.sonOkuma < 800L) {
+            if (simdi - YikimKozmetikSecim.sonOkuma < 2000L) {
                 return;
             }
             YikimKozmetikSecim.sonOkuma = simdi;

@@ -181,6 +181,13 @@ public final class YikimKozmetik {
     private static final long[] DOSYA_DAMGA = new long[] {Long.MIN_VALUE, Long.MIN_VALUE};
     private static final String[] DOSYA_B64 = new String[] {"", ""};
 
+    /// mtime ^ (boyut << 8) — iki syscall, tek işaret.
+    private static long[] damga(Path f) throws java.io.IOException {
+        long mtime = Files.getLastModifiedTime(f).toMillis();
+        long boyut = Files.size(f);
+        return new long[] {mtime ^ (boyut << 8), boyut};
+    }
+
     /** Bu kurulumda `.yikim/<ad>` işaret dosyası var mı? */
     private static boolean imVar(String ad) {
         try {
@@ -237,15 +244,39 @@ public final class YikimKozmetik {
     }
 
     /// 64x32 kopya varsa onu, yoksa tam dosyayı döndür.
+    ///
+    /// v1.29.3 — İZ KRALİÇESİ DÜZELTMESİ (SHUTTER): bu metot `pelerin(id)`
+    /// üzerinden HER KAREDE çağrılıyordu. Kopya dosya VARKEN her karede
+    /// `Files.readAllBytes` + `Base64.encodeToString` yapılıyordu — kendi
+    /// pelerinli oyuncu için saniyede 60 kez disk okuma + kodlama, HEPSİ
+    /// render thread'inde. OBS açıldığında kare zamanı zaten dolarsa bu
+    /// iş görünür takılmalara ("shutter") ve FPS düşüşüne yol açıyordu.
+    /// Artık `imzaliOku` gibi mtime+boyut damgasıyla önbelleğe alınır:
+    /// dosya değişmedikçe disk okuma YOK, base64 YOK.
+    private static final long[] KUCUK_DAMGA = new long[] {Long.MIN_VALUE, Long.MIN_VALUE};
+    private static final String[] KUCUK_B64 = new String[] {"", ""};
+
     private static String kucukDosya(String ad, String tam) {
         try {
+            int yuva = "elytra.kucuk.png".equals(ad) ? 1 : 0;
             Path f = YikimKozmetik.stateDir().resolve(ad);
-            if (Files.isRegularFile(f)) {
-                byte[] png = Files.readAllBytes(f);
-                if (png.length > 8) {
-                    return Base64.getEncoder().encodeToString(png);
-                }
+            if (!Files.isRegularFile(f)) {
+                YikimKozmetik.KUCUK_DAMGA[yuva] = Long.MIN_VALUE;
+                YikimKozmetik.KUCUK_B64[yuva] = "";
+                return tam;
             }
+            long[] damgaVeBoyut = YikimKozmetik.damga(f);
+            if (YikimKozmetik.KUCUK_DAMGA[yuva] == damgaVeBoyut[0]) {
+                return YikimKozmetik.KUCUK_B64[yuva];
+            }
+            byte[] png = Files.readAllBytes(f);
+            String b64 = "";
+            if (png.length > 8) {
+                b64 = Base64.getEncoder().encodeToString(png);
+            }
+            YikimKozmetik.KUCUK_DAMGA[yuva] = damgaVeBoyut[0];
+            YikimKozmetik.KUCUK_B64[yuva] = b64;
+            return b64.isEmpty() ? tam : b64;
         }
         catch (Throwable ignored) {
             // kopya okunamazsa tam dosya kullanılır
@@ -770,7 +801,7 @@ public final class YikimKozmetik {
             else {
                 b64 = YikimKozmetik.UZAK_PELERIN.get(id);
             }
-            class_2960 d = YikimKozmetik.doku("pelerin-" + id, b64);
+            class_2960 d = YikimKozmetik.dokuHizli(id, YikimKozmetik.DOKU_PELERIN, "pelerin-", b64);
             if (d == null && kendi) {
                 // HD dosya kurulamadıysa 64×32 kopyayla devam: pelerin kaybolmaz.
                 d = YikimKozmetik.doku("pelerin-k-" + id,
@@ -805,7 +836,7 @@ public final class YikimKozmetik {
             else {
                 b64 = YikimKozmetik.UZAK_KANAT.get(id);
             }
-            class_2960 d = YikimKozmetik.doku("kanat-" + id, b64);
+            class_2960 d = YikimKozmetik.dokuHizli(id, YikimKozmetik.DOKU_KANAT, "kanat-", b64);
             if (d == null && kendi) {
                 d = YikimKozmetik.doku("kanat-k-" + id,
                     YikimKozmetik.kucukDosya("elytra.kucuk.png", ""));
@@ -842,6 +873,34 @@ public final class YikimKozmetik {
         catch (Throwable ignored) {
             return null;
         }
+    }
+
+    /// v1.29.3 — FPS: kare başına, oyuncu başına doku kimliği önbelleği.
+    ///
+    /// Eskiden her karede `"pelerin-" + id` (dizi birleştirme) + doku imzası
+    /// için iki dizgi daha üretiliyordu; 80 oyunculu sunucuda kare başına
+    /// yüzlerce gereksiz nesne = GC baskısı. Artık UUID anahtarlı tek bakış:
+    /// base64 NESNESİ aynıysa (kimlik + uzunluk) doku kimliği doğrudan
+    /// döner; yeni tasarım gelince yavaş yola (kurulum) düşer.
+    private static final Map<UUID, Object[]> DOKU_PELERIN = new ConcurrentHashMap<>();
+    private static final Map<UUID, Object[]> DOKU_KANAT = new ConcurrentHashMap<>();
+
+    private static class_2960 dokuHizli(UUID id, Map<UUID, Object[]> onbellek, String onEk, String b64) {
+        if (b64 == null || b64.isEmpty()) {
+            return null;
+        }
+        int kimlik = System.identityHashCode(b64);
+        int uzunluk = b64.length();
+        Object[] kayit = onbellek.get(id);
+        if (kayit != null && kayit[0] == (Object) kimlik && kayit[1] == (Object) uzunluk) {
+            return (class_2960) kayit[2];
+        }
+        class_2960 d = YikimKozmetik.doku(onEk + id, b64);
+        if (onbellek.size() > 512) {
+            onbellek.clear();
+        }
+        onbellek.put(id, new Object[] {(Object) kimlik, (Object) uzunluk, d});
+        return d;
     }
 
     /** base64 PNG → TextureManager'a kayıtlı Identifier (bir kez).
@@ -967,15 +1026,30 @@ public final class YikimKozmetik {
         }
     }
 
+    /**
+     * v1.29.3 — FPS: `varsayilanMi` her karede, HER diğer oyuncu için
+     * `Class.forName` + `getMethod` + `invoke` yapıyordu (yansıma yaklaşık
+     * 0.5-2 µs; 80 oyunculu sunucuda kare başına yüzlerce çağrı). Artık
+     * sınıf ve metot BİR KEZ bulunup saklanır.
+     */
+    private static volatile java.lang.reflect.Method VARSAYILAN_METOT;
+    private static volatile Class<?> VARSAYILAN_SINIF;
+
     /** 1.21.9+ `AssetInfo$TextureAssetInfo(Identifier)` — aynı id hem kimlik hem yol. */
+    private static volatile Class<?> DOKU_BILGI_SINIF;
+    private static volatile java.lang.reflect.Constructor<?> DOKU_BILGI_KURUCU;
+
     private static Object dokuBilgisi(class_2960 id) {
         try {
-            Class<?> tur = YikimKozmetik.sinif("net.minecraft.class_12079$class_10726");
-            if (tur == null) {
-                return null;
+            if (YikimKozmetik.DOKU_BILGI_SINIF == null) {
+                Class<?> tur = YikimKozmetik.sinif("net.minecraft.class_12079$class_10726");
+                if (tur == null) {
+                    return null;
+                }
+                YikimKozmetik.DOKU_BILGI_KURUCU = tur.getConstructor(class_2960.class);
+                YikimKozmetik.DOKU_BILGI_SINIF = tur;
             }
-            Constructor<?> c = tur.getConstructor(class_2960.class);
-            return c.newInstance(id);
+            return YikimKozmetik.DOKU_BILGI_KURUCU.newInstance(id);
         }
         catch (Throwable ignored) {
             return null;
@@ -1033,12 +1107,15 @@ public final class YikimKozmetik {
      * nesneyle AYNI örnekse hiç dokunma. */
     private static boolean varsayilanMi(Object mevcut, UUID id) {
         try {
-            Class<?> c = YikimKozmetik.sinif("net.minecraft.class_1068");
-            if (c == null) {
-                return false;
+            if (YikimKozmetik.VARSAYILAN_SINIF == null) {
+                YikimKozmetik.VARSAYILAN_SINIF = YikimKozmetik.sinif("net.minecraft.class_1068");
+                if (YikimKozmetik.VARSAYILAN_SINIF == null) {
+                    return false;
+                }
+                YikimKozmetik.VARSAYILAN_METOT =
+                    YikimKozmetik.VARSAYILAN_SINIF.getMethod("method_4648", UUID.class);
             }
-            Method m = c.getMethod("method_4648", UUID.class);
-            return mevcut == m.invoke(null, id);
+            return mevcut == YikimKozmetik.VARSAYILAN_METOT.invoke(null, id);
         }
         catch (Throwable ignored) {
             return false;

@@ -62,6 +62,18 @@ GIZLILIK: bot\\.env (token + API anahtari) zip'e EKLENEMEZ; onu kendin olustur.
 Bot rol verildiginde ya da ALINDIGINDA bunu guvenlik API'sine yazar;
 launcher bu bilgiye bakar. Etiketi birakan oyuncunun cizim izni kapanir.
 
+--- HERKESE MESAJ (/duyuru) ---
+Komut yalnizca YIKIM_ADMIN_ID ile tanimli hesapta calisir:
+
+   /duyuru metin: <mesaj> baslik: <baslik> kanal: 1
+
+  metin   zorunlu, en fazla 1800 karakter
+  baslik  istege bagli (embed basligi)
+  kanal   1 ise duyuru CHANNEL_ID kanalina da yazilir
+
+Sunucudaki tum insan uyelerine DM gider (botlar atlanir). DM kapali
+olanlar sessizce sayilir. Bittiğinde komut sana ozet yazar.
+
 Detayli kurulum: bot/KURULUM.txt
 =====================================================
 `;

@@ -39,11 +39,33 @@ YÖNTEM B - Şifreli token (önerilen):
 GUILD_ID=Sunucu ID
 CHANNEL_ID=Hoşgeldin mesajı kanal ID
 ROLE_ID=Verilecek rol ID
+ROLE_YOL_ID=Etikete bağlı rol ID (boşsa ROLE_ID kullanılır)
+YIKIM_ADMIN_ID=Duyuru komutunu kullanacak kişinin Discord ID'si
 
 
 5) Botu Başlatma
 ----------------
 node index.js
+
+
+6) HERKESE MESAJ GÖNDERME (/duyuru)
+----------------------------------
+Komut yalnız YIKIM_ADMIN_ID ile tanımlı hesapta çalışır (sunucuda ya da
+bot'a DM'den).
+
+  /duyuru metin: <mesaj> baslik: <isteğe bağlı başlık> kanal: 1
+
+  metin   : zorunlu — herkese gidecek yazı (en fazla 1800 karakter)
+  baslik  : isteğe bağlı — embed başlığı
+  kanal   : 1 seçilirse duyuru CHANNEL_ID kanalına da yazılır
+
+Davranış:
+  - Sunucudaki TÜM insan üyelerine DM gider (botlar atlanır).
+  - Gönderim 4'erli gruplar + 400 ms bekleme ile yapılır (Discord DM sınırı).
+  - DM'i kapalı olanlar sessizce "atlanan" olarak sayılır.
+  - Bittiğinde komut sana özet yazar: giden / atlanan / toplam.
+  - Kullanıcıları etiketlemek istersen Discord'un kendi etiketini
+    (<@ID>) metin içine yazabilirsin.
 
 
 6) Eklenen Güvenlik Özellikleri

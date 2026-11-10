@@ -71,7 +71,12 @@ foreach ($uz in @("amd64.AppImage", "amd64.deb")) {
 
 # ZORUNLU GUNCELLEME ESIGI: launcher kurulumunu yapan JSON'a bu satiri ekleriz.
 # "1.0.0" yerine gercekte zorunlu yapmak istedigin en dusuk surumu yaz.
-$MINIMUM = "0.8.0"
+# v0.8.2: KULLANICI ISTEGI - "herkes Linux/Windows fark etmeksizin aninda,
+# sormadan guncellensin". Bundan onceki sürümler (0.7.x) bu alani TANIMAZ;
+# onlar icin zorunlu kilidi ancak bir kez 0.8.x kurulunca devreye girer.
+# (v0.8.1'de 0.8.0 kalmasi secilmisti cunku .deb/.rpm kendini gunccelleyemiyordu;
+# v0.8.2'de o yol "paketi indir" olarak duzeltildigi icin esik yukseltilebilir.)
+$MINIMUM = "0.8.1"
 
 # latest.json — updater bu dosyayi okur (releases/latest/download/latest.json)
 $platformlar = @"
