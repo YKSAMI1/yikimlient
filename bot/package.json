@@ -1,6 +1,9 @@
 {
-  "dependencies": {
-    "croxydb": "^0.0.26",
-    "discord.js": "^14.26.4"
-  }
+    "dependencies":  {
+                         "croxydb":  "^0.0.26",
+                         "discord.js":  "^14.26.4"
+                     },
+    "scripts":  {
+                    "test":  "node --test test/"
+                }
 }

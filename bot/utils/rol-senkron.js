@@ -1,22 +1,30 @@
-// ROL SENKRONU — "Yol Silindiri" rolü ↔ güvenlik API.
+// ROL BİLDİRİMİ — "Yol Silindiri" rolünün verilip/alınmasını güvenlik API'sine yazar.
 //
-// Launcher'ın çizme kapısı (HD fotoğraf, maske, katalog seçimi) API'deki
-// rol bilgisine bakar. Rol bir kez yazıldıktan sonra oyuncu Discord'da
-// etiketi bırakabilir; bu durum API'ye İLETİLMİŞSE launcher izni geri
-// çeker. Aşağıdaki iki yardımcı bunu sağlar:
+// BUNUN DIŞINDA HİÇBİR ŞEY YAPMAZ:
+//   ✘ üye taraması yapmaz (açılışta/periyodik "tüm üyeler" taraması YOK —
+//     456 üyeliğe her 10 dakikada members.fetch() atmak Discord'u rate-limit'e
+//     sokuyor ve her üye için API'ye yazmak yerel API'yi düşürüyordu),
+//   ✘ rol kararı vermez, karar orijinal sistemin: eventler/guildMemberUpdate.js.
+//   ✔ YALNIZCA rol gerçekten değiştiğinde, o tek kullanıcı için API'ye bildirir.
 //
-//   1) rolDurumuBildir  — tek kullanıcı, rol değişince (guildMemberUpdate)
-//   2) rolDurumlariniSenkron — bot açılışında TÜM üyeler (rol verilmiş ama
-//      hiç bildirilmemiş, rol kaldırılmış olabilir)
+// Karar mekanizması (etiket varsa rol, etiket yoksa rol yok, hoşgeldin/veda
+// mesajları) eventler/guildMemberUpdate.js içindedir ve özel sistemdir —
+// burada ona DOKUNULMAZ.
 
 const api = require('./api');
 
-/** Rol durumunu API'ye yaz; değişmediyse çağrılmaz. */
+/** Rol durumunu API'ye yaz; değişmediyse çağrılmaz (gereksiz yazmayı önler). */
 async function rolDurumuBildir(discordId, rolVar, db, logger) {
-  if (!api.hazirMi()) return;
+  if (!discordId) return;
+  if (!api.hazirMi()) {
+    // API anahtarı tanımlı değilse botun işleyişi bozulmasın: sessizce geç.
+    return;
+  }
+
   const anahtar = `rol.${discordId}`;
   const onceki = db.get(anahtar);
-  if (onceki === rolVar) return;
+  if (onceki === rolVar) return; // değişmedi → yazma
+
   try {
     const sonuc = await api.rolGuncelle({ discordId, rolYol: rolVar });
     if (sonuc.ok) db.set(anahtar, rolVar);
@@ -26,75 +34,4 @@ async function rolDurumuBildir(discordId, rolVar, db, logger) {
   }
 }
 
-/**
- * Bot açılışında sunucudaki TÜM üyelerin rol durumunu API'ye yaz.
- * `db` içindeki `rol.<id>` kaydı ile karşılaştırır — böylece gereksiz yazma
- * olmaz, bot her açılışta API'yi doğru duruma getirir.
- */
-async function rolDurumlariniSenkron(client, db, logger, config, rolId) {
-  if (!api.hazirMi()) {
-    if (logger) logger.warn('YIKIM_BOT_ANAHTARI yok - rol senkronu atlandı.');
-    return;
-  }
-  let guild;
-  try {
-    guild = await client.guilds.fetch(config.guild.id);
-  } catch (error) {
-    logger.error(`Sunucu okunamadı: ${error.message}`);
-    return;
-  }
-
-  let uyeler;
-  try {
-    uyeler = await guild.members.fetch();
-  } catch (error) {
-    logger.error(`Üyeler okunamadı: ${error.message}`);
-    return;
-  }
-
-  let gonderilen = 0;
-  let duzeltilen = 0;
-  for (const [, uye] of uyeler) {
-    if (uye.user?.bot) continue;
-
-    let rolVar = rolId ? uye.roles.cache.has(rolId) : false;
-
-    // AÇILIŞ ONARIMI: Discord üye listesinde etiket bilgisi (`primaryGuild`)
-    // geldiyse rolü etikete göre düzelt. Bot kapalıyken etiket bırakılmış
-    // olabilir; bu durumda rol açılışta kaldırılır. Bilgi YOKSA dokunulmaz —
-    // REST yanıtı bu alanı her zaman içermeyebilir.
-    if (rolId && uye.user && 'primaryGuild' in uye.user) {
-      const pg = uye.user.primaryGuild;
-      const etiketVar = !!(pg && String(pg.identityGuildId || '') === String(config.guild.id));
-      if (etiketVar !== rolVar) {
-        try {
-          if (etiketVar) {
-            await uye.roles.add(rolId, 'YIKIM etiketi (açılış senkronu)');
-          } else {
-            await uye.roles.remove(rolId, 'YIKIM etiketi yok (açılış senkronu)');
-          }
-          rolVar = etiketVar;
-          duzeltilen += 1;
-          if (logger) {
-            logger.info(`Açılışta rol düzeltildi: ${uye.user.tag} → ${etiketVar ? 'verildi' : 'kaldırıldı'}`);
-          }
-        } catch (error) {
-          if (logger) logger.warn(`Rol düzeltilemedi (${uye.user.tag}): ${error.message}`);
-        }
-      }
-    }
-
-    const anahtar = `rol.${uye.id}`;
-    if (db.get(anahtar) === rolVar) continue;
-    await rolDurumuBildir(uye.id, rolVar, db, logger);
-    gonderilen += 1;
-  }
-  if (logger) {
-    logger.info(
-      `Rol senkronu tamamlandı: ${gonderilen} kullanıcı API'ye yazıldı, ` +
-        `${duzeltilen} rol etikete göre düzeltildi.`,
-    );
-  }
-}
-
-module.exports = { rolDurumuBildir, rolDurumlariniSenkron };
+module.exports = { rolDurumuBildir };

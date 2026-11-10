@@ -6,7 +6,6 @@ const { spawn } = require('child_process');
 const config = require('./config.js');
 const { resolveToken } = require('./utils/token');
 const api = require('./utils/api');
-const { rolDurumlariniSenkron } = require('./utils/rol-senkron');
 const {
   rejectUnauthorizedGuild,
   installProcessGuards,
@@ -348,32 +347,12 @@ async function hazirCalistir(kaynak, client) {
     logger.warn('YIKIM_BOT_ANAHTARI tanımlı değil - güvenlik API çağrıları kapalı.');
   }
 
-  // ---- rol senkronu ("Yol Silindiri") ----
-  // Rol verilmiş/alınmış ama API'ye hiç bildirilmemiş olabilir. Bot her
-  // açılışta sunucudaki gerçek rol durumunu API'ye yazar; launcher çizme
-  // izni bu bilgiye bakar (HD fotoğraf/maske yükleme bununla açılır).
-  const rolId = (process.env.ROLE_YOL_ID || process.env.ROLE_ID || '').trim();
-  if (rolId) {
-    await rolDurumlariniSenkron(client, db, logger, config, rolId);
-
-    // ---- PERİYODİK ROLLÜ SENKRON (güvenlik ağı) ----
-    // `GUILD_MEMBER_UPDATE` bazen kaçırılabiliyor: bot minik bir restart
-    // geçiriyor, Discord olayı göndermiyor ya da kullanıcı endpoint'te
-    // "primary guild" alanını göndermiyor. Sonuç: etiket bırakılmış ama rol
-    // duruyordu (binlerce kullanıcıda yaşandı). Bunu güvenlik ağı olarak
-    // 10 dakikada bir çalıştırır: etiket yok → rol kalkar (eger rolu varsa).
-    // Ağır değil: tek seferlik member fetch + sadece farklı olanlara dokunma.
-    const PERIYOT_MS = 10 * 60_000;
-    const periyodikTara = async () => {
-      try {
-        await rolDurumlariniSenkron(client, db, logger, config, rolId);
-      } catch (error) {
-        logger.warn(`Periyodik rol taraması başarısız: ${error.message}`);
-      }
-    };
-    setInterval(periyodikTara, PERIYOT_MS).unref?.();
-    logger.info(`Periyodik rol senkronu açık (${PERIYOT_MS / 60000} dakikada bir).`);
-  }
+  // ---- rol senkronu: YALNIZCA rol gerçekten verilip/alkıldığı an çalışır ----
+  // Gereksiz Discord üye taraması YOK (açılış/periyodik tarama kaldırıldı:
+  // 456 üyeliğe 10 dakikada bir `members.fetch()` atmak Discord'u "opcode 8
+  // rate limited"a sokuyordu ve her üye için API'ye yazı yazmak yerel API'yi
+  // düşürüyordu). Karar/rol mantığı eventler/guildMemberUpdate.js içindedir;
+  // API'ye bildirim de orada, rol değiştiği anda yapılır.
 
   // ---- kozmetik duyurusu ----
   // "Yol Silindiri" rolü olanlara kendi pelerin/elitralarını çizebileceklerini

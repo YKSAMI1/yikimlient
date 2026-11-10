@@ -137,6 +137,9 @@ public final class YikimGlifFabrika {
     }
 
     /// İlk render sırasında (render thread) çağrılır — asla null döndürmemeye çalış.
+    /// Sürüme özel alt sınıf (BeyazGlif) `src/version/<mc-surumu>/` altındadır:
+    /// `method_73399` dönüş tipi 1.21.11'de daralmış (class_11767$class_12238),
+    /// 1.21.10 ve öncesinde yoktur — bu yüzden sınıf sürüme göre derlenir.
     private static class_382 pisir(int slot) {
         class_382 glif = PISINMIS[slot];
         if (glif == null) {
@@ -168,29 +171,6 @@ public final class YikimGlifFabrika {
     }
 
     // ---------------------------------------------------------------- iç tipler
-
-    /// v1.12.3 RENK/TONLAMA DÜZELTMESİ: bazı sunucular isimlere takım önekleri +
-    /// renk kodları ekler — glif quad'ı o rengin tonuyla çarpılıyordu; sonuç
-    /// "aynı çizim ama renkler farklı" ve koyu isimlerde rozet görünmezdi.
-    /// Bu alt sınıf rengi VE ışığı zorla beyaz/açık tutar: hangi sunucuda
-    /// olursa olsun çizim birebir doygun ve görünür çıkar.
-    static final class BeyazGlif extends class_382 {
-        BeyazGlif(class_379 olculer, class_8538 tipler, com.mojang.blaze3d.textures.GpuTextureView doku,
-                  float u1, float u2, float v1, float v2,
-                  float sol, float sag, float ust, float alt) {
-            super(olculer, tipler, doku, u1, u2, v1, v2, sol, sag, ust, alt);
-        }
-
-        @Override
-        public class_11767.class_12238 method_73399(float x, float y, int renk, int golgeRenk,
-                                                    class_2583 stil, float f1, float f2) {
-            // v1.13.0 ÇİFT GÖRÜNTÜ DÜZELTMESİ: eski kod gölge rengini de beyaza
-            // zorluyordu → gölge, 1px kaymış BEYAZ bir kopya olarak çiziliyor ve
-            // rozet "üst üste binmiş / iki tane" görünüyordu. Gölge şeffaf:
-            // tek, keskin rozet; hangi takım renginde olursa olsun beyaz kalır.
-            return super.method_73399(x, y, 0xFFFFFFFF, 0x00000000, stil, f1, f2);
-        }
-    }
 
     private static final class IcSaglayici implements class_390 {
         private final int slot;

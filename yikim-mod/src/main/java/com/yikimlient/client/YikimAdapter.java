@@ -64,9 +64,35 @@ public final class YikimAdapter {
     public static int optionValue(class_315 options, String key) {
         return switch (key) {
             case "particles" -> ((class_4066)options.method_42475().method_41753()).ordinal();
-            case "graphics" -> ((class_5365)options.method_75329().method_41753()).ordinal();
+            case "graphics" -> grafikSecenegi(options) != null ? grafikSecenegi(options).method_41753().ordinal() : 0;
             default -> ((class_4063)options.method_42528().method_41753()).ordinal();
         };
+    }
+
+    /**
+     * GRAFİK AYARI SEÇENEĞİ — sürüme göre adı değişir (v1.29.4 çok sürümlü derleme).
+     *
+     *   1.21.11  →  options.method_75329()
+     *   1.21.9/10 →  options.method_42534()
+     *
+     * Kaynak her iki sürüme de derleneceği için doğrudan çağrı yapamayız;
+     * yansımayla sınarız (bulunamazsa null → çağıran kapalı davranış).
+     */
+    @SuppressWarnings("unchecked")
+    private static net.minecraft.class_7172<net.minecraft.class_5365> grafikSecenegi(class_315 options) {
+        if (options == null) {
+            return null;
+        }
+        for (String ad : new String[] {"method_75329", "method_42534"}) {
+            try {
+                return (net.minecraft.class_7172<net.minecraft.class_5365>)
+                    options.getClass().getMethod(ad).invoke(options);
+            }
+            catch (Throwable ignored) {
+                // bu sürümde bu ad yok — sıradakini dene
+            }
+        }
+        return null;
     }
 
     public static boolean setOption(class_315 options, String key, int index) {
@@ -80,11 +106,15 @@ public final class YikimAdapter {
                 return true;
             }
             case "graphics": {
+                net.minecraft.class_7172<net.minecraft.class_5365> secenek = YikimAdapter.grafikSecenegi(options);
+                if (secenek == null) {
+                    return false;
+                }
                 class_5365[] values = class_5365.values();
                 if (index < 0 || index >= values.length) {
                     return false;
                 }
-                options.method_75329().method_41748(values[index]);
+                secenek.method_41748(values[index]);
                 return true;
             }
         }
