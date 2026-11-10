@@ -1,61 +1,61 @@
 {
-    "generatedAt":  "2026-11-05T21:20:00Z",
-    "modVersion":  "1.29.1",
+    "generatedAt":  "2026-11-10T20:16:53Z",
+    "modVersion":  "1.29.2",
     "mods":  [
                  {
                      "mcVersion":  "1.21.1",
                      "adapter":  "legacy",
-                     "file":  "yikimlient-1.29.1+1.21.11.jar"
+                     "file":  "yikimlient-1.29.2+1.21.11.jar"
                  },
                  {
                      "mcVersion":  "1.21.2",
                      "adapter":  "legacy2",
-                     "file":  "yikimlient-1.29.1+1.21.11.jar"
+                     "file":  "yikimlient-1.29.2+1.21.11.jar"
                  },
                  {
                      "mcVersion":  "1.21.3",
                      "adapter":  "legacy2",
-                     "file":  "yikimlient-1.29.1+1.21.11.jar"
+                     "file":  "yikimlient-1.29.2+1.21.11.jar"
                  },
                  {
                      "mcVersion":  "1.21.4",
                      "adapter":  "hybrid",
-                     "file":  "yikimlient-1.29.1+1.21.11.jar"
+                     "file":  "yikimlient-1.29.2+1.21.11.jar"
                  },
                  {
                      "mcVersion":  "1.21.5",
                      "adapter":  "hybrid",
-                     "file":  "yikimlient-1.29.1+1.21.11.jar"
+                     "file":  "yikimlient-1.29.2+1.21.11.jar"
                  },
                  {
                      "mcVersion":  "1.21.6",
                      "adapter":  "mid",
-                     "file":  "yikimlient-1.29.1+1.21.11.jar"
+                     "file":  "yikimlient-1.29.2+1.21.11.jar"
                  },
                  {
                      "mcVersion":  "1.21.7",
                      "adapter":  "mid",
-                     "file":  "yikimlient-1.29.1+1.21.11.jar"
+                     "file":  "yikimlient-1.29.2+1.21.11.jar"
                  },
                  {
                      "mcVersion":  "1.21.8",
                      "adapter":  "mid",
-                     "file":  "yikimlient-1.29.1+1.21.11.jar"
+                     "file":  "yikimlient-1.29.2+1.21.11.jar"
                  },
                  {
                      "mcVersion":  "1.21.9",
                      "adapter":  "newer",
-                     "file":  "yikimlient-1.29.1+1.21.11.jar"
+                     "file":  "yikimlient-1.29.2+1.21.11.jar"
                  },
                  {
                      "mcVersion":  "1.21.10",
                      "adapter":  "newer",
-                     "file":  "yikimlient-1.29.1+1.21.11.jar"
+                     "file":  "yikimlient-1.29.2+1.21.11.jar"
                  },
                  {
                      "mcVersion":  "1.21.11",
                      "adapter":  "modern",
-                     "file":  "yikimlient-1.29.1+1.21.11.jar"
+                     "file":  "yikimlient-1.29.2+1.21.11.jar"
                  }
              ]
 }
