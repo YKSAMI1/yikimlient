@@ -1,7 +1,7 @@
 {
     "schemaVersion": 1,
     "id": "yikimlient",
-    "version": "1.29.4+1.21.10",
+    "version": "1.29.4+1.21.1",
     "name": "YIKIM Client",
     "description": "YIKIMLient'in oyun içi çekirdeği. Sağ Shift ile YIKIM paneli; çakışmayan HUD düzeni, tam ekran HUD editörü, kare hızı teşhisi, oyun içi katalog ve başlatıcı ile dosya köprüsü.",
     "authors": [
@@ -23,7 +23,7 @@
     "depends": {
         "fabricloader": ">=0.19.5",
         "fabric-api": "*",
-        "minecraft": "1.21.10",
+        "minecraft": "1.21.1",
         "java": ">=21"
     }
 }

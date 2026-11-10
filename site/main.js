@@ -1,6 +1,6 @@
 /* YIKIMLient site — etkileşimler */
 const REPO = "YKSAMI1/yikimlient";
-const YEDEK_SURUM = "0.8.2";
+const YEDEK_SURUM = "0.8.3";
 const CACHE_MS = 10 * 60 * 1000;
 
 const OS_ETIKET = {
@@ -162,7 +162,7 @@ function gozlemci() {
   // Yukarıda kalan öğeler asla gizli kalmasın: sayfa ortasında açıldıysa,
   // hızlı kaydırıldıysa veya gözlemci kaçırdıysa hemen görünür yap.
   //
-  // v0.8.2 — MOBİL: burada eskiden `scroll` dinleyicisi vardı ve her kaydırma
+  // v0.8.3 — MOBİL: burada eskiden `scroll` dinleyicisi vardı ve her kaydırma
   // karesinde görünmeyen TÜM öğeler için getBoundingClientRect() çağırıyordu
   // (zorunlu layout → telefonlarda kaydırma takılması). Artık yalnız açılışta
   // bir kez + 4 sn emniyet zamanlayıcısı çalışır; IntersectionObserver
@@ -232,7 +232,7 @@ function sayaclar() {
   // Görünür alanın üstünde kalanlar (sayfa ortasında açılış / hızlı kaydırma)
   // 0'da takılı kalmasın: hedef değeri hemen yaz.
   //
-  // v0.8.2 — MOBİL: burada eskiden `scroll` dinleyicisi vardı; her karede tüm
+  // v0.8.3 — MOBİL: burada eskiden `scroll` dinleyicisi vardı; her karede tüm
   // sayaçlar için layout okuması yapıyordu. Artık açılışta bir kez + 4 sn
   // sonra bir kez (tek layout) çalışır.
   const yukaridakiler = () =>
