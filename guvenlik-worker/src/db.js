@@ -75,7 +75,18 @@ export function dbYap(d1) {
     },
 
     cihazBul: (cihaz_id) => one("SELECT * FROM cihaz WHERE cihaz_id = ?", cihaz_id),
-    cihazSonGorulen: (cihaz_id) => run("UPDATE cihaz SET son_gorulen = ? WHERE cihaz_id = ?", simdi(), cihaz_id),
+    /**
+     * "Son görülen" alanı: her istekte yazmak D1 ücretsiz kotasını (100.000
+     * yazma/gün) boşa harcıyordu. Yalnız 10 dakikadan eskiyse güncellenir;
+     * koşul tutmazsa D1 hiçbir satır yazmaz (ücretsiz).
+     */
+    cihazSonGorulen: (cihaz_id) =>
+      run(
+        "UPDATE cihaz SET son_gorulen = ? WHERE cihaz_id = ? AND son_gorulen < ?",
+        simdi(),
+        cihaz_id,
+        simdi() - 10 * 60 * 1000
+      ),
     yetkiBitisYaz: (cihaz_id, bitis) =>
       run("UPDATE cihaz SET yetki_bitis = ? WHERE cihaz_id = ?", bitis, cihaz_id),
 
@@ -242,15 +253,10 @@ export function dbYap(d1) {
     // ---------- nonce (tekrar saldırısı) ----------
     /** true = ilk kez görüldü; false = tekrar (reddet). */
     async nonceKabul(nonce) {
+      // Eski nonce'lar birikmesin: her istekte %2 olasılıkla temizle.
+      if (Math.random() < 0.02) await this.nonceTemizle();
       const degisen = await run("INSERT OR IGNORE INTO nonce (nonce, ts) VALUES (?, ?)", nonce, simdi());
-      if (degisen === 1) {
-        return true;
-      }
-      // Eski nonce tablosu büyümesin: fırsat buldukça temizle.
-      if (Math.random() < 0.05) {
-        await run("DELETE FROM nonce WHERE ts < ?", simdi() - NONCE_OMUR);
-      }
-      return false;
+      return degisen === 1;
     },
 
     nonceTemizle: () => run("DELETE FROM nonce WHERE ts < ?", simdi() - NONCE_OMUR),

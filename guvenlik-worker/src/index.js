@@ -64,14 +64,17 @@ const hata = (env, durum, mesaj) => cevap(env, durum, { hata: mesaj });
 
 // ---------- istek doğrulama ----------
 
-async function istekDogrula(env, d, zarf, govdeMetni) {
+async function istekDogrula(env, d, zarf, govdeMetni, nonceGerekli = true) {
   const { cihaz_id, ts, nonce, imza: imza_b64 } = zarf;
   const pub_key = zarf.pub_key ?? zarf.govde?.pub_key;
   if (!cihaz_id || !nonce || !imza_b64 || typeof ts !== "number") {
     return { hata: "eksik imza alanlari" };
   }
   if (Math.abs(simdi() - ts) >= 5 * 60 * 1000) return { hata: "zaman penceresi" };
-  if (!(await d.nonceKabul(nonce))) return { hata: "nonce kullanilmis" };
+  // Yalnız yazan uçlarda nonce saklanır. Salt-okunur uçlar (durum/kozmetik
+  // okuma) 5 sn'de bir çağrıldığı için her istekte D1'e yazmak ücretsiz
+  // kotayı tüketirdi; tekrar oynatma bu uçlarda yeni bir yetki vermez.
+  if (nonceGerekli && !(await d.nonceKabul(nonce))) return { hata: "nonce kullanilmis" };
 
   const mesaj = imzaMetni(cihaz_id, ts, nonce, govdeMetni);
   const kayitli = await d.cihazBul(cihaz_id);
@@ -316,6 +319,10 @@ const CIHAZ_YOLLARI = {
   "/api/kozmetik/oku": kozmetikOkuYolu,
 };
 
+// Tekrar koruması (nonce) gerektirmeyen salt-okunur uçlar: launcher bunları
+// 5 saniyede bir çağırıyor, her çağrıda D1'e nonce yazmak kotayı tüketirdi.
+const SALT_OKUNUR = new Set(["/api/baglama/durum", "/api/kozmetik/oku"]);
+
 // Bot uçları: gövde imzasız, `x-bot-anahtari` başlığıyla korunur.
 const BOT_YOLLARI = {
   "/api/baglama/dogrula": baglamaDogrula,
@@ -391,7 +398,7 @@ async function yonlendir(request, env) {
 
   const zarf = g.govde;
   const govdeMetni = JSON.stringify(zarf.govde ?? zarf ?? {});
-  const dogrula = await istekDogrula(env, d, zarf, govdeMetni);
+  const dogrula = await istekDogrula(env, d, zarf, govdeMetni, !SALT_OKUNUR.has(yol));
   if (dogrula.hata) {
     const durum = dogrula.hata === "eksik imza alanlari" ? 400 : 401;
     return hata(env, durum, dogrula.hata);
