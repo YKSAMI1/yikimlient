@@ -14,8 +14,16 @@ use serde::de::DeserializeOwned;
 
 use crate::guvenlik::{cihaz_kimligi_al, imzola, istek_imza_metni};
 
-/// Yerel/geliştirme adresi. Öncelik: `YIKIM_API` ortam değişkeni →
-/// `guvenlik/api-url.txt` (yayın adresi; kurulum yöneticisi yazar) → localhost.
+/// Yayın API'sinin genel adresi.
+///
+/// Site (Vercel) `/api/*` isteklerini tüneldeki güvenlik sunucusuna yönlendirir
+/// (`site/vercel.json`). Böylece adres SABİT kalır: tünel/URL değişince yalnız
+/// site yeniden yayınlanır, oyuncuların launcher'ı güncellenmez.
+pub const YAYIN_API_ADRESI: &str = "https://yikimlient.vercel.app";
+
+/// API adresi. Öncelik: `YIKIM_API` ortam değişkeni → `guvenlik/api-url.txt`
+/// (yerel/geliştirme için; sunucu sahibi `http://127.0.0.1:8788` yazar) →
+/// yayın adresi.
 pub fn api_adresi() -> String {
     if let Ok(v) = std::env::var("YIKIM_API") {
         let v = v.trim();
@@ -30,7 +38,7 @@ pub fn api_adresi() -> String {
             return v.trim_end_matches('/').to_string();
         }
     }
-    "http://127.0.0.1:8788".into()
+    YAYIN_API_ADRESI.into()
 }
 
 /// Yayın API'sinin imza doğrulama anahtarı (GENEL anahtar — gizli değil).
@@ -192,12 +200,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn api_adresi_yerel_varsayilan() {
+    fn api_adresi_env_ve_yayin_varsayilani() {
+        // Yerel ayar dosyası testi etkilemesin: geçici uygulama klasörü.
+        let dir = std::env::temp_dir().join(format!("yikim-api-adres-{}", std::process::id()));
+        std::env::set_var("YIKIM_APP_DIR", &dir);
         std::env::remove_var("YIKIM_API");
-        assert_eq!(api_adresi(), "http://127.0.0.1:8788");
+        assert_eq!(api_adresi(), YAYIN_API_ADRESI);
         std::env::set_var("YIKIM_API", "https://ornek.example.com/");
         assert_eq!(api_adresi(), "https://ornek.example.com");
         std::env::remove_var("YIKIM_API");
+        std::env::remove_var("YIKIM_APP_DIR");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

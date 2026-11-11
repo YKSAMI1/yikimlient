@@ -98,20 +98,38 @@ function istekDogrula(yanit, govde, govdeMetni) {
   return { cihaz_id, pub_key, yeni: true };
 }
 
-function govdeOku(is, islem) {
+function govdeOku(is, yanit, islem) {
   let metin = "";
   is.on("data", (p) => {
     metin += p;
-    if (metin.length > 64 * 1024) is.destroy();
+    // Gövde sınırı: bağlantıyı kesmek yerine yanıt ver (aksi hâlde istek
+    // zaman aşımına kadar asılı kalır).
+    if (metin.length > 64 * 1024) {
+      is.destroy();
+      if (!yanit.headersSent) hata(yanit, 413, "govde cok buyuk");
+    }
   });
   is.on("end", () => {
     let govde = {};
     try {
       govde = metin ? JSON.parse(metin) : {};
     } catch {
-      return hata(is.res, 400, "bozuk govde");
+      // DİKKAT: `is.res` YOKTUR (IncomingMessage'da response alanı yok) —
+      // eskiden burada `hata(is.res, ...)` çağrılıyordu ve bozuk gövde gönderen
+      // HER istek API sürecini çökertiyordu (502 + tüm oyuncuların bağlantısı).
+      return hata(yanit, 400, "bozuk govde");
     }
-    islem(govde);
+    // `null`, sayı, dizi, metin: zarf nesne olmalı (aksi hâlde alan okumaları
+    // yakalanmayan TypeError üretir — bu geri çağrı `try/catch` dışında çalışır).
+    if (!govde || typeof govde !== "object" || Array.isArray(govde)) {
+      return hata(yanit, 400, "govde nesne olmali");
+    }
+    try {
+      islem(govde);
+    } catch (e) {
+      console.error("[guvenlik-api] govde isleme hatasi:", e?.message || e);
+      if (!yanit.headersSent) hata(yanit, 500, "sunucu hatasi");
+    }
   });
 }
 
@@ -337,7 +355,23 @@ const CIHAZ_YOLLARI = {
 };
 
 export function handle(is, yanit) {
-  const url = is.url.split("?")[0];
+  // TEK İSTEK TÜM SUNUCUYU DÜŞÜRMESİN: bozuk JSON / null gövde / beklenmeyen
+  // alan eskiden yakalanmayan TypeError üretip süreci çökertiyordu (tüm
+  // oyuncular 502 alıyordu). Burada her şey yakalanır.
+  try {
+    return handleIc(is, yanit);
+  } catch (e) {
+    console.error("[guvenlik-api] istek hatasi (handle):", e?.message || e);
+    try {
+      if (!yanit.headersSent) hata(yanit, 500, "sunucu hatasi");
+    } catch {
+      /* yanıt kapanmış */
+    }
+  }
+}
+
+function handleIc(is, yanit) {
+  const url = (is.url || "/").split("?")[0];
   yanit.setHeader("access-control-allow-origin", "*");
   yanit.setHeader("access-control-allow-headers", "content-type");
   yanit.setHeader("access-control-allow-methods", "POST,GET,OPTIONS");
@@ -355,21 +389,21 @@ export function handle(is, yanit) {
   }
   if (url === "/api/baglama/dogrula") {
     if (!botMu(is)) return hata(yanit, 401, "bot anahtari gecersiz");
-    return govdeOku(is, (icerik) => yurut(yanit, () => baglamaDogrula(yanit, icerik)));
+    return govdeOku(is, yanit, (icerik) => yurut(yanit, () => baglamaDogrula(yanit, icerik)));
   }
   if (url === "/api/sifirla/iste") {
     if (!botMu(is)) return hata(yanit, 401, "bot anahtari gecersiz");
-    return govdeOku(is, (icerik) => yurut(yanit, () => sifirlaKod(yanit, icerik)));
+    return govdeOku(is, yanit, (icerik) => yurut(yanit, () => sifirlaKod(yanit, icerik)));
   }
   if (url === "/api/rol/guncelle") {
     if (!botMu(is)) return hata(yanit, 401, "bot anahtari gecersiz");
-    return govdeOku(is, (icerik) => yurut(yanit, () => rolGuncelle(yanit, icerik)));
+    return govdeOku(is, yanit, (icerik) => yurut(yanit, () => rolGuncelle(yanit, icerik)));
   }
 
   const hedef = CIHAZ_YOLLARI[url];
   if (!hedef) return hata(yanit, 404, "yol yok");
   if (kapisi.hizSiniriAsildi(ip(is))) return hata(yanit, 429, "hiz siniri");
-  govdeOku(is, (govde) => {
+  govdeOku(is, yanit, (govde) => {
     const govdeMetni = JSON.stringify(govde.govde ?? govde ?? {});
     const cihaz = istekDogrula(yanit, govde, govdeMetni);
     if (!cihaz) return;
@@ -398,6 +432,11 @@ export function baslat() {
     console.error("[guvenlik-api] YIKIM_PEPPER ve YIKIM_ANAHTAR gerekli — bkz. .env.example");
     process.exit(1);
   }
+  // Beklenmeyen bir async hata süreci öldürmesin: logla, sunucu ayakta kalsın.
+  // (Tek bir bozuk istek yüzünden tüm oyuncuların bağlantısı kopuyordu.)
+  process.on("uncaughtException", (e) => {
+    console.error("[guvenlik-api] yakalanmamis hata:", e?.stack || e?.message || e);
+  });
   const sunucu = http.createServer(handle);
   sunucu.listen(Number(PORT), HOST, () => {
     console.log(`[guvenlik-api] dinleniyor: http://${HOST}:${PORT}`);
