@@ -13,25 +13,30 @@
 
 const api = require('./api');
 
-/** Rol durumunu API'ye yaz; değişmediyse çağrılmaz (gereksiz yazmayı önler). */
+/** Rol durumunu API'ye yaz; değişmediyse çağrılmaz (gereksiz yazmayı önler).
+ *  Döner: API'ye gerçekten yazıldıysa true (ayrıntılı DM göndermek için). */
 async function rolDurumuBildir(discordId, rolVar, db, logger) {
-  if (!discordId) return;
+  if (!discordId) return false;
   if (!api.hazirMi()) {
     // API anahtarı tanımlı değilse botun işleyişi bozulmasın: sessizce geç.
-    return;
+    return false;
   }
 
   const anahtar = `rol.${discordId}`;
   const onceki = db.get(anahtar);
-  if (onceki === rolVar) return; // değişmedi → yazma
+  if (onceki === rolVar) return false; // değişmedi → yazma
 
   try {
     const sonuc = await api.rolGuncelle({ discordId, rolYol: rolVar });
-    if (sonuc.ok) db.set(anahtar, rolVar);
-    else if (logger) logger.warn(`Rol güncellenemedi (${discordId}): ${sonuc.hata || sonuc.durum}`);
+    if (sonuc.ok) {
+      db.set(anahtar, rolVar);
+      return true;
+    }
+    if (logger) logger.warn(`Rol güncellenemedi (${discordId}): ${sonuc.hata || sonuc.durum}`);
   } catch (error) {
     if (logger) logger.warn(`Rol güncellenemedi (${discordId}): ${error.message}`);
   }
+  return false;
 }
 
 module.exports = { rolDurumuBildir };

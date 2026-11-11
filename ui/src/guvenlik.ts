@@ -30,6 +30,8 @@ let ozet: Record<string, HesapGuvenlik> = {};
 let ozetZaman = 0;
 /** Bağlantı yoklaması — güvenlik kartı yeniden çizilince temizlenir. */
 let yoklama: ReturnType<typeof setInterval> | null = null;
+/** "Yol Silindiri" rolünün son bilinen durumu — değişince kullanıcıya haber ver. */
+let rolYolOnce: boolean | null = null;
 
 export function guvenlikYoklamayiDurdur(): void {
   if (yoklama !== null) {
@@ -79,6 +81,23 @@ async function rolTazele(): Promise<void> {
     if (imza === rolImza) return;
     const ilk = rolImza === "";
     rolImza = imza;
+    // "Yol Silindiri" rolü değişti mi? Kullanıcı ne olduğunu anlamlı bir
+    // mesajla duysun: izin açıldı / izin kapanıp tasarım kilitlendi basit
+    // bir bildirim yeterli (ayrıntı Kozmetikler sayfasındaki kutuda).
+    if (t.dogrulandi && rolYolOnce !== null && rolYolOnce !== t.rolYol) {
+      if (t.rolYol) {
+        toast(
+          'Yol Silindiri izni açıldı ✓ pelerinini ve elıtranı çizebilirsin — Kozmetikler sayfasına geç.',
+          "ok",
+        );
+      } else {
+        toast(
+          'Yol Silindiri izni kapandı — tasarımın kaydedildi ama şu an varsayılan YIKIM pelerini/elitrası görünüyor. Etiketi geri alınca aynı tasarım döner.',
+          "err",
+        );
+      }
+    }
+    rolYolOnce = t.rolYol;
     if (ilk) return; // ilk okuma yalnız taban çizgisi
     window.dispatchEvent(new CustomEvent("yikim:yetki", { detail: t }));
   } catch {

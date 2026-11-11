@@ -231,8 +231,10 @@ function kozmetikKisitliCiz(root: HTMLElement, erisimOverride?: Erisim): void {
     kutu.innerHTML = `<span aria-hidden="true">🔒</span>
       <div><b>Kendi tasarımını çizmek için "Yol Silindiri" rolü gerekir</b>
       <small>Discord sunucusundaki YIKIM etiketini/rolünü al; rolü taşıdığın sürece kendi pelerin ve
-         elitranı çizebilir, fotoğraf (HD) ve maske yükleyebilirsin. Etiketi bırakırsan çizme izni
-         otomatik geri alınır — bu sayfada yalnız aç/kapa kalır.</small></div>
+         elitranı çizebilir, fotoğraf (HD) ve maske yükleyebilirsin.
+         <br><b>Rolü bırak</b> → çizim iznin anında kapanır ve görünümün varsayılan YIKIM pelerini/elitrasına
+         döner. Tasarımın silinmez, senin bilgisayarında durur (başkası da göremez).
+         <br><b>Rolü geri al</b> → aynı tasarım otomatik geri döner; bir şey yapman gerekmez.</small></div>
       <button class="btn ghost sm" id="kz-kisitli-eski">Discord'a katıl ↗</button>`;
   }
   bas.after(kutu);
@@ -288,6 +290,10 @@ function iskelet(): string {
         </button>
         <div class="kz-sekme-sag" id="kz-sekme-ipucu">Atlasta ya da 3D modelin üstünde çiz</div>
       </div>
+
+      <p class="kz-rol-ipucu" id="kz-rol-ipucu">Çizme izni Discord'daki <b>"Yol Silindiri"</b> etiketine/rolüne
+         bağlıdır: etiketi bırakırsan izin anında kapanır, tasarımın bilgisayarında kalır ve görünümün
+         varsayılan YIKIM pelerinine döner. Etiketi yeniden alınca aynı tasarım otomatik geri gelir.</p>
 
       <div class="kz-yerlesim">
         <aside class="kz-oniz3d" id="kz-oniz3d">

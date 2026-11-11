@@ -48,6 +48,11 @@ const STEPS: TourStep[] = [
     text: "Görsel dünyalar (5 tema!), Discord Rich Presence, Java profilleri (Agresif FPS dahil), RAM — hepsi burada.",
   },
   {
+    page: "kozmetik", sel: '.rail-item[data-page="kozmetik"]',
+    title: "Kozmetikler — \"Yol Silindiri\" kuralı",
+    text: "Hesabını Discord'da doğruladıktan sonra kendi pelerinini ve elıtranı burada çizebilirsin. Çizme izni, sunucudaki YIKIM etiketi/\"Yol Silindiri\" rolüne bağlıdır: rolü bırakırsan izin anında kapanır, tasarımın bilgisayarında kalır ve görünümün varsayılan YIKIM pelerinine döner; etiketi yeniden alınca aynı tasarım geri gelir.",
+  },
+  {
     page: "home", sel: null,
     title: "Hazırsın!",
     text: "İyi oyunlar — YIKIM hep HIZ. Bu rehber artık gösterilmeyecek.",

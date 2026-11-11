@@ -1354,6 +1354,20 @@ input.search-in.input, .search-in.input {
 .kozmetik-sayfa.cizim3d .kz-oniz3d { position: static; }
 .kozmetik-sayfa.cizim3d .kz-oniz3d canvas { height: min(66vh, 560px); }
 
+/* "Yol Silindiri" kuralı — kozmetik sayfasında kalıcı bilgi satırı. */
+.kz-rol-ipucu {
+  margin: -4px 0 2px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  padding: 8px 12px;
+  border: 1px solid var(--cizgi, rgba(255, 255, 255, 0.08));
+  border-left: 2px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg2);
+}
+.kz-rol-ipucu b { color: var(--text); font-weight: 600; }
+
 /* Kısıtlı kozmetik görünümü (doğrulanmadı / "Yol Silindiri" rolü yok):
    editör ve fotoğraf yükleme kapalı — yalnız 3B önizleme, pelerin/elitra
    seçimi (sekmeler) ve aç/kapa anahtarları kalır. */
