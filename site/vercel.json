@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://power-descending-plain-invite.trycloudflare.com/api/:path*"
+      "destination": "https://yikim-guvenlik.yikimlient.workers.dev/api/:path*"
     }
   ],
   "headers": [

@@ -1,0 +1,28 @@
+# YIKIM güvenlik API'si — Cloudflare Workers + D1
+#
+# Dağıtım (tek seferlik):
+#   npx wrangler login
+#   npx wrangler d1 create yikim-guvenlik          # çıkan database_id'yi aşağıya yaz
+#   npx wrangler d1 execute yikim-guvenlik --remote --file=migrations/0001_init.sql
+#   npx wrangler secret put YIKIM_PEPPER
+#   npx wrangler secret put YIKIM_ANAHTAR
+#   npx wrangler secret put YIKIM_IMZA_GIZLI
+#   npx wrangler secret put YIKIM_BOT_ANAHTARI
+#   npx wrangler deploy
+
+name = "yikim-guvenlik"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+workers_dev = true
+preview_urls = false
+
+[[d1_databases]]
+binding = "DB"
+database_name = "yikim-guvenlik"
+database_id = "d25716de-1a84-4f18-808f-b2b83e9a3c7c"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true
