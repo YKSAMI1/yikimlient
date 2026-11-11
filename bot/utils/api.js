@@ -6,7 +6,7 @@
 //
 // API kapalıysa/erişilemezse bot çökmez: tüm çağrılar `{ ok:false }` döner.
 
-const VARSAYILAN_ADRES = 'http://127.0.0.1:8788';
+const VARSAYILAN_ADRES = 'https://yikimlient.vercel.app';
 
 function adres() {
   return (process.env.YIKIM_API || VARSAYILAN_ADRES).replace(/\/+$/, '');
