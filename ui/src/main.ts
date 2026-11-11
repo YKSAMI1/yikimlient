@@ -657,8 +657,11 @@ listen("mod-install-progress", (e: any) => {
 // Rust, rol/izin değişimini anında bildirir (`cmd_guvenlik_durum` emit eder).
 // Arayüz yoklaması da aynı pencere olayını yayar → sayfalar tek yerden dinler.
 listen("yikim:yetki", () => {
-  renderAccountPill();
-  window.dispatchEvent(new CustomEvent("yikim:yetki"));
+  // Önce yerel yetki özeti tazelenir (✕ rozeti, rol etiketi), sonra sayfalar.
+  void guvenlikOzetYukle(true).finally(() => {
+    renderAccountPill();
+    window.dispatchEvent(new CustomEvent("yikim:yetki"));
+  });
 });
 
 // ---------- Başlangıç ----------

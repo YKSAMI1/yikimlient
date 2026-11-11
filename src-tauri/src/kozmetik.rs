@@ -249,6 +249,31 @@ fn ana_kopyayi_yedekle(anahtar: &str, ad: &str) {
     let _ = crate::guvenlik::hesap_kozmetik_yaz(anahtar, ad, &png);
 }
 
+/// Kurulumlardaki `.yikim/aktif-hesap` işaretinden ÖNCEKİ hesabı oku.
+/// Kozmetik ana kopyası hesap değişiminde değiştirilmeden önce sahibini bulmak
+/// için kullanılır (eski sürümlerde tasarım yalnız ana kopyada duruyordu).
+fn onceki_aktif_anahtar() -> Option<String> {
+    for inst in crate::instances::list() {
+        let Ok(s) = std::fs::read_to_string(inst.dir().join(".yikim").join("aktif-hesap")) else {
+            continue;
+        };
+        let s = s.trim();
+        if !s.is_empty() {
+            return Some(s.to_string());
+        }
+    }
+    None
+}
+
+/// Hesap deposu hiç kullanılmamış mı? (eski sürümden gelen tek kopya tasarım)
+fn hesap_deposu_bos() -> bool {
+    let dir = crate::guvenlik::guvenlik_dir().join("kozmetik");
+    match std::fs::read_dir(dir) {
+        Ok(mut d) => d.next().is_none(),
+        Err(_) => true,
+    }
+}
+
 /// Gömülü varsayılanı ZORLA yaz (ana kopya + etkinse kurulumlar).
 ///
 /// `varsayilani_kur`dan farkı: ana kopya dolu olsa bile üzerine yazar. Rolü
@@ -283,6 +308,10 @@ pub fn varsayilani_zorla(ad: &str) -> usize {
 /// özel tasarım oyuna YAZILMAZ — ana kopya ve kurulumlar gömülü varsayılana
 /// çevrilir. Tasarım hesap deposunda kalır; rol geri gelince yeniden yüklenir.
 pub fn hesap_durumunu_uygula(anahtar: &str) -> usize {
+    // Aynı anda iki yoklama (arayüz + arka plan) çalışabilir: dosya silme/yazma
+    // sırası karışmasın diye tek kilit.
+    static KILIT: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _kilit = KILIT.lock().unwrap_or_else(|e| e.into_inner());
     let mut yazilan = 0usize;
     let izinli = ozel_izinli(anahtar);
     for ad in ["pelerin.png", "elytra.png"] {
@@ -308,8 +337,16 @@ pub fn hesap_durumunu_uygula(anahtar: &str) -> usize {
             yazilan += tum_kurulumlara_yaz(ad, &png);
             kucuk_yaz(ad, &png);
         } else {
-            // Depoda tasarım yok: ana kopyada başka hesaptan/eski sürümden
-            // kalan çizim olabilir — bu hesaba TAŞINMAZ, varsayılan yazılır.
+            // Depoda bu hesabın tasarımı yok. Ana kopyada kalan çizim ESKİ
+            // sürümden (hesap deposu yokken) gelmiş olabilir → silinmesin:
+            // önceki etkin hesaba (yoksa, depo hiç kullanılmamışsa bu hesaba)
+            // yedekle, sonra her yerde varsayılana dön. Böylece hem eski çizim
+            // korunur hem de başka hesabın tasarımı bu hesaba geçmez.
+            if let Some(onceki) = onceki_aktif_anahtar().filter(|o| o != anahtar) {
+                ana_kopyayi_yedekle(&onceki, ad);
+            } else if hesap_deposu_bos() {
+                ana_kopyayi_yedekle(anahtar, ad);
+            }
             yazilan += varsayilani_zorla(ad);
         }
     }

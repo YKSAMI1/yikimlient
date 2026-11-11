@@ -52,6 +52,78 @@ pub async fn rol_tazele() {
     let _ = guvenlik::rol_yol_yaz(&h.anahtar, rol);
 }
 
+/// Arka plan rol kilidi yoklaması.
+///
+/// NEDEN RUST: launcher penceresi oyunun arkasındayken/minimize iken webview
+/// zamanlayıcıları kısıtlanır (Chromium gizli sayfada `setInterval`'ı seyreltir)
+/// → "etiket düştü ama kozmetik hâlâ oyunda görünüyor" durumu kalırdı. Rol
+/// kontrolü burada yapılır; arayüz `yikim:yetki` olayıyla tazelenir.
+pub fn rol_yoklamayi_baslat(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        // Açılışta hesap/oturum otursun; ilk tur 10 sn sonra.
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+        loop {
+            rol_kilidini_yokla(Some(&app)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        }
+    });
+}
+
+/// Tek tur: sunucudan rol/bağlantı durumunu sor; çizim izni değiştiyse
+/// kozmetikleri ANINDA uygula ve arayüze haber ver.
+///
+/// API kapalıysa hiçbir şey yapılmaz (fail-open): sunucuya ulaşamadan
+/// kilitlemek, çevrimdışı oyuncunun kozmetiğini haksız yere kaldırırdı.
+pub async fn rol_kilidini_yokla(app: Option<&tauri::AppHandle>) {
+    let Some(h) = secili_hesap() else {
+        return;
+    };
+    let Ok(v) = guvenlik_api::api_cagir::<serde_json::Value>(
+        "/api/baglama/durum",
+        json!({ "hesap_anahtar": h.anahtar }),
+    )
+    .await
+    else {
+        return;
+    };
+
+    let rol_yol = v.get("rol_yol").and_then(|x| x.as_bool()).unwrap_or(false);
+    let baglandi = v.get("baglandi").and_then(|x| x.as_bool()).unwrap_or(false);
+    let once = hesap_yetki::yerel_yetki(&h.anahtar);
+    if once.rol_yol != rol_yol {
+        let _ = guvenlik::rol_yol_yaz(&h.anahtar, rol_yol);
+    }
+    let dogrulandi = once.dogrulandi && baglandi;
+    let simdi = hesap_yetki::HesapYetki {
+        anahtar: once.anahtar.clone(),
+        ad: once.ad.clone(),
+        tur: once.tur.clone(),
+        dogrulandi,
+        rol_yol,
+        kozmetik_serbest: dogrulandi,
+        offline_izin_bitis: once.offline_izin_bitis,
+        sahip_kilidi: once.sahip_kilidi,
+    };
+    let cizim_serbest = hesap_yetki::cizim_izinli(&simdi);
+    if hesap_yetki::cizim_izinli(&once) == cizim_serbest {
+        return; // izin değişmedi: dosyalara dokunma
+    }
+    guvenlik::aktif_hesap_yaz(&h.anahtar);
+    crate::kozmetik::hesap_durumunu_uygula(&h.anahtar);
+    if let Some(app) = app {
+        let _ = app.emit(
+            "yikim:yetki",
+            json!({
+                "anahtar": h.anahtar,
+                "cizim_serbest": cizim_serbest,
+                "kozmetik_serbest": hesap_yetki::kozmetik_izinli(&simdi),
+                "rol_yol": rol_yol,
+                "dogrulandi": dogrulandi,
+            }),
+        );
+    }
+}
+
 /// Yerel yetki kaydını API yanıtından güncelle.
 fn yerel_kaydet(h: &HesapKimlik, dogrulandi: bool, rol_yol: bool, bitis: i64) {
     guvenlik::hesap_kaydet(&guvenlik::HesapYetkiKayit {

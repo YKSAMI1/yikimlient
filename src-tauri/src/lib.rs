@@ -303,6 +303,9 @@ pub fn run() {
             commands::spawn_catalog_watcher(app.handle().clone());
             // Oyun içi hesap değiştirme istekleri (mod → launcher → taze oturum)
             hesap_kopru::spawn_hesap_watcher(app.handle().clone());
+            // "Yol Silindiri" rolü düşünce kozmetik ANINDA kilitlensin: arka plan
+            // yoklaması webview gizliyken (oyun açıkken) de çalışır.
+            guvenlik_komut::rol_yoklamayi_baslat(app.handle().clone());
             // Discord presence: launcher açık → "YIKIMLient açık" (yerel IPC, internet yok)
             discord_rpc::basla();
             discord_rpc::launcher_presence();
