@@ -612,12 +612,19 @@ pub async fn cmd_kozmetik_aktif(
     let acc = selected_account().map_err(|_| "hesap yok")?;
     let tur = if acc.kind == "microsoft" { "microsoft" } else { "cracked" };
     let anahtar = crate::hesap_yetki::hesap_anahtari(&acc.name, tur, &acc.uuid);
+    // ROL KİLİDİ: "Yol Silindiri" yoksa hesabın özel tasarımı hiçbir yere
+    // yazılmaz. Önce her yeri gömülü varsayılana çevir; aç/kapa anahtarı
+    // yine çalışır (varsayılan pelerin/elitra serbesttir).
+    let izinli = crate::kozmetik::ozel_izinli(&anahtar);
+    if !izinli {
+        crate::kozmetik::hesap_durumunu_uygula(&anahtar);
+    }
 
     // Kapalı durumu HESAP BAZLI saklanır: bir hesapta kapatmak diğerini etkilemez.
     if let Some(acik) = pelerin {
         crate::guvenlik::hesap_kozmetik_kapali_yaz(&anahtar, "pelerin.png", !acik);
         crate::kozmetik::aktif_ayarla("pelerin.png", acik)?;
-        if acik {
+        if acik && izinli {
             // Hesabın kendi tasarımı varsa onu geri yaz (varsayılanın üstüne).
             if let Some(png) = crate::guvenlik::hesap_kozmetik_oku(&anahtar, "pelerin.png") {
                 crate::kozmetik::tum_kurulumlara_yaz("pelerin.png", &png);
@@ -629,7 +636,7 @@ pub async fn cmd_kozmetik_aktif(
     if let Some(acik) = kanat {
         crate::guvenlik::hesap_kozmetik_kapali_yaz(&anahtar, "elytra.png", !acik);
         crate::kozmetik::aktif_ayarla("elytra.png", acik)?;
-        if acik {
+        if acik && izinli {
             if let Some(png) = crate::guvenlik::hesap_kozmetik_oku(&anahtar, "elytra.png") {
                 crate::kozmetik::tum_kurulumlara_yaz("elytra.png", &png);
                 crate::kozmetik::kucuk_yaz("elytra.png", &png);
@@ -639,16 +646,17 @@ pub async fn cmd_kozmetik_aktif(
     }
 
     // Sunucudaki kopya da güncellenir: pasifken boş gönderilir, diğer YIKIMLient
-    // oyuncuları vanilla görünümü görür.
+    // oyuncuları vanilla görünümü görür. Rol kilidinde özel tasarım YÜKLENMEZ
+    // (ana kopya artık gömülü varsayılandır; mod onu kendisi yayınlar).
     let kc = match pelerin {
-        Some(true) => Some(crate::kozmetik::ana_b64("pelerin.png").unwrap_or_default()),
+        Some(true) if izinli => Some(crate::kozmetik::ana_b64("pelerin.png").unwrap_or_default()),
         Some(false) => Some(String::new()),
-        None => None,
+        _ => None,
     };
     let ke = match kanat {
-        Some(true) => Some(crate::kozmetik::ana_b64("elytra.png").unwrap_or_default()),
+        Some(true) if izinli => Some(crate::kozmetik::ana_b64("elytra.png").unwrap_or_default()),
         Some(false) => Some(String::new()),
-        None => None,
+        _ => None,
     };
 
     let mut yuklendi = false;

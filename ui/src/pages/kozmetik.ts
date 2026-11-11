@@ -256,6 +256,16 @@ async function yetkiTazele(root: HTMLElement): Promise<void> {
   kozmetikKisitliCiz(root, erisim);
 }
 
+// Rol düştü/verildi: sayfa açıksa ANINDA kısıtlı görünüme geç. Rust tarafı
+// bu arada ana kopyayı gömülü varsayılana çevirdiği için `yukle` artık özel
+// tasarımı değil varsayılanı gösterir (tasarım hesap deposunda korunur).
+window.addEventListener("yikim:yetki", () => {
+  const root = document.getElementById("kz-sayfa");
+  if (!root) return;
+  void yetkiTazele(root);
+  void yukle(root);
+});
+
 function iskelet(): string {
   return `
     <div class="page-wrap kozmetik-sayfa" id="kz-sayfa">
@@ -1336,21 +1346,28 @@ function kenarlariDoldur(p: Piksel[], tur: Tur): void {
   const k = KOZ_KUTU[tur];
   const { u, v, d } = k;
   const oku = (x: number, y: number): Piksel => p[y * KOZ_G + x] ?? "";
-  // "Dış" panel artık ARKADAN GÖRÜNEN yüz (u+2d+w, v+d). Bu yüzün sol sütunu
-  // karakterin SOL yanına, sağ sütunu SAĞ yanına denk gelir — ön panelin
-  // tersine (orada sol sütun sağ yana gider).
+  // "Dış" panelin dikey sütunları yan şeritlere taşınır. Hangi şeride
+  // gideceği panele göre değişir: pelerinde görünen yüz pz'dir (u ekseni
+  // +x → sol sütun nx şeridine), elitrada nz'dir (u ekseni −x → sol sütun
+  // px şeridine). Eşleşme bu yüzden ters çalışır.
+  const solSerit = tur === "pelerin" ? u : u + d + k.w;
+  const sagSerit = tur === "pelerin" ? u + d + k.w : u;
   for (let y = 0; y < dis.h; y++) {
     const sol = oku(dis.x, dis.y + y);
     const sag = oku(dis.x + dis.w - 1, dis.y + y);
     for (let i = 0; i < d; i++) {
-      yaz(p, u + d + k.w + i, v + d + y, sol); // sol yan şerit
-      yaz(p, u + i, v + d + y, sag);           // sağ yan şerit
+      yaz(p, solSerit + i, v + d + y, sol);
+      yaz(p, sagSerit + i, v + d + y, sag);
     }
   }
-  // üst / alt şeritler (dış panelin ilk ve son satırı)
+  // üst / alt şeritler (dış panelin ilk ve son satırı). py/ny yüzlerinde u
+  // ekseni +x; pelerin paneli (pz) de +x olduğu için sıra doğrudan, elitra
+  // paneli (nz) −x olduğu için ters çevrilir.
+  const ters = tur !== "pelerin";
   for (let x = 0; x < dis.w; x++) {
-    const ust = oku(dis.x + x, dis.y);
-    const alt = oku(dis.x + x, dis.y + dis.h - 1);
+    const sx = ters ? dis.w - 1 - x : x;
+    const ust = oku(dis.x + sx, dis.y);
+    const alt = oku(dis.x + sx, dis.y + dis.h - 1);
     for (let i = 0; i < d; i++) {
       yaz(p, u + d + x, v + i, ust);
       yaz(p, u + d + k.w + x, v + i, alt);
@@ -1596,17 +1613,10 @@ function hdPafta(
     g.fillStyle = "#000000";
     g.fillRect(dx, dy, dw, dh);
   }
-  // PELERİN: oyun görünen yüzü (nz) YATAY AYNALAYARAK örer → doku şimdiden
-  // aynalanır, oyunda düz görünür. (Elitrada böyle bir ayna yok.)
-  if (tur === "pelerin") {
-    g.save();
-    g.translate(dx + dw, dy);
-    g.scale(-1, 1);
-    g.drawImage(kaynak, 0, 0);
-    g.restore();
-  } else {
-    g.drawImage(kaynak, dx, dy);
-  }
+  // Aynalama YOK: pelerin ve elitra vanilla UV'sini birebir kullanır.
+  // Pelerin modeli oyunda 180° Y döndürülür (görünen yüz (1,1)); doku ters
+  // yazılmaz, önizleme de dönüşü uygular → oyunda da düz görünür.
+  g.drawImage(kaynak, dx, dy);
   if (duz) return t;
 
   // İç astar: dış yüzün yatay aynası (gövdeye bakan yüz).
@@ -1668,14 +1678,7 @@ function fotografGorunum(root: HTMLElement, tur: Tur): void {
       g.clearRect(0, 0, on.width, on.height);
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = "high";
-      if (tur === "pelerin") {
-        // Doku oyunun aynası için ters yazıldı → önizlemede geri çevrilir.
-        g.save();
-        g.translate(on.width, 0);
-        g.scale(-1, 1);
-      }
       g.drawImage(img, b.x * N, b.y * N, b.w * N, b.h * N, 0, 0, on.width, on.height);
-      if (tur === "pelerin") g.restore();
     };
     img.src = fileSrc(yol);
   } else if (on) {
@@ -1987,8 +1990,9 @@ function kirpPenceresi(root: HTMLElement, tur: Tur, resim: HTMLImageElement): vo
 
     // "Oyunda görünecek" = KAYDEDİLECEK dokunun oyunda görünen yüzü (WYSIWYG):
     // atlas hdPafta() ile birebir üretilir, elitrada vanilla siluet maskesi
-    // uygulanır, pelerinde oyunun aynası geri çevrilir. Böylece önizleme ile
-    // kaydettikten sonraki görünüm aynı olur.
+    // uygulanır. Pelerinde/elitrada aynalama yoktur — dış panel doğrudan
+    // oyunda göründüğü gibi gösterilir. Böylece önizleme ile kaydettikten
+    // sonraki görünüm aynı olur.
     const pafta = hdPafta(resim, sec, tur, duz, hd, ayna, don);
     const kN = pafta.width / KOZ_G;
     const yuz = disBolge(tur);

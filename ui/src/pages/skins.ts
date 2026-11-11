@@ -8,8 +8,7 @@ import { currentAccount, fileSrc, icon, invoke, navigate, openLoginModal, openMo
 import { hesapDogrulandi, hesapRolYol } from "../guvenlik";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import { PikselPafta } from "../sahne/piksel-pafta";
-import { PELERIN_DIS, PELERIN_IC } from "../sahne/skin-bolgeler";
-import { pelerinHazirla, pelerinPaneli } from "../sahne/pelerin";
+import { pelerinPaneli } from "../sahne/pelerin";
 import { KOZ_G, KOZ_Y, disBolge } from "../sahne/kozmetik-pafta";
 import { KART_TUVAL_GENISLIK, KART_TUVAL_YUKSEKLIK, kartCiz } from "../sahne/skin-kart";
 import type { SkinHub, SkinKayit } from "../sahne/skin-tipleri";
@@ -526,24 +525,10 @@ function sahneSecimUygula(root: HTMLElement): void {
   void sahne.skin({ url: fileSrc(secili.dosya), slim: secili.slim });
 }
 
-/** Mojang paftasında ARKADAN GÖRÜNEN yüz (12,1)'dir; 3B vitrin ise "dış" yüz
- *  olarak (1,1) panelini çizer. Panel devredilmezse vitrin pelerinin iç
- *  astarını (yani "arkasını") gösteriyordu. */
-async function mojangPelerinUrl(yol: string): Promise<string> {
-  const resim = await new Promise<HTMLImageElement>((coz, red) => {
-    const i = new Image();
-    i.onload = () => coz(i);
-    i.onerror = red;
-    i.src = fileSrc(yol);
-  });
-  const pafta = pelerinHazirla(resim);
-  const g = pafta.getContext("2d");
-  if (!g) return fileSrc(yol);
-  const dis = g.getImageData(PELERIN_DIS.x, PELERIN_DIS.y, PELERIN_DIS.w, PELERIN_DIS.h);
-  g.putImageData(dis, PELERIN_IC.x, PELERIN_IC.y);
-  return pafta.toDataURL("image/png");
-}
-
+/** Eski launcher uyumluluğu: Mojang paftasını olduğu gibi göster.
+ *
+ *  Panel devretmeye GEREK YOK — vitrin artık oyunla aynı paneli kullanır
+ *  (pelerinde görünen yüz (1,1); model 180° döndürülür). */
 function sahnePelerin(): void {
   if (!hub) return;
   const aktif = hub.pelerinler.find((p) => p.aktif && p.dosya);
@@ -554,15 +539,7 @@ function sahnePelerin(): void {
     void sahneGetir().pelerin(null);
     return;
   }
-  const jeton = yol;
-  void mojangPelerinUrl(yol)
-    .then((url) => {
-      if (sonPelerin !== jeton) return; // bu arada başka pelerin seçildi
-      void sahneGetir().pelerin({ url });
-    })
-    .catch(() => {
-      if (sonPelerin === jeton) void sahneGetir().pelerin(null);
-    });
+  void sahneGetir().pelerin({ url: fileSrc(yol) });
 }
 
 /** KATALOG: kayıtlı pelerin/elitralar + hangisi giyili. */

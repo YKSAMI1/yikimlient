@@ -38,6 +38,54 @@ export function guvenlikYoklamayiDurdur(): void {
   }
 }
 
+// ---------------------------------------------------------------- rol yoklaması
+//
+// Rol ("Yol Silindiri") Discord'da düşürülünce bot bunu API'ye yazar. Launcher
+// açıkken bunu duymak için 5 sn'de bir + pencere odağa gelince sorulur. Rust
+// tarafı (`cmd_guvenlik_durum`) değişimi görünce kozmetik dosyalarını ANINDA
+// günceller; burada da `yikim:yetki` olayı yayılır → açık sayfa kendini
+// tazeler. Yeniden başlatma GEREKMEZ.
+
+let rolYoklama: ReturnType<typeof setInterval> | null = null;
+let rolImza = "";
+
+export function rolYoklamayiBaslat(): void {
+  if (rolYoklama !== null) return;
+  const tik = (): void => {
+    void rolTazele();
+  };
+  rolYoklama = setInterval(tik, 5000);
+  window.addEventListener("focus", tik);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) tik();
+  });
+  tik();
+}
+
+export function rolYoklamayiDurdur(): void {
+  if (rolYoklama !== null) {
+    clearInterval(rolYoklama);
+    rolYoklama = null;
+  }
+}
+
+async function rolTazele(): Promise<void> {
+  if (document.hidden) return;
+  try {
+    await guvenlikOzetYukle(true);
+    const t = await guvenlikYetkiTazele();
+    if (!t) return; // API kapalı: yerel durum korunur
+    const imza = `${t.cizimSerbest}|${t.rolYol}|${t.dogrulandi}`;
+    if (imza === rolImza) return;
+    const ilk = rolImza === "";
+    rolImza = imza;
+    if (ilk) return; // ilk okuma yalnız taban çizgisi
+    window.dispatchEvent(new CustomEvent("yikim:yetki", { detail: t }));
+  } catch {
+    // Sessiz: ağ hatası kozmetiği kilitlemez.
+  }
+}
+
 /** Tüm hesapların doğrulama durumunu yerel kayıttan tazele. */
 export async function guvenlikOzetYukle(zorla = false): Promise<void> {
   if (!zorla && Date.now() - ozetZaman < 15000) return;

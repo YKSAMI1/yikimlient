@@ -15,7 +15,7 @@ import { bildirimAcKapa, bildirimEkle, bildirimKutuBaslat, bildirimZilIlkDurum }
 import { startDropWatcher } from "./drop";
 import { maybeStartTour } from "./tour";
 import { maybeStartOnboarding } from "./onboarding";
-import { guvenlikOzetYukle, hesapCarpi } from "./guvenlik";
+import { guvenlikOzetYukle, hesapCarpi, rolYoklamayiBaslat } from "./guvenlik";
 import { applyFx } from "./fx";
 import { applyCursor } from "./cursor";
 import { WINDOW_CONTROLS, icon, ICONS } from "./icons";
@@ -654,6 +654,13 @@ listen("mod-install-progress", (e: any) => {
   // "✓ <ad>" satırları standard-mods-progress'ten geliyor; tekil kurulumlarda sessiz kal
 });
 
+// Rust, rol/izin değişimini anında bildirir (`cmd_guvenlik_durum` emit eder).
+// Arayüz yoklaması da aynı pencere olayını yayar → sayfalar tek yerden dinler.
+listen("yikim:yetki", () => {
+  renderAccountPill();
+  window.dispatchEvent(new CustomEvent("yikim:yetki"));
+});
+
 // ---------- Başlangıç ----------
 export async function boot(): Promise<void> {
   try {
@@ -661,6 +668,9 @@ export async function boot(): Promise<void> {
     registerPages();
     setupShell();
     navigate("home");
+    // Rol/doğrulama yoklaması: "Yol Silindiri" düşünce kozmetikler ANINDA
+    // kilitlenir (launcher + oyun), yeniden başlatma gerekmez.
+    rolYoklamayiBaslat();
     // Sürükle-bırak + ilk kurulum sihirbazı + (o oynanmadıysa) rehber tur
     startDropWatcher();
     if (!maybeStartOnboarding()) maybeStartTour();

@@ -369,6 +369,33 @@ export function renderHome(root: HTMLElement): void {
 }
 
 /** Karakter vitrinini başlat: skin + emote paketleri sahneye bağlanır. */
+/** Ana menü vitrinindeki pelerini diskteki güncel duruma göre yenile.
+ *
+ *  Rol kilidinde Rust ana kopyayı gömülü varsayılana çevirir; aç/kapa kapalıysa
+ *  `pelerin_aktif` false olur → pelerin tamamen kalkar. */
+async function vitrinPelerin(): Promise<void> {
+  if (!document.getElementById("sahne-katman")) return;
+  try {
+    const koz = (await invoke("cmd_kozmetik_oku")) as {
+      pelerin_dosya: string | null;
+      pelerin_aktif?: boolean;
+    };
+    const sah = sahneGetir();
+    if (koz?.pelerin_dosya && koz.pelerin_aktif !== false) {
+      await sah.pelerin({ url: fileSrc(String(koz.pelerin_dosya)) });
+    } else {
+      await sah.pelerin(null);
+    }
+  } catch {
+    // kozmetik okunamazsa pelerinsiz vitrin
+  }
+}
+
+// Rol düştü/verildi: ana menü açıksa pelerin ANINDA güncellenir.
+window.addEventListener("yikim:yetki", () => {
+  void vitrinPelerin();
+});
+
 async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string } | null | undefined): Promise<void> {
   const canvas = root.querySelector("#sahne-katman") as HTMLCanvasElement | null;
   if (!canvas) return;
@@ -392,17 +419,7 @@ async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string }
     await sah.skin(null);
   }
   // Kozmetik: özel pelerin varsa ve etkinse ana menüde de görünsün (rozet gibi).
-  try {
-    const koz = (await invoke("cmd_kozmetik_oku")) as {
-      pelerin_dosya: string | null;
-      pelerin_aktif?: boolean;
-    };
-    if (koz?.pelerin_dosya && koz.pelerin_aktif !== false) {
-      await sah.pelerin({ url: fileSrc(String(koz.pelerin_dosya)) });
-    }
-  } catch {
-    // kozmetik okunamazsa pelerinsiz vitrin
-  }
+  await vitrinPelerin();
   // Ayarlar → Animasyonlar: kapalıysa vitrin sadece idle durur.
   if (state.config?.menu_animasyon === false) {
     sah.emoteleriKur([]);

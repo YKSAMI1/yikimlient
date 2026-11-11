@@ -213,23 +213,104 @@ pub fn kapali_imleri_sil(ad: &str) {
     }
 }
 
+/// Hesap özel pelerin/elitra ÇİZEBİLİR mi? (doğrulandı + izin + "Yol Silindiri")
+///
+/// Rol Discord'da düşürüldüğünde bu `false` olur ve hesabın özel tasarımı
+/// oyunda/launcher'da gösterilmez; tasarım hesap deposunda korunur, rol geri
+/// gelince aynen geri yüklenir.
+pub fn ozel_izinli(anahtar: &str) -> bool {
+    crate::hesap_yetki::cizim_izinli(&crate::hesap_yetki::yerel_yetki(anahtar))
+}
+
+/// Ana kopyanın "kapalı" işaretini yaz/sil (hesap bazlı aç/kapa ana kopyaya da
+/// yansısın: `aktif()` ve `varsayilani_kur()` buna bakıyor).
+fn ana_kapali_ayarla(ad: &str, kapali: bool) {
+    if kapali {
+        let _ = std::fs::write(kapali_yol(ad), b"");
+    } else {
+        let _ = std::fs::remove_file(kapali_yol(ad));
+    }
+}
+
+/// Ana kopyadaki tasarımı hesap deposuna yedekle (depoda yoksa).
+///
+/// Rol düşünce ana kopya gömülü varsayılana çevrilir; kullanıcının çizimi
+/// kaybolmasın diye önce buraya taşınır. Gömülü varsayılanın kendisi yedeklenmez.
+fn ana_kopyayi_yedekle(anahtar: &str, ad: &str) {
+    if crate::guvenlik::hesap_kozmetik_oku(anahtar, ad).is_some() {
+        return;
+    }
+    let Ok(png) = std::fs::read(ana_yol(ad)) else {
+        return;
+    };
+    if varsayilan_png(ad).is_some_and(|v| v == png.as_slice()) {
+        return;
+    }
+    let _ = crate::guvenlik::hesap_kozmetik_yaz(anahtar, ad, &png);
+}
+
+/// Gömülü varsayılanı ZORLA yaz (ana kopya + etkinse kurulumlar).
+///
+/// `varsayilani_kur`dan farkı: ana kopya dolu olsa bile üzerine yazar. Rolü
+/// düşen hesabın özel tasarımı böylece ana kopyadan (ve dolayısıyla önizleme
+/// komutlarından) tamamen kaldırılır.
+pub fn varsayilani_zorla(ad: &str) -> usize {
+    let Some(png) = varsayilan_png(ad) else {
+        return 0;
+    };
+    let yol = ana_yol(ad);
+    if let Some(ust) = yol.parent() {
+        let _ = std::fs::create_dir_all(ust);
+    }
+    let mut sayi = 0usize;
+    if std::fs::write(&yol, png).is_ok() {
+        sayi += 1;
+    }
+    kucuk_sil(ad);
+    if aktif(ad) {
+        sayi += kurulumlara_yaz(ad, png);
+    }
+    sayi
+}
+
 /// Bir hesabın kozmetik durumunu kurulumlara uygula (hesap değişince).
 ///
 /// Sıra: önceki hesabın dosya/işaretleri temizlenir → hesap "kapalı" dediyse
 /// yalnız işaret yazılır → tasarım varsa yazılır → hiçbiri yoksa mod gömülü
 /// varsayılanı gösterir.
+///
+/// ROL KİLİDİ: hesap "Yol Silindiri" rolünü taşımıyorsa (ya da doğrulanmadıysa)
+/// özel tasarım oyuna YAZILMAZ — ana kopya ve kurulumlar gömülü varsayılana
+/// çevrilir. Tasarım hesap deposunda kalır; rol geri gelince yeniden yüklenir.
 pub fn hesap_durumunu_uygula(anahtar: &str) -> usize {
     let mut yazilan = 0usize;
+    let izinli = ozel_izinli(anahtar);
     for ad in ["pelerin.png", "elytra.png"] {
         tum_kurulumlardan_sil(ad);
         kapali_imleri_sil(ad);
-        if crate::guvenlik::hesap_kozmetik_kapali(anahtar, ad) {
+        let kapali = crate::guvenlik::hesap_kozmetik_kapali(anahtar, ad);
+        ana_kapali_ayarla(ad, kapali);
+        if !izinli {
+            // Özel tasarımı önce hesap deposuna al, sonra her yerde varsayılana
+            // dön. Ana kopya da varsayılan olur → önizleme sızdırmaz.
+            ana_kopyayi_yedekle(anahtar, ad);
+            yazilan += varsayilani_zorla(ad);
+            if kapali {
+                kapali_imleri_yaz(ad);
+            }
+            continue;
+        }
+        if kapali {
             kapali_imleri_yaz(ad);
             continue;
         }
         if let Some(png) = crate::guvenlik::hesap_kozmetik_oku(anahtar, ad) {
             yazilan += tum_kurulumlara_yaz(ad, &png);
             kucuk_yaz(ad, &png);
+        } else {
+            // Depoda tasarım yok: ana kopyada başka hesaptan/eski sürümden
+            // kalan çizim olabilir — bu hesaba TAŞINMAZ, varsayılan yazılır.
+            yazilan += varsayilani_zorla(ad);
         }
     }
     yazilan

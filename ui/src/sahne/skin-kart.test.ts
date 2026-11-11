@@ -10,10 +10,13 @@ import {
   kartParcalari,
 } from "./skin-bolgeler.ts";
 
-test("görünen dış yüz sağ panelde, iç astar sol panelde", () => {
-  // Vanilla cape modeli uv(0,0): (12,1) arkadan görünen yüz, (1,1) astar.
-  assert.deepEqual(PELERIN_DIS, { x: 12, y: 1, w: 10, h: 16 });
-  assert.deepEqual(PELERIN_IC, { x: 1, y: 1, w: 10, h: 16 });
+test("görünen dış yüz (1,1), iç astar (12,1)", () => {
+  // Vanilla pelerin modeli 180° Y döndürülerek kurulur
+  // (`PartPose.offsetAndRotation(0,0,2, 0,π,0)`), bu yüzden arkadan görünen
+  // yüz pz panelidir: (u+d, v+d) = (1,1). Mojang pelerinlerinde tasarım
+  // (1,1)'de, (12,1) düz astardır. Elitra bunun tersidir (dış 36,2).
+  assert.deepEqual(PELERIN_DIS, { x: 1, y: 1, w: 10, h: 16 });
+  assert.deepEqual(PELERIN_IC, { x: 12, y: 1, w: 10, h: 16 });
 });
 
 test("kart altı parçadan oluşur ve ayaklar 32. pikselde biter", () => {

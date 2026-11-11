@@ -6,6 +6,7 @@
 
 use serde::Serialize;
 use serde_json::json;
+use tauri::Emitter as _;
 
 use crate::{commands, guvenlik, guvenlik_api, hesap_yetki};
 
@@ -68,7 +69,7 @@ fn yerel_kaydet(h: &HesapKimlik, dogrulandi: bool, rol_yol: bool, bitis: i64) {
 
 /// Genel durum: cihaz, API, bot, bağlantı ve kozmetik izinleri.
 #[tauri::command]
-pub async fn cmd_guvenlik_durum() -> Result<serde_json::Value, String> {
+pub async fn cmd_guvenlik_durum(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
     let cihaz = guvenlik::cihaz_kimligi_al(true);
     let hesap = secili_hesap();
 
@@ -144,9 +145,39 @@ pub async fn cmd_guvenlik_durum() -> Result<serde_json::Value, String> {
         sahip_kilidi: yerel.sahip_kilidi,
     };
 
+    let cizim_serbest = hesap_yetki::cizim_izinli(&yetki);
+    let kozmetik_serbest = hesap_yetki::kozmetik_izinli(&yetki);
+
     // Aktif hesabı kurulumlara köprüle
+    let mut kilit_degisti = false;
     if let Some(h) = hesap.as_ref() {
         guvenlik::aktif_hesap_yaz(&h.anahtar);
+        // ROL KİLİDİ: çizim izni değiştiyse (rol düştü/verildi, doğrulama
+        // kayboldu) kozmetikleri HEMEN uygula — yeniden başlatma bekleme.
+        // API kapalıysa yerel kayıt korunur (fail-open): sunucuya ulaşamadan
+        // kilitlemek, çevrimdışı oyuncunun kozmetiğini haksız yere silerdi.
+        if api_acik {
+            let once = hesap_yetki::cizim_izinli(&yerel);
+            if once != cizim_serbest {
+                crate::kozmetik::hesap_durumunu_uygula(&h.anahtar);
+                kilit_degisti = true;
+            }
+        }
+    }
+
+    // Arayüze anında haber: 5 sn'lik yoklamayı beklemeden kozmetik sayfası,
+    // ana sayfa vitrini ve ad rozeti tazelenir.
+    if kilit_degisti {
+        let _ = app.emit(
+            "yikim:yetki",
+            json!({
+                "anahtar": hesap.as_ref().map(|h| h.anahtar.clone()).unwrap_or_default(),
+                "cizim_serbest": cizim_serbest,
+                "kozmetik_serbest": kozmetik_serbest,
+                "rol_yol": rol_yol,
+                "dogrulandi": dogrulandi,
+            }),
+        );
     }
 
     Ok(json!({
@@ -166,8 +197,8 @@ pub async fn cmd_guvenlik_durum() -> Result<serde_json::Value, String> {
         "discord_ad": discord_ad,
         "neden": neden,
         "yetki": yetki,
-        "kozmetik_serbest": hesap_yetki::kozmetik_izinli(&yetki),
-        "cizim_serbest": hesap_yetki::cizim_izinli(&yetki),
+        "kozmetik_serbest": kozmetik_serbest,
+        "cizim_serbest": cizim_serbest,
         "carpi": hesap_yetki::carpi_goster(&yetki),
     }))
 }

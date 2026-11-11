@@ -14,18 +14,34 @@ use serde::de::DeserializeOwned;
 
 use crate::guvenlik::{cihaz_kimligi_al, imzola, istek_imza_metni};
 
-/// Yerel test adresi (proje kapsamı: $env YIKIM_API yoksa localhost).
+/// Yerel/geliştirme adresi. Öncelik: `YIKIM_API` ortam değişkeni →
+/// `guvenlik/api-url.txt` (yayın adresi; kurulum yöneticisi yazar) → localhost.
 pub fn api_adresi() -> String {
     if let Ok(v) = std::env::var("YIKIM_API") {
-        if !v.trim().is_empty() {
-            return v.trim().trim_end_matches('/').to_string();
+        let v = v.trim();
+        if !v.is_empty() {
+            return v.trim_end_matches('/').to_string();
+        }
+    }
+    let yol = crate::guvenlik::guvenlik_dir().join("api-url.txt");
+    if let Ok(v) = std::fs::read_to_string(&yol) {
+        let v = v.trim();
+        if !v.is_empty() {
+            return v.trim_end_matches('/').to_string();
         }
     }
     "http://127.0.0.1:8788".into()
 }
 
+/// Yayın API'sinin imza doğrulama anahtarı (GENEL anahtar — gizli değil).
+/// Sunucu bunu `guvenlik-api/.env` içindeki `YIKIM_IMZA_GIZLI`den türetir.
+/// Her launcher'da gömülü olması, oyuncuların sunucu yanıtlarını
+/// doğrulayabilmesi için gerekir (yalnız sunucunun diskinde olan api-pub.txt
+/// başka bilgisayarlarda yoktu → yanıtlar "imzasız" sayılıyordu).
+pub const YAYIN_API_PUB: &str = "7KQAP+vcD6GLgnAm7xxfcW+azF+QVSH49Gye8h8cQUk=";
+
 /// Sunucu genel anahtarı (base64) — imza doğrulamak için.
-/// Yayında Cloudflare Worker ortam değişkeninden okunur; yerelde test dosyasından.
+/// Sıra: `YIKIM_API_PUB` ortamı → `guvenlik/api-pub.txt` → gömülü yayın anahtarı.
 pub fn sunucu_pub_b64() -> Option<String> {
     if let Ok(v) = std::env::var("YIKIM_API_PUB") {
         if !v.trim().is_empty() {
@@ -33,7 +49,13 @@ pub fn sunucu_pub_b64() -> Option<String> {
         }
     }
     let yol = crate::guvenlik::guvenlik_dir().join("api-pub.txt");
-    std::fs::read_to_string(&yol).ok().map(|s| s.trim().to_string())
+    if let Ok(v) = std::fs::read_to_string(&yol) {
+        let v = v.trim();
+        if !v.is_empty() {
+            return Some(v.to_string());
+        }
+    }
+    Some(YAYIN_API_PUB.to_string())
 }
 
 /// API'nin ayakta olup olmadığını sor (2 sn zaman aşımı).

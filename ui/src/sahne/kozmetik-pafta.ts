@@ -7,20 +7,26 @@
 // Bölge yerleşimi oyunun kendi modellerinden çıkarıldı (ModelPart cuboid UV):
 //
 //   PELERİN  texOffs(0,0) 10×16×1        ELİTRA  texOffs(22,0) 10×20×2
-//   dış   (12,1) 10×16                   dış yüz (36,2) 10×20
-//   iç    (1,1)  10×16                   iç yüz  (24,2) 10×20
+//   dış   (1,1)  10×16                   dış yüz (36,2) 10×20
+//   iç    (12,1) 10×16                   iç yüz  (24,2) 10×20
 //   yanlar (11,1) / (0,1) 1×16           yanlar  (34,2) / (22,2) 2×20
 //   üst   (1,0) 10×1                     üst     (24,0) 10×2
 //   alt   (11,0) 10×1                    alt     (34,0) 10×2
 //
-//   "Dış" = oyunda ARKADAN GÖRÜNEN yüz. Cuboid UV düzeninde bu panel
-//   `(u+2d+w, v+d)`; gövdeye bakan iç astar ise `(u+d, v+d)`.
-//   Kanıt: gerçek vanilla elitra dokusunda desen yalnız (36,2) panelinde
-//   durur (173 opak piksel); (24,2) tamamen saydamdır. Oyunda arkadan
-//   görünen yüz bu yüzden (36,2); pelerinde karşılığı (12,1).
+//   "Dış" = oyunda ARKADAN GÖRÜNEN yüz. İki kozmetik FARKLI paneller kullanır:
 //
-// `ui/src/sahne/karakter.ts` içindeki `kozUV` aynı formülü kullanır; ikisi
-// ayrışırsa önizleme oyundan farklı görünür.
+//   PELERİN: model 180° Y döndürülerek kurulur (vanilla `PartPose`
+//   `offsetAndRotation(0,0,2, 0,π,0)`), bu yüzden görünen yüz `(u+d, v+d)` =
+//   (1,1), astar `(u+2d+w, v+d)` = (12,1). Kanıt: gerçek Mojang pelerinlerinde
+//   (jeb_/Dinnerbone/Searge/Grumm) desen (1,1)'de, (12,1) düz astardır; eski
+//   exe de tasarımı (1,1)'e yazıyordu.
+//
+//   ELİTRA: kanatlar döndürülmez, görünen yüz `(u+2d+w, v+d)` = (36,2). Kanıt:
+//   vanilla elitra dokusunda desen yalnız orada (173 opak piksel); (24,2)
+//   tamamen saydamdır.
+//
+// `ui/src/sahne/karakter.ts` içindeki `kozUV` vanilla formülünü kullanır;
+// pelerin önizlemesi kutuyu oyundaki gibi 180° döndürerek aynı yüzü gösterir.
 
 export type Piksel = string;
 
@@ -54,12 +60,12 @@ export interface KozBolge {
 
 /** Pelerin yüzleri (vanilla `class_9950` cuboid uv(0,0)).
  *
- *  `(12,1)` paneli oyunda ARKADAN GÖRÜNEN yüzdür — tasarım oraya gider.
- *  `(1,1)` paneli gövdeye bakan iç astardır. (v0.6.3: bu iki panel daha önce
- *  ters etiketlenmişti; launcher önizlemesi oyunun aynası gibi görünüyordu.) */
+ *  Model 180° Y döndürülerek kurulur, bu yüzden oyunda ARKADAN GÖRÜNEN yüz
+ *  `(1,1)` panelidir — tasarım oraya gider; `(12,1)` gövdeye bakan iç astardır.
+ *  (Mojang pelerinlerinde de desen (1,1)'dedir.) Elitra tersidir: dış (36,2). */
 export const PELERIN_BOLGELERI: KozBolge[] = [
-  { id: "p-dis", ad: "Dış (görünen)", x: 12, y: 1, w: 10, h: 16 },
-  { id: "p-ic", ad: "İç (astar)", x: 1, y: 1, w: 10, h: 16 },
+  { id: "p-dis", ad: "Dış (görünen)", x: 1, y: 1, w: 10, h: 16 },
+  { id: "p-ic", ad: "İç (astar)", x: 12, y: 1, w: 10, h: 16 },
   { id: "p-sol", ad: "Sol yan", x: 11, y: 1, w: 1, h: 16 },
   { id: "p-sag", ad: "Sağ yan", x: 0, y: 1, w: 1, h: 16 },
   { id: "p-ust", ad: "Üst", x: 1, y: 0, w: 10, h: 1 },

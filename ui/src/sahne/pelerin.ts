@@ -1,11 +1,9 @@
-// PELERİN PAFTASI — 64×32 doku, iki panel: iç astar ve dış (görünen) yüz.
+// PELERİN PAFTASI — 64×32 doku, iki panel: dış (görünen) yüz ve iç astar.
 //
-// Vanilla düzen: `(1,1)` paneli gövdeye bakan İÇ yüzdür, `(12,1)` paneli ise
-// oyunda arkadan görünen DIŞ yüzdür — tasarım oraya gider. Katalogda da
-// oyuncunun gördüğü yüz (12,1) çizilir; (1,1) çizilince kapakların "arkası"
-// görünüyordu. Bir ara "dolu panel
-// kazanır" kuralı kullanılıyordu; iki panel de boyanmış pelerinlerde yanlış
-// panel (iç astar) seçiliyor ve katalogda desen "ters" görünüyordu.
+// Vanilla düzeni: pelerin modeli 180° Y döndürülerek kurulur, bu yüzden oyunda
+// arkadan görünen DIŞ yüz `(1,1)` panelidir — tasarım oraya gider; `(12,1)`
+// gövdeye bakan İÇ astardır. (Mojang pelerinlerinde de desen (1,1)'dedir;
+// elitra tersidir, dış (36,2).) Katalogda oyuncunun gördüğü yüz (1,1) çizilir.
 
 import { PELERIN_DIS, PELERIN_IC, type Dilim } from "./skin-bolgeler";
 

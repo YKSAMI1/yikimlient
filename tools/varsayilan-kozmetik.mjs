@@ -16,9 +16,10 @@
 //   src-tauri/resources/kozmetik/{pelerin,elytra}.png
 //
 // Atlas yerleşimi (kozmetik.rs başlığıyla aynı):
-//   PELERİN  ön (1,1)10×16 · arka (12,1)10×16 · yanlar (0,1)/(11,1)1×16
+//   PELERİN  dış/görünen (1,1)10×16 · iç astar (12,1)10×16 · yanlar (0,1)/(11,1)1×16
 //            üst (1,0)10×1 · alt (11,0)10×1
-//   ELİTRA   dış (24,2)10×20 · iç (36,2)10×20 · yanlar (22,2)/(34,2)2×20
+//            (pelerin modeli oyunda 180° Y döner → görünen yüz (1,1))
+//   ELİTRA   dış (36,2)10×20 · iç (24,2)10×20 · yanlar (22,2)/(34,2)2×20
 //            üst (24,0)10×2 · alt (34,0)10×2
 
 import { deflateSync } from "node:zlib";
@@ -139,10 +140,10 @@ function pelerinYuz(x, y, g, h, koyu) {
 
 function pelerinUret() {
   tuval.fill(0);
-  // Ön yüz (vücuda bakan): daha koyu.
-  pelerinYuz(1, 1, 10, 16, true);
-  // Arka yüz (asıl görünen).
-  pelerinYuz(12, 1, 10, 16, false);
+  // Görünen yüz (oyunda arkadan görünen, model 180° döner): (1,1).
+  pelerinYuz(1, 1, 10, 16, false);
+  // Gövdeye bakan iç astar (vücuda dönük): (12,1).
+  pelerinYuz(12, 1, 10, 16, true);
   // Yanlar.
   dikdortgen(0, 1, 1, 16, RENK.gece);
   dikdortgen(11, 1, 1, 16, RENK.gece);
@@ -183,8 +184,8 @@ function elitraYuz(x, y, g, h, ic) {
 
 function elitraUret() {
   tuval.fill(0);
-  elitraYuz(24, 2, 10, 20, false); // dış yüz
-  elitraYuz(36, 2, 10, 20, true); // iç yüz
+  elitraYuz(36, 2, 10, 20, false); // dış yüz (kanatlar döndürülmez)
+  elitraYuz(24, 2, 10, 20, true); // iç yüz
   // Yanlar (2×20).
   for (const x of [22, 34]) {
     degradeDoldur(x, 2, 2, 20, RENK.geceUst, RENK.geceAlt);

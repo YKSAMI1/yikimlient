@@ -74,12 +74,12 @@ function kutuYap(b: Bölge, doku: THREE.Texture | null, saydam = false): THREE.M
  *  Yüz sırası: [px, nx, py, ny, pz, nz]. Alt yüz (ny) dikey aynalıdır —
  *  vanilla paftada alt şerit ters durur.
  *
- *  GÖRÜNEN yüz = `(u+2d+w, v+d)` paneli (kutunun ARKASI, nz). Kanıt: gerçek
- *  vanilla elitra dokusunda desen yalnız bu panelde (36,2) durur; `(u+d,v+d)`
- *  paneli (24,2) tamamen saydamdır. Oyunda arkadan görünen yüz bu yüzden nz.
- *  v0.6.3: burada eskiden ön/arka panelleri TAKAS eden `disDisari` dalı vardı;
- *  önizleme oyunun tersini gösteriyordu (kullanıcı: "launcherde ters, oyunda
- *  düzgün"). Artık vanilla `ModelPart.Cube` düzeni birebir kullanılır. */
+ *  UV'ler vanilla formülüdür, aynalama YOKTUR. Pelerinde oyunda görünen yüz
+ *  pz'dir `(u+d, v+d)` = (1,1) — çünkü vanilla model kutuyu 180° Y döndürür
+ *  (`pelerinMeshKur` aynı dönüşü uygular). Elitrada dönüş yoktur; görünen yüz
+ *  nz'dir `(u+2d+w, v+d)` = (36,2) — vanilla elitra dokusunda desen yalnız
+ *  orada durur (173 opak piksel), (24,2) tamamen saydamdır.
+ *  v0.6.3'te pelerin panelleri ters etiketlenmişti; v0.9.0'da düzeltildi. */
 function kozUV(
     geo: THREE.BufferGeometry,
     u: number,
@@ -838,16 +838,11 @@ export class Sahne {
         if (this.pelerinGrup) this.pelerinMeshSil(); // çift mesh imkânsız
         const geo = new THREE.BoxGeometry(10 * KS, 16 * KS, 1 * KS);
         kozUV(geo, 0, 0, 10, 16, 1);
-        // Oyunda pelerinin GÖRÜNEN yüzü (nz) yatay aynalanır; atlas da o ayna
-        // için ters yazıldığı için önizleme de aynı aynayı uygular.
-        const puv = geo.attributes.uv as THREE.BufferAttribute;
-        for (const k of [20, 22]) {
-            const x1 = puv.getX(k);
-            const x2 = puv.getX(k + 1);
-            puv.setX(k, x2);
-            puv.setX(k + 1, x1);
-        }
-        puv.needsUpdate = true;
+        // Vanilla pelerin modeli kutuyu 180° Y döndürerek kurar
+        // (`PartPose.offsetAndRotation(0,0,2, 0,π,0)`). Dönüş olmadan arkadan
+        // görünen yüz (12,1) = astar olurdu; 180° ile oyunda görünen yüz
+        // (1,1) = tasarımdır. Önizleme de aynı dönüşü uygular → WYSIWYG.
+        // (Ayrıca UV aynalama YAPILMAZ: dönüş okunabilirliği korur.)
         const mat = new THREE.MeshLambertMaterial({
             map: this.pelerinDoku,
             transparent: true,
@@ -855,6 +850,7 @@ export class Sahne {
             side: THREE.DoubleSide,
         });
         const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.y = Math.PI;
         mesh.position.set(0, -8 * KS, 0);
         kutuIzgarasi(mesh, 10, 16, 1);
 

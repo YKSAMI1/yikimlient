@@ -58,12 +58,21 @@ export const BOLGELER: SkinBolge[] = [
 
 
 /** Pelerin paftası (64×32) — oyunda ARKADAN GÖRÜNEN panel, yani TASARIM.
- *  Vanilla düzeni: pelerin kutusu uv(0,0) ile kurulur →
- *  (1,1) = gövdeye bakan İÇ yüz, (12,1) = arkadan görünen DIŞ yüz.
- *  (Mojang paftalarında desen (12,1)'e çizilir; (1,1) onun aynasıdır.) */
-export const PELERIN_DIS: Dilim = { x: 12, y: 1, w: 10, h: 16 };
+ *
+ *  Kesin kanıt: vanilla pelerin modeli kutuyu 180° Y döndürerek kurar
+ *  (`PartPose.offsetAndRotation(0,0,2, 0,π,0)`; 1.21.9+ `class_9950`, klasik
+ *  `cloak` tanımının birebir aynısı). Dönüş olmasa arkadan görünen yüz
+ *  `(u+2d+w, v+d)` = (12,1) olurdu; 180° dönüşle görünen yüz `(u+d, v+d)` =
+ *  **(1,1)** olur. Gerçek Mojang pelerinlerinde tasarım da (1,1) panelindedir
+ *  ve (12,1) düz astardır (jeb_/Dinnerbone/Searge/Grumm paftaları birebir
+ *  incelendi). Eski exe de tasarımı (1,1)'e yazıp (12,1)'e aynasını koyuyordu.
+ *
+ *  ELİTRA FARKLI: elitra modeli döndürülmez, dış yüz `(36,2)`dir (vanilla
+ *  elitra dokusunda desen yalnız orada: 173 opak piksel; (24,2) tamamen
+ *  saydam). Bu yüzden iki kozmetik aynı formülü kullanmaz. */
+export const PELERIN_DIS: Dilim = { x: 1, y: 1, w: 10, h: 16 };
 /** Pelerin iç astarı (gövdeye bakan, oyuncuya dönük yüz). */
-export const PELERIN_IC: Dilim = { x: 1, y: 1, w: 10, h: 16 };
+export const PELERIN_IC: Dilim = { x: 12, y: 1, w: 10, h: 16 };
 
 export function bolgeBul(x: number, y: number): SkinBolge | null {
   for (const b of BOLGELER) {
