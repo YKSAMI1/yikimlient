@@ -16,9 +16,8 @@
     // main.js yüklenemezse içerik gizli kalmasın
     setTimeout(function () { if (!window.__ykHazir) document.documentElement.classList.remove("js"); }, 3500);
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <!-- Yazı tipleri sitenin kendi dosyalarından (Google Fonts engelli — bkz. fonts.css) -->
+  <link rel="stylesheet" href="/fonts.css" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
