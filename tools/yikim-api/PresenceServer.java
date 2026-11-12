@@ -54,14 +54,25 @@ public class PresenceServer {
     private static final int MAX_PLAYERS = 200;
     private static final int MAX_ROZET_B64 = 4096;
     /** protokol sürümü — GET yanıtında görünür, dağıtım doğrulaması için */
-    private static final int SURUM = 6;
+    private static final int SURUM = 7;
 
     /// KOZMETİKLER (v4): uuid → base64 PNG doku (64×32).
     ///   PELERINLER: "kc" — özel pelerin dokusu
     ///   KANATLAR  : "ke" — elitra kanat dokusu
+    ///   DERİLER   : "ks" — kendi skinin (64×64), "ksm" = slim(1)/classic(0)
     /// Herkes kullanabilir (ücretsiz); izin listesine bağlı DEĞİL.
     private static final Map<String, String> PELERINLER = new ConcurrentHashMap<>();
     private static final Map<String, String> KANATLAR = new ConcurrentHashMap<>();
+    /// v7 DERİLER (skin paylaşımı): YIKIMLient kullanan herkes birinin skinini
+    /// görür — pelerin/elıtra ile TAMAMEN aynı protokol, ayrı alanlar.
+    /// Mojang hesabı olmayan (cracked) oyuncunun skini bu yolla görünür.
+    private static final Map<String, String> DERILER = new ConcurrentHashMap<>();
+    /// Derinin gövde varyantı: true = slim (Alex modeli).
+    private static final Map<String, Boolean> DERI_SLIM = new ConcurrentHashMap<>();
+    private static final Map<String, String> DERI_SURUM = new ConcurrentHashMap<>();
+    /// Deri dokusu üst sınırı (base64): 64×64 normal deri ~10 KB; HD deri
+    /// 1024×512'e kadar (~700 KB) parçalı yüklenir.
+    private static final int MAX_DERI_B64 = 700_000;
     /// Artık kozmetik TAM 64×32 atlas olarak gönderilir (2048 piksel); detaylı
   /// bir doku PNG'si küçük olsa da güvenli sınır yüksek tutulur.
   // v5: HD doku (1024x512'e kadar PNG) base64 olarak ~700 KB olabilir.
@@ -321,13 +332,14 @@ public class PresenceServer {
 
     // ---------------------------------------------------------------- kozmetik
 
-    /// Kozmetikleri diske yaz: {"<uuid>":{"kc":"<b64>","ke":"<b64>"}, ...}
+    /// Kozmetikleri diske yaz: {"<uuid>":{"kc":"<b64>","ke":"<b64>","ks":"<b64>","ksm":1}, ...}
     private static void kozmetikleriKaydet() {
         // HD dokularla dosya çok şişebilir; 8 MB üstünde diske yazma atlanır
         // (ücretsiz katmanda zaten kalıcı disk yok, bellek yeterli).
         int boyut = 0;
         for (String v : PELERINLER.values()) boyut += v.length();
         for (String v : KANATLAR.values()) boyut += v.length();
+        for (String v : DERILER.values()) boyut += v.length();
         if (boyut > 8_000_000) {
             return;
         }
@@ -335,6 +347,7 @@ public class PresenceServer {
         boolean ilk = true;
         Set<String> hepsi = new HashSet<>(PELERINLER.keySet());
         hepsi.addAll(KANATLAR.keySet());
+        hepsi.addAll(DERILER.keySet());
         for (String uuid : hepsi) {
             if (!ilk) json.append(',');
             ilk = false;
@@ -349,6 +362,14 @@ public class PresenceServer {
             if (k != null) {
                 if (alan) json.append(',');
                 json.append("\"ke\":\"").append(k).append('"');
+                alan = true;
+            }
+            String d = DERILER.get(uuid);
+            if (d != null) {
+                if (alan) json.append(',');
+                json.append("\"ks\":\"").append(d).append('"');
+                Boolean slim = DERI_SLIM.get(uuid);
+                json.append(",\"ksm\":").append(slim == null ? 0 : slim ? 1 : 0);
             }
             json.append('}');
         }
@@ -376,6 +397,8 @@ public class PresenceServer {
                 }
                 String p = alan(json, son, "kc");
                 String k = alan(json, son, "ke");
+                String d = alan(json, son, "ks");
+                Integer slim = sayi(json.substring(son), "ksm");
                 if (p != null && p.length() <= MAX_KOZMETIK_B64) {
                     PELERINLER.put(uuid, p);
                     PELERIN_SURUM.put(uuid, dokuSurumu(p));
@@ -384,12 +407,18 @@ public class PresenceServer {
                     KANATLAR.put(uuid, k);
                     KANAT_SURUM.put(uuid, dokuSurumu(k));
                 }
+                if (d != null && d.length() <= MAX_DERI_B64) {
+                    DERILER.put(uuid, d);
+                    DERI_SURUM.put(uuid, dokuSurumu(d));
+                    DERI_SLIM.put(uuid, slim != null && slim == 1);
+                }
                 int kapanis = json.indexOf('}', son);
                 i = kapanis < 0 ? son + 1 : kapanis + 1;
             }
-            if (!PELERINLER.isEmpty() || !KANATLAR.isEmpty()) {
+            if (!PELERINLER.isEmpty() || !KANATLAR.isEmpty() || !DERILER.isEmpty()) {
                 System.out.println("[YIKIM presence] kozmetik diskten yuklendi: "
-                    + PELERINLER.size() + " pelerin, " + KANATLAR.size() + " kanat");
+                    + PELERINLER.size() + " pelerin, " + KANATLAR.size() + " kanat, "
+                    + DERILER.size() + " deri");
             }
         } catch (Throwable yoksay) { /* yok say */ }
     }
@@ -454,6 +483,23 @@ public class PresenceServer {
         return json.append('}').toString();
     }
 
+    /// v7: aynı sunucudaki oyuncuların gövde varyantı: {"<uuid>":1|0}.
+    /// Yalnız deri paylaşmış oyuncular yazılır; istemci bilinmeyen varyantı
+    /// klasik (wide) kabul eder.
+    private static String deriSlimYaz(String istekSahibi, Map<String, Oyuncu> ayniSunucu) {
+        StringBuilder json = new StringBuilder("{");
+        boolean ilk = true;
+        for (String akran : ayniSunucu.keySet()) {
+            if (akran.equals(istekSahibi)) continue;
+            Boolean slim = DERI_SLIM.get(akran);
+            if (slim == null) continue;
+            if (!ilk) json.append(',');
+            ilk = false;
+            json.append('"').append(akran).append("\":").append(slim ? 1 : 0);
+        }
+        return json.append('}').toString();
+    }
+
     /// İstemcinin elindeki doku sürümleri ("ob":"uuid:sürüm;uuid:sürüm").
     private static Map<String, String> bildiklerim(String govde) {
         Map<String, String> sonuc = new java.util.HashMap<>();
@@ -480,7 +526,7 @@ public class PresenceServer {
     /// gerçekten yeni bir aktarımda (kayıt yok / parça sayısı değişti) kurulur.
     private static void parcaAl(HttpExchange degis, String uuid, String govde, String hedef)
             throws IOException {
-        if (!"kc".equals(hedef) && !"ke".equals(hedef)) {
+        if (!"kc".equals(hedef) && !"ke".equals(hedef) && !"ks".equals(hedef)) {
             cevap(degis, 400, "{\"p\":[]}");
             return;
         }
@@ -532,6 +578,11 @@ public class PresenceServer {
                     PELERINLER.remove(uuid);
                     PELERIN_SURUM.remove(uuid);
                 }
+                else if ("ks".equals(hedef)) {
+                    DERILER.remove(uuid);
+                    DERI_SLIM.remove(uuid);
+                    DERI_SURUM.remove(uuid);
+                }
                 else {
                     KANATLAR.remove(uuid);
                     KANAT_SURUM.remove(uuid);
@@ -540,6 +591,12 @@ public class PresenceServer {
             else if ("kc".equals(hedef)) {
                 PELERINLER.put(uuid, b64);
                 PELERIN_SURUM.put(uuid, dokuSurumu(b64));
+            }
+            else if ("ks".equals(hedef)) {
+                Integer slimGeldi = sayi(govde, "ksm");
+                DERILER.put(uuid, b64);
+                DERI_SURUM.put(uuid, dokuSurumu(b64));
+                DERI_SLIM.put(uuid, slimGeldi != null && slimGeldi == 1);
             }
             else {
                 KANATLAR.put(uuid, b64);
@@ -718,6 +775,9 @@ public class PresenceServer {
             // Boş dizge = "kaldır" (alan() boşu null sayar, bu yüzden hamAlan).
             String pelerin = hamAlan(govde, "kc");
             String kanat = hamAlan(govde, "ke");
+            // v7 DERİ (skin paylaşımı) — aynı kural: boş = kaldır.
+            String deri = hamAlan(govde, "ks");
+            Integer deriSlimGeldi = sayi(govde, "ksm");
             boolean kozmetikDegisti = false;
             if (pelerin != null && pelerin.length() <= MAX_KOZMETIK_B64) {
                 if (pelerin.isEmpty()) {
@@ -738,6 +798,19 @@ public class PresenceServer {
                 else {
                     KANATLAR.put(uuid, kanat);
                     KANAT_SURUM.put(uuid, dokuSurumu(kanat));
+                }
+                kozmetikDegisti = true;
+            }
+            if (deri != null && deri.length() <= MAX_DERI_B64) {
+                if (deri.isEmpty()) {
+                    DERILER.remove(uuid);
+                    DERI_SLIM.remove(uuid);
+                    DERI_SURUM.remove(uuid);
+                }
+                else {
+                    DERILER.put(uuid, deri);
+                    DERI_SURUM.put(uuid, dokuSurumu(deri));
+                    DERI_SLIM.put(uuid, deriSlimGeldi != null && deriSlimGeldi == 1);
                 }
                 kozmetikDegisti = true;
             }
@@ -767,9 +840,9 @@ public class PresenceServer {
             }
 
             // yalnız kozmetik isteği (presence bilgisi yok) burada biter
-            if (pelerin != null || kanat != null) {
+            if (pelerin != null || kanat != null || deri != null) {
                 if (sunucu == null) {
-                    cevap(degis, 200, "{\"p\":[],\"b\":{},\"kc\":{},\"ke\":{}}");
+                    cevap(degis, 200, "{\"p\":[],\"b\":{},\"kc\":{},\"ke\":{},\"ks\":{},\"ksm\":{}}");
                     return;
                 }
             }
@@ -815,12 +888,17 @@ public class PresenceServer {
                 .append(",\"x\":").append(pixelYaz(uuid, liste))
                 .append(",\"kc\":").append(kozmetikYaz(PELERINLER, PELERIN_SURUM, bilinen, uuid, liste))
                 .append(",\"ke\":").append(kozmetikYaz(KANATLAR, KANAT_SURUM, bilinen, uuid, liste))
+                .append(",\"ks\":").append(kozmetikYaz(DERILER, DERI_SURUM, bilinen, uuid, liste))
+                // v7: aynı sunucudaki oyuncuların gövde varyantı (slim/wide).
+                // Deri dokusu yoksa da yazılır: oyuncu klasik/wide olabilir.
+                .append(",\"ksm\":").append(deriSlimYaz(uuid, liste))
                 .append(",\"pn\":").append(isimlerYaz(uuid, liste))
                 // v6: İSTEK SAHİBİNİN sunucuda kayıtlı doku sürümleri. İstemci
                 // bunu kendi dosyasıyla karşılaştırır; sunucu yeniden başlayıp
                 // dokuyu unuttuysa kendiliğinden yeniden yükler.
                 .append(",\"sv\":{\"kc\":\"").append(surumYaz(PELERIN_SURUM, uuid))
-                .append("\",\"ke\":\"").append(surumYaz(KANAT_SURUM, uuid)).append("\"}")
+                .append("\",\"ke\":\"").append(surumYaz(KANAT_SURUM, uuid))
+                .append("\",\"ks\":\"").append(surumYaz(DERI_SURUM, uuid)).append("\"}")
                 .append(",\"izinler\":").append(izinlerYaz()).append('}');
             cevap(degis, 200, json.toString());
         }

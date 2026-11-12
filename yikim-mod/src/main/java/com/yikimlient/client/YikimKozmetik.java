@@ -34,6 +34,12 @@ import net.minecraft.class_310;
 public final class YikimKozmetik {
     private static final Map<UUID, String> UZAK_PELERIN = new ConcurrentHashMap<UUID, String>();
     private static final Map<UUID, String> UZAK_KANAT = new ConcurrentHashMap<UUID, String>();
+    /// v7 DERİ PAYLAŞIMI: diğer oyuncuların skini (base64 PNG, 64×64).
+    /// Mojang hesabı olmayan (cracked) oyuncunun skini bu yolla görünür —
+    /// pelerin/elıtra ile TAMAMEN aynı mekanizma.
+    private static final Map<UUID, String> UZAK_DERI = new ConcurrentHashMap<UUID, String>();
+    /// Aynı oyuncunun gövde varyantı: slim (Alex) = true. Bilinmiyorsa klasik.
+    private static final Map<UUID, Boolean> UZAK_DERI_SLIM = new ConcurrentHashMap<UUID, Boolean>();
     /** anahtar (dosya adı / uuid-tür) → kayıtlı doku kimliği */
     private static final Map<String, class_2960> DOKULAR = new ConcurrentHashMap<String, class_2960>();
     private static final java.util.Set<String> BASARISIZ = ConcurrentHashMap.newKeySet();
@@ -48,15 +54,25 @@ public final class YikimKozmetik {
     private static final int TEK_PARCA_ESIK = 18000;
     /// Sunucunun kabul ettiği en büyük base64; üstündeyse 64×32 kopya gönderilir.
     private static final int SUNUCU_SINIR = 690_000;
+    /// v7: 64×64 deri (skin) normalde ~10 KB base64 → tek parçada gider.
+    private static final int DERI_PARCA_ESIK = 18000;
 
     /// Sırası bekleyen HD dokular (parçalı gönderim).
     private static volatile String bekleyenPelerin = "";
     private static volatile String bekleyenKanat = "";
+    /// v7: bekleyen DERİ (skin paylaşımı).
+    private static volatile String bekleyenDeri = "";
     private static volatile String gonderilenPelerin = "";
     private static volatile String gonderilenKanat = "";
+    /// v7: parcali deri yuklemesinde son gonderilen imza.
+    private static volatile String gonderilenDeri = "";
 
     private static volatile String sonPelerinB64 = "";
     private static volatile String sonKanatB64 = "";
+    /// v7: son gonderilen deri (skin) - degismedikce yeniden gonderilmez.
+    /// v7: son gonderilen derinin gövde varyanti (slim=1 / klasik=0).
+    private static volatile boolean deriSlim;
+    private static volatile String sonDeriB64 = "";
     /// Aynı anda tek HD yüklemesi (arka plan iş parçacığı).
     private static final java.util.concurrent.atomic.AtomicBoolean YUKLEME_VAR =
         new java.util.concurrent.atomic.AtomicBoolean();
@@ -169,6 +185,12 @@ public final class YikimKozmetik {
         YikimKozmetik.kanatYerel = YikimKozmetik.imzaliOku("elytra.png", 1);
         boolean degisti = !YikimKozmetik.pelerinYerel.equals(oncekiPelerin)
             || !YikimKozmetik.kanatYerel.equals(oncekiKanat);
+        // v7: deri.png de izlenir (skin paylaşımı).
+        String oncekiDeri = YikimKozmetik.deriYerel;
+        YikimKozmetik.deriYerel = YikimKozmetik.imzaliOku("deri.png", 2);
+        if (!YikimKozmetik.deriYerel.equals(oncekiDeri)) {
+            degisti = true;
+        }
         if (degisti) {
             YikimKozmetik.pelerinKucuk = YikimKozmetik.kucukDosya("pelerin.kucuk.png", YikimKozmetik.pelerinYerel);
             YikimKozmetik.kanatKucuk = YikimKozmetik.kucukDosya("elytra.kucuk.png", YikimKozmetik.kanatYerel);
@@ -177,9 +199,20 @@ public final class YikimKozmetik {
         }
     }
 
+    /// v7 DERİ (skin): launcher'ın Skin Merkezi'nde seçilen/girilen deri
+    /// `.yikim/deri.png` olarak yazılır. Aynı önbellek yöntemi: dosya
+    /// değişmedikçe okunmaz, kodlanmaz.
+    private static volatile String deriYerel = "";
+
+    /// Kendi derimizin base64 hâli (yoksa boş).
+    public static synchronized String deriB64() {
+        YikimKozmetik.dosyalariTazele();
+        return YikimKozmetik.deriYerel;
+    }
+
     /** Dosya imzası (mtime ^ boyut) → base64 önbelleği. Değişmeyen dosya okunmaz. */
-    private static final long[] DOSYA_DAMGA = new long[] {Long.MIN_VALUE, Long.MIN_VALUE};
-    private static final String[] DOSYA_B64 = new String[] {"", ""};
+    private static final long[] DOSYA_DAMGA = new long[] {Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE};
+    private static final String[] DOSYA_B64 = new String[] {"", "", ""};
 
     /// mtime ^ (boyut << 8) — iki syscall, tek işaret.
     private static long[] damga(Path f) throws java.io.IOException {
@@ -300,8 +333,10 @@ public final class YikimKozmetik {
         return !YikimKozmetikSecim.aktifId(YikimKozmetikSecim.DERI).isEmpty()
             || !YikimKozmetik.pelerinYerel.isEmpty()
             || !YikimKozmetik.kanatYerel.isEmpty()
+            || !YikimKozmetik.deriYerel.isEmpty()
             || !YikimKozmetik.UZAK_PELERIN.isEmpty()
             || !YikimKozmetik.UZAK_KANAT.isEmpty()
+            || !YikimKozmetik.UZAK_DERI.isEmpty()
             || !YikimKozmetik.pelerinKapali
             || !YikimKozmetik.kanatKapali;
     }
@@ -344,6 +379,30 @@ public final class YikimKozmetik {
                 YikimKozmetik.bekleyenKanat = kanat;
             }
         }
+        // ---- v7 DERİ (skin paylaşımı) ----
+        // Launcher'ın Skin Merkezi'nde seçilen deri `.yikim/deri.png` olarak
+        // yazılır; burada aynen paylaşılır. Pelerin/elıtra farkı: deri 64×64
+        // ve gövde modeli (slim/klasik) de taşınır.
+        String deri = YikimKozmetik.deriB64();
+        boolean slimMi = YikimKozmetikSecim.deriSlim;
+        if (!deri.equals(YikimKozmetik.sonDeriB64) || YikimKozmetik.deriSlim != slimMi) {
+            YikimKozmetik.deriSlim = slimMi;
+            YikimKozmetik.sonDeriB64 = deri;
+            if (deri.isEmpty()) {
+                // Doku kaldırıldı: sunucudaki kopya da silinir.
+                ek.append(",\"ks\":\"\"");
+            }
+            else if (deri.length() <= YikimKozmetik.DERI_PARCA_ESIK) {
+                ek.append(",\"ks\":\"").append(deri).append('"');
+            }
+            else {
+                // HD deri: parçalı yükleme (pelrin/elıtra ile aynı yöntem).
+                YikimKozmetik.bekleyenDeri = deri;
+                YikimKozmetik.gonderilenDeri = "";
+            }
+            ek.append(",\"ksm\":").append(slimMi ? 1 : 0);
+            YikimPresence.hemenGonder();
+        }
         return ek.toString();
     }
 
@@ -360,6 +419,7 @@ public final class YikimKozmetik {
         StringBuilder sb = new StringBuilder();
         YikimKozmetik.surumEkle(sb, YikimKozmetik.UZAK_PELERIN);
         YikimKozmetik.surumEkle(sb, YikimKozmetik.UZAK_KANAT);
+        YikimKozmetik.surumEkle(sb, YikimKozmetik.UZAK_DERI);
         return sb.toString();
     }
 
@@ -425,6 +485,28 @@ public final class YikimKozmetik {
                 hepsiTamam = false;
             }
         }
+        // v7 DERİ: HD deri parça parça gider (gövde sınırına takılmadan).
+        // Kısa deri zaten govdeEk içinde tek istekte gittiği için buraya
+        // sadece büyük (HD) deri düşer.
+        String d = YikimKozmetik.bekleyenDeri;
+        if (!d.isEmpty() && !d.equals(YikimKozmetik.gonderilenDeri)) {
+            String veri = d;
+            if (veri.length() > YikimKozmetik.SUNUCU_SINIR) {
+                hepsiTamam = false;
+            }
+            else {
+                String sv = YikimKozmetik.parcaliGonder(ucak, uuid, "ks", veri);
+                if (sv != null) {
+                    YikimKozmetik.gonderilenDeri = d;
+                    if (d.equals(YikimKozmetik.bekleyenDeri)) {
+                        YikimKozmetik.bekleyenDeri = "";
+                    }
+                }
+                else {
+                    hepsiTamam = false;
+                }
+            }
+        }
         return hepsiTamam;
     }
 
@@ -435,7 +517,8 @@ public final class YikimKozmetik {
     /// bitince bekleyen kaldıysa sonraki kalp atışı yeniden başlatır.
     public static void yuklemeyiBaslat(String ucak, String uuid) {
         if (YikimKozmetik.bekleyenPelerin.isEmpty()
-            && YikimKozmetik.bekleyenKanat.isEmpty()) {
+            && YikimKozmetik.bekleyenKanat.isEmpty()
+            && YikimKozmetik.bekleyenDeri.isEmpty()) {
             return;
         }
         if (!YikimKozmetik.YUKLEME_VAR.compareAndSet(false, true)) {
@@ -586,7 +669,54 @@ public final class YikimKozmetik {
         }
         YikimKozmetik.haritaOku(json, "kc", YikimKozmetik.UZAK_PELERIN);
         YikimKozmetik.haritaOku(json, "ke", YikimKozmetik.UZAK_KANAT);
+        // v7: diğer oyuncuların derileri (skin paylaşımı).
+        YikimKozmetik.haritaOku(json, "ks", YikimKozmetik.UZAK_DERI);
+        YikimKozmetik.deriSlimOku(json);
         YikimKozmetik.sunucuSurumunuIsle(json);
+    }
+
+    /// Yanıttaki "ksm" haritasını oku: {"<uuid>":1|0}
+    /// Oyuncunun gövde varyantı (slim/klasik). Bilinmiyorsa klasik varsayılır.
+    private static void deriSlimOku(String json) {
+        try {
+            int d = json.indexOf("\"ksm\"");
+            if (d < 0) {
+                return;
+            }
+            int sol = json.indexOf('{', d);
+            int sag = sol < 0 ? -1 : json.indexOf('}', sol);
+            if (sol < 0 || sag <= sol) {
+                return;
+            }
+            String ic = json.substring(sol + 1, sag);
+            java.util.Map<UUID, Boolean> yeni = new java.util.HashMap<UUID, Boolean>();
+            int t = 0;
+            while (t < ic.length()) {
+                int a1 = ic.indexOf('"', t);
+                if (a1 < 0) break;
+                int a2 = ic.indexOf('"', a1 + 1);
+                if (a2 < 0) break;
+                String anahtar = ic.substring(a1 + 1, a2);
+                int vn = ic.indexOf(':', a2);
+                if (vn < 0) break;
+                int j = vn + 1;
+                while (j < ic.length() && ic.charAt(j) == ' ') j++;
+                boolean deger = j < ic.length() && ic.charAt(j) == '1';
+                try {
+                    yeni.put(UUID.fromString(anahtar), Boolean.valueOf(deger));
+                }
+                catch (IllegalArgumentException bozuk) {
+                    // uuid değil — atla
+                }
+                t = ic.indexOf(',', a2);
+                if (t < 0) break;
+                t = t + 1;
+            }
+            if (!yeni.isEmpty()) {
+                YikimKozmetik.UZAK_DERI_SLIM.putAll(yeni);
+            }
+        }
+        catch (Throwable ignored) { }
     }
 
     /// v1.26: sunucunun BİZİM dokumuz için bildirdiği sürüm ("sv").
@@ -609,6 +739,7 @@ public final class YikimKozmetik {
             String ic = json.substring(sol + 1, sag);
             String kc = YikimKozmetik.metinDeger(ic, "kc");
             String ke = YikimKozmetik.metinDeger(ic, "ke");
+            String ks = YikimKozmetik.metinDeger(ic, "ks");
             long simdi = System.currentTimeMillis();
             // onarım en fazla 15 sn'de bir: bozuk bir uçta sonsuz döngü olmasın
             if (simdi - YikimKozmetik.sonKendiniOnar < 15000L) {
@@ -621,6 +752,10 @@ public final class YikimKozmetik {
             if (ke != null && !ke.equals(YikimKozmetik.kendiSurumKe)) {
                 eksik = YikimKozmetik.kendiniOnar(false) || eksik;
             }
+            // v7: deri (skin) sunucuda yok/başka sürüm → yeniden gönder.
+            if (ks != null && !ks.equals(YikimKozmetik.deriSurumu())) {
+                eksik = YikimKozmetik.kendiniOnarDeri() || eksik;
+            }
             if (eksik) {
                 YikimKozmetik.sonKendiniOnar = simdi;
                 YikimPresence.hemenGonder();
@@ -629,6 +764,28 @@ public final class YikimKozmetik {
         catch (Throwable ignored) {
             // bozuk yanıt kozmetiği bozmaz
         }
+    }
+
+    /// Kendi derimizin sunucudaki sürüm karşılığı (boşsa sunucuda deri yok).
+    private static String deriSurumu() {
+        String deri = YikimKozmetik.deriB64();
+        return deri.isEmpty() ? "" : YikimKozmetik.dokuSurumu(deri);
+    }
+
+    /// Sunucunun deri kopyasını yerel dosyayla eşitle (yeniden yükle / sil).
+    private static boolean kendiniOnarDeri() {
+        String yerel = YikimKozmetik.deriB64();
+        if (yerel.isEmpty()) {
+            YikimKozmetik.sonDeriB64 = YikimKozmetik.SILME_IMI;
+            return true;
+        }
+        if (yerel.length() <= YikimKozmetik.DERI_PARCA_ESIK) {
+            YikimKozmetik.sonDeriB64 = YikimKozmetik.SILME_IMI;
+            return true;
+        }
+        YikimKozmetik.bekleyenDeri = yerel;
+        YikimKozmetik.gonderilenDeri = "";
+        return true;
     }
 
     /// Sunucudaki kopyayı yerel dosyayla eşitle (yeniden yükle / sil).
@@ -884,6 +1041,8 @@ public final class YikimKozmetik {
     /// döner; yeni tasarım gelince yavaş yola (kurulum) düşer.
     private static final Map<UUID, Object[]> DOKU_PELERIN = new ConcurrentHashMap<>();
     private static final Map<UUID, Object[]> DOKU_KANAT = new ConcurrentHashMap<>();
+    /// v7: baska oyuncularin deri dokulari (skin paylasimi onbellegi).
+    private static final Map<UUID, Object[]> DOKU_DERI = new ConcurrentHashMap<>();
 
     private static class_2960 dokuHizli(UUID id, Map<UUID, Object[]> onbellek, String onEk, String b64) {
         if (b64 == null || b64.isEmpty()) {
@@ -1128,19 +1287,31 @@ public final class YikimKozmetik {
             if (mevcut == null) {
                 return null;
             }
+            boolean ince = YikimKozmetikSecim.deriSlim;
+            // v7 DERİ PAYLAŞIMI: BAŞKA bir oyuncunun skini. Mojang hesabı
+            // olmayan (cracked) oyuncunun çizdiği skin de bu yolla görünür —
+            // pelerin/elıtra mekanizmasının birebir aynısı.
+            class_2960 uzak = null;
+            if (kendi == null) {
+                String b64 = YikimKozmetik.UZAK_DERI.get(id);
+                if (b64 != null && !b64.isEmpty()) {
+                    uzak = YikimKozmetik.dokuHizli(id, YikimKozmetik.DOKU_DERI, "deri-", b64);
+                    Boolean slim = YikimKozmetik.UZAK_DERI_SLIM.get(id);
+                    ince = slim == null ? false : slim.booleanValue();
+                }
+            }
+            class_2960 deri = kendi != null ? kendi : uzak;
             // Kendi derimiz seçiliyse "varsayılan skin" korumasını atla: tek
             // oyunculuda giriş olmadığı için gövde varsayılan görünür ve
             // seçim hiç uygulanmazdı.
-            if (kendi == null && YikimKozmetik.varsayilanMi(mevcut, id)) {
+            if (deri == null && YikimKozmetik.varsayilanMi(mevcut, id)) {
                 return null;
             }
             class_2960 pelerin = YikimKozmetik.pelerin(id);
             class_2960 kanat = YikimKozmetik.kanat(id);
-            class_2960 deri = kendi;
             if (pelerin == null && kanat == null && deri == null) {
                 return null;
             }
-            boolean ince = YikimKozmetikSecim.deriSlim;
             // FPS (v1.34.0): anahtar artık METİN değil — kimlik karşılaştırması.
             // Eskiden her kare her oyuncu için 4 dizgi birleştirme + String.hashCode
             // yapılıyordu; çok oyunculu sunucularda (80+ oyuncu) bu kare başına

@@ -70,12 +70,11 @@ export function renderSkins(root: HTMLElement): void {
     kapiCiz(root, false);
     return;
   }
+  // ÇATLAK (offline) hesap artık KAPI değil: skin sayfası doğrudan açılır,
+  // üstte yalnız bir uyarı şeridi olur (v0.9.2). Mojang hesabı olmayan
+  // oyuncu da kendi skinini çizip YIKIMLient kullanan herkese
+  // gösterebilsin diye kapı tamamen kaldırıldı.
   const yerel = acc.kind !== "microsoft";
-  if (yerel && !yerelModAcik) {
-    // Çatlak hesap: önce bilgi kartı; "Skin Çiz" ile yerel editöre geçilir.
-    kapiCiz(root, true);
-    return;
-  }
   root.innerHTML = iskelet(acc.name, yerel);
   baglantilar(root, acc.id);
   canliKok = root;
@@ -93,9 +92,12 @@ export function renderSkins(root: HTMLElement): void {
 }
 
 /**
- * ÇATLAK (offline) hesap: artık KAPI değil — istemci tarafı skin.
- * Mojang'a çıkmadığı için skin yalnız bu bilgisayarda görünür; doğrulanmış
- * hesapta kitaplığa kalıcı kaydolur. Premium hesapta ağ özellikleri açılır.
+ * ÇATLAK (offline) hesap: KAPI KALKTI (v0.9.2) — skin sayfası doğrudan açılır,
+ * sayfanın üstünde yalnız bilinçlendirme şeridi olur.
+ *
+ * Skin artık YIKIMLient kullanan herkese görünür (pelerin/elıtra sistemi ile
+ * aynı yol: presence paylaşımı). Mojang hesabı olmayan oyuncunun skini artık
+ * yalnız kendi bilgisayarında kalmıyor.
  */
 function kapiCiz(root: HTMLElement, yerel: boolean): void {
   root.innerHTML = `
@@ -142,7 +144,7 @@ function iskelet(ad: string, yerel: boolean): string {
         <div>
           <h1>Skin Merkezi</h1>
           <p class="sub">${yerel
-            ? "Offline (cracked) hesap — skin yalnız bu bilgisayarda görünür."
+            ? "Skinini çiz, yükle ve giy — YIKIMLient kullanan herkes görür."
             : "Skinlerini seç, giy; pelerinini tak. Giyilen skin sunucularda görünür."}</p>
         </div>
         <div class="skin-ust-aksiyon">
@@ -152,6 +154,14 @@ function iskelet(ad: string, yerel: boolean): string {
           <button class="btn primary" id="sk-duzenle">${icon("brush")} Skin Düzenle</button>
         </div>
       </div>
+      ${yerel ? `
+      <p class="skin-cracked-uyari">
+        <span class="skin-cracked-ikon">${icon("info")}</span>
+        <span><b>Çatlak (offline) hesap:</b> skinini buradan çizip yükleyebilirsin ve artık
+        <b>YIKIMLient kullanan herkeste</b> görünür (pelerin/elıtra paylaşımı gibi). Microsoft
+        hesabın olmadığı için skini Mojang'a yüklenmez — oyunu <i>orijinal hesap</i> olarak
+        giren oyuncular (YIKIMLient dışı) klasik skini görür.</span>
+      </p>` : ""}
       <div id="sk-serit"></div>
       <div class="skin-govde">
         <section class="skin-sahne">
