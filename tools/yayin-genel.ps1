@@ -35,12 +35,14 @@ git push -q origin "refs/heads/main:refs/heads/main" 2>&1 | Out-Null
 Write-Host "[2/7] release olustur + Windows yukle"
 $notes = Join-Path $cikti "RELEASE-NOTES.md"
 if (-not (Test-Path $notes)) { Write-Host "NOT DOSYASI YOK: $notes"; exit 1 }
-gh release create "v$V" --title "YIKIMLient v$V" --notes-file $notes 2>&1 | Select-Object -First 2
-gh release upload "v$V" $exe $sig "$cikti\SHA256SUMS.txt" --clobber 2>&1 | Select-Object -First 1
+# SHA256SUMS: once Windows satirini yaz (yoksa) - sonra yukleme sirasinda var olsun
 if (-not (Test-Path "$cikti\SHA256SUMS.txt")) {
   $ozet = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
   [System.IO.File]::WriteAllText("$cikti\SHA256SUMS.txt", "$ozet  $(Split-Path $exe -Leaf)`n", (New-Object System.Text.UTF8Encoding($false)))
 }
+gh release create "v$V" --title "YIKIMLient v$V" --notes-file $notes 2>&1 | Select-Object -First 2
+gh release upload "v$V" $exe $sig "$cikti\SHA256SUMS.txt" --clobber 2>&1 | Select-Object -First 1
+if ($LASTEXITCODE -ne 0) { Write-Host "WINDOWS YUKLEME HATASI"; exit 1 }
 Copy-Item $exe $cikti -Force
 Copy-Item $sig $cikti -Force
 
