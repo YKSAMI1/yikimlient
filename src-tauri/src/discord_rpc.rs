@@ -196,6 +196,13 @@ fn ipc_set_activity(sock: &mut IpcSocket, pid: u32, activity: Option<&Value>) ->
 
 // ---------- presence katmanı ----------
 
+/// KULLANICI TERCİHİ (v0.9.3): "YIKIMLient İndir" butonu artık GitHub değil
+/// KENDİ SİTEMİZE gidiyor. Nedenler: (1) GitHub sayfası İngilizce ve ham;
+/// sitede indirme tek tıkla anlaşılır, (2) ISP Google harici kaynakları
+/// engellediği için siteyi kendi sunucumuzdan veriyoruz, (3) buton
+/// GitHub'daki eski sürüm notlarını gösteriyordu.
+const INDIR_URL: &str = "https://yikimlient.vercel.app";
+
 fn activity_json(details: &str, state: &str, _with_assets: bool, started_at: i64) -> Value {
     // KULLANICI TERCİHİ: assets (large_image) ASLA gönderilmez — Discord
     // uygulamanın (botun) profil fotosunu gösterir; "?" placeholder da
@@ -205,7 +212,7 @@ fn activity_json(details: &str, state: &str, _with_assets: bool, started_at: i64
         "state": state,
         "details": details,
         "timestamps": { "start": started_at },
-        "buttons": [{ "label": "YIKIMLient İndir", "url": "https://github.com/YKSAMI1/yikimlient" }],
+        "buttons": [{ "label": "YIKIMLient İndir", "url": INDIR_URL }],
     })
 }
 

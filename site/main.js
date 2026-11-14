@@ -1,6 +1,6 @@
 /* YIKIMLient site — etkileşimler */
 const REPO = "YKSAMI1/yikimlient";
-const YEDEK_SURUM = "0.9.3";
+const YEDEK_SURUM = "0.9.4";
 const CACHE_MS = 10 * 60 * 1000;
 
 const OS_ETIKET = {
