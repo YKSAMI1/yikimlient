@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "YIKIMLient",
   "version": "0.9.3",
@@ -57,10 +57,10 @@
       "icons/128x128.png",
       "icons/icon.png"
     ],
-    "copyright": "Ã‚Â© 2026 YIKIMLient",
+    "copyright": "Â© 2026 YIKIMLient",
     "publisher": "YIKIMLient",
-    "shortDescription": "YIKIMLient Ã¢â‚¬â€ HÃ„Â±zlÃ„Â± Minecraft Launcher",
-    "longDescription": "Ultra hafif, ultra hÃ„Â±zlÃ„Â± Minecraft launcher ve oyun iÃƒÂ§i mod. Electron yok; Tauri 2 + Rust ile geliÃ…Å¸tirildi.",
+    "shortDescription": "YIKIMLient â€” HÄ±zlÄ± Minecraft Launcher",
+    "longDescription": "Ultra hafif, ultra hÄ±zlÄ± Minecraft launcher ve oyun iÃ§i mod. Electron yok; Tauri 2 + Rust ile geliÅŸtirildi.",
     "windows": {
       "nsis": {
         "installMode": "currentUser",
