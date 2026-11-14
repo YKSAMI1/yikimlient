@@ -90,7 +90,7 @@ $mdir = Join-Path $GameDir "mods"
 New-Item -ItemType Directory -Force -Path $mdir | Out-Null
 
 $api = Get-ChildItem (Join-Path $KOK "yikim-mod\araclar\fabric-api\$Ver") -Filter "fabric-api-*.jar" -File -ErrorAction SilentlyContinue | Select-Object -First 1
-$modJar = Join-Path $KOK "src-tauri\resources\mods\yikimlient-1.0.0-$Ver+$Ver.jar"
+$modJar = Join-Path $KOK "src-tauri\resources\mods\yikimlient-1.0.1-$Ver+$Ver.jar"
 foreach ($m in @($api.FullName, $modJar)) { if ($m) { Copy-Item $m -Destination $mdir -Force } }
 Set-Content -Path (Join-Path $GameDir "options.txt") -Value "version:131004`nmaxFps:260`nenableVsync:false`nlang:tr_tr`nguiScale:2`npreferredGraphicsBackend:`"vulkan`"" -Encoding UTF8
 

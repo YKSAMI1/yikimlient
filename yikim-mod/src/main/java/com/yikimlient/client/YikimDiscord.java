@@ -30,7 +30,7 @@ public final class YikimDiscord {
     private static final String CLIENT_ID = "1560649366899920926";
     /** Logo: Discord'a elle asset yüklemeye gerek kalmasın diye doğrudan URL. */
     private static final String LOGO_URL = "https://github.com/YKSAMI1/yikimlient/raw/main/src-tauri/icons/icon.png";
-    private static final String INDIR_URL = "https://github.com/YKSAMI1/yikimlient";
+    private static final String INDIR_URL = "https://yikimlient.vercel.app";
 
     private static RandomAccessFile winPipe;
     private static SocketChannel unixPipe;

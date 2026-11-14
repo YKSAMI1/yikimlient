@@ -43,13 +43,23 @@ $sha = (Get-FileHash -Path $jar -Algorithm SHA256).Hash.ToLower()
 
 Write-Host "[3/6] sicak.json yaziliyor (gomulu manifest'teki tum mc surumleri kapsanir)"
 # Gomulu resources/manifest.json'daki TUM mcVersion'lar icin ayni kayit - jar
-# surumler arasi geri uyumlu (adaptasyon); tek jar her MC'ye gider:
+# TEK JAR HER MC'YE GIDERMI� HATASI (v0.9.4): eski kod, derlenen jar'i manifest'teki
+# TUM mcVersion'lara yaziyordu. 26.x eklendikten sonra bu, 26.x kurulumlarina
+# BIR 1.21.11 JAR'I kurmaya calisiyordu -> Fabric "duplicate mod id" veya sinif
+# bulunamadi ile oyun acilmiyordu. Artik ayni jar sadece AYNI AILEYE yazilir;
+# diger aileler (26.x) gomulu jar'larina guvenir (launcher zaten 26.x jar'larini
+# kendi manifestinden kuruyor).
 $mcp = Get-Content "$kok\src-tauri\resources\mods\manifest.json" -Raw | ConvertFrom-Json
 $mods = @()
 $ojar = "yikimlient-$MV+$McVersion.jar"
 $url = "https://github.com/YKSAMI1/yikimlient/releases/download/sicak/$ojar"
+# Bu derlemenin ait oldugu aile: 1.21.x mi, 26.x mi?
+$benimAilem = if ($McVersion -like "1.21*") { "1.21" } elseif ($McVersion -like "26*") { "26" } else { $McVersion }
 foreach ($m in $mcp.mods) {
-    $mods += @{ mcVersion = $m.mcVersion; file = $ojar; modVersion = $MV; url = $url; sha256 = $sha }
+    $mc = $m.mcVersion
+    $ailesi = if ($mc -like "1.21*") { "1.21" } elseif ($mc -like "26*") { "26" } else { $mc }
+    if ($ailesi -ne $benimAilem) { continue }   # baska aileye dokunma
+    $mods += @{ mcVersion = $mc; file = $ojar; modVersion = $MV; url = $url; sha256 = $sha }
 }
 $exp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 

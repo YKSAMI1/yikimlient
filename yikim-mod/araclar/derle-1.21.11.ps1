@@ -62,7 +62,16 @@ $eapSave = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 $cp | Out-File "$env:TEMP\yikim-cp.txt" -Encoding UTF8
 $cp = "$cp;$lib\it\unimi\dsi\fastutil\8.5.18\fastutil-8.5.18.jar"
-& javac --release 21 -encoding UTF-8 -nowarn -proc:none -cp $cp -d $out "$src\*.java" "$src\mixin\*.java" 2>&1 | ForEach-Object { $_.ToString() } | Out-File "$env:TEMP\yikim-javac.txt" -Encoding UTF8
+# SÜRÜME ÖZGÜ SINIFLAR: BeyazGlif gibi sınıflar src/version/<McVersion>/java
+# altında yaşar (26.x ve 1.21.x aileleri aynı src/main'den derlenir). Bu dizin
+# verilmezse "cannot find symbol: class BeyazGlif" ile derleme çöker.
+$verKok = Join-Path $koku "src\version\$McVersion\java"
+$verDosyalar = @()
+if (Test-Path $verKok) {
+    $verDosyalar = Get-ChildItem $verKok -Recurse -Filter "*.java" | ForEach-Object { $_.FullName }
+}
+$kaynaklar = @("$src\*.java", "$src\mixin\*.java") + $verDosyalar
+& javac --release 21 -encoding UTF-8 -nowarn -proc:none -cp $cp -d $out $kaynaklar 2>&1 | ForEach-Object { $_.ToString() } | Out-File "$env:TEMP\yikim-javac.txt" -Encoding UTF8
 $ErrorActionPreference = $eapSave
 if ($LASTEXITCODE -ne 0) {
     # KRITIK: eskiden burada "mixin'siz derle" yedegi vardi. Mixin'lerden biri
