@@ -1,8 +1,8 @@
-{
+﻿{
   "name": "yikimlient",
   "private": true,
-  "version": "0.9.2",
-  "description": "YIKIMLient â€” ultra-hafif, hÄ±zlÄ± ve gÃ¼zel Minecraft launcher",
+  "version": "0.9.3",
+  "description": "YIKIMLient Ã¢â‚¬â€ ultra-hafif, hÃ„Â±zlÃ„Â± ve gÃƒÂ¼zel Minecraft launcher",
   "type": "module",
   "scripts": {
     "dev": "vite",

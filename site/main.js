@@ -1,22 +1,22 @@
-/* YIKIMLient site — etkileşimler */
+﻿/* YIKIMLient site â€” etkileÅŸimler */
 const REPO = "YKSAMI1/yikimlient";
-const YEDEK_SURUM = "0.9.2";
+const YEDEK_SURUM = "0.9.3";
 const CACHE_MS = 10 * 60 * 1000;
 
 const OS_ETIKET = {
-  windows: { ikon: "Windows için indir", uzanti: [".exe", ".msi"], boyutEtiket: "Kurulum", sistem: "Windows 10/11", sistemAlt: "64-bit" },
-  appimage: { ikon: "Linux için indir (.AppImage)", uzanti: [".appimage"], boyutEtiket: "AppImage", sistem: "Linux 64-bit", sistemAlt: "glibc 2.31+" },
+  windows: { ikon: "Windows iÃ§in indir", uzanti: [".exe", ".msi"], boyutEtiket: "Kurulum", sistem: "Windows 10/11", sistemAlt: "64-bit" },
+  appimage: { ikon: "Linux iÃ§in indir (.AppImage)", uzanti: [".appimage"], boyutEtiket: "AppImage", sistem: "Linux 64-bit", sistemAlt: "glibc 2.31+" },
   deb: { ikon: "Debian paketini indir (.deb)", uzanti: [".deb"], boyutEtiket: "Debian paketi", sistem: "Debian / Ubuntu", sistemAlt: "amd64" },
 };
 
 let secili = "windows";
 let surumler = []; // [{ surum, onSurum, varliklar: [{ad,url,boyut}] }]
 
-/* ---------- yardımcılar ---------- */
+/* ---------- yardÄ±mcÄ±lar ---------- */
 const boyutYazi = (b) =>
   !b ? "" : b > 1024 * 1024 ? (b / (1024 * 1024)).toFixed(1) + " MB" : Math.round(b / 1024) + " KB";
 
-/** Seçili platform için en yeni sürümdeki dosyayı bul. */
+/** SeÃ§ili platform iÃ§in en yeni sÃ¼rÃ¼mdeki dosyayÄ± bul. */
 function varlik(os = secili) {
   const uzantilar = OS_ETIKET[os].uzanti;
   for (const s of surumler) {
@@ -36,12 +36,12 @@ function indirmeAdresi(os) {
 
 function surumAltYazi() {
   const v = varlik(secili);
-  if (!v) return "Son sürüm · GitHub'dan güvenli indirme";
+  if (!v) return "Son sÃ¼rÃ¼m Â· GitHub'dan gÃ¼venli indirme";
   const b = boyutYazi(v.boyut);
-  return `v${v.surum}${b ? " · " + b : ""} · GitHub'dan güvenli indirme`;
+  return `v${v.surum}${b ? " Â· " + b : ""} Â· GitHub'dan gÃ¼venli indirme`;
 }
 
-/* ---------- platform seçimi ---------- */
+/* ---------- platform seÃ§imi ---------- */
 function platformSec(os) {
   secili = os;
 
@@ -65,7 +65,7 @@ function platformSec(os) {
   const boyutBaslik = document.getElementById("statBoyutEtiket");
   if (boyutBaslik) boyutBaslik.textContent = OS_ETIKET[os].boyutEtiket;
 
-  // Üçüncü kutu seçili platforma göre değişir (eskiden hep "Windows 10/11").
+  // ÃœÃ§Ã¼ncÃ¼ kutu seÃ§ili platforma gÃ¶re deÄŸiÅŸir (eskiden hep "Windows 10/11").
   const sistem = document.getElementById("statSistem");
   const sistemAlt = document.getElementById("statSistemAlt");
   if (sistem) sistem.textContent = OS_ETIKET[os].sistem;
@@ -73,12 +73,12 @@ function platformSec(os) {
 
   const v = varlik(os);
   const sb = document.getElementById("statBoyut");
-  if (sb) sb.textContent = v?.boyut ? "~" + Math.round(v.boyut / (1024 * 1024)) + " MB" : "—";
+  if (sb) sb.textContent = v?.boyut ? "~" + Math.round(v.boyut / (1024 * 1024)) + " MB" : "â€”";
 
   try { localStorage.setItem("yikim-os", os); } catch { }
 }
 
-/* ---------- GitHub sürümleri ---------- */
+/* ---------- GitHub sÃ¼rÃ¼mleri ---------- */
 function surumCoz(j) {
   return (Array.isArray(j) ? j : []).map((x) => ({
     surum: String(x.tag_name || "").replace(/^v/i, "") || "0.0.0",
@@ -93,7 +93,7 @@ function surumCoz(j) {
 }
 
 async function surumYukle() {
-  // önbellek: GitHub API saatte 60 istek — gereksiz tüketmeyelim
+  // Ã¶nbellek: GitHub API saatte 60 istek â€” gereksiz tÃ¼ketmeyelim
   try {
     const ham = localStorage.getItem("yikim-surumler");
     if (ham) {
@@ -130,7 +130,7 @@ async function surumYukle() {
   platformSec(secili);
 }
 
-/* ---------- kaydırma animasyonu ---------- */
+/* ---------- kaydÄ±rma animasyonu ---------- */
 function gozlemci() {
   const ogeler = document.querySelectorAll(".reveal");
 
@@ -159,14 +159,14 @@ function gozlemci() {
     io.observe(e);
   });
 
-  // Yukarıda kalan öğeler asla gizli kalmasın: sayfa ortasında açıldıysa,
-  // hızlı kaydırıldıysa veya gözlemci kaçırdıysa hemen görünür yap.
+  // YukarÄ±da kalan Ã¶ÄŸeler asla gizli kalmasÄ±n: sayfa ortasÄ±nda aÃ§Ä±ldÄ±ysa,
+  // hÄ±zlÄ± kaydÄ±rÄ±ldÄ±ysa veya gÃ¶zlemci kaÃ§Ä±rdÄ±ysa hemen gÃ¶rÃ¼nÃ¼r yap.
   //
-  // v0.8.3 — MOBİL: burada eskiden `scroll` dinleyicisi vardı ve her kaydırma
-  // karesinde görünmeyen TÜM öğeler için getBoundingClientRect() çağırıyordu
-  // (zorunlu layout → telefonlarda kaydırma takılması). Artık yalnız açılışta
-  // bir kez + 4 sn emniyet zamanlayıcısı çalışır; IntersectionObserver
-  // görünür alana girenleri zaten yakalar.
+  // v0.8.3 â€” MOBÄ°L: burada eskiden `scroll` dinleyicisi vardÄ± ve her kaydÄ±rma
+  // karesinde gÃ¶rÃ¼nmeyen TÃœM Ã¶ÄŸeler iÃ§in getBoundingClientRect() Ã§aÄŸÄ±rÄ±yordu
+  // (zorunlu layout â†’ telefonlarda kaydÄ±rma takÄ±lmasÄ±). ArtÄ±k yalnÄ±z aÃ§Ä±lÄ±ÅŸta
+  // bir kez + 4 sn emniyet zamanlayÄ±cÄ±sÄ± Ã§alÄ±ÅŸÄ±r; IntersectionObserver
+  // gÃ¶rÃ¼nÃ¼r alana girenleri zaten yakalar.
   const yukaridakileriAc = () => {
     document.querySelectorAll(".reveal:not(.is-in)").forEach((e) => {
       if (e.getBoundingClientRect().bottom < 0) e.classList.add("is-in");
@@ -175,7 +175,7 @@ function gozlemci() {
 
   yukaridakileriAc();
 
-  // emniyet: 4 sn içinde görünür alanda kalan hiçbir öğe gizli kalmasın
+  // emniyet: 4 sn iÃ§inde gÃ¶rÃ¼nÃ¼r alanda kalan hiÃ§bir Ã¶ÄŸe gizli kalmasÄ±n
   setTimeout(() => {
     ogeler.forEach((e) => {
       const r = e.getBoundingClientRect();
@@ -185,7 +185,7 @@ function gozlemci() {
   }, 4000);
 }
 
-/* ---------- sayı sayacı ---------- */
+/* ---------- sayÄ± sayacÄ± ---------- */
 function sayaclar() {
   const ogeler = [...document.querySelectorAll("[data-count]")];
   if (!ogeler.length) return;
@@ -229,12 +229,12 @@ function sayaclar() {
 
   ogeler.forEach((e) => io.observe(e));
 
-  // Görünür alanın üstünde kalanlar (sayfa ortasında açılış / hızlı kaydırma)
-  // 0'da takılı kalmasın: hedef değeri hemen yaz.
+  // GÃ¶rÃ¼nÃ¼r alanÄ±n Ã¼stÃ¼nde kalanlar (sayfa ortasÄ±nda aÃ§Ä±lÄ±ÅŸ / hÄ±zlÄ± kaydÄ±rma)
+  // 0'da takÄ±lÄ± kalmasÄ±n: hedef deÄŸeri hemen yaz.
   //
-  // v0.8.3 — MOBİL: burada eskiden `scroll` dinleyicisi vardı; her karede tüm
-  // sayaçlar için layout okuması yapıyordu. Artık açılışta bir kez + 4 sn
-  // sonra bir kez (tek layout) çalışır.
+  // v0.8.3 â€” MOBÄ°L: burada eskiden `scroll` dinleyicisi vardÄ±; her karede tÃ¼m
+  // sayaÃ§lar iÃ§in layout okumasÄ± yapÄ±yordu. ArtÄ±k aÃ§Ä±lÄ±ÅŸta bir kez + 4 sn
+  // sonra bir kez (tek layout) Ã§alÄ±ÅŸÄ±r.
   const yukaridakiler = () =>
     ogeler.forEach((el) => {
       if (!el.dataset.sayildi && el.getBoundingClientRect().bottom < 0) bitir(el);
@@ -244,7 +244,7 @@ function sayaclar() {
   setTimeout(yukaridakiler, 4000);
 }
 
-/* ---------- menü ---------- */
+/* ---------- menÃ¼ ---------- */
 function navKur() {
   const nav = document.getElementById("nav");
   const toggle = document.getElementById("navToggle");
@@ -258,8 +258,8 @@ function navKur() {
     }
   };
   durum();
-  // rAF ile tekilleştir: kaydırma sırasında saniyede onlarca kez değil,
-  // kare başına bir kez ve yalnız durum gerçekten değişince DOM'a dokunur.
+  // rAF ile tekilleÅŸtir: kaydÄ±rma sÄ±rasÄ±nda saniyede onlarca kez deÄŸil,
+  // kare baÅŸÄ±na bir kez ve yalnÄ±z durum gerÃ§ekten deÄŸiÅŸince DOM'a dokunur.
   window.addEventListener(
     "scroll",
     () => {
@@ -285,7 +285,7 @@ function navKur() {
   );
 }
 
-/* ---------- başlat ---------- */
+/* ---------- baÅŸlat ---------- */
 function baslat() {
   window.__ykHazir = true;
 
