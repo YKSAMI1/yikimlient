@@ -202,6 +202,35 @@ public final class YikimAdapter {
         return mouse.comp_4799();
     }
 
+    /**
+     * SON ÇİZİM SIRASINDA GELEN FARE KONUMU (v1.33.13).
+     *
+     * NEDEN VAR: Tıklamalar hiçbir şey yapmıyordu. Çizimde gelen mouseX/mouseY
+     * DOĞRU çalışıyordu (üstüne gelince parlama çalışıyor), fakat
+     * MouseButtonEvent.x()/y() ile gelen konum çizimden gelenle AYNI değildi —
+     * ölçek/scale farkı vardı, tıklama hiçbir zaman kartın üstüne denk gelmiyordu.
+     * Çözüm: tıklamada da ÇİZİMİN konumunu kullan.
+     */
+    private static double sonFareX;
+    private static double sonFareY;
+    private static boolean sonFareGecerli;
+
+    /** Çizim oncesi cagrilir: ekranin bildigi fare konumunu sakla. */
+    public static void fareGuncelle(int mouseX, int mouseY) {
+        YikimAdapter.sonFareX = mouseX;
+        YikimAdapter.sonFareY = mouseY;
+        YikimAdapter.sonFareGecerli = true;
+    }
+
+    /** Son cizimin fare konumu — tiklamada kullanilir (bkz. usteki aciklama). */
+    public static double fareX() {
+        return YikimAdapter.sonFareGecerli ? YikimAdapter.sonFareX : 0.0;
+    }
+
+    public static double fareY() {
+        return YikimAdapter.sonFareGecerli ? YikimAdapter.sonFareY : 0.0;
+    }
+
     private static int mouseButton(class_11909 mouse) {
         return mouse.comp_4800().comp_4801();
     }
@@ -219,6 +248,8 @@ public final class YikimAdapter {
         }
 
         public void method_25394(class_332 graphics, int mouseX, int mouseY, float partialTick) {
+            // v1.33.13: panel de cizimin fare konumunu kullanir (bkz. TitleScreenBase)
+            YikimAdapter.fareGuncelle(mouseX, mouseY);
             this.panel.draw(graphics, this.field_22793, mouseX, mouseY, this.field_22789, this.field_22790);
         }
 
@@ -227,19 +258,19 @@ public final class YikimAdapter {
         }
 
         public boolean method_25402(class_11909 mouse, boolean doubleClick) {
-            if (this.panel.click(YikimAdapter.mouseX(mouse), YikimAdapter.mouseY(mouse), YikimAdapter.mouseButton(mouse))) {
+            if (this.panel.click(YikimAdapter.fareX(), YikimAdapter.fareY(), YikimAdapter.mouseButton(mouse))) {
                 return true;
             }
             return super.method_25402(mouse, doubleClick);
         }
 
         public boolean method_25406(class_11909 mouse) {
-            this.panel.release(YikimAdapter.mouseX(mouse), YikimAdapter.mouseY(mouse), YikimAdapter.mouseButton(mouse));
+            this.panel.release(YikimAdapter.fareX(), YikimAdapter.fareY(), YikimAdapter.mouseButton(mouse));
             return super.method_25406(mouse);
         }
 
         public boolean method_25403(class_11909 mouse, double dragX, double dragY) {
-            this.panel.drag(YikimAdapter.mouseX(mouse), YikimAdapter.mouseY(mouse));
+            this.panel.drag(YikimAdapter.fareX(), YikimAdapter.fareY());
             return super.method_25403(mouse, dragX, dragY);
         }
 
@@ -297,6 +328,11 @@ public final class YikimAdapter {
         }
 
         public void method_25394(class_332 graphics, int mouseX, int mouseY, float partialTick) {
+            // (v1.33.13) Cizimde gelen fare konumunu sakla: tiklamada ve surukleme
+            // de AYNI konumu kullanacagiz. 26.x'te MouseButtonEvent'in kendi x/y'si
+            // bu konumla birebir ayni degil -> tiklama hicbir zaman hicbir seyin
+            // ustune denk gelmiyordu (vurgu calisiyordu, tiklama yoktu).
+            YikimAdapter.fareGuncelle(mouseX, mouseY);
             this.menu.draw(graphics, this.field_22793, mouseX, mouseY, this.field_22789, this.field_22790);
         }
 
@@ -305,12 +341,27 @@ public final class YikimAdapter {
         }
 
         public boolean method_25402(class_11909 mouse, boolean doubleClick) {
-            return this.menu.click(YikimAdapter.mouseX(mouse), YikimAdapter.mouseY(mouse), YikimAdapter.mouseButton(mouse));
+            // v1.33.14: iki koordinat seti de denenir.
+            // 26.x'te olayla gelen x/y ile cizimdeki x/y ayni olmayabiliyor;
+            // once cizim konumu denenir, bosa duserse olay konumu denenir.
+            int dugme = YikimAdapter.mouseButton(mouse);
+            double fx = YikimAdapter.fareX();
+            double fy = YikimAdapter.fareY();
+            double ex = mouse.comp_4798();
+            double ey = mouse.comp_4799();
+            YikimLog.info("YIKIM tiklama: cizim(" + fx + "," + fy + ") olay(" + ex + "," + ey + ") dugme=" + dugme);
+            double tx = fx;
+            double ty = fy;
+            if (!this.menu.ilkVurus(fx, fy) && this.menu.ilkVurus(ex, ey)) {
+                tx = ex;
+                ty = ey;
+            }
+            return this.menu.click(tx, ty, dugme);
         }
 
         /** Karakteri sürükleyerek döndürme (v1.31.0). */
         public boolean method_25403(class_11909 mouse, double dragX, double dragY) {
-            if (this.menu.drag(YikimAdapter.mouseX(mouse), YikimAdapter.mouseY(mouse), dragX)) {
+            if (this.menu.drag(YikimAdapter.fareX(), YikimAdapter.fareY(), dragX)) {
                 return true;
             }
             return super.method_25403(mouse, dragX, dragY);

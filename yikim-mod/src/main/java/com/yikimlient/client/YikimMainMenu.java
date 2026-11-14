@@ -612,6 +612,23 @@ public final class YikimMainMenu {
         ++this.hitCount;
     }
 
+    /**
+     * Bu konumda tiklanabilir bir sey var mi? (v1.33.14)
+     *
+     * NEDEN VAR: 26.x'te tıklama koordinatları cizimdeki koordinatlarla aynı
+     * olmuyor (ölcek farkı). Tiklama hangi setin "isabet ettigini" gormek icin
+     * bu yuzden once deniyoruz — bosa duserse diger set denenir.
+     */
+    boolean ilkVurus(double mouseX, double mouseY) {
+        for (int index = this.hitCount - 1; index >= 0; --index) {
+            Hit hit = this.hits.get(index);
+            if (hit.inside(mouseX, mouseY)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     boolean click(double mouseX, double mouseY, int button) {
         if (button != 0) {
             return true;
