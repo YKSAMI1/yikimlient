@@ -199,7 +199,7 @@ public final class YikimAtolyeEkrani extends class_437 {
         double mx = tik.comp_4798();
         double my = tik.comp_4799();
         int tus = tik.comp_4800().comp_4801();
-        if (tus == 0) {
+        if (YikimAdapter.solTik(tus)) {
             if (izgaraIci(mx, my)) {
                 this.boyaBasili = true;
                 boya(mx, my);
@@ -295,7 +295,7 @@ public final class YikimAtolyeEkrani extends class_437 {
         double mx = tik.comp_4798();
         double my = tik.comp_4799();
         int tus = tik.comp_4800().comp_4801();
-        if (this.boyaBasili && tus == 0 && izgaraIci(mx, my)) {
+        if (this.boyaBasili && YikimAdapter.solTik(tus) && izgaraIci(mx, my)) {
             boya(mx, my);
             return true;
         }

@@ -967,13 +967,13 @@ public final class YikimPanel {
         }
         int commitWidth = this.commitWidth(font);
         if (commitWidth > 0 && YikimDraw.inside(mouseX, mouseY, this.commitX(font), this.py2 - 26 + 4, commitWidth, 18)) {
-            if (button == 0 && this.applyModChanges()) {
+            if (YikimAdapter.solTik(button) && this.applyModChanges()) {
                 YikimMetrics.notify("De\u011fi\u015fiklikler kaydedildi \u2014 oyun kapan\u0131nca uygulanacak");
                 class_310.method_1551().method_1592();
             }
             return true;
         }
-        if (button == 0 && mouseX >= (double)(this.trackX - 6) && mouseX <= (double)(this.trackX + 4 + 4) && mouseY >= (double)this.listTop && mouseY <= (double)this.listBottom) {
+        if (YikimAdapter.solTik(button) && mouseX >= (double)(this.trackX - 6) && mouseX <= (double)(this.trackX + 4 + 4) && mouseY >= (double)this.listTop && mouseY <= (double)this.listBottom) {
             this.scrollDragging = true;
             this.scrollTo(mouseY);
             return true;
@@ -1633,7 +1633,7 @@ public final class YikimPanel {
         @Override
         boolean click(double mouseX, double mouseY, int button) {
             int index = this.segmentAt(mouseX);
-            if (button != 0 || index < 0 || index >= YikimPresets.PRESETS.size()) {
+            if (!YikimAdapter.solTik(button) || index < 0 || index >= YikimPresets.PRESETS.size()) {
                 return true;
             }
             YikimPanel.this.selectedPreset = YikimPresets.apply(class_310.method_1551(), YikimPresets.PRESETS.get((int)index).id);
@@ -1732,7 +1732,7 @@ public final class YikimPanel {
 
         @Override
         boolean click(double mouseX, double mouseY, int button) {
-            if (button == 0) {
+            if (YikimAdapter.solTik(button)) {
                 this.action.run();
             }
             return true;
@@ -1786,7 +1786,7 @@ public final class YikimPanel {
         @Override
         boolean click(double mouseX, double mouseY, int button) {
             int index = this.segmentAt(mouseX);
-            if (button != 0 || index < 0) {
+            if (!YikimAdapter.solTik(button) || index < 0) {
                 return true;
             }
             this.selected = index;
@@ -1828,7 +1828,7 @@ public final class YikimPanel {
 
         @Override
         boolean click(double mouseX, double mouseY, int button) {
-            if (button != 0) {
+            if (!YikimAdapter.solTik(button)) {
                 return true;
             }
             this.setter.accept(!this.getter.getAsBoolean());
@@ -1886,7 +1886,7 @@ public final class YikimPanel {
 
         @Override
         boolean click(double mouseX, double mouseY, int button) {
-            if (button != 0) {
+            if (!YikimAdapter.solTik(button)) {
                 return true;
             }
             YikimPanel.this.dragging = this;
@@ -1980,7 +1980,7 @@ public final class YikimPanel {
 
         @Override
         boolean click(double mouseX, double mouseY, int button) {
-            if (button == 0 && this.mod.toggleable()) {
+            if (YikimAdapter.solTik(button) && this.mod.toggleable()) {
                 YikimLog.info("mod satiri tiklandi: " + this.mod.id + " dosya='" + this.mod.fileName + "' disabled=" + this.mod.disabled);
                 YikimModBridge.toggle(this.mod);
                 YikimPanel.this.cacheAt = 0L;
@@ -2035,7 +2035,7 @@ public final class YikimPanel {
 
         @Override
         boolean click(double mouseX, double mouseY, int button) {
-            if (button != 0) {
+            if (!YikimAdapter.solTik(button)) {
                 return true;
             }
             if (YikimCatalog.isQueued(this.hit.slug)) {

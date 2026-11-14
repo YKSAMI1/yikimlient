@@ -142,7 +142,7 @@ public final class YikimIzinlilerEkrani extends class_437 {
         double mx = tik.comp_4798();
         double my = tik.comp_4799();
         int tus = tik.comp_4800().comp_4801();
-        if (tus == 0) {
+        if (YikimAdapter.solTik(tus)) {
             if (mx >= listeX && mx < listeX + 220) {
                 for (int i = 0; i < this.gorunenSatir; i++) {
                     int y = listeY + i * satirH;

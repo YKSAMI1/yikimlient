@@ -189,7 +189,7 @@ public final class YikimTemaEkrani extends class_437 {
 
     @Override
     public boolean method_25402(net.minecraft.class_11909 tik, boolean cift) {
-        if (tik.comp_4800().comp_4801() != 0) {
+        if (!YikimAdapter.solTik(tik.comp_4800().comp_4801())) {
             return super.method_25402(tik, cift);
         }
         double mx = tik.comp_4798();

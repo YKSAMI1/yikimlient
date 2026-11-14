@@ -231,6 +231,20 @@ public final class YikimAdapter {
         return YikimAdapter.sonFareGecerli ? YikimAdapter.sonFareY : 0.0;
     }
 
+    /**
+     * SOL / BIRINCIL fare düğmesi mi? (v1.33.15 — 26.x KRİTİK DÜZELTME)
+     *
+     * 1.21.x GLFW kullanıyordu: sol=0, sağ=1, orta=2
+     * 26.x   SDL  kullanıyor:  sol=1, orta=2, sağ=3
+     *
+     * Elle "== 0" kontrolü 26.x'te SOL TIKI kaçırıyordu: menüde hiçbir şey
+     * tıklanmıyor, sürüklenmiyor, seçiliyordu (üzerine gelince parlaması
+     * çalışıyordu çünkü o çizimden geliyordu). İki numarayı da kabul ediyoruz.
+     */
+    public static boolean solTik(int dugme) {
+        return dugme == 0 || dugme == 1;
+    }
+
     private static int mouseButton(class_11909 mouse) {
         return mouse.comp_4800().comp_4801();
     }

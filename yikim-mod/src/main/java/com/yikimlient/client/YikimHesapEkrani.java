@@ -139,7 +139,7 @@ public final class YikimHesapEkrani extends class_437 {
         }
         double mx = tik.comp_4798();
         double my = tik.comp_4799();
-        if (tik.comp_4800().comp_4801() != 0) {
+        if (!YikimAdapter.solTik(tik.comp_4800().comp_4801())) {
             return super.method_25402(tik, cift);
         }
         if (icinde(mx, my, this.yenileX, this.yenileY, 100, 20)) {

@@ -112,6 +112,9 @@ public final class YikimMainMenu {
 
     private static void open(class_437 next) {
         if (next != null) {
+            if (YikimDebug.aktif) {
+                YikimLog.info("YIKIM ekran-ac: " + next.getClass().getName());
+            }
             class_310.method_1551().method_1507(next);
         } else {
             YikimMetrics.notify("Bu ekran bu s\u00fcr\u00fcmde a\u00e7\u0131lam\u0131yor");
@@ -183,6 +186,9 @@ public final class YikimMainMenu {
             int x = this.columnX + column * (buttonWidth + 3);
             int y = this.buttonsTop + row * (this.buttonHeight + this.buttonGap);
             boolean hovered = YikimDraw.inside(mouseX, mouseY, x, y, buttonWidth, this.buttonHeight);
+            if (YikimDebug.aktif) {
+                YikimLog.info("YIKIM buton #" + index + " '" + button.label() + "' @ " + x + "," + y + " " + buttonWidth + "x" + this.buttonHeight);
+            }
             this.drawButton(graphics, font, button, x, y, buttonWidth, this.buttonHeight, hovered);
             this.addHit(x, y, buttonWidth, this.buttonHeight, button.action());
         }
@@ -597,6 +603,11 @@ public final class YikimMainMenu {
     }
 
     private void addHit(int x, int y, int width, int height, Runnable action) {
+        // GECICI TESHIS (v1.0.5-debug): buton kutularini logla. Tiklat
+        // denemelerinde gercek konumu ogrenmek icin; yayinlanan surumde kaldirilir.
+        if (YikimDebug.aktif) {
+            YikimLog.info("YIKIM hit: " + x + "," + y + " " + width + "x" + height);
+        }
         Hit hit;
         if (this.hitCount < this.hits.size()) {
             hit = this.hits.get(this.hitCount);
@@ -630,15 +641,26 @@ public final class YikimMainMenu {
     }
 
     boolean click(double mouseX, double mouseY, int button) {
-        if (button != 0) {
+        if (!YikimAdapter.solTik(button)) {
             return true;
         }
         this.surukleme = false;
         for (int index = this.hitCount - 1; index >= 0; --index) {
             Hit hit = this.hits.get(index);
-            if (!hit.inside(mouseX, mouseY)) continue;
+            if (!hit.inside(mouseX, mouseY)) {
+                if (YikimDebug.aktif) {
+                    YikimLog.info("YIKIM tik-sor: " + mouseX + "," + mouseY + " vs " + hit.x + "," + hit.y + " " + hit.width + "x" + hit.height);
+                }
+                continue;
+            }
+            if (YikimDebug.aktif) {
+                YikimLog.info("YIKIM tik-ISABET: " + mouseX + "," + mouseY + " -> " + hit.x + "," + hit.y + " " + hit.width + "x" + hit.height);
+            }
             hit.action.run();
             return true;
+        }
+        if (YikimDebug.aktif) {
+            YikimLog.info("YIKIM tik-YOK: " + mouseX + "," + mouseY + " hitCount=" + this.hitCount);
         }
         return true;
     }
