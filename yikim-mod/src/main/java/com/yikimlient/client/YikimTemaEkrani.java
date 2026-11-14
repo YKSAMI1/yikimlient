@@ -31,6 +31,7 @@ public final class YikimTemaEkrani extends class_437 {
     private int kartY;
     private int kartG;
     private int kartH;
+    private final long acilisZamani = System.currentTimeMillis();
 
     public YikimTemaEkrani() {
         super(class_2561.method_43470("YIKIM Arayüz Teması"));
@@ -56,7 +57,26 @@ public final class YikimTemaEkrani extends class_437 {
 
     @Override
     public boolean method_25422() {
-        return false;
+        return true;
+    }
+
+    /**
+     * Esc = ekrani kapat (1.21.x ve 26.x'te AYNI davranis).
+     *
+     * NEDEN BASTAN YAZMIYORUZ: 1.21.x'te Esc'in GLFW kodu 256'dir ama 26.x'te SDL
+     * kullanildigi icin KeyEvent.key() baska bir deger dondurur. Elle "== 256"
+     * karsilastirmasi 26.x'te HİÇ eşleşmez → kullanici ekranda siki kalirdi.
+     * Vanilla Screen keyPressed ise her iki surumde de
+     * "event.isEscape() && shouldCloseOnEsc() → onClose()" yolunu kullanir.
+     * Bu yuzden sadece shouldCloseOnEsc=true yapip buraya düşüyoruz.
+     */
+    @Override
+    public void method_25419() {
+        // Esc: şu anki temada kal ama bir daha sorma
+        YikimConfig cfg = YikimConfig.get();
+        cfg.temaSurum = YikimClient.TEMA_SURUM;
+        cfg.save();
+        kapat();
     }
 
     @Override
@@ -169,7 +189,7 @@ public final class YikimTemaEkrani extends class_437 {
 
     @Override
     public boolean method_25402(net.minecraft.class_11909 tik, boolean cift) {
-        if (tik.comp_4800().comp_4797() != 0) {
+        if (tik.comp_4800().comp_4801() != 0) {
             return super.method_25402(tik, cift);
         }
         double mx = tik.comp_4798();
@@ -184,21 +204,22 @@ public final class YikimTemaEkrani extends class_437 {
         return super.method_25402(tik, cift);
     }
 
+    /**
+     * GÜVENLİK KEMERİ: girdiler hiçbir sebeple işlenmezse bile 90 saniye
+     * sonra ekran kendiliğinden kapanır. (Bir sürümde girdi yolu bozulursa
+     * kullanıcı asla ekranda sıkışık kalmaz — tema değişmeden kapanır.)
+     */
     @Override
-    public boolean method_25404(net.minecraft.class_11908 tus) {
-        if (tus.comp_4795() == 256) {
-            // Esc: şu anki temada kal ama bir daha sorma
-            YikimConfig cfg = YikimConfig.get();
-            cfg.temaSurum = YikimClient.TEMA_SURUM;
-            cfg.save();
+    public void method_25393() {
+        if (System.currentTimeMillis() - this.acilisZamani > 90000L) {
             kapat();
-            return true;
         }
-        return super.method_25404(tus);
     }
 
     private static void kapat() {
         YikimTemaEkrani.aciliyor = false;
-        class_310.method_1551().method_1507(new class_442());
+        // YIKIM ana menüsüne DÖN (vanilla başlık ekranına değil — aksi halde
+        // YIKIM menüsü tamamen kaybolur ve oyun vanilla görünümde kalırdı).
+        class_310.method_1551().method_1507(YikimAdapter.titleScreen());
     }
 }

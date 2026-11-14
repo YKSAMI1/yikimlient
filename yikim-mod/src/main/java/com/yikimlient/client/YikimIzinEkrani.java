@@ -85,7 +85,16 @@ public final class YikimIzinEkrani extends class_437 {
 
     @Override
     public boolean method_25422() {
-        return false;
+        // v1.33.12: Esc'in çalışması için true (26.x'te SDL tuş kodları farklı;
+        // elle "== 256" yakalanamıyor). Vanilla Screen isEscape() + onClose()
+        // yolunu kullanıyor — her sürümde aynı davranır.
+        return true;
+    }
+
+    /** Esc: bir önce ekrana dön. */
+    @Override
+    public void method_25419() {
+        class_310.method_1551().method_1507(null);
     }
 
     @Override
@@ -156,7 +165,7 @@ public final class YikimIzinEkrani extends class_437 {
     public boolean method_25402(net.minecraft.class_11909 tik, boolean cift) {
         double mx = tik.comp_4798();
         double my = tik.comp_4799();
-        int tus = tik.comp_4800().comp_4797();
+        int tus = tik.comp_4800().comp_4801();
         if (tus == 0) {
             // satır tıkları
             if (mx >= listeX && mx < listeX + 220) {
@@ -183,10 +192,8 @@ public final class YikimIzinEkrani extends class_437 {
 
     @Override
     public boolean method_25404(net.minecraft.class_11908 tus) {
-        if (tus.comp_4795() == 256) {
-            class_310.method_1551().method_1507(null);
-            return true;
-        }
+        // NOT: Esc elle yakalanmiyor (26.x SDL tuş kodları) — vanilla isEscape() +
+        // onClose() yeterli. Bkz. method_25422 / method_25419.
         return super.method_25404(tus);
     }
 }

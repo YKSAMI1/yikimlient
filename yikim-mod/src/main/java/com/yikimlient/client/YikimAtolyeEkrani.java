@@ -47,7 +47,16 @@ public final class YikimAtolyeEkrani extends class_437 {
 
     @Override
     public boolean method_25422() {
-        return false; // oyun durmasın
+        // v1.33.12: Esc'in çalışması için true. (26.x'te SDL tuş kodları farklı;
+        // elle "== 256" yakalamak artık mümkün değil. Vanilla Screen isEscape()
+        // ile method_25419 (onClose) çağırır — her sürümde aynı yol.)
+        return true;
+    }
+
+    /** Esc: daima oyuna dön (Kaydet'e basmadan çıkış artık ÇALIŞIYOR). */
+    @Override
+    public void method_25419() {
+        class_310.method_1551().method_1507(null);
     }
 
     @Override
@@ -189,7 +198,7 @@ public final class YikimAtolyeEkrani extends class_437 {
     public boolean method_25402(class_11909 tik, boolean cift) {
         double mx = tik.comp_4798();
         double my = tik.comp_4799();
-        int tus = tik.comp_4800().comp_4797();
+        int tus = tik.comp_4800().comp_4801();
         if (tus == 0) {
             if (izgaraIci(mx, my)) {
                 this.boyaBasili = true;
@@ -275,11 +284,9 @@ public final class YikimAtolyeEkrani extends class_437 {
 
     @Override
     public boolean method_25404(net.minecraft.class_11908 tus) {
-        // Esc: daima oyuna dön (Kaydet'e basmadan çıkış artık ÇALIŞIYOR)
-        if (tus.comp_4795() == 256) {
-            class_310.method_1551().method_1507(null);
-            return true;
-        }
+        // NOT: Esc elle yakalanmiyor — 26.x'te SDL tuş kodları farklı olduğu için
+        // "== 256" hiç eşleşmiyordu. Vanilla Screen, isEscape() ile onClose()'u
+        // kendisi çağırıyor (her sürümde aynı yol). Bkz. method_25422/method_25419.
         return super.method_25404(tus);
     }
 
@@ -287,7 +294,7 @@ public final class YikimAtolyeEkrani extends class_437 {
     public boolean method_25403(class_11909 tik, double dx, double dy) {
         double mx = tik.comp_4798();
         double my = tik.comp_4799();
-        int tus = tik.comp_4800().comp_4797();
+        int tus = tik.comp_4800().comp_4801();
         if (this.boyaBasili && tus == 0 && izgaraIci(mx, my)) {
             boya(mx, my);
             return true;

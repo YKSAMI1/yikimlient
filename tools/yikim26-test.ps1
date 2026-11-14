@@ -1,13 +1,13 @@
-<#-
-  YIKIM modunun 26.x sürümlerinde gerçekten yüklenip yüklenmediğini doğrular.
-  Launcher'ın gerçek kurulumunu (%APPDATA%/.yikimlient → versions/libraries/assets)
-  kullanarak oyunu başlatır; mods/ klasörüne sadece Fabric API + YIKIM jar'ı konur.
+﻿<#-
+  YIKIM modunun 26.x sÃ¼rÃ¼mlerinde gerÃ§ekten yÃ¼klenip yÃ¼klenmediÄŸini doÄŸrular.
+  Launcher'Ä±n gerÃ§ek kurulumunu (%APPDATA%/.yikimlient â†’ versions/libraries/assets)
+  kullanarak oyunu baÅŸlatÄ±r; mods/ klasÃ¶rÃ¼ne sadece Fabric API + YIKIM jar'Ä± konur.
 
   KULLANIM:  powershell -File tools\yikim26-test.ps1 -Ver 26.3
              powershell -File tools\yikim26-test.ps1 -Ver 26.2 -Temizle
 
-  ÖNKOŞUL:  node tools\test-26-hazirla.mjs <Ver>   (version json'lari + eksik
-            kütüphane/asset'leri indirir)
+  Ã–NKOÅUL:  node tools\test-26-hazirla.mjs <Ver>   (version json'lari + eksik
+            kÃ¼tÃ¼phane/asset'leri indirir)
 -#>
 param(
   [ValidateSet("26.1", "26.1.1", "26.1.2", "26.2", "26.3")]
@@ -90,7 +90,7 @@ $mdir = Join-Path $GameDir "mods"
 New-Item -ItemType Directory -Force -Path $mdir | Out-Null
 
 $api = Get-ChildItem (Join-Path $KOK "yikim-mod\araclar\fabric-api\$Ver") -Filter "fabric-api-*.jar" -File -ErrorAction SilentlyContinue | Select-Object -First 1
-$modJar = Join-Path $KOK "src-tauri\resources\mods\yikimlient-1.0.1-$Ver+$Ver.jar"
+$modJar = Join-Path $KOK "yikim-mod\derleme\yikimlient-1.0.2-$Ver+$Ver.jar"
 foreach ($m in @($api.FullName, $modJar)) { if ($m) { Copy-Item $m -Destination $mdir -Force } }
 Set-Content -Path (Join-Path $GameDir "options.txt") -Value "version:131004`nmaxFps:260`nenableVsync:false`nlang:tr_tr`nguiScale:2`npreferredGraphicsBackend:`"vulkan`"" -Encoding UTF8
 
@@ -108,6 +108,8 @@ $ga = @(
 )
 
 $log = Join-Path $GameDir "test.log"
+# sonraki giris testleri (tema ekrani fare/klavye) icin classpath diske yazilir
+[System.IO.File]::WriteAllText((Join-Path $GameDir "cp.txt"), $cps, (New-Object System.Text.UTF8Encoding($false)))
 "=== SURUM $Ver"
 "MODS : $(Get-ChildItem $mdir | ForEach-Object { $_.Name })"
 "LIB  : $($cp.Count) jar"

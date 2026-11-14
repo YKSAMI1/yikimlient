@@ -65,15 +65,21 @@ const YAMALAR = [
   ["registerKeyBinding(", "registerKeyMapping("],
 
   // ---- kayıt (record) erişimcileri: intermediary `comp_XXXX` adları
+  // (v1.33.12 düzeltmesi: MOUSE DÜĞMESİ `comp_4801`, MODIFIER `comp_4797`.
+  //  Önceki liste `comp_4797 → modifiers` yazdıktan hemen sonra `comp_4797 →
+  //  button` yazıyordu; ilk yama her zaman kazandığı için fare düğmesi
+  //  aslında "modifier" okunuyordu → sağ/orta tık sol tık gibi davranıyordu.)
   ["public int getKeycode()", "public int input()"],
-  ["public int comp_4797()", "public int modifiers()"],
+  ["comp_4801()", "button()"],       // MouseButtonInfo.button
+  ["comp_4797()", "modifiers()"],    // KeyEvent/MouseButtonInfo modifiers
   ["comp_4798()", "x()"],
   ["comp_4799()", "y()"],
   ["comp_4800()", "buttonInfo()"],
-  ["comp_4797()", "button()"],
   ["comp_4795()", "key()"],
   ["comp_4793()", "codepoint()"],
-  ["comp_4801()", "modifiers()"],
+  // Esc: 1.21.x'te KeyEvent.method_74231 (interface default) = isEscape.
+  // 26.x'te SDL tuş kodları farklı olduğu için elle "== 256" ÇALIŞMAZ.
+  ["method_74231(", "isEscape("],
 
   // ---- bileşen/metin (26.1 adları)
   ["method_10862", "withStyle"],

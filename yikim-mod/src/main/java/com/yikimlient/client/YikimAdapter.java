@@ -251,7 +251,10 @@ public final class YikimAdapter {
         }
 
         public boolean method_25404(class_11908 key) {
-            if (key.comp_4795() == 344) {
+            // NOT (v1.33.12): 344 = Right Shift'ın GLFW kodu. 26.x SDL'ye geçtiği
+            // için key() bu değeri döndürmez → panele Shift ile kapatmak çalışmazdı.
+            // isEscape() her iki sürümde de doğru yolda; Esc'le kapatma buraya eklendi.
+            if (key.comp_4795() == 344 || key.method_74231()) {
                 if (this.panel.editorActive()) {
                     this.panel.exitEditor();
                     return true;
