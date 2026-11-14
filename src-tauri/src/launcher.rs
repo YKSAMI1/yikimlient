@@ -1368,6 +1368,20 @@ pub async fn launch_game(
         }
     }
 
+    // ---- 26.2+: Vulkan'ı doğrudan seç -------------------------------------
+    // Resmî başlatma argümanı (`--graphicsBackend <default|opengl|vulkan>`).
+    // Oyun bu argümanı, options.txt'deki "tercih edilen grafik API'si"
+    // ayarından ÖNCE okur ve ayarı yok sayar; Vulkan başlatılamazsa kendisi
+    // OpenGL'e düşer (yani "seç" deriz, kullanıcı asla siyah ekranda kalmaz).
+    // 26.1 ve öncesi bu seçeneği TANIMAZ (bilinmeyen seçenek → oyun açılmaz),
+    // bu yüzden sürüm kapısı zorunlu.
+    if let Some((mj, mn, _)) = crate::yikim_mod::parse_version(&inst.mc_version) {
+        if mj > 26 || (mj == 26 && mn >= 2) {
+            game_args.push("--graphicsBackend".into());
+            game_args.push("vulkan".into());
+        }
+    }
+
     let jvm_args = build_jvm_args(&vj, &inst, &natives_dir, &classpath_str, &vars);
 
     let _ = std::fs::create_dir_all(&game_dir);

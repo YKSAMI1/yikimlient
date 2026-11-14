@@ -56,6 +56,31 @@
       "mcVersion": "1.21.11",
       "adapter": "modern",
       "file": "yikimlient-1.30.0+1.21.11.jar"
+    },
+    {
+      "mcVersion": "26.1",
+      "adapter": "modern",
+      "file": "yikimlient-1.0.0-26.1+26.1.jar"
+    },
+    {
+      "mcVersion": "26.1.1",
+      "adapter": "modern",
+      "file": "yikimlient-1.0.0-26.1.1+26.1.1.jar"
+    },
+    {
+      "mcVersion": "26.1.2",
+      "adapter": "modern",
+      "file": "yikimlient-1.0.0-26.1.2+26.1.2.jar"
+    },
+    {
+      "mcVersion": "26.2",
+      "adapter": "modern",
+      "file": "yikimlient-1.0.0-26.2+26.2.jar"
+    },
+    {
+      "mcVersion": "26.3",
+      "adapter": "modern",
+      "file": "yikimlient-1.0.0-26.3+26.3.jar"
     }
   ]
 }

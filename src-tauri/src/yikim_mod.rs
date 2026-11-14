@@ -189,8 +189,8 @@ pub fn install_from(embedded_dir: &Path, inst: &Instance) -> Result<bool, String
     if inst.mod_loader != "fabric" {
         return Ok(false); // mod yalnızca Fabric
     }
-    if !inst.mc_version.starts_with("1.21") {
-        return Ok(false); // jar'lar 1.21 ailesine göredir (26.x ayrı iş)
+    if !(inst.mc_version.starts_with("1.21") || inst.mc_version.starts_with("26.")) {
+        return Ok(false); // jar'lar 1.21 ve 26.x ailelerine göredir
     }
     let mods_dir = inst.mods_dir();
     fs::create_dir_all(&mods_dir).map_err(|e| format!("mods klasörü açılamadı: {e}"))?;

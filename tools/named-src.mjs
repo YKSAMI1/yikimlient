@@ -150,7 +150,7 @@ for (const { ad, hedef } of kokler) {
 
 // kaynaklar (resources) de aynen kopyalanır — 26.x'te de aynı
 const resKaynak = join(MOD, "src", "main", "resources");
-const resHedef = join(CIKTI_KOK, "..", "resources");
+const resHedef = join(CIKTI_KOK, "resources");
 if (existsSync(resKaynak)) {
   mkdirSync(resHedef, { recursive: true });
   const yuru = (d) => {

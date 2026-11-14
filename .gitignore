@@ -11,10 +11,16 @@ tools/updater-private.key*
 .freebuff/
 
 # derleme çıktıları ve indirme araçları (yeniden üretilebilir)
-yikim-mod/araclar/
+# dizin DEĞİL, "her şey" yasaklanır: derleme betikleri (*.ps1 / *.mjs) repoda kalır,
+# indirilen jar'lar (mc-*.jar, kutuphane/, fabric-api/) repoya girmez.
+yikim-mod/araclar/*
+!yikim-mod/araclar/*.ps1
+!yikim-mod/araclar/*.mjs
 yikim-mod/derleme/
 yikim-mod/.gradle/
 yikim-mod/build/
+# 26.x için üretilen "official" kaynak ağacı — derlemede yeniden yazılır
+yikim-mod/src/official/
 
 # binary ve temp — GitHub Release'lerinde durur, git'te değil
 *.exe
@@ -30,4 +36,7 @@ tools/yikim-api/bulut/kozmetikler.json
 
 # yerel test paketi (buyuk; repoya girmez)
 yayin-test/
+
+# launcher'in gelistirme sirasinda indirdigi oyun varliklari
+/assets/
 

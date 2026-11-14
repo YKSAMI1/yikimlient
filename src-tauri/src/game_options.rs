@@ -21,6 +21,10 @@ pub const FORCED_OPTIONS: &[(&str, &str)] = &[
     ("damageTiltStrength", "0.0"), // erişilebilirlik: hasar sarsıntısı kapalı
     ("darknessEffectScale", "0.0"), // erişilebilirlik: karanlık efekti kapalı
     ("distortionEffectScale", "0.0"), // erişilebilirlik: distorsiyon (nausea/portal) kapalı
+    // 26.2+ grafik API'si: Vulkan. Değer enum olduğu için options.txt'de JSON
+    // dizesi olarak (tırnaklı) yazılır — tıpkı inactivityFpsLimit gibi.
+    // 26.1 ve öncesi bu anahtarı tanımaz, satır sessizce yok sayılır.
+    ("preferredGraphicsBackend", "\"vulkan\""),
 ];
 
 /// Oyun klasörünün options.txt'sine profil anahtarlarını yaz (idempotent).
@@ -146,6 +150,8 @@ mod tests {
         assert!(out.contains("fovEffectScale:0.0"));
         assert!(out.contains("screenEffectScale:0.0"));
         assert!(out.contains("damageTiltStrength:0.0"));
+        // 26.2+ Vulkan tercihi (enum → tırnaklı JSON dizesi)
+        assert!(out.contains("preferredGraphicsBackend:\"vulkan\""));
         assert!(!out.contains("maxFps:120"));
         // ikinci çalıştırma değişiklik yapmamalı (aynı içerik)
         let again = std::fs::read_to_string(dir.join("options.txt")).unwrap();
