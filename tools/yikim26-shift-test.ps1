@@ -1,14 +1,25 @@
 ﻿<#-
-  SAÄ SHIFT TESTÄ° (26.x menÃ¼ tuÅŸu) â€” gerÃ§ek klavye olayÄ±yla.
-  powershell -ExecutionPolicy Bypass -File tools\yikim26-shift-test.ps1 -Ver 26.3
+    SAĞ SHIFT TESTİ (26.x menü tuşu) — gerçek klavye olayıyla.
+    powershell -ExecutionPolicy Bypass -File tools\yikim26-shift-test.ps1 -Ver 26.3
 
-  GUIYVENLIK: yalnÄ±zca baÅŸlÄ±ÄŸÄ± TAM "Minecraft* 26.3" olan (menÃ¼de olan)
-  penceremize tuÅŸ gÃ¶nderir; kullanÄ±cÄ±nÄ±n "26.3 - ..." baÅŸlÄ±klÄ± oyununa gÃ¶ndermez.
+    GÜVENLİK: yalnızca BAŞLIĞI "Minecraft* 26.3" olan (menüde olan) KENDİ test
+    penceremize tuş gönderir; kullanıcının kendi oyununa göndermez.
+
+    KANIT İZNİ: mod `-Dyikimlient.debug=1` ile her Right Shift basışında
+    "YIKIM menu-tus tetiklendi (panelAcik=...)" satırını yazar. Bu test
+    o satırın SAYISINI ölçer: "tus moda gecti: True / panel ACIK algilandi".
+    (Eski sürüm Yalnızca "HUD" kelimesini arıyordu ve menü butonu loguna
+    takılıp başarıymış gibi görünüyordu.)
+
+    DİKKAT (v0.9.7'de yaşanan): fare tıklamasıyla odak vermek menü butonuna
+    denk geliyordu ("HUD'u düzenle" ekranı açılıyor, Shift ekrana gidiyordu;
+    ya da "Çıkış" butonu oyunu kapatıyordu). Bu yüzden bu sürümde odak için
+    fare KULLANILMAZ — pencere öne getirilip GetForegroundWindow ile DOĞRULANIR.
 #>
 param(
-  [ValidateSet("26.1","26.1.1","26.1.2","26.2","26.3")]
-  [string]$Ver = "26.3",
-  [int]$Bekleme = 150
+    [ValidateSet("26.1","26.1.1","26.1.2","26.2","26.3")]
+    [string]$Ver = "26.3",
+    [int]$Bekleme = 180
 )
 $ErrorActionPreference = 'Continue'
 $APP = "$env:APPDATA\.yikimlient"
@@ -16,6 +27,22 @@ $KOK = Split-Path -Parent $PSScriptRoot
 $GameDir = Join-Path $env:TEMP "yikim26-$Ver"
 $oyunLog = Join-Path $GameDir "logs\latest.log"
 $log = Join-Path $GameDir "test.log"
+
+if (-not (Test-Path (Join-Path $GameDir "cp.txt"))) {
+    Write-Host "HAZIRLIK YOK: once 'node tools\test-26-hazirla.mjs $Ver' (cp.txt uretimi gerekli)"
+    exit 1
+}
+# mod jar'ı test dizinine taze kopyala — eski jar sessizce kullanılıyordu
+$jarKaynak = Join-Path $KOK "yikim-mod\derleme\yikimlient-1.0.7-$Ver+$Ver.jar"
+if (Test-Path $jarKaynak) {
+    Copy-Item $jarKaynak (Join-Path $GameDir "mods") -Force
+    Get-ChildItem (Join-Path $GameDir "mods") -Filter "yikimlient-*.jar" |
+        Where-Object { $_.Name -ne (Split-Path $jarKaynak -Leaf) } |
+        Remove-Item -Force
+    Write-Host "mod jar tazelendi: $(Split-Path $jarKaynak -Leaf)"
+} else {
+    Write-Host "mod jar bulunamadi (mevcut kopya kullanilacak): $jarKaynak"
+}
 
 $cfg = Join-Path $GameDir "config\yikimlient.cfg"
 if (Test-Path $cfg) {
@@ -36,15 +63,15 @@ Write-Host "PID: $($p.Id) - menu bekleniyor"
 
 $hazir = $false
 foreach ($i in 1..([int]($Bekleme/5))) {
-  Start-Sleep -Seconds 5
-  $t2 = Get-Content $oyunLog -ErrorAction SilentlyContinue
-  if ($t2 -match "ana men" -or $t2 -match "YIKIM Client .* haz") { $hazir = $true; break }
+    Start-Sleep -Seconds 5
+    $t2 = Get-Content $oyunLog -ErrorAction SilentlyContinue
+    if ($t2 -match "ana men" -or $t2 -match "YIKIM Client .* haz") { $hazir = $true; break }
 }
 if (-not $hazir) { Write-Host "menu gelmedi"; Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; exit 1 }
 Start-Sleep -Seconds 12
 
 $hedef = Get-Process -Id $p.Id -ErrorAction SilentlyContinue
-Write-Host "HEDEF: '$($hedef.MainWindowTitle)'"
+Write-Host "HEDEF PID: $($p.Id) - pencere: '$($hedef.MainWindowTitle)'"
 
 Add-Type @"
 using System;
@@ -54,60 +81,76 @@ public class W5 {
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern void keybd_event(byte v, byte s, uint f, int e);
-  [DllImport("user32.dll")] public static extern void SetCursorPos(int x, int y);
-  [DllImport("user32.dll")] public static extern void mouse_event(uint f, int x, int y, uint d, int e);
-  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out R r);
   [StructLayout(LayoutKind.Sequential)] public struct R { public int L, T, Rt, B; }
 }
 "@
-[W5]::ShowWindow($hedef.MainWindowHandle, 9) | Out-Null
-[W5]::SetForegroundWindow($hedef.MainWindowHandle) | Out-Null
-Start-Sleep -Seconds 3
-$fg = [W5]::GetForegroundWindow()
-Write-Host "ÖNDE OLAN PENCERE: $fg  (bizim: $($hedef.MainWindowHandle))  ayni=$($fg -eq $hedef.MainWindowHandle)"
-# ODAGI GARANTİ ET: pencerenin içine tıkla (fare olayı daha önce çalışmıştı)
-$r = New-Object W5+R
-[W5]::GetWindowRect($hedef.MainWindowHandle, [ref] $r) | Out-Null
-$w = $r.Rt - $r.L; $h = $r.B - $r.T
-$cx = $r.L + [int]($w * 0.85); $cy = $r.T + [int]($h * 0.85)
-Write-Host "  odak için tık: $cx,$cy"
-[W5]::SetCursorPos($cx, $cy) | Out-Null
-Start-Sleep -Milliseconds 600
-[W5]::mouse_event(0x0002, $cx, $cy, 0, 0) | Out-Null
-Start-Sleep -Milliseconds 250
-[W5]::mouse_event(0x0004, $cx, $cy, 0, 0) | Out-Null
-Start-Sleep -Seconds 3
-$fg2 = [W5]::GetForegroundWindow()
-Write-Host "  tıklama sonrası önde olan bizim: $($fg2 -eq $hedef.MainWindowHandle)"
-Start-Sleep -Seconds 3
-$fg = [W5]::GetForegroundWindow()
-Write-Host "ÖNDE OLAN PENCERE: $fg  (bizim: $($hedef.MainWindowHandle))  ayni=$($fg -eq $hedef.MainWindowHandle)"
-if ($fg -ne $hedef.MainWindowHandle) {
-  Write-Host "ÖNE GETİRİLEMEDİ — pencereye iki kez tıklanıyor (odak için)"
-  $r = New-Object W5+R
-  Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out R r); public struct R { public int L,T,Rt,B; }' -Name W5b -Namespace W
+
+# ---- ODAGI GARANTİ ET (fare YOK) -------------------------------------------
+# Fare tıklaması menü butonuna denk gelebilir: "HUD'u düzenle" ekranı açıp
+# Shift'i yutar ya da "Çıkış" butonu oyunu kapatır. Klavye olayı için tek
+# gereken: pencere ÖN PLANDA olmalı. Bunu GetForegroundWindow ile kanıtlarız.
+$odakTamam = $false
+foreach ($deneme in 1..5) {
+    [W5]::ShowWindow($hedef.MainWindowHandle, 9) | Out-Null
+    [W5]::SetForegroundWindow($hedef.MainWindowHandle) | Out-Null
+    Start-Sleep -Seconds 2
+    $fg = [W5]::GetForegroundWindow()
+    if ($fg -eq $hedef.MainWindowHandle) {
+        $odakTamam = $true
+        Write-Host "  odak TAMAM (deneme $deneme) - klavye olayi bu pencereye gider"
+        break
+    }
+    Write-Host "  odak YOK (deneme $deneme): onde=$fg bizim=$($hedef.MainWindowHandle)"
+}
+if (-not $odakTamam) {
+    Write-Host "DURDURULDU: test penceresi one getirilemedi (baska bir tam ekran oyun one geciriyor)."
+    Write-Host "  Bu bir MOD HATASI DEGIL: ortam kisiti. Diger oyunu kapatip tekrar kos."
+    Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+    exit 2
+}
+
+function TetikSayisi() {
+    $t = Get-Content $oyunLog -ErrorAction SilentlyContinue
+    return @($t | Select-String -Pattern "menu-tus tetiklendi").Count
+}
+function PanelAcikSayisi() {
+    $t = Get-Content $oyunLog -ErrorAction SilentlyContinue
+    return @($t | Select-String -Pattern "tetiklendi \(panelAcik=true\)").Count
 }
 
 function ShiftBas($ad) {
     Write-Host "  $ad"
+    $once = TetikSayisi
+    $onceAcik = PanelAcikSayisi
     [W5]::keybd_event(0xA0, 0x2A, 0, 0) | Out-Null    # VK_LSHIFT down
     Start-Sleep -Milliseconds 120
     [W5]::keybd_event(0xA1, 0x36, 0, 0) | Out-Null    # VK_RSHIFT down
-    Start-Sleep -Milliseconds 120
+    Start-Sleep -Milliseconds 250
     [W5]::keybd_event(0xA1, 0x36, 2, 0) | Out-Null    # VK_RSHIFT up
     [W5]::keybd_event(0xA0, 0x2A, 2, 0) | Out-Null    # VK_LSHIFT up
     Start-Sleep -Seconds 7
+    $sonra = TetikSayisi
+    $sonraAcik = PanelAcikSayisi
+    $tusAlgindi = $sonra -gt $once
+    $durum = if ($sonraAcik -gt $onceAcik) { "panel ACIK algilandi" }
+             elseif ($tusAlgindi) { "tus alindi (panel kapatma yolu kullanildi)" }
+             else { "TUS MODA ULASMADI" }
+    Write-Host ("    tus moda gecti: {0}  {1}  (toplam basma: {2})" -f $tusAlgindi, $durum, $sonra)
+    # odak kaybolduysa sonraki basma da bosuna gider - hemen uyar
+    $fg = [W5]::GetForegroundWindow()
+    if ($fg -ne $hedef.MainWindowHandle) { Write-Host "    UYARI: odak kayboldu (pencere one gecmedi)" }
 }
 
-ShiftBas "SHIFT #1 (panel aÃ§Ä±lmalÄ±)"
-ShiftBas "SHIFT #2 (panel kapanmalÄ±)"
-ShiftBas "SHIFT #3"
+ShiftBas "SHIFT #1 (panel acilmali)"
+ShiftBas "SHIFT #2 (panel kapanmali)"
+ShiftBas "SHIFT #3 (tekrar acilmali)"
 
 Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 3
 
-"=== PANEL AÃ‡ILMA Ä°ZLERÄ°:"
 $t = Get-Content $log -ErrorAction SilentlyContinue
-$t | Select-String -Pattern "YIKIM panel|panel.*acik|Hud|ScreenBase|setScreen|Narrator" | Select-Object -Last 8 | ForEach-Object { "   $($_.Line)" }
+"=== KANIT SATIRLARI (menu-tus tetiklendi):"
+@($t | Select-String -Pattern "menu-tus tetiklendi") | Select-Object -Last 8 | ForEach-Object { "   $($_.Line)" }
 "=== HATA:"
-$t | Select-String -Pattern "StackOverflow|ReportedException|NullPointer" | Select-Object -First 4 | ForEach-Object { "   $($_.Line)" }
+@($t | Select-String -Pattern "StackOverflow|ReportedException|NullPointer") | Select-Object -First 4 | ForEach-Object { "   $($_.Line)" }
+"=== 26.x GIRIS NOTU: 26.3 SDL scancode (RSHIFT=229), 26.1/26.2 GLFW (344). Mod her surumde InputConstants.KEY_RSHIFT kullanir."

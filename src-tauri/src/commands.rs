@@ -2665,11 +2665,13 @@ pub(crate) async fn surum_kimligi_coz(inst: &mut Instance) -> Result<String, Str
                 inst.save()?;
             }
             // mrpack/import bazen tam id ("1.21.1-forge-52.0.24") yazar — ayıkla
-            let forge_ver = inst
-                .loader_version
-                .rsplit_once("-forge-")
-                .map(|(_, v)| v.to_string())
-                .unwrap_or_else(|| inst.loader_version.clone());
+            // mrpack/import bazen tam id ("1.21.1-forge-52.0.24") ya da mc önekli
+            // build ("1.21.1-52.0.24") yazar — ikisi de tek biçime indirilir.
+            let forge_ver = launcher::forge_surum_ayikla(&inst.mc_version, &inst.loader_version);
+            if forge_ver != inst.loader_version.trim() {
+                inst.loader_version = forge_ver.clone();
+                inst.save()?;
+            }
             let vid = format!("{}-forge-{}", inst.mc_version, forge_ver);
             if !crate::core::versions_dir().join(&vid).join(format!("{vid}.json")).exists() {
                 launcher::install_forge_profile(&inst.mc_version, &forge_ver).await?;

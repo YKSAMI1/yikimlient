@@ -227,10 +227,34 @@ pub async fn forge_latest_build(mc: &str) -> Result<String, String> {
     }
 }
 
+/// Forge sürüm metnini saf sürüme indirger.
+/// Girdiler: "52.0.24", "1.21.1-52.0.24", "1.21.1-forge-52.0.24",
+/// "forge-52.0.24" → hepsi "52.0.24".
+pub fn forge_surum_ayikla(mc: &str, ham: &str) -> String {
+    let s = ham.trim();
+    if let Some(r) = s.strip_prefix(&format!("{mc}-forge-")) {
+        return r.to_string();
+    }
+    let s = s.strip_prefix("forge-").unwrap_or(s);
+    if let Some(r) = s.strip_prefix(&format!("{mc}-")) {
+        return r.to_string();
+    }
+    s.to_string()
+}
+
+/// Forge Maven koordinatı: "{mc}-{ver}" (installer URL'i ve dosya adı bu biçimi ister).
+pub fn forge_koordinat(mc: &str, ham: &str) -> String {
+    format!("{mc}-{}", forge_surum_ayikla(mc, ham))
+}
+
 /// Forge kurulumu: resmî installer jar + `--installClient <oyun_dizini>`.
 /// Installer kendi libraries'lerini ve versions/<id>.json'u yazar; burada
 /// saver ayarlar. Dönüş: sürüm kimliği (forge-<ver> id'si).
 pub async fn install_forge_profile(mc: &str, forge_ver: &str) -> Result<String, String> {
+    // Girdi "52.0.24", "1.21.1-52.0.24" ya da "1.21.1-forge-52.0.24" olabilir.
+    // Maven koordinatı HER ZAMAN "{mc}-{ver}" — çıplak sürümle URL 404 verir.
+    let forge_ver = forge_surum_ayikla(mc, forge_ver);
+    let koord = format!("{mc}-{forge_ver}");
     let vid = format!("{mc}-forge-{forge_ver}");
     let vers = versions_dir();
     let profil = vers.join(&vid).join(format!("{vid}.json"));
@@ -252,10 +276,10 @@ pub async fn install_forge_profile(mc: &str, forge_ver: &str) -> Result<String, 
     // installer jar: maven.minecraftforge.net (kayıt: app_dir/cache)
     let cache = app_dir().join("cache");
     std::fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
-    let installer = cache.join(format!("forge-{forge_ver}-installer.jar"));
+    let installer = cache.join(format!("forge-{koord}-installer.jar"));
     if !installer.exists() {
         let url = format!(
-            "https://maven.minecraftforge.net/net/minecraftforge/forge/{forge_ver}/forge-{forge_ver}-installer.jar"
+            "https://maven.minecraftforge.net/net/minecraftforge/forge/{koord}/forge-{koord}-installer.jar"
         );
         yikim_log(format!("forge installer indiriliyor: {url}"));
         let resp = http_client()
@@ -1523,4 +1547,19 @@ pub async fn launch_game(
     // (Discord RPC KALDIRILDI — internet bağlantısını etkileyebiliyordu)
 
     Ok(pid)
+}
+
+#[cfg(test)]
+mod forge_testler {
+    use super::*;
+
+    #[test]
+    fn forge_surum_bicimleri_tek_bicime_iner() {
+        assert_eq!(forge_surum_ayikla("1.21.1", "52.0.24"), "52.0.24");
+        assert_eq!(forge_surum_ayikla("1.21.1", "1.21.1-52.0.24"), "52.0.24");
+        assert_eq!(forge_surum_ayikla("1.21.1", "1.21.1-forge-52.0.24"), "52.0.24");
+        assert_eq!(forge_surum_ayikla("1.21.1", "forge-52.0.24"), "52.0.24");
+        assert_eq!(forge_koordinat("1.21.1", "52.0.24"), "1.21.1-52.0.24");
+        assert_eq!(forge_koordinat("1.20.1", "47.2.0"), "1.20.1-47.2.0");
+    }
 }
