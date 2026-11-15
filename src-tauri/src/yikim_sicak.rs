@@ -365,6 +365,26 @@ pub async fn yazi_senkonize(handle: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Sıcak kanalı BAŞLATMADAN ÖNCE senkron tazele (v0.9.6).
+///
+/// NEDEN VAR: `kanali_dagit` açılışta ASENKRON çalışır. Kullanıcı launcher'ı
+/// açıp hemen "Başlat"a basarsa indirme henüz tamamlanmamıştır; o zaman
+/// `yikim_mod::install_from` gömülü (ESKİ) jar'ı kurar. Özellikle MOD PAKETİ
+/// açan kullanıcıda görüldü: paket kuruluyor ama mod eski sürümde kalıyordu.
+///
+/// Bu fonksiyon başlatma akışında, mod kurulumundan ÖNCE çağrılır: manifest
+/// ve jar'ların yerelde olmasını garanti eder. Hata olursa SESSİZCE geçilir —
+/// başlatma asla bu kanala bağımlı değildir (gömülü jar yedek kalır).
+pub async fn tazele_bekle(handle: tauri::AppHandle) {
+    // 8 sn sınırı: internet papara/iş yoksa başlatma ASLA bekletilmesin.
+    // Zaman aşımı olursa gömülü jar'la devam edilir (yine de akış bozulmaz).
+    match tokio::time::timeout(std::time::Duration::from_secs(8), yazi_senkonize(handle)).await {
+        Ok(Ok(())) => {}
+        Ok(Err(h)) => core::yikim_log(format!("sicak (başlatma öncesi): {h}")),
+        Err(_) => core::yikim_log("sicak (başlatma öncesi): zaman aşımı — gömülü sürüm kullanılacak".into()),
+    }
+}
+
 /// Sıcak kanal: YALNIZ açılışta bir kez sorulur.
 ///
 /// Bant genişliği: açılışta çekilen `sicak.json` yalnızca birkaç KB'lık bir

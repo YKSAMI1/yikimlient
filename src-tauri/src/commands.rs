@@ -2784,6 +2784,8 @@ pub async fn paket_sonrasi_hazirla(app: &AppHandle, kimlik: &str, inst: &mut Ins
 
     // ---- 7) YIKIM modu ----
     pack_adim_k(app, kimlik, ADIM_MOD, "aktif", 0, 0, "YIKIM çekirdeği kuruluyor");
+    // SICAK KANAL ÖNCE (v0.9.6): paket kurulumu da en yeni jar'ı görsün.
+    crate::yikim_sicak::tazele_bekle(app.clone()).await;
     match yikim_mod::ensure_installed(app, inst) {
         Ok(_) => pack_adim_k(app, kimlik, ADIM_MOD, "bitti", 1, 1, "YIKIM çekirdeği hazır"),
         Err(e) => {
@@ -3009,6 +3011,11 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
     }
 
     // YIKIM çekirdeği — her başlatmada garanti (eski kurulumlar da bu yolla kavrıyor)
+    // SICAK KANAL ÖNCE: mod paketi açan/eski kurulumdaki kullanıcı eski sürümle
+    // oynuyordu çünkü açılıştaki eşzamansız indirme henüz bitmemişti (v0.9.6).
+    // Artık başlatmadan hemen önce senkron tazeleme yapılır: mod kurulumu her
+    // zaman mevcut EN YENİ jar'ı görür.
+    crate::yikim_sicak::tazele_bekle(app.clone()).await;
     if let Err(e) = yikim_mod::ensure_installed(&app, &inst) {
         core::yikim_log(format!("YIKIM modu doğrulanamadı (başlatma engellenmedi): {e}"));
     }
