@@ -32,7 +32,7 @@ if (-not $mid) { Write-Host "sicak.json yok"; exit 1 }
 $canli = gh api "repos/YKSAMI1/yikimlient/releases/assets/$mid" --header 'Accept: application/octet-stream' 2>$null | ConvertFrom-Json
 
 # 1.21.x (ve diger) girdileri oldugu gibi tasi
-$eski = @($canli.mods | Where-Object { $_.mcVersion -notlike '26*' })
+$eski = @($canli.mods | Where-Object { $_.mcVersion -notlike '26*' -and $_.file -and $_.file.EndsWith("+$($_.mcVersion).jar") })
 $kaynaklar = @($canli.kaynaklar)
 
 Write-Host ("[3/4] manifest yaziliyor: {0} mevcut + {1} 26.x" -f @($eski).Count, $girdiler.Count)

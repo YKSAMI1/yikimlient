@@ -23,7 +23,9 @@
 param(
     [Parameter(Mandatory=$true)][string]$MV,
     [string]$Notlar = "",
-    [string]$McVersion = "1.21.11"
+    [string]$McVersion = "1.21.11",
+    # mod-yayinla.ps1 gibi ust akislar jar'i ZATEN derlediyse tekrar derleme
+    [switch]$AtlaDerle
 )
 # PS 5.1 hunesi: yerli stderr akisi Stop modunda hataya doner - Continue'dayiz;
 # kritik noktalar zaten acik denetimli (Test-Path, ASSET YOK, versiyon eslesme).
@@ -31,8 +33,12 @@ $ErrorActionPreference = 'Continue'
 $kok = Split-Path -Parent $PSScriptRoot
 Set-Location $kok
 
-Write-Host "[1/6] MOD derleniyor"
-powershell -ExecutionPolicy Bypass -File (Join-Path $kok "yikim-mod\araclar\derle-1.21.11.ps1") -McVersion $McVersion -ModVersion $MV | Select-Object -Last 1
+if ($AtlaDerle) {
+    Write-Host "[1/6] MOD derlemesi atlandi (-AtlaDerle): yikimlient-$MV+$McVersion.jar kullanilacak"
+} else {
+    Write-Host "[1/6] MOD derleniyor"
+    powershell -ExecutionPolicy Bypass -File (Join-Path $kok "yikim-mod\araclar\derle-1.21.11.ps1") -McVersion $McVersion -ModVersion $MV | Select-Object -Last 1
+}
 $jarRel = "yikim-mod\derleme\yikimlient-$MV+$McVersion.jar"
 if (-not (Test-Path $jarRel)) { Write-Host "MOD JARI YOK: $jarRel - durduruluyor"; exit 1 }
 $jar = Join-Path $kok $jarRel
@@ -53,12 +59,20 @@ $mcp = Get-Content "$kok\src-tauri\resources\mods\manifest.json" -Raw | ConvertF
 $mods = @()
 $ojar = "yikimlient-$MV+$McVersion.jar"
 $url = "https://github.com/YKSAMI1/yikimlient/releases/download/sicak/$ojar"
-# Bu derlemenin ait oldugu aile: 1.21.x mi, 26.x mi?
-$benimAilem = if ($McVersion -like "1.21*") { "1.21" } elseif ($McVersion -like "26*") { "26" } else { $McVersion }
+# Bu derlemenin ait oldugu aile.
+# ONEMLI: "1.21" TEK AILE DEGIL. 1.21.1-1.21.8 legacy jar (1.3.1) kullanir,
+# 1.21.9-1.21.11 ise 1.33.x jar kullanir. Ikisini ayni aileye koymak 1.21.5
+# kullanicisina 1.21.11 jar'i kuruyordu -> oyun acilmiyordu.
+function Aile([string]$mc) {
+    if ($mc -like "26*") { return "26" }
+    if ($mc -eq "1.21.9" -or $mc -eq "1.21.10" -or $mc -eq "1.21.11") { return "1.21yeni" }
+    if ($mc -like "1.21.*") { return "1.21eski" }
+    return $mc
+}
+$benimAilem = Aile $McVersion
 foreach ($m in $mcp.mods) {
     $mc = $m.mcVersion
-    $ailesi = if ($mc -like "1.21*") { "1.21" } elseif ($mc -like "26*") { "26" } else { $mc }
-    if ($ailesi -ne $benimAilem) { continue }   # baska aileye dokunma
+    if ((Aile $mc) -ne $benimAilem) { continue }   # baska aileye dokunma
     $mods += @{ mcVersion = $mc; file = $ojar; modVersion = $MV; url = $url; sha256 = $sha }
 }
 $exp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
@@ -91,7 +105,43 @@ if ($klr.Count -eq 0) {
     Write-Host "      UYARI: canli manifestte kaynak yok - arayuz sicak kanali bos kalacak"
     Write-Host "      (arayuz yayinlamak icin: tools\sicak-ui.ps1 -Surum <surum>)"
 }
-$sj = @{ v = 1; exp = $exp; not = $Notlar; mods = $mods; kaynaklar = $klr } | ConvertTo-Json -Depth 8
+# DIGER AILELER KORUNUR (KRITIK): bu script yalnizca kendi ailesini yazar.
+# Canli manifestteki oteki aile girdileri (ornegin 26.x) aynen tasinmazsa
+# 1.21.x yayini 26.x sicak kanalini SILER.
+# Ayrica BOZUK girdiler atilir: `file` adi kendi mcVersion'u ile bitmiyorsa
+# (1.21.5 kaydinda 1.21.11 jar'i gibi) o girdi kurulmaz - oyun acilmaz.
+$digerMods = @()
+$canliOk = $false
+$ilkYayin = $false
+try {
+    $relCanli = gh api "repos/YKSAMI1/yikimlient/releases/tags/sicak" 2>$null | ConvertFrom-Json
+    if (-not $relCanli) { $ilkYayin = $true }
+    $midCanli = ($relCanli.assets | Where-Object { $_.name -eq 'sicak.json' } | Select-Object -First 1).id
+    if ($midCanli) {
+        $canliMods = gh api "repos/YKSAMI1/yikimlient/releases/assets/$midCanli" --header 'Accept: application/octet-stream' 2>$null | ConvertFrom-Json
+        if ($canliMods -and $canliMods.mods) {
+            $digerMods = @($canliMods.mods | Where-Object {
+                $_.file -and $_.file.EndsWith("+$($_.mcVersion).jar") -and (Aile $_.mcVersion) -ne $benimAilem
+            })
+            $bozuk = @($canliMods.mods).Count - $digerMods.Count - @($mods).Count
+            if ($bozuk -gt 0) { Write-Host "      atilan bozuk/eski girdi: $bozuk" }
+            $canliOk = $true
+        }
+    }
+} catch { $digerMods = @() }
+
+# GUVENLIK: canli manifest okunamadiysa YAZMA. Aksi halde bu aile disindaki
+# tum girdiler (ornegin 26.x) silinir ve o kullanicilar guncelleme almaz.
+if (-not $canliOk -and -not $ilkYayin) {
+    Write-Host "DURDURULDU: canli sicak.json okunamadi - diger aileler silinmesin diye yazilmiyor."
+    Write-Host "            (gh oturumunu kontrol et: gh auth status)"
+    exit 1
+}
+
+$tumMods = @($mods) + @($digerMods)
+Write-Host ("      manifest: {0} bu aile + {1} diger aile = {2} girdi" -f @($mods).Count, @($digerMods).Count, @($tumMods).Count)
+
+$sj = @{ v = 1; exp = $exp; not = $Notlar; mods = $tumMods; kaynaklar = $klr } | ConvertTo-Json -Depth 8
 $tempJson = Join-Path $env:TEMP "sicak.json"
 [System.IO.File]::WriteAllText($tempJson, $sj, (New-Object System.Text.UTF8Encoding($false)))
 

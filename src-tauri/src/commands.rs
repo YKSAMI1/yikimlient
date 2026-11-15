@@ -1162,7 +1162,11 @@ pub async fn cmd_create_instance(
     }
     let created = instances::create(instance)?;
 
-    // YIKIM çekirdeği — her kurulumda otomatik (yalnız Fabric + 1.21.x)
+    // YIKIM çekirdeği — her kurulumda otomatik (yalnız Fabric + 1.21.x/26.x)
+    // SICAK KANAL ÖNCE: yeni oluşturulan kurulum da EN YENİ jar'ı alsın.
+    // (Eskiden burada tazeleme yoktu; mod paketi kurulumunda eski gömülü
+    // sürüm kurulabiliyordu.)
+    crate::yikim_sicak::tazele_bekle(app.clone()).await;
     if let Err(e) = yikim_mod::ensure_installed(&app, &created) {
         core::yikim_log(format!("YIKIM modu kurulamadı (kurulum engellenmedi): {e}"));
     }

@@ -113,8 +113,24 @@ fn durum_yolu() -> PathBuf {
 /// "yikimlient-1.12.7+1.21.11.jar" → (1, 12, 7).
 pub(crate) fn mv_from_dosya(adi: &str) -> Option<(u32, u32, u32)> {
     let kalan = adi.strip_prefix("yikimlient-")?;
-    let mv = kalan.split('+').next()?;
-    yikim_mod::parse_version(mv)
+    let govde = kalan.split('+').next()?;
+    // İKİ AD BİÇİMİ VAR:
+    //   1.21.x : "1.33.16+1.21.11"   -> mod sürümü doğrudan tire yok
+    //   26.x   : "1.0.6-26.3+26.3"   -> mod sürümü ile mc sürümü TİREYLE ayrık
+    // Tireyi kesmezsek "1.0.6-26.3" parse edilemiyordu; sıcak kanal 26.x'te
+    // sessizce atlanıyor, kullanıcı gömülü (eski) jar'da kalıyordu.
+    let surum = govde.split('-').next()?;
+    yikim_mod::parse_version(surum)
+}
+
+/// Jar adının hedeflediği Minecraft sürümü: "yikimlient-1.0.6-26.3+26.3.jar" -> "26.3".
+/// Manifestteki bir kayıt kendi mcVersion'ı ile bitmeyen bir jar gösteriyorsa
+/// (ör. 1.21.5 kaydında 1.21.11 jar'ı) o kayıt KURULMAZ: yanlış sürüm oyunu açar
+/// ve çöker. Bu kontrol, hatalı manifest yayınlarının kullanıcıya ulaşmasını keser.
+pub(crate) fn dosya_mc(adi: &str) -> Option<String> {
+    let kalan = adi.strip_prefix("yikimlient-")?;
+    let mc = kalan.split('+').nth(1)?;
+    Some(mc.trim_end_matches(".jar").to_string())
 }
 
 /// a, b'den daha mı yeni (katı).
@@ -193,12 +209,19 @@ pub(crate) fn daha_yeni_jar(mc_version: &str, gomulu_adi: &str) -> Option<PathBu
     let m = disk_manifest()?;
     let kok = sicak_dir();
 
-    // 1) birebir mc eşleşmesi
-    let secilen = m.mods.iter().find(|e| e.mc_version == mc_version).or_else(|| {
+    // 1) birebir mc eşleşmesi (dosya adı da o mc'yi göstermeli)
+    let gecerli = |e: &&SicakModEntry| dosya_mc(&e.file).as_deref() == Some(e.mc_version.as_str());
+    let secilen = m
+        .mods
+        .iter()
+        .filter(gecerli)
+        .find(|e| e.mc_version == mc_version)
+        .or_else(|| {
         // 2) aynı minor içinde en yakın patch (eşitlikte küçük patch tercih)
         let (_, tm, tp) = yikim_mod::parse_version(mc_version)?;
         m.mods
             .iter()
+            .filter(gecerli)
             .filter_map(|e| yikim_mod::parse_version(&e.mc_version).map(|v| (v, e)))
             .filter(|((_, mj, _), _)| *mj == tm)
             .min_by(|(av, _), (bv, _)| {
@@ -626,6 +649,40 @@ mod tests {
         assert_eq!(mv_from_dosya("yikimlient-1.12.7+1.21.11.jar"), Some((1, 12, 7)));
         assert_eq!(mv_from_dosya("yikimlient-1.12.6+1.21.11.jar"), Some((1, 12, 6)));
         assert_eq!(mv_from_dosya("switch.jar"), None);
+    }
+
+    /// 26.x jar adlari "1.0.6-26.3+26.3" biciminde: mod surumu ile mc surumu
+    /// TIREYLE ayrilir. Bu adlar cozulemedigi icin sicak kanal 26.x'te
+    /// sessizce atlaniyordu (kullanici 1.0.5'te kaliyordu).
+    #[test]
+    fn mv_ayristirma_26x() {
+        assert_eq!(mv_from_dosya("yikimlient-1.0.6-26.3+26.3.jar"), Some((1, 0, 6)));
+        assert_eq!(mv_from_dosya("yikimlient-1.0.5-26.1.2+26.1.2.jar"), Some((1, 0, 5)));
+        assert_eq!(mv_from_dosya("yikimlient-1.0.10-26.1+26.1.jar"), Some((1, 0, 10)));
+        // bozuk ad hala None
+        assert_eq!(mv_from_dosya("yikimlient-xx-26.3+26.3.jar"), None);
+    }
+
+    /// Jar adinin gosterdigi mc surumu. Manifestte bir kayit kendi
+    /// mcVersion'u ile bitmeyen jar gosteriyorsa kurulmamali (yanlis surum =
+    /// acilmayan oyun). Canli manifestte 1.21.5 -> 1.21.11 jar'i hatasi vardi.
+    #[test]
+    fn dosya_mc_ayristirma() {
+        assert_eq!(dosya_mc("yikimlient-1.33.16+1.21.11.jar").as_deref(), Some("1.21.11"));
+        assert_eq!(dosya_mc("yikimlient-1.0.6-26.3+26.3.jar").as_deref(), Some("26.3"));
+        assert_eq!(dosya_mc("yikimlient-1.3.1+1.21.5.jar").as_deref(), Some("1.21.5"));
+        assert_ne!(dosya_mc("yikimlient-1.33.16+1.21.11.jar").as_deref(), Some("1.21.5"));
+        assert_eq!(dosya_mc("baska.jar"), None);
+    }
+
+    /// Sicak kanal secimi 26.x'te GERCEKTEN daha yeni jar'i secmeli.
+    /// (Saf mantik testi: dosya sistemi gerektirmez.)
+    #[test]
+    fn surum_karsilastirma_26x() {
+        let gomulu = mv_from_dosya("yikimlient-1.0.5-26.3+26.3.jar").unwrap();
+        let sicak = mv_from_dosya("yikimlient-1.0.6-26.3+26.3.jar").unwrap();
+        assert!(daha_yeni(sicak, gomulu), "1.0.6 sicak jar 1.0.5 gomuluden yeni sayilmali");
+        assert!(!daha_yeni(gomulu, sicak));
     }
 
     #[test]
