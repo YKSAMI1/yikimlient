@@ -1728,3 +1728,20 @@ input.search-in.input, .search-in.input {
 .skin-cracked-ikon svg { width: 16px; height: 16px; }
 .skin-cracked-uyari i { font-style: normal; color: var(--text); }
 
+/* Bellek uyarı şeridi — "N mod var, önerilen X MB".
+   BİLGİLENDİRME amaçlı: RAM'e dokunulmaz, sürgü Kurulumlar → Java & Args. */
+.ram-uyari {
+  display: block;
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-radius: 10px;
+}
+.ram-uyari b { color: var(--text); font-weight: 600; }
+/* Modal içindeki uyarı: başlık ile liste arası */
+.modal .ram-uyari { margin: 4px 0 14px; }
+

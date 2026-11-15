@@ -8,6 +8,7 @@
    ============================================================ */
 import { invoke, openModal, navigate, refreshState, state, toast } from "./main";
 import { packKartBaslat, packKartHata, packKartTamam } from "./pack-kur";
+import { paketSonrasiRamUyarisi } from "./ram-uyari";
 
 let veil: HTMLElement | null = null;
 
@@ -70,6 +71,7 @@ async function handleDropped(path: string): Promise<void> {
         await refreshState();
         packKartTamam();
         navigate("instances");
+        void paketSonrasiRamUyarisi(inst);
       } catch (e) {
         packKartHata(String(e));
       }

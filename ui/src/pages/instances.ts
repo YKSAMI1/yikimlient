@@ -1,5 +1,6 @@
 import { el, fmtBytes, fmtDuration, fileSrc, icon, invoke, lamp, launch, listen, nav, navigate, openLoginModal, state, toast } from "../main";
 import { packKartBaslat, packKartHata, packKartTamam } from "../pack-kur";
+import { paketSonrasiRamUyarisi, ramUyarisiHtml } from "../ram-uyari";
 import { bildirimEkle } from "../bildirim";
 import { enterRows } from "../motion";
 import { loaderIcon } from "../loader-icons";
@@ -181,6 +182,7 @@ async function importPackFile(): Promise<void> {
     packKartTamam();
     toast(`${(inst as any).name || "Paket"} kuruldu!`, "ok");
     navigate("instances");
+    void paketSonrasiRamUyarisi(inst);
   } catch (e) {
     packKartHata(String(e));
     toast(`Paket içe aktarılamadı: ${e}`, "err");
@@ -665,6 +667,13 @@ function tumunuGuncelleBagla(updates: Record<string, any>, inst: any): void {
 async function tabJava(content: HTMLElement, inst: any): Promise<void> {
   content.innerHTML = `<div class="spinner" style="margin:40px auto"></div>`;
   const presets: any[] = await invoke("cmd_list_java_arg_presets");
+  // Bellek uyarısı: mod sayısı yerel klasörden okunur (hızlı). Okunamazsa
+  // uyarı gösterilmez - sekme asla bozulmaz.
+  let modSayisi = 0;
+  try {
+    const modlar = (await invoke("cmd_list_mods", { instanceId: inst.id })) as any[] | undefined;
+    if (Array.isArray(modlar)) modSayisi = modlar.length;
+  } catch { /* yok */ }
   const ozelAcik = inst.java_preset_id === "ozel";
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
   const ozelCmds = inst.custom_vm_args ?? (presets.find((p) => p.id === "balanced")?.args ?? []).join("\\n");
@@ -677,6 +686,7 @@ async function tabJava(content: HTMLElement, inst: any): Promise<void> {
           <span class="chip" id="ram-val">${inst.ram_mb} MB</span>
         </div>
         <p style="margin-top:8px; font-size:12px; color:var(--text-dim)">Sistem RAM'inin en fazla yarısını ayır. 4 GB çoğu modlu paket için yeterli.</p>
+        <div id="ram-uyari-kutu">${ramUyarisiHtml(modSayisi, inst.ram_mb, state.sys?.total_ram_mb || 0, "ayar")}</div>
       </div>
       <div class="card">
         <h3>${icon("args")} Java Argüman Presetleri</h3>
@@ -714,8 +724,14 @@ async function tabJava(content: HTMLElement, inst: any): Promise<void> {
     </div>
   `;
   const range = content.querySelector("#ram-range") as HTMLInputElement;
+  const uyariKutu = content.querySelector("#ram-uyari-kutu") as HTMLElement | null;
+  const toplamRam = state.sys?.total_ram_mb || 0;
   range.addEventListener("input", () => {
-    (content.querySelector("#ram-val") as HTMLElement).textContent = `${range.value} MB`;
+    const mb = parseInt(range.value);
+    (content.querySelector("#ram-val") as HTMLElement).textContent = `${mb} MB`;
+    // Bellek uyarısı sürgüyle canlı güncellenir: eşiğe ulaşınca kendiliğinden
+    // kaybolur, düşürülünce geri gelir (RAM ASLA otomatik değiştirilmez).
+    if (uyariKutu) uyariKutu.innerHTML = ramUyarisiHtml(modSayisi, mb, toplamRam, "ayar");
   });
   range.addEventListener("change", async () => {
     await invoke("cmd_set_instance_ram", { id: inst.id, ramMb: parseInt(range.value) });

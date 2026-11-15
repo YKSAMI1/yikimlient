@@ -719,6 +719,7 @@ async function dinleYikimpackAc(): Promise<void> {
       await refreshStateRef();
       packKartTamam(kimlik);
       toast(`${(inst as any).name || "Paket"} kuruldu ✓`, "ok");
+      void (await import("./ram-uyari")).paketSonrasiRamUyarisi(inst);
     } catch (err) {
       const m = String(err);
       if (m.includes("paket_zaten_kuruluyor")) {

@@ -1,5 +1,6 @@
 import { el, fmtBytes, icon, invoke, nav, navigate, openExternal, openModal, state, toast } from "../main";
 import { packKartBaslat, packKartHata, packKartTamam } from "../pack-kur";
+import { ramUyarisiHtml } from "../ram-uyari";
 import { mdToHtml } from "../md";
 
 interface SearchResult {
@@ -714,18 +715,26 @@ async function installPack(r: SearchResult, v: RepoVersion): Promise<void> {
     });
     await import("../main").then((m) => m.refreshState());
     packKartTamam();
-    await askJavaPreset(inst);
+    // Bellek uyarısı için mod sayısı: kurulum bitti, mods/ hazır. Okunamazsa
+    // uyarı gösterilmez (kurulum akışı asla bloklanmaz).
+    let modSayisi = 0;
+    try {
+      const modlar = (await invoke("cmd_list_mods", { instanceId: inst.id })) as any[] | undefined;
+      if (Array.isArray(modlar)) modSayisi = modlar.length;
+    } catch { /* mod listesi okunamadı - uyarı yok */ }
+    await askJavaPreset(inst, modSayisi);
     navigate("instances");
   } catch (e) {
     packKartHata(String(e));
   }
 }
 
-async function askJavaPreset(inst: any): Promise<void> {
+async function askJavaPreset(inst: any, modSayisi = 0): Promise<void> {
   const presets: any[] = await invoke("cmd_list_java_arg_presets");
   const { root, close } = openModal(`
     <h2>Özel Java argümanı eklensin mi?</h2>
     <div class="sub">Bu paket için FPS odaklı hazır ayarlardan birini seç. Sonra her zaman değiştirebilirsin.</div>
+    ${ramUyarisiHtml(modSayisi, inst.ram_mb, state.sys?.total_ram_mb || 0, "kurulum")}
     <div class="preset-list">
       ${presets.map((p) => `
         <div class="preset-row card hover" data-id="${p.id}">
