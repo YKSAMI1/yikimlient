@@ -320,13 +320,16 @@ pub fn aktif_bayraklari_yaz(anahtar: &str, dogrulandi: bool) -> usize {
 mod tests {
     use super::*;
 
-    fn gecici_dir() -> PathBuf {
-        std::env::temp_dir().join(format!("yikim-guvenlik-{}", std::process::id()))
+    /// Testin KENDİ dizini: iki test aynı yolu kullanırsa biri diğerinin
+    /// dizinini siler (belirti: tek başına geçen test, tam pakette düşer).
+    fn gecici_dir(ad: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("yikim-guvenlik-{ad}-{}", std::process::id()))
     }
 
     #[test]
     fn cihaz_uretimi_ve_kaliciligi() {
-        let dir = gecici_dir();
+        let _kilit = crate::test_kilit::kilitle();
+        let dir = gecici_dir("cihaz");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::env::set_var("YIKIM_APP_DIR", &dir);
@@ -389,7 +392,8 @@ mod tests {
 
     #[test]
     fn rol_yol_yaz_yerel_kaydi_gunceller() {
-        let dir = gecici_dir();
+        let _kilit = crate::test_kilit::kilitle();
+        let dir = gecici_dir("rol");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::env::set_var("YIKIM_APP_DIR", &dir);

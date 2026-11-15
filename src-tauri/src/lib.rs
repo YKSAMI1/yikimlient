@@ -29,6 +29,10 @@ pub mod yikim_sicak;
 pub mod yikim_ui;
 pub mod yikimpack;
 
+/// Test izolasyon kilidi (yalnızca test derlemesinde).
+#[cfg(test)]
+pub mod test_kilit;
+
 /// Launcher sürümü (Cargo.toml) — Discord presence ve loglar için.
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 

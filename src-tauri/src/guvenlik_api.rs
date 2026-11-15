@@ -201,6 +201,9 @@ mod tests {
 
     #[test]
     fn api_adresi_env_ve_yayin_varsayilani() {
+        // Bu test YIKIM_APP_DIR'i SİLİYOR; kilit olmadan aynı anda koşan
+        // guvenlik testlerinin dizinini uçuruyordu.
+        let _kilit = crate::test_kilit::kilitle();
         // Yerel ayar dosyası testi etkilemesin: geçici uygulama klasörü.
         let dir = std::env::temp_dir().join(format!("yikim-api-adres-{}", std::process::id()));
         std::env::set_var("YIKIM_APP_DIR", &dir);
