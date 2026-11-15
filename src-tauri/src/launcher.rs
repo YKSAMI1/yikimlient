@@ -247,6 +247,70 @@ pub fn forge_koordinat(mc: &str, ham: &str) -> String {
     format!("{mc}-{}", forge_surum_ayikla(mc, ham))
 }
 
+/// Forge/NeoForge installer'ı hedef klasörde `launcher_profiles.json` arıyor
+/// ("There is no minecraft launcher profile ... you need to run the launcher first!").
+/// Launcher böyle bir dosya yazmadığı için installer 1 koduyla düşüyordu.
+/// Var olan dosyaya dokunulmaz.
+fn launcher_profili_hazirla() -> Result<(), String> {
+    let p = app_dir().join("launcher_profiles.json");
+    if p.exists() {
+        return Ok(());
+    }
+    let icerik = r#"{"profiles":{},"settings":{},"version":3,"clientToken":""}"#;
+    std::fs::write(&p, icerik).map_err(|e| format!("launcher_profiles.json yazılamadı: {e}"))
+}
+
+/// Forge/NeoForge installer'ını çalıştırır.
+/// İki tuzak: (1) `launcher_profiles.json` yoksa installer hiç kurmaz;
+/// (2) sebebi stderr'e değil **stdout**'a yazar. Bu yüzden iki akış birlikte
+/// okunur, tam çıktı `logs/installer-<vid>.log` dosyasına yazılır ve hata
+/// mesajında kullanıcıya gerçek satır gösterilir.
+fn installer_calistir(java: &Path, installer: &Path, tur: &str, vid: &str) -> Result<(), String> {
+    launcher_profili_hazirla()?;
+    let cikti = std::process::Command::new(java)
+        .arg("-jar")
+        .arg(installer)
+        .arg("--installClient")
+        .arg(app_dir())
+        .output()
+        .map_err(|e| format!("{tur} installer başlatılamadı: {e}"))?;
+    if cikti.status.success() {
+        return Ok(());
+    }
+    let tam = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&cikti.stdout),
+        String::from_utf8_lossy(&cikti.stderr)
+    );
+    let log_dizin = app_dir().join("logs");
+    let _ = std::fs::create_dir_all(&log_dizin);
+    let log_yolu = log_dizin.join(format!("installer-{vid}.log"));
+    let _ = std::fs::write(&log_yolu, &tam);
+    yikim_log(format!(
+        "{tur} installer başarısız (kod {:?}) — tam çıktı: {}",
+        cikti.status.code(),
+        log_yolu.display()
+    ));
+    let neden = tam
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .rev()
+        .find(|l| {
+            l.contains("There is no")
+                || l.contains("Exception")
+                || l.contains("error")
+                || l.contains("Error")
+                || l.contains("failed")
+        })
+        .unwrap_or("ayrıntı yok");
+    Err(format!(
+        "{tur} installer başarısız (kod {:?}): {neden} · tam çıktı: {}",
+        cikti.status.code(),
+        log_yolu.display()
+    ))
+}
+
 /// Forge kurulumu: resmî installer jar + `--installClient <oyun_dizini>`.
 /// Installer kendi libraries'lerini ve versions/<id>.json'u yazar; burada
 /// saver ayarlar. Dönüş: sürüm kimliği (forge-<ver> id'si).
@@ -297,21 +361,8 @@ pub async fn install_forge_profile(mc: &str, forge_ver: &str) -> Result<String, 
     // kurulum: java -jar installer --installClient <app_dir>
     // (installer kendi libraries + versions altına yazar; 1-3 dk sürebilir)
     yikim_log(format!("forge kurulumu başlıyor: {vid}"));
-    let cikti = std::process::Command::new(&java)
-        .arg("-jar")
-        .arg(&installer)
-        .arg("--installClient")
-        .arg(app_dir())
-        .output()
-        .map_err(|e| format!("forge installer başlatılamadı: {e}"))?;
-    if !cikti.status.success() {
-        let log = String::from_utf8_lossy(&cikti.stderr);
-        yikim_log(format!("forge installer çıktı: {}", log.chars().take(400).collect::<String>()));
-        return Err(format!(
-            "forge installer hata kodu {:?} — ayrıntı kayıtlarda",
-            cikti.status.code()
-        ));
-    }
+    yikim_log(format!("forge kurulumu başlıyor: {vid}"));
+    installer_calistir(&java, &installer, "Forge", &vid)?;
     if !profil.exists() {
         return Err(format!("forge installer sürüm json'u yazmaydı: {vid}"));
     }
@@ -448,24 +499,7 @@ pub async fn install_neoforge_profile(mc: &str, ver: &str) -> Result<String, Str
     }
 
     yikim_log(format!("neoforge kurulumu başlıyor: {vid}"));
-    let cikti = std::process::Command::new(&java)
-        .arg("-jar")
-        .arg(&installer)
-        .arg("--installClient")
-        .arg(app_dir())
-        .output()
-        .map_err(|e| format!("neoforge installer başlatılamadı: {e}"))?;
-    if !cikti.status.success() {
-        let log = String::from_utf8_lossy(&cikti.stderr);
-        yikim_log(format!(
-            "neoforge installer çıktı: {}",
-            log.chars().take(400).collect::<String>()
-        ));
-        return Err(format!(
-            "neoforge installer hata kodu {:?} — ayrıntı kayıtlarda",
-            cikti.status.code()
-        ));
-    }
+    installer_calistir(&java, &installer, "NeoForge", &vid)?;
     if !profil.exists() {
         return Err(format!("neoforge installer sürüm json'u yazmadı: {vid}"));
     }
