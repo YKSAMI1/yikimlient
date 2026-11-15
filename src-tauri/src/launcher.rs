@@ -540,13 +540,28 @@ fn merge_version(mut parent: serde_json::Value, child: serde_json::Value) -> ser
     if let Some(t) = child["type"].as_str() {
         parent["type"] = serde_json::Value::String(t.into());
     }
-    // libraries: parent + child
-    let mut libs = Vec::new();
-    if let Some(arr) = parent["libraries"].as_array() {
-        libs.extend(arr.iter().cloned());
-    }
-    if let Some(arr) = child["libraries"].as_array() {
-        libs.extend(arr.iter().cloned());
+    // libraries: parent + child, aynı Maven kimliği (`name`) tek kez.
+    // Ham birleştirme aynı jar'ı classpath'e iki kez koyuyordu ve NeoForge'un
+    // union dosya sistemi "Duplicate key ... gson-2.10.1.jar" ile çöküyordu.
+    // Vanilla launcher da çocuk profilin kütüphanesini aynı adla değiştirir
+    // (child sonra geldiği için onun tanımı kazanır).
+    let mut libs: Vec<serde_json::Value> = Vec::new();
+    let mut konum: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let ust = parent["libraries"].as_array().cloned().unwrap_or_default();
+    let alt = child["libraries"].as_array().cloned().unwrap_or_default();
+    for lib in ust.into_iter().chain(alt) {
+        let ad = lib["name"].as_str().unwrap_or("").to_string();
+        if ad.is_empty() {
+            libs.push(lib);
+            continue;
+        }
+        match konum.get(&ad).copied() {
+            Some(i) => libs[i] = lib,
+            None => {
+                konum.insert(ad, libs.len());
+                libs.push(lib);
+            }
+        }
     }
     parent["libraries"] = serde_json::Value::Array(libs);
 
@@ -749,6 +764,10 @@ pub async fn download_all_for_version(
             }
         }
     }
+
+    // aynı hedefe iki indirme = yarış (paralel yazma bozuk dosya üretebilir)
+    let mut hedefler: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
+    jobs.retain(|(_, d, _)| hedefler.insert(d.clone()));
 
     yikim_log(format!("indirme planı: {} dosya", jobs.len()));
 
@@ -1382,6 +1401,10 @@ pub async fn launch_game(
         ));
     }
     classpath.push(client_jar);
+    // güvenlik ağı: aynı jar iki kez classpath'e girerse NeoForge/Forge'un
+    // BootstrapLauncher'ı "Duplicate key" ile çöküyor — tekrarları at.
+    let mut gorulen: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
+    classpath.retain(|p| gorulen.insert(p.clone()));
     // Windows'ta JDK classpath ayırıcı `;` — MAIN_SEPARATOR (`\`) ilgisiz, her zaman `:` üretiyordu.
     let cp_sep = if cfg!(windows) { ";" } else { ":" };
     let classpath_str = classpath
@@ -1644,5 +1667,39 @@ mod forge_testler {
                 .replace('\\', "/")
                 .ends_with(&format!("/{profil}/{profil}.jar")));
         }
+    }
+
+    /// Vanilla 1.21.1 ile NeoForge profilinde 11 kütüphane aynı (gson dahil).
+    /// Ham birleştirme aynı jar'ı classpath'e iki kez koyup
+    /// "Duplicate key ... gson-2.10.1.jar" hatası veriyordu.
+    #[test]
+    fn lib_birlestirmede_ayni_jar_tek_kez_ve_cocuk_kazanir() {
+        let van = serde_json::json!({
+            "id": "1.21.1",
+            "libraries": [
+                {"name": "com.google.code.gson:gson:2.10.1",
+                 "downloads": {"artifact": {"path": "gson-vanilla.jar"}}},
+                {"name": "org.ow2.asm:asm:9.7"}
+            ]
+        });
+        let nf = serde_json::json!({
+            "id": "neoforge-21.1.266",
+            "inheritsFrom": "1.21.1",
+            "libraries": [
+                {"name": "com.google.code.gson:gson:2.10.1",
+                 "downloads": {"artifact": {"path": "gson-profil.jar"}}},
+                {"name": "net.neoforged:neoforge:21.1.266:client"}
+            ]
+        });
+        let m = merge_version(van, nf);
+        assert_eq!(m["id"], "1.21.1");
+        let libs = m["libraries"].as_array().unwrap();
+        assert_eq!(libs.len(), 3, "tekrar eden gson tek kayda inmeli");
+        let gson: Vec<_> = libs
+            .iter()
+            .filter(|l| l["name"] == "com.google.code.gson:gson:2.10.1")
+            .collect();
+        assert_eq!(gson.len(), 1);
+        assert_eq!(gson[0]["downloads"]["artifact"]["path"], "gson-profil.jar");
     }
 }
