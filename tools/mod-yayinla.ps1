@@ -92,7 +92,19 @@ if ($YalnizKur -or $AtlaDerle) {
     foreach ($v in $SURUMLER_26) {
         $mv = "$Surum26-$v"
         $jar = Join-Path $Derleme "yikimlient-$mv+$v.jar"
+        Remove-Item $jar -Force -ErrorAction SilentlyContinue
+        # KRITIK: derle-26.ps1 src/official'i KENDISI URETMEZ. Hazirlik adimi
+        # atlanirsa src/main'deki degisiklik jar'a GIRMEZ; eski kod "yeni surum"
+        # diye yayinlanir (sessiz ve cok tehlikeli). Her surum icin once hazirla.
+        $hazir = & node (Join-Path $kok "yikim-mod\araclar\surum-hazirla-26.mjs") $v 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "        HATA  $v hazirlanamadi"
+            $hazir | Select-Object -Last 6 | ForEach-Object { Write-Host "             $_" }
+            $hatali += $v
+            continue
+        }
         $cikti = & powershell -ExecutionPolicy Bypass -File (Join-Path $kok "yikim-mod\araclar\derle-26.ps1") -McVersion $v -ModVersion $mv 2>&1
+        # Onceki derlemeden kalan jar "basarili" gibi gorunmesin
         if (Test-Path $jar) {
             Write-Host "        26.x  $v -> $(Split-Path $jar -Leaf)"
         } else {
@@ -103,6 +115,7 @@ if ($YalnizKur -or $AtlaDerle) {
     }
     foreach ($v in $SURUMLER_121) {
         $jar = Join-Path $Derleme "yikimlient-$Surum121+$v.jar"
+        Remove-Item $jar -Force -ErrorAction SilentlyContinue
         $cikti = & powershell -ExecutionPolicy Bypass -File (Join-Path $kok "yikim-mod\araclar\derle-1.21.11.ps1") -McVersion $v -ModVersion $Surum121 2>&1
         if (Test-Path $jar) {
             Write-Host "        1.21.x $v -> $(Split-Path $jar -Leaf)"

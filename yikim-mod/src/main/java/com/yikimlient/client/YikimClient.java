@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.33.16";
+    public static final String MOD_VERSION = "1.33.17";
     /** Arayüz teması seçim sürümü: config'teki değer bundan küçükse ilk açılışta sorulur. */
     public static final int TEMA_SURUM = 1;
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
@@ -68,7 +68,7 @@ implements ClientModInitializer {
         HudRenderCallback.EVENT.register(YikimHud::render);
         ClientTickEvents.END_CLIENT_TICK.register(YikimClient::tick);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
-            YikimLog.info("YIKIM kapan\u0131\u015f: g\u00fcnl\u00fck kuyru\u011fu bo\u015falt\u0131ld\u0131 (v1.3.1).");
+            YikimLog.info("YIKIM kapan\u0131\u015f: g\u00fcnl\u00fck kuyru\u011fu bo\u015falt\u0131ld\u0131 (v" + MOD_VERSION + ").");
             YikimLog.flushNow();
         });
         LOGGER.info("YIKIM Client {} haz\u0131r: {} HUD \u00f6\u011fesi, rozet motoru etkin, oyun ayarlar\u0131na kendili\u011finden dokunulmaz.", (Object)MOD_VERSION, (Object)YikimWidgets.all().size());
