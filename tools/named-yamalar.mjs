@@ -149,6 +149,10 @@ const YAMALAR_262 = [
   // varlık türü sabitleri EntityTypes'a taşındı
   ["net.minecraft.world.entity.EntityType.BLAZE", "net.minecraft.world.entity.EntityTypes.BLAZE"],
   ["EntityType.BLAZE", "EntityTypes.BLAZE"],
+  // Panel açık mı kontrolü: ekran Minecraft'tan Gui'ye taşındı (v1.33.16).
+  // YikimAdapter.panelEkrani gövdesi 26.x'te böyle yazılır.
+  ["client.gui instanceof net.minecraft.client.gui.screens.Screen",
+   "client.gui.screen() instanceof net.minecraft.client.gui.screens.Screen"],
 ];
 
 // ---------------------------------------------------------------------------

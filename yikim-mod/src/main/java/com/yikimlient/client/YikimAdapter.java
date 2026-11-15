@@ -14,6 +14,7 @@ import net.minecraft.class_315;
 import net.minecraft.class_327;
 import net.minecraft.class_332;
 import net.minecraft.class_3675;
+import net.minecraft.class_310;
 import net.minecraft.class_4063;
 import net.minecraft.class_4066;
 import net.minecraft.class_429;
@@ -243,6 +244,19 @@ public final class YikimAdapter {
      */
     public static boolean solTik(int dugme) {
         return dugme == 0 || dugme == 1;
+    }
+
+    /**
+     * Şu an YIKIM paneli açık mı? (sürüm güvenli)
+     *
+     * 1.21.x'te ekran `Minecraft.screen` (field_1755) alanındaydı.
+     * 26.2+'da ekran yönetimi `Gui`'ye taşındı: `Minecraft.gui.screen()`.
+     * Bu yüzden bu kontrolü doğrudan yapmak tek satırda mümkün değil;
+     * 26.x derlemesinde named-yamalar bu metodu `client.gui.screen()` olarak
+     * yazar (bkz. YAMALAR_262). Yanlış kontrol paneli kapatmayı bozuyordu.
+     */
+    public static boolean panelEkrani(class_310 client) {
+        return client.field_1755 instanceof YikimAdapter.ScreenBase;
     }
 
     private static int mouseButton(class_11909 mouse) {
