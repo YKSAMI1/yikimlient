@@ -1274,6 +1274,15 @@ fn build_jvm_args(
     out
 }
 
+/// Client jar konum adayları: (1) inheritsFrom kökü — vanilla sürümün jar'ı,
+/// (2) profil klasörü — paketle gelen jar'lar burada olabilir.
+fn client_jar_adaylari(kok_id: &str, profil_id: &str) -> Vec<PathBuf> {
+    vec![
+        versions_dir().join(kok_id).join(format!("{kok_id}.jar")),
+        versions_dir().join(profil_id).join(format!("{profil_id}.jar")),
+    ]
+}
+
 /// Oyunu başlat; stdout/stderr'i canlı loga aktar, çıkışta istatistik kaydet.
 /// İstatistik tamamen event-driven: oyun içinde sıfır dosya I/O.
 pub async fn launch_game(
@@ -1335,24 +1344,42 @@ pub async fn launch_game(
             }
         }
     }
-    let client_jar = versions_dir().join(version_id).join(format!("{version_id}.jar"));
-    // fabric gibi inheritsFrom'lu profillerde client jar vanilla sürüm klasöründe
-    // durur (downloads vanilla JSON'dan gelir); orada yoksa zincirin köküne bak.
-    let client_jar = if client_jar.exists() {
-        client_jar
-    } else {
-        let root_id = version_id
-            .split_once("-")
-            .and_then(|(_, rest)| {
-                // "fabric-loader-x.y.z-1.21.11" → son segment vanilla sürümüdür
-                rest.rsplit('-').next().map(|s| s.to_string())
-            })
-            .unwrap_or_else(|| version_id.to_string());
-        let root_jar = versions_dir().join(&root_id).join(format!("{root_id}.jar"));
-        if root_jar.exists() { root_jar } else { client_jar }
-    };
+    // Client jar: adı profil kimliğinden türetmek yanlış yola çıkarıyordu.
+    // "1.21.1-forge-52.0.24" → son parça "52.0.24" aranıyor, jar aslında
+    // dururken "client jar eksik" hatası veriliyordu. Birleşik JSON'un kendi
+    // `id`'si inheritsFrom zincirinin kökü (vanilla) olduğu için jar oradadır.
+    let kok_id = vj["id"].as_str().unwrap_or(version_id).to_string();
+    let client_jar = client_jar_adaylari(&kok_id, version_id)
+        .into_iter()
+        .find(|p| p.exists())
+        .unwrap_or_else(|| versions_dir().join(&kok_id).join(format!("{kok_id}.jar")));
+    // Hiçbiri yoksa JSON'daki adresten indir — eksik jar yüzünden oyun düşmesin.
     if !client_jar.exists() {
-        return Err("client jar eksik".into());
+        let url = vj["downloads"]["client"]["url"].as_str().unwrap_or("");
+        let sha = vj["downloads"]["client"]["sha1"].as_str().unwrap_or("");
+        if !url.is_empty() {
+            yikim_log(format!("client jar launch'ta indiriliyor: {}", client_jar.display()));
+            if let Some(p) = client_jar.parent() {
+                let _ = std::fs::create_dir_all(p);
+            }
+            crate::util::download_many(
+                vec![(
+                    url.to_string(),
+                    client_jar.clone(),
+                    if sha.is_empty() { None } else { Some(sha.to_string()) },
+                )],
+                crate::util::DlOpts { concurrency: 1, retries: 3 },
+                |_| {},
+            )
+            .await
+            .map_err(|e| format!("client jar indirilemedi ({url}): {e}"))?;
+        }
+    }
+    if !client_jar.exists() {
+        return Err(format!(
+            "client jar eksik: {} (JSON'da client indirme adresi yok)",
+            client_jar.display()
+        ));
     }
     classpath.push(client_jar);
     // Windows'ta JDK classpath ayırıcı `;` — MAIN_SEPARATOR (`\`) ilgisiz, her zaman `:` üretiyordu.
@@ -1595,5 +1622,27 @@ mod forge_testler {
         assert_eq!(forge_surum_ayikla("1.21.1", "forge-52.0.24"), "52.0.24");
         assert_eq!(forge_koordinat("1.21.1", "52.0.24"), "1.21.1-52.0.24");
         assert_eq!(forge_koordinat("1.20.1", "47.2.0"), "1.20.1-47.2.0");
+    }
+
+    /// Forge/NeoForge profilinde client jar vanilla kök klasöründedir; ad
+    /// profilden türetilince "52.0.24" gibi olmayan bir yol aranıyordu.
+    #[test]
+    fn client_jar_vanilla_kokunde_aranir() {
+        for (kok, profil) in [
+            ("1.21.1", "1.21.1-forge-52.0.24"),
+            ("1.21.1", "neoforge-21.1.266"),
+            ("1.21.11", "fabric-loader-0.17.2-1.21.11"),
+        ] {
+            let adaylar = client_jar_adaylari(kok, profil);
+            let ilk = adaylar[0].to_string_lossy().replace('\\', "/");
+            assert!(
+                ilk.ends_with(&format!("/{kok}/{kok}.jar")),
+                "{profil} → beklenmeyen yol: {ilk}"
+            );
+            assert!(adaylar[1]
+                .to_string_lossy()
+                .replace('\\', "/")
+                .ends_with(&format!("/{profil}/{profil}.jar")));
+        }
     }
 }
