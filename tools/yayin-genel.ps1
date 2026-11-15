@@ -1,4 +1,4 @@
-# YIKIMLient yayin hatti (genel) - Windows yerel imza + Linux CI + latest.json birlesimi
+﻿# YIKIMLient yayin hatti (genel) - Windows yerel imza + Linux CI + latest.json birlesimi
 #
 #   powershell -ExecutionPolicy Bypass -File tools\yayin-genel.ps1 0.9.4
 #
