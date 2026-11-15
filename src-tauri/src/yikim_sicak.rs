@@ -124,13 +124,34 @@ pub(crate) fn mv_from_dosya(adi: &str) -> Option<(u32, u32, u32)> {
 }
 
 /// Jar adının hedeflediği Minecraft sürümü: "yikimlient-1.0.6-26.3+26.3.jar" -> "26.3".
-/// Manifestteki bir kayıt kendi mcVersion'ı ile bitmeyen bir jar gösteriyorsa
-/// (ör. 1.21.5 kaydında 1.21.11 jar'ı) o kayıt KURULMAZ: yanlış sürüm oyunu açar
-/// ve çöker. Bu kontrol, hatalı manifest yayınlarının kullanıcıya ulaşmasını keser.
 pub(crate) fn dosya_mc(adi: &str) -> Option<String> {
     let kalan = adi.strip_prefix("yikimlient-")?;
     let mc = kalan.split('+').nth(1)?;
     Some(mc.trim_end_matches(".jar").to_string())
+}
+
+/// Uyumluluk ailesi. Bir jar, aynı ailedeki tüm sürümlere kurulabilir:
+///   "1.21yeni"  -> 1.21.9 / 1.21.10 / 1.21.11  (tek 1.33.x jar)
+///   "1.21eski"  -> 1.21.1 ... 1.21.8            (1.3.1 jar'ları)
+///   "26.x"      -> her 26.x sürümü KENDİ jar'ını ister (26.1 jar'ı 26.3'e olmaz)
+pub(crate) fn aile(mc: &str) -> String {
+    if mc.starts_with("26.") {
+        return mc.to_string();
+    }
+    match mc {
+        "1.21.9" | "1.21.10" | "1.21.11" => "1.21yeni".to_string(),
+        _ if mc.starts_with("1.21.") => "1.21eski".to_string(),
+        _ => mc.to_string(),
+    }
+}
+
+/// Manifest kaydı kendi ailesine uyan bir jar gösteriyor mu?
+/// Yanlış aile (1.21.5 kaydında 1.21.11 jar'ı) oyunu açar ve çökertir.
+pub(crate) fn dosya_uyumlu(mc: &str, dosya: &str) -> bool {
+    match dosya_mc(dosya) {
+        Some(dm) => aile(mc) == aile(&dm),
+        None => false,
+    }
 }
 
 /// a, b'den daha mı yeni (katı).
@@ -210,7 +231,7 @@ pub(crate) fn daha_yeni_jar(mc_version: &str, gomulu_adi: &str) -> Option<PathBu
     let kok = sicak_dir();
 
     // 1) birebir mc eşleşmesi (dosya adı da o mc'yi göstermeli)
-    let gecerli = |e: &&SicakModEntry| dosya_mc(&e.file).as_deref() == Some(e.mc_version.as_str());
+    let gecerli = |e: &&SicakModEntry| dosya_uyumlu(&e.mc_version, &e.file);
     let secilen = m
         .mods
         .iter()
@@ -671,8 +692,27 @@ mod tests {
         assert_eq!(dosya_mc("yikimlient-1.33.16+1.21.11.jar").as_deref(), Some("1.21.11"));
         assert_eq!(dosya_mc("yikimlient-1.0.6-26.3+26.3.jar").as_deref(), Some("26.3"));
         assert_eq!(dosya_mc("yikimlient-1.3.1+1.21.5.jar").as_deref(), Some("1.21.5"));
-        assert_ne!(dosya_mc("yikimlient-1.33.16+1.21.11.jar").as_deref(), Some("1.21.5"));
         assert_eq!(dosya_mc("baska.jar"), None);
+    }
+
+    /// Manifest kaydi kendi ailesine uyan jar'i gostermeli.
+    /// Canli manifestte 1.21.1-1.21.8 kayitlari 1.21.11 jar'ini gosteriyordu:
+    /// o surumlerde oyun ACILMIYOR. 1.21.9-11 ise ayni jar'i mesru kullanir.
+    #[test]
+    fn dosya_uyumlulugu() {
+        // mesru
+        assert!(dosya_uyumlu("1.21.9", "yikimlient-1.33.16+1.21.11.jar"));
+        assert!(dosya_uyumlu("1.21.10", "yikimlient-1.33.16+1.21.11.jar"));
+        assert!(dosya_uyumlu("1.21.11", "yikimlient-1.33.16+1.21.11.jar"));
+        assert!(dosya_uyumlu("1.21.5", "yikimlient-1.3.1+1.21.5.jar"));
+        assert!(dosya_uyumlu("26.3", "yikimlient-1.0.6-26.3+26.3.jar"));
+        // bozuk: eski aileye yeni jar
+        assert!(!dosya_uyumlu("1.21.5", "yikimlient-1.33.16+1.21.11.jar"));
+        assert!(!dosya_uyumlu("1.21.1", "yikimlient-1.33.16+1.21.11.jar"));
+        // bozuk: 26.x'te baska surumun jar'i
+        assert!(!dosya_uyumlu("26.1", "yikimlient-1.0.6-26.3+26.3.jar"));
+        // bozuk: jar adi taninmiyor
+        assert!(!dosya_uyumlu("1.21.11", "baska.jar"));
     }
 
     /// Sicak kanal secimi 26.x'te GERCEKTEN daha yeni jar'i secmeli.

@@ -72,8 +72,9 @@ if (Test-Path $manifestYolu) {
         }
     }
 }
-if (-not $Surum26) { if ($YalnizKur) { $Surum26 = $eski26 } else { $Surum26 = SurumArttir $eski26 } }
-if (-not $Surum121) { if ($YalnizKur) { $Surum121 = $eski121 } else { $Surum121 = SurumArttir $eski121 } }
+$SurumSabit = $YalnizKur -or $AtlaDerle
+if (-not $Surum26) { if ($SurumSabit) { $Surum26 = $eski26 } else { $Surum26 = SurumArttir $eski26 } }
+if (-not $Surum121) { if ($SurumSabit) { $Surum121 = $eski121 } else { $Surum121 = SurumArttir $eski121 } }
 
 Write-Host ""
 Write-Host "==== YIKIM MOD YAYINI ===="
@@ -158,16 +159,36 @@ if (Test-Path $Kurulu) {
 }
 
 # --- 4) SICAK KANAL ------------------------------------------------------
+$yayinHatasi = $false
 if ($YalnizKur -or $AtlaYayin) {
     Write-Host "[4/6] sicak kanal yayini atlandi"
 } else {
     Write-Host "[4/6] sicak kanala yukleniyor (1.21.x)"
     & powershell -ExecutionPolicy Bypass -File (Join-Path $kok "tools\sicak.ps1") -MV $Surum121 -McVersion "1.21.11" -Notlar $Notlar -AtlaDerle 2>&1 |
-        Where-Object { $_ -match "TAMAM|HATA|YOK|yayinda|mcVersion" } | ForEach-Object { Write-Host "        $_" }
+        Where-Object { $_ -match "TAMAM|HATA|YOK|yayinda|mcVersion|DURDURULDU|girdi" } | ForEach-Object { Write-Host "        $_" }
+    if ($LASTEXITCODE -ne 0) { $yayinHatasi = $true }
 
     Write-Host "[5/6] sicak kanala yukleniyor (26.x)"
     & powershell -ExecutionPolicy Bypass -File (Join-Path $kok "tools\sicak-26.ps1") -MV $Surum26 -Notlar $Notlar 2>&1 |
         Where-Object { $_ -match "26\.|toplam|kaynak|TAMAM|HATA|YOK" } | ForEach-Object { Write-Host "        $_" }
+    if ($LASTEXITCODE -ne 0) { $yayinHatasi = $true }
+
+    # DOGRULAMA: canli manifest gercekten istenen surumleri tasiyor mu?
+    $dogrula = $true
+    try {
+        $r = Invoke-WebRequest "https://github.com/YKSAMI1/yikimlient/releases/download/sicak/sicak.json" -UseBasicParsing
+        $canli = [System.Text.Encoding]::UTF8.GetString($r.Content) | ConvertFrom-Json
+        $g26 = @($canli.mods | Where-Object { $_.mcVersion -eq "26.3" })[0]
+        $g121 = @($canli.mods | Where-Object { $_.mcVersion -eq "1.21.11" })[0]
+        if (-not $g26 -or $g26.modVersion -ne $Surum26) { Write-Host "        DOGRULAMA: 26.3 girdisi $Surum26 degil!"; $dogrula = $false }
+        if (-not $g121 -or $g121.modVersion -ne $Surum121) { Write-Host "        DOGRULAMA: 1.21.11 girdisi $Surum121 degil!"; $dogrula = $false }
+        foreach ($mc in @("1.21.1", "1.21.5", "1.21.8")) {
+            $g = @($canli.mods | Where-Object { $_.mcVersion -eq $mc })[0]
+            if ($g -and -not $g.file.EndsWith("+$mc.jar")) { Write-Host "        DOGRULAMA: $mc girdisi yanlis jar gosteriyor: $($g.file)"; $dogrula = $false }
+        }
+        if ($dogrula) { Write-Host "        DOGRULAMA: canli manifest dogru ($($canli.mods.Count) girdi)" }
+    } catch { Write-Host "        DOGRULAMA: canli manifest okunamadi"; $dogrula = $false }
+    if (-not $dogrula) { $yayinHatasi = $true }
 }
 
 # --- 6) BU MAKINEDEKI TUM KURULUM/MOD PAKETLERINE KUR --------------------
@@ -201,6 +222,11 @@ if (-not (Test-Path $instKok)) {
 }
 
 Write-Host ""
+if ($yayinHatasi) {
+    Write-Host "BITTI - AMA YAYINDA HATA VAR (yukaridaki DOGRULAMA satirlarina bak)."
+    Write-Host "  Yerel kurulumlar yine de guncellendi."
+    exit 1
+}
 Write-Host "BITTI."
 if (-not $YalnizKur -and -not $AtlaYayin) {
     Write-Host "  - Sicak kanal yayinda: herkes launcher'i acinca yeni modu alir (exe gerekmez)."

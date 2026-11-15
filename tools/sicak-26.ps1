@@ -31,8 +31,35 @@ $mid = ($rel.assets | Where-Object { $_.name -eq 'sicak.json' } | Select-Object 
 if (-not $mid) { Write-Host "sicak.json yok"; exit 1 }
 $canli = gh api "repos/YKSAMI1/yikimlient/releases/assets/$mid" --header 'Accept: application/octet-stream' 2>$null | ConvertFrom-Json
 
-# 1.21.x (ve diger) girdileri oldugu gibi tasi
-$eski = @($canli.mods | Where-Object { $_.mcVersion -notlike '26*' -and $_.file -and $_.file.EndsWith("+$($_.mcVersion).jar") })
+if (-not $canli -or -not $canli.mods) {
+    Write-Host "DURDURULDU: canli manifest okunamadi - diger aileler silinmesin diye yazilmiyor."
+    exit 1
+}
+
+# AILE KURALI (sicak.ps1 ile AYNI olmali):
+#   1.21.9 / 1.21.10 / 1.21.11 -> TEK jar (1.33.x) paylasir  = "1.21yeni"
+#   1.21.1 ... 1.21.8           -> legacy jar (1.3.1)         = "1.21eski"
+#   26.x                        -> her surum KENDI jar'ini ister (26.1 jar'i 26.3'e olmaz)
+# Bu kural olmadan 1.21.9/1.21.10 girdileri "+1.21.11.jar" gosterdigi icin
+# "kendi surumuyle bitmiyor" diye ATILIYORDU (canli manifest 8 -> 6 dustu).
+function Aile([string]$mc) {
+    if ($mc -like "26*") { return $mc }
+    if ($mc -eq "1.21.9" -or $mc -eq "1.21.10" -or $mc -eq "1.21.11") { return "1.21yeni" }
+    if ($mc -like "1.21.*") { return "1.21eski" }
+    return $mc
+}
+function Gecerli($e) {
+    if (-not $e.file) { return $false }
+    $p = $e.file -split '\+'
+    if (@($p).Count -lt 2) { return $false }
+    $dosyaMc = $p[1] -replace '\.jar$', ''
+    return (Aile $dosyaMc) -eq (Aile $e.mcVersion)
+}
+
+# 26.x disindaki girdiler korunur (gecerli olanlar)
+$eski = @($canli.mods | Where-Object { $_.mcVersion -notlike '26*' -and (Gecerli $_) })
+$atilan = @($canli.mods).Count - @($eski).Count - @($canli.mods | Where-Object { $_.mcVersion -like '26*' }).Count
+if ($atilan -gt 0) { Write-Host "   atilan bozuk girdi: $atilan" }
 $kaynaklar = @($canli.kaynaklar)
 
 Write-Host ("[3/4] manifest yaziliyor: {0} mevcut + {1} 26.x" -f @($eski).Count, $girdiler.Count)

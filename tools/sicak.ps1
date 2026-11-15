@@ -64,12 +64,16 @@ $url = "https://github.com/YKSAMI1/yikimlient/releases/download/sicak/$ojar"
 # 1.21.9-1.21.11 ise 1.33.x jar kullanir. Ikisini ayni aileye koymak 1.21.5
 # kullanicisina 1.21.11 jar'i kuruyordu -> oyun acilmiyordu.
 function Aile([string]$mc) {
-    if ($mc -like "26*") { return "26" }
     if ($mc -eq "1.21.9" -or $mc -eq "1.21.10" -or $mc -eq "1.21.11") { return "1.21yeni" }
     if ($mc -like "1.21.*") { return "1.21eski" }
+    # 26.x: her surum kendi jar'ini ister - tek aileye toplanamaz
     return $mc
 }
 $benimAilem = Aile $McVersion
+if ($McVersion -like "26*") {
+    Write-Host "DURDURULDU: 26.x jar'lari bu script ile yayinlanmaz - tools\sicak-26.ps1 kullan."
+    exit 1
+}
 foreach ($m in $mcp.mods) {
     $mc = $m.mcVersion
     if ((Aile $mc) -ne $benimAilem) { continue }   # baska aileye dokunma
