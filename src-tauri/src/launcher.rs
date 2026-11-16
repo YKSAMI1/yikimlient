@@ -1293,6 +1293,74 @@ fn build_jvm_args(
     out
 }
 
+/// Forge/NeoForge (BootstrapLauncher) FML, classpath'e konan HAM vanilla jar'ı da
+/// mod gibi yüklemeye kalkıyor ve şu hatayla çöküyor:
+/// `ResolutionException: Modules minecraft and _1._21._1 export package
+/// net.minecraft.obfuscate to module borderlesswindow`.
+/// Profil JSON'undaki `${version_name}` bizim sürüm kimliğimize
+/// ("neoforge-21.1.229") çözüldüğü için gerçek jar adını (`1.21.1.jar`) tutmuyor.
+/// Bu yüzden ignoreList'i classpath'e eklediğimiz vanilla jar'ın DOSYA ADIYLA
+/// birlikte yeniden yazıyoruz (NeoForge PR #1718'in yaptığı iş).
+/// Yalnızca profil gerçekten bir ignoreList tanımlıyorsa dokunur (Forge eski
+/// sürümleri / vanilla / Fabric etkilenmez).
+fn ignore_list_duzelt(jvm_args: &mut Vec<String>, client_jar_adi: &str, kok_id: &str) {
+    // Ham MC jar'ı olmayan bir dosya (ör. birleşik profil jar'ı) classpath'teyse
+    // onu yok saymak Forge'un kendi sınıflarını gizler — dokunma.
+    if client_jar_adi.is_empty() || client_jar_adi != format!("{kok_id}.jar") {
+        return;
+    }
+    let mut liste: Vec<String> = Vec::new();
+    let mut tanimli = false;
+    for a in jvm_args.iter() {
+        if let Some(v) = a.strip_prefix("-DignoreList=") {
+            tanimli = true;
+            for p in v.split(',') {
+                let p = p.trim();
+                if !p.is_empty() && !liste.iter().any(|x| x == p) {
+                    liste.push(p.to_string());
+                }
+            }
+        }
+    }
+    if !tanimli {
+        return;
+    }
+    if !liste.iter().any(|x| x == client_jar_adi) {
+        liste.push(client_jar_adi.to_string());
+    }
+    let yeni = format!("-DignoreList={}", liste.join(","));
+    jvm_args.retain(|a| !a.starts_with("-DignoreList="));
+    // JVM'de aynı -D iki kez geçerse SONUNCUSU geçerli; yine de tek bırakıyoruz.
+    jvm_args.push(yeni);
+}
+
+/// Forge/NeoForge kurulumunda YIKIM modu (Fabric) ASLA yüklenmemeli.
+/// jar `fabric.mod.json` taşır; FML onu mod saymaz ama yüklemeye çalışıp
+/// uyarı/çökme üretebiliyor. Paket içe aktarılırken kurulum HENÜZ DİSKE
+/// YAZILMAMIŞKEN sıcak kanal eski "fabric" varsayımıyla jar'ı kopyalayabiliyordu
+/// (v0.9.11 ve öncesi) — her başlatmada temizle, kurulum kendini onarsın.
+fn fabric_olmayan_temizle(inst: &crate::instances::Instance) {
+    // Yalnızca FML yükleyicileri: Quilt Fabric modlarını yükleyebildiği için
+    // oraya (ve vanilla'ya) dokunmuyoruz — hata NeoForge/Forge'da çıkıyor.
+    if inst.mod_loader != "forge" && inst.mod_loader != "neoforge" {
+        return;
+    }
+    let mods = inst.mods_dir();
+    let Ok(rd) = std::fs::read_dir(&mods) else {
+        return;
+    };
+    for e in rd.flatten() {
+        let ad = e.file_name().to_string_lossy().to_string();
+        let kucuk = ad.to_lowercase();
+        if kucuk.starts_with("yikimlient-") && kucuk.ends_with(".jar") && std::fs::remove_file(e.path()).is_ok() {
+            yikim_log(format!(
+                "YIKIM modu (Fabric) kaldırıldı: {ad} — {} kurulumu",
+                inst.mod_loader
+            ));
+        }
+    }
+}
+
 /// Client jar konum adayları: (1) inheritsFrom kökü — vanilla sürümün jar'ı,
 /// (2) profil klasörü — paketle gelen jar'lar burada olabilir.
 fn client_jar_adaylari(kok_id: &str, profil_id: &str) -> Vec<PathBuf> {
@@ -1312,6 +1380,9 @@ pub async fn launch_game(
     java_dir: &Path,
     session: std::sync::Arc<crate::stats::LiveSession>,
 ) -> Result<u32, String> {
+    // Forge/NeoForge: Fabric modu (YIKIM) mods/ içinde kalırsa oyun/loader hata
+    // verebilir — başlatmadan önce temizle (eski sürümlerin açtığı yarayı kapatır).
+    fabric_olmayan_temizle(&inst);
     let vj = load_version_json_merged(version_id).await?;
     let main_class = vj["mainClass"]
         .as_str()
@@ -1400,6 +1471,10 @@ pub async fn launch_game(
             client_jar.display()
         ));
     }
+    let vanilla_jar_adi = client_jar
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_default();
     classpath.push(client_jar);
     // güvenlik ağı: aynı jar iki kez classpath'e girerse NeoForge/Forge'un
     // BootstrapLauncher'ı "Duplicate key" ile çöküyor — tekrarları at.
@@ -1490,7 +1565,9 @@ pub async fn launch_game(
         }
     }
 
-    let jvm_args = build_jvm_args(&vj, &inst, &natives_dir, &classpath_str, &vars);
+    let mut jvm_args = build_jvm_args(&vj, &inst, &natives_dir, &classpath_str, &vars);
+    // NeoForge/Forge: ham vanilla jar'ı ignoreList'e ekle (bkz. fonksiyon notu).
+    ignore_list_duzelt(&mut jvm_args, &vanilla_jar_adi, &kok_id);
 
     let _ = std::fs::create_dir_all(&game_dir);
     let java_path = java_exe(java_dir);
@@ -1667,6 +1744,46 @@ mod forge_testler {
                 .replace('\\', "/")
                 .ends_with(&format!("/{profil}/{profil}.jar")));
         }
+    }
+
+    /// NeoForge canlı çökme senaryosu: profil JSON'u `${version_name}` yerine
+    /// profil kimliğini yazdığı için ignoreList ham MC jar'ını tutmuyordu →
+    /// ResolutionException. Düzeltme jar adını listeye eklemeli.
+    #[test]
+    fn ignore_list_ham_mc_jarini_kapsar() {
+        let mut args = vec![
+            "-Xmx2G".to_string(),
+            "-DignoreList=client-extra,neoforge-21.1.229.jar".to_string(),
+            "-cp".to_string(),
+            "a;b".to_string(),
+        ];
+        ignore_list_duzelt(&mut args, "1.21.1.jar", "1.21.1");
+        let il = args
+            .iter()
+            .filter(|a| a.starts_with("-DignoreList="))
+            .collect::<Vec<_>>();
+        assert_eq!(il.len(), 1, "tek ignoreList kalmalı");
+        assert_eq!(il[0], "-DignoreList=client-extra,neoforge-21.1.229.jar,1.21.1.jar");
+        // diğer argümanlar korunur
+        assert!(args.contains(&"-Xmx2G".to_string()));
+        assert!(args.contains(&"-cp".to_string()));
+    }
+
+    /// Birleşik profil jar'ı classpath'teyse (ham MC jar'ı yoksa) ignoreList'e
+    /// EKLENMEMELİ — yoksa Forge'un kendi sınıfları yok sayılır.
+    #[test]
+    fn ignore_list_profil_jarini_yok_saymaz() {
+        let mut args = vec!["-DignoreList=client-extra".to_string()];
+        ignore_list_duzelt(&mut args, "neoforge-21.1.229.jar", "1.21.1");
+        assert_eq!(args, vec!["-DignoreList=client-extra".to_string()]);
+    }
+
+    /// ignoreList tanımlamayan sürümler (vanilla/Fabric/eski Forge) değişmez.
+    #[test]
+    fn ignore_list_yoksa_eklenmez() {
+        let mut args = vec!["-Xmx2G".to_string(), "-Dfoo=bar".to_string()];
+        ignore_list_duzelt(&mut args, "1.21.1.jar", "1.21.1");
+        assert_eq!(args, vec!["-Xmx2G".to_string(), "-Dfoo=bar".to_string()]);
     }
 
     /// Vanilla 1.21.1 ile NeoForge profilinde 11 kütüphane aynı (gson dahil).

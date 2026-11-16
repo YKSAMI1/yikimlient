@@ -2708,6 +2708,11 @@ pub(crate) async fn surum_kimligi_coz(inst: &mut Instance) -> Result<String, Str
 /// not edilir çünkü başlatma yolunda tekrar denenir.
 pub async fn paket_sonrasi_hazirla(app: &AppHandle, kimlik: &str, inst: &mut Instance) -> Result<(), String> {
     use repos::{pack_adim_k, ADIM_HAZIR, ADIM_LOADER, ADIM_MOD, ADIM_SURUM};
+    // ÖNEMLİ (v0.9.12): paket içe aktarma loader/mc_version'ı bellekte değiştiriyor
+    // ama kurulum diske YAZILMIYOR. Aşağıdaki sıcak kanal tazelemesi kurulumları
+    // diskten yeniden yüklediği için hepsini varsayılan "fabric" sanıp Fabric
+    // modunu (yikimlient-*.jar) NeoForge kurulumuna kopyalıyordu. Önce diske yaz.
+    inst.save()?;
     // ---- 5) yükleyici ----
     let yukleyici_adi = match inst.mod_loader.as_str() {
         "fabric" => "Fabric",
