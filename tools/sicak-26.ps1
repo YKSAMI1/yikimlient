@@ -22,7 +22,7 @@ foreach ($v in $surumler) {
   $sha = (Get-FileHash -Path $jar -Algorithm SHA256).Hash.ToLower()
   $girdiler += @{ mcVersion = $v; file = "yikimlient-$MV-$v+$v.jar"; modVersion = $MV; url = "$cev/yikimlient-$MV-$v+$v.jar"; sha256 = $sha }
   gh release upload sicak $jar --clobber 2>&1 | Out-Null
-  Write-Host "  $v -> $($girdiler[-1].file) ($sha.Substring(0,12)...)"
+  Write-Host "  $v -> $($girdiler[-1].file) ($($sha.Substring(0,12))...)"
 }
 
 Write-Host "[2/4] canli manifest okunuyor (1.21.x girdileri KORUNACAK)"

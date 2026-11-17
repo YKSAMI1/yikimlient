@@ -310,10 +310,12 @@ public final class YikimAdapter {
         }
 
         public boolean method_25404(class_11908 key) {
-            // NOT (v1.33.12): 344 = Right Shift'ın GLFW kodu. 26.x SDL'ye geçtiği
-            // için key() bu değeri döndürmez → panele Shift ile kapatmak çalışmazdı.
-            // isEscape() her iki sürümde de doğru yolda; Esc'le kapatma buraya eklendi.
-            if (key.comp_4795() == 344 || key.method_74231()) {
+            // Panelden Shift ile cikis: tus kodu sabit yazilmaz, surumun
+            // InputConstants degerine birakilir (26.3 SDL'de 229, 1.21.x'te 344).
+            if (key.comp_4795() == YikimKeys.MENU_TUS || key.method_74231()) {
+                if (YikimDebug.aktif) {
+                    YikimLog.info("YIKIM panel kapatma tusu: " + key.comp_4795());
+                }
                 if (this.panel.editorActive()) {
                     this.panel.exitEditor();
                     return true;

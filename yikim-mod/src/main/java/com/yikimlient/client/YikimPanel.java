@@ -1070,13 +1070,13 @@ public final class YikimPanel {
     boolean key(int keyCode) {
         if (this.editorMode) {
             // editörde tek amaç: çıkmak. ESC panele döner; Sağ Shift ScreenBase'de yakalanır.
-            if (keyCode == 256) {
+            if (keyCode == YikimKeys.ESC_TUS) {
                 this.exitEditor();
             }
             return true;
         }
         switch (keyCode) {
-            case 258: {
+            case YikimKeys.TAB_TUS: {
                 this.tab = (this.tab + 1) % TAB_NAMES.length;
                 this.scroll = 0;
                 this.searchFocused = false;
@@ -1084,11 +1084,11 @@ public final class YikimPanel {
                 this.rebuild();
                 return true;
             }
-            case 259: {
+            case YikimKeys.BACKSPACE_TUS: {
                 return this.backspace();
             }
-            case 257: 
-            case 335: {
+            case YikimKeys.ENTER_TUS: 
+            case YikimKeys.NUMPAD_ENTER_TUS: {
                 if (this.tab == 4 && this.modView == 1) {
                     YikimCatalog.search();
                     return true;

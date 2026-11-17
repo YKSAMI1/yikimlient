@@ -667,19 +667,19 @@ public final class YikimMainMenu {
 
     boolean key(int keyCode) {
         switch (keyCode) {
-            case 256: {
+            case YikimKeys.ESC_TUS: {
                 this.hint("\u00c7\u0131kmak i\u00e7in \"\u00c7\u0131k\u0131\u015f\" d\u00fc\u011fmesi \u2014 Esc burada men\u00fcy\u00fc kapatmaz");
                 return true;
             }
-            case 344: {
-                YikimPanel.open(class_310.method_1551(), 0);
+            case YikimKeys.MENU_TUS: {
+                YikimKeys.menuyuCalistir(class_310.method_1551());
                 return true;
             }
-            case 345: {
+            case YikimKeys.HUD_TUS: {
                 this.chipHud.run();
                 return true;
             }
-            case 346: {
+            case YikimKeys.PROFIL_TUS: {
                 YikimPresets.cycle(class_310.method_1551());
                 return true;
             }

@@ -325,17 +325,17 @@ public final class YikimKozmetikEkrani extends class_437 {
     @Override
     public boolean method_25404(class_11908 key) {
         int kod = key.comp_4795();
-        if (kod == 256) {
+        if (kod == YikimKeys.ESC_TUS) {
             this.method_25419();
             return true;
         }
-        if (kod == 258) {
+        if (kod == YikimKeys.TAB_TUS) {
             this.sekmeSec((YikimKozmetikSecim.sekme() + 1) % YikimKozmetikSecim.SEKME_SAYISI);
             return true;
         }
-        if (kod == 262 || kod == 263) {
+        if (kod == YikimKeys.SAG_OK_TUS || kod == YikimKeys.SOL_OK_TUS) {
             int tur = YikimKozmetikSecim.sekme();
-            int arti = kod == 262 ? 1 : -1;
+            int arti = kod == YikimKeys.SAG_OK_TUS ? 1 : -1;
             YikimKozmetikSecim.sayfaAyarla(tur, Math.max(0, YikimKozmetikSecim.sayfa(tur) + arti));
             return true;
         }

@@ -33,7 +33,11 @@ if (-not (Test-Path (Join-Path $GameDir "cp.txt"))) {
     exit 1
 }
 # mod jar'ı test dizinine taze kopyala — eski jar sessizce kullanılıyordu
-$jarKaynak = Join-Path $KOK "yikim-mod\derleme\yikimlient-1.0.7-$Ver+$Ver.jar"
+# (en yeni derlenmiş jar seçilir; sürüm numarası elle güncellenmez)
+$jarAdaylar = Get-ChildItem (Join-Path $KOK "yikim-mod\derleme") -Filter "yikimlient-*-$Ver+$Ver.jar" -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending
+$jarKaynak = if ($jarAdaylar) { $jarAdaylar[0].FullName }
+             else { Join-Path $KOK "yikim-mod\derleme\yikimlient-1.0.8-$Ver+$Ver.jar" }
 if (Test-Path $jarKaynak) {
     Copy-Item $jarKaynak (Join-Path $GameDir "mods") -Force
     Get-ChildItem (Join-Path $GameDir "mods") -Filter "yikimlient-*.jar" |
@@ -111,17 +115,22 @@ if (-not $odakTamam) {
 
 function TetikSayisi() {
     $t = Get-Content $oyunLog -ErrorAction SilentlyContinue
-    return @($t | Select-String -Pattern "menu-tus tetiklendi").Count
+    return @($t | Select-String -Pattern "menu-tus tetiklendi|panel kapatma tusu").Count
 }
 function PanelAcikSayisi() {
     $t = Get-Content $oyunLog -ErrorAction SilentlyContinue
-    return @($t | Select-String -Pattern "tetiklendi \(panelAcik=true\)").Count
+    return @($t | Select-String -Pattern "tetiklendi \(panelAcik=false\)").Count
+}
+function PanelKapaliSayisi() {
+    $t = Get-Content $oyunLog -ErrorAction SilentlyContinue
+    return @($t | Select-String -Pattern "panel kapatma tusu").Count
 }
 
 function ShiftBas($ad) {
     Write-Host "  $ad"
     $once = TetikSayisi
     $onceAcik = PanelAcikSayisi
+    $onceKapali = PanelKapaliSayisi
     [W5]::keybd_event(0xA0, 0x2A, 0, 0) | Out-Null    # VK_LSHIFT down
     Start-Sleep -Milliseconds 120
     [W5]::keybd_event(0xA1, 0x36, 0, 0) | Out-Null    # VK_RSHIFT down
@@ -131,9 +140,11 @@ function ShiftBas($ad) {
     Start-Sleep -Seconds 7
     $sonra = TetikSayisi
     $sonraAcik = PanelAcikSayisi
+    $sonraKapali = PanelKapaliSayisi
     $tusAlgindi = $sonra -gt $once
     $durum = if ($sonraAcik -gt $onceAcik) { "panel ACIK algilandi" }
-             elseif ($tusAlgindi) { "tus alindi (panel kapatma yolu kullanildi)" }
+             elseif ($sonraKapali -gt $onceKapali) { "panel KAPANDI algilandi" }
+             elseif ($tusAlgindi) { "tus alindi" }
              else { "TUS MODA ULASMADI" }
     Write-Host ("    tus moda gecti: {0}  {1}  (toplam basma: {2})" -f $tusAlgindi, $durum, $sonra)
     # odak kaybolduysa sonraki basma da bosuna gider - hemen uyar

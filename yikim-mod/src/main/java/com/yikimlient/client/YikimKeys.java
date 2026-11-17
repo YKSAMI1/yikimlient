@@ -21,6 +21,25 @@ import net.minecraft.class_3675;
 import net.minecraft.class_437;
 
 public final class YikimKeys {
+    // SURUMDEN BAGIMSIZ TUS KODLARI (v1.33.18 / 1.0.8).
+    // Neden: 1.21.x ve 26.1/26.2'de RIGHT_SHIFT = 344 (GLFW), ama 26.3 pencere
+    // sistemini SDL'ye gecirince RIGHT_SHIFT = 229 (SDL scancode) olur. Ayni sekilde
+    // Esc/Tab/Enter/yon tuslari da 26.3'te tamamen farkli degerler alir.
+    // Bu yuzden HICBIR yerde elle 344/256/258... yazilmaz: deger, o surumun
+    // InputConstants sabitinden okunur ve tek yerde tutulur.
+    public static final int MENU_TUS = class_3675.field_31955;
+    public static final int HUD_TUS = class_3675.field_31954;
+    public static final int PROFIL_TUS = class_3675.field_31953;
+    public static final int ZOOM_TUS = class_3675.field_31949;
+    public static final int ATOLYE_TUS = class_3675.field_31907;
+    public static final int ESC_TUS = class_3675.field_31958;
+    public static final int TAB_TUS = class_3675.field_31948;
+    public static final int ENTER_TUS = class_3675.field_31957;
+    public static final int NUMPAD_ENTER_TUS = class_3675.field_31980;
+    public static final int BACKSPACE_TUS = class_3675.field_31986;
+    public static final int SOL_OK_TUS = class_3675.field_31983;
+    public static final int SAG_OK_TUS = class_3675.field_31984;
+
     public static class_304 menu;
     public static class_304 hud;
     public static class_304 profile;
@@ -32,30 +51,17 @@ public final class YikimKeys {
     }
 
     public static void register() {
-        // NOT (v1.33.16 / 1.0.6): tus kodlari SABIT ADIyla verilir, elle yazilmaz.
-        // Neden: 1.21.x ve 26.1/26.2'de RIGHT_SHIFT = 344 (GLFW), ama 26.3 pencere
-        // sistemini SDL'ye gecirince RIGHT_SHIFT = 229 (SDL scancode) olur. Sabit adi
-        // (InputConstants.KEY_RSHIFT) her surumde DOGRU degeri verdigi icin tek satir
-        // her yerde calisir. Elle 344 yazmak 26.3'te tusu yanlis yere bagliyordu:
-        // "sag shift calismiyor, hicbir sey acilmiyor" sikayeti buydu.
-        menu = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.menu", class_3675.field_31955));
-        hud = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.hud", class_3675.field_31954));
-        profile = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.profile", class_3675.field_31953));
-        zoom = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.zoom", class_3675.field_31949));
-        atolye = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.atolye", class_3675.field_31907));
+        menu = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.menu", MENU_TUS));
+        hud = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.hud", HUD_TUS));
+        profile = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.profile", PROFIL_TUS));
+        zoom = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.zoom", ZOOM_TUS));
+        atolye = KeyBindingHelper.registerKeyBinding((class_304)YikimAdapter.key("key.yikimlient.atolye", ATOLYE_TUS));
     }
 
-    private static boolean sonShift;
-
     public static void poll(class_310 client) {
-        // SAĞ SHIFT elle de dinlenir (v1.33.16 / 1.0.6).
-        // 1.21.x'te KeyMapping GLFW koduyla kayıtlıydı ve çalışıyordu.
-        // 26.x pencere sistemini SDL'ye geçirince KeyMapping'in oluşturduğu
-        // klavye kimliği artık eşleşmiyor → "tusa basıyorum, menü açılmıyor".
-        // ÇÖZÜM: KeyMapping'in YANINA doğrudan klavye durumu kontrolü koyuyoruz.
-        // InputConstants.isKeyDown + InputConstants.KEY_RSHIFT iki sürümde de
-        // (GLFW'de 344, SDL'de 1073742055) DOĞRU değeri verdiği için tek satır
-        // her iki sürümde çalışır — elle kod yazmaya gerek kalmaz.
+        // Menu tusu KeyMapping uzerinden dinlenir. Ekran acikken (ornegin ozel
+        // ana menu) KeyMapping tiklamasi uretilmez; o durumda tus, ekranin
+        // keyPressed yolundan MENU_TUS ile yakalanir (bkz. YikimMainMenu.key).
         boolean mappingCalisti = false;
         while (menu.method_1436()) {
             mappingCalisti = true;
@@ -81,8 +87,8 @@ public final class YikimKeys {
         YikimKeys.tickZoom(client);
     }
 
-    /** Menü tuşunun yaptığı iş (aç/kapat). */
-    private static void menuyuCalistir(class_310 client) {
+    /** Menü tuşunun yaptığı iş (aç/kapat). Ana menü de bu yolu kullanır. */
+    static void menuyuCalistir(class_310 client) {
         if (YikimDebug.aktif) {
             YikimLog.info("YIKIM menu-tus tetiklendi (panelAcik=" + YikimAdapter.panelEkrani(client) + ")");
         }

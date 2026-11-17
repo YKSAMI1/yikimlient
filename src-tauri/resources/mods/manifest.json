@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-15T08:15:28Z",
-  "modVersion": "1.33.17 (1.21.9-1.21.11) / 1.0.7 (26.1-26.3) / 1.3.1 (1.21.1-1.21.8)",
+  "generatedAt": "2026-11-17T10:47:00Z",
+  "modVersion": "1.33.17 (1.21.9-1.21.11) / 1.0.8 (26.1-26.3) / 1.3.1 (1.21.1-1.21.8)",
   "mods": [
     {
       "mcVersion": "1.21.1",
@@ -60,27 +60,27 @@
     {
       "mcVersion": "26.1",
       "adapter": "modern",
-      "file": "yikimlient-1.0.7-26.1+26.1.jar"
+      "file": "yikimlient-1.0.8-26.1+26.1.jar"
     },
     {
       "mcVersion": "26.1.1",
       "adapter": "modern",
-      "file": "yikimlient-1.0.7-26.1.1+26.1.1.jar"
+      "file": "yikimlient-1.0.8-26.1.1+26.1.1.jar"
     },
     {
       "mcVersion": "26.1.2",
       "adapter": "modern",
-      "file": "yikimlient-1.0.7-26.1.2+26.1.2.jar"
+      "file": "yikimlient-1.0.8-26.1.2+26.1.2.jar"
     },
     {
       "mcVersion": "26.2",
       "adapter": "modern",
-      "file": "yikimlient-1.0.7-26.2+26.2.jar"
+      "file": "yikimlient-1.0.8-26.2+26.2.jar"
     },
     {
       "mcVersion": "26.3",
       "adapter": "modern",
-      "file": "yikimlient-1.0.7-26.3+26.3.jar"
+      "file": "yikimlient-1.0.8-26.3+26.3.jar"
     }
   ]
 }
