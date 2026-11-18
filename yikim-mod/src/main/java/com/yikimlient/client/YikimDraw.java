@@ -55,7 +55,11 @@ public final class YikimDraw {
         int background = active ? YikimTheme.alpha(YikimTheme.accent, 85) : (hovered ? -1726737383 : YikimTheme.alpha(YikimTheme.backdrop, 204));
         graphics.method_25294(x, y, x + width, y + height, background);
         if (active) {
-            graphics.method_25294(x, y + height - 2, x + width, y + height, YikimTheme.accent);
+            if (YikimTema.alev()) {
+                YikimDraw.alevCizgi(graphics, x, y + height, width);
+            } else {
+                graphics.method_25294(x, y + height - 2, x + width, y + height, YikimTheme.accent);
+            }
         } else if (hovered) {
             graphics.method_25294(x, y + height - 1, x + width, y + height, YikimTheme.alpha(YikimTheme.accent, 136));
         }
@@ -76,9 +80,79 @@ public final class YikimDraw {
         int switchWidth = 20;
         int switchX = x + width - switchWidth - 4;
         int switchY = y + (height - 10) / 2;
-        graphics.method_25294(switchX, switchY, switchX + switchWidth, switchY + 10, value ? YikimTheme.alpha(YikimTheme.accent, 255) : -13487558);
+        if (value) {
+            if (YikimTema.alev()) {
+                YikimDraw.alevAnahtar(graphics, switchX, switchY, switchWidth, 10,
+                    hovered ? YikimDraw.blend(YikimTheme.accent2, -1, 0.16f) : YikimTheme.accent2);
+            } else {
+                graphics.method_25294(switchX, switchY, switchX + switchWidth, switchY + 10, YikimTheme.alpha(YikimTheme.accent, 255));
+            }
+        } else {
+            graphics.method_25294(switchX, switchY, switchX + switchWidth, switchY + 10, -13487558);
+        }
         int knobX = value ? switchX + switchWidth - 9 : switchX + 1;
         graphics.method_25294(knobX, switchY + 1, knobX + 8, switchY + 9, -723722);
+    }
+
+    /**
+     * ALEV görünümü: seçili öğenin altında küçük bir kor alevi.
+     *
+     * Kare başına en fazla 5 taban dilimi + 5 dilcik = 10 düz dikdörtgen çizer;
+     * parçacık, doku, blur veya allocation yok. Yalnızca panel/menü açıkken
+     * çağrıldığı için oyun içi kare bütçesine dokunmaz.
+     *
+     * @param y alevin oturacağı taban çizgisi (genelde öğenin alt kenarı)
+     */
+    public static void alevCizgi(class_332 graphics, int x, int y, int width) {
+        if (width <= 0) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        float phase = (float)(now % 1500L) / 1500.0f;
+        int base = width >= 80 ? 2 : 1;
+        int uc = YikimDraw.blend(YikimTheme.accent, -1, 0.42f);
+        // taban: soldan sağa kor -> turuncu
+        for (int i = 0; i < 5; ++i) {
+            int left = x + width * i / 5;
+            int right = x + width * (i + 1) / 5;
+            int renk = YikimDraw.blend(YikimTheme.accent2, YikimTheme.accent, ((float)i + 0.5f) / 5.0f);
+            graphics.method_25294(left, y - base, right, y, YikimTheme.alpha(renk, 200));
+        }
+        // dilcikler: hafif nefes alan 5 küçük kor ucu
+        for (int i = 0; i < 5; ++i) {
+            float t = ((float)i + 0.5f) / 5.0f;
+            float dalga = 0.5f + 0.5f * (float)Math.sin((phase + t) * 6.2831855f);
+            int h = 1 + (int)(dalga * (i == 2 ? 2.6f : 1.6f));
+            int yari = Math.max(1, width / 28);
+            int cx = x + (int)((float)width * t);
+            int renk = YikimDraw.blend(YikimTheme.accent2, uc, t);
+            graphics.method_25294(cx - yari, y - base - h, cx + yari, y - base,
+                YikimTheme.alpha(renk, 150 + (int)(dalga * 70.0f)));
+        }
+    }
+
+    /**
+     * ALEV görünümü: açık anahtarın gövdesi kor geçişiyle dolar. Yuvarlak
+     * köşeler korunur; iç kısım 4 dikey dilime bölünür (4 dolum).
+     */
+    public static void alevAnahtar(class_332 graphics, int x, int y, int width, int height, int baseColor) {
+        if (width <= 2 || height <= 2) {
+            return;
+        }
+        YikimDraw.roundedFill(graphics, x, y, x + width, y + height, baseColor);
+        int icUst = y + 1;
+        int icAlt = y + height - 1;
+        int icSol = x + 1;
+        int icGenislik = width - 2;
+        int uc = YikimDraw.blend(YikimTheme.accent, -1, 0.46f);
+        for (int i = 0; i < 4; ++i) {
+            int left = icSol + icGenislik * i / 4;
+            int right = icSol + icGenislik * (i + 1) / 4;
+            int renk = YikimDraw.blend(baseColor, uc, ((float)i + 0.5f) / 4.0f);
+            graphics.method_25294(left, icUst, right, icAlt, renk);
+        }
+        graphics.method_25294(x + 2, y + height - 1, x + width - 2, y + height,
+            YikimTheme.alpha(YikimTheme.accent2, 190));
     }
 
     public static void bar(class_332 graphics, int x, int y, int width, int height, float ratio, int color) {

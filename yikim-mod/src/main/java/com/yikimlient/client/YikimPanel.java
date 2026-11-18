@@ -314,6 +314,9 @@ public final class YikimPanel {
             if (active || hovered) {
                 YikimDraw.roundedFill(graphics, x, y, x + width, y + height, active ? YikimTheme.alpha(YikimTheme.accent, 46) : 0x44FFFFFF);
             }
+            if (active && YikimTema.alev()) {
+                YikimDraw.alevCizgi(graphics, x, y + height, width);
+            }
             int iconX = labels ? x + 7 : x + (width - 12) / 2;
             if (!YikimTema.sade()) {
                 YikimMenuIcons.draw(graphics, TAB_ICONS[index], iconX, y + (height - 12) / 2, 12, active ? YikimTheme.accent : (hovered ? -6645082 : -9539974));
@@ -674,13 +677,13 @@ public final class YikimPanel {
         this.rows.add(new ValueRow(this, "Y\u00fckl\u00fc mod", () -> this.cacheModsCount, -723722));
         this.rows.add(new ValueRow(this, "Oturum", () -> this.cacheSession, -6645082));
         this.rows.add(new SectionRow(this, "Arayüz teması"));
-        this.rows.add(new SegmentRow(new String[]{"Klasik", "Sade"}, YikimTema.sade() ? 1 : 0, index -> {
-            YikimTema.sec(index == 1 ? YikimTema.SADE : YikimTema.KLASIK);
+        this.rows.add(new SegmentRow(new String[]{"Klasik", "Alev"}, YikimTema.alev() ? 1 : 0, index -> {
+            YikimTema.sec(index == 1 ? YikimTema.ALEV : YikimTema.KLASIK);
             YikimMetrics.notify("Arayüz teması: " + YikimTema.ad());
             this.cacheAt = 0L;
             this.rebuild();
         }));
-        this.rows.add(new TextRow(this, "Sade: karakter önde, tek sütun, süssüz. Klasik: pano + yan panel.", -9539974));
+        this.rows.add(new TextRow(this, "Alev: aynı düzen + seçili öğenin altında kor, açık anahtarlarda sıcak geçiş.", -9539974));
         this.rows.add(new ButtonRow(this, "Ön izlemeli tema seçimini aç", false, () -> {
             YikimPanel.close();
             class_310.method_1551().method_1507(new YikimTemaEkrani());
@@ -1476,12 +1479,16 @@ public final class YikimPanel {
     }
 
     private void switchAt(class_332 graphics, int x, int y, boolean on, boolean hovered) {
-        int track;
-        int n = track = on ? YikimTheme.accent : -13487558;
-        if (hovered) {
-            track = YikimDraw.blend(track, -1, 0.18f);
+        if (on && YikimTema.alev()) {
+            int base = hovered ? YikimDraw.blend(YikimTheme.accent2, -1, 0.16f) : YikimTheme.accent2;
+            YikimDraw.alevAnahtar(graphics, x, y, 22, 11, base);
+        } else {
+            int track = on ? YikimTheme.accent : -13487558;
+            if (hovered) {
+                track = YikimDraw.blend(track, -1, 0.18f);
+            }
+            YikimDraw.roundedFill(graphics, x, y, x + 22, y + 11, track);
         }
-        YikimDraw.roundedFill(graphics, x, y, x + 22, y + 11, track);
         int knobX = on ? x + 12 : x + 2;
         YikimDraw.roundedFill(graphics, knobX, y + 2, knobX + 8, y + 9, -723722);
     }
@@ -1653,6 +1660,9 @@ public final class YikimPanel {
                 boolean selected = preset.id.equals(YikimPanel.this.selectedPreset);
                 int fill = selected ? YikimTheme.alpha(YikimTheme.accent, 216) : (hovered == index ? -1996488705 : 0x66111118);
                 YikimDraw.roundedFill(graphics, sx, this.y, sx + segW, this.y + this.height(), fill);
+                if (selected && YikimTema.alev()) {
+                    YikimDraw.alevCizgi(graphics, sx, this.y + this.height(), segW);
+                }
                 String text = YikimDraw.clip(font, preset.label, segW - 10);
                 YikimAdapter.text(graphics, font, text, sx + Math.max(4, (segW - font.method_1727(text)) / 2), this.y + 9, selected ? -15724524 : -6645082, !selected);
             }
@@ -1804,6 +1814,9 @@ public final class YikimPanel {
                 boolean bl = selected = index == this.selected;
                 int fill = selected ? YikimTheme.alpha(YikimTheme.accent, 216) : (hovered == index ? -1996488705 : 0x66111118);
                 YikimDraw.roundedFill(graphics, sx, this.y, sx + segW, this.y + this.height(), fill);
+                if (selected && YikimTema.alev()) {
+                    YikimDraw.alevCizgi(graphics, sx, this.y + this.height(), segW);
+                }
                 String text = YikimDraw.clip(font, this.labels[index], segW - 8);
                 YikimAdapter.text(graphics, font, text, sx + Math.max(3, (segW - font.method_1727(text)) / 2), this.y + 9, selected ? -15724524 : -6645082, !selected);
             }

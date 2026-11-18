@@ -93,6 +93,11 @@ public final class YikimConfig {
         config.catalogSource = properties.getProperty("katalog.kaynak", config.catalogSource).toLowerCase(Locale.ROOT);
         config.customMainMenu = YikimConfig.bool(properties, "menu.yikim", config.customMainMenu);
         config.uiTema = properties.getProperty("arayuz.tema", config.uiTema).trim().toLowerCase(Locale.ROOT);
+        // v1.34.0: "sade" düzeni kaldırıldı. Eski/bilinmeyen değerler klasik'e taşınır;
+        // yalnızca "alev" kor alevi görünümünü açar.
+        if (!"alev".equals(config.uiTema)) {
+            config.uiTema = "klasik";
+        }
         config.temaSurum = (int)YikimConfig.number(properties, "arayuz.tema-surum", config.temaSurum);
         config.backdropStyle = properties.getProperty("menu.arka", config.backdropStyle).trim().toLowerCase(Locale.ROOT);
         for (YikimWidget widget : YikimWidgets.all()) {
@@ -144,7 +149,7 @@ public final class YikimConfig {
         properties.setProperty("renk.ozel", Boolean.toString(this.customAccent));
         properties.setProperty("katalog.kaynak", this.catalogSource);
         properties.setProperty("menu.yikim", Boolean.toString(this.customMainMenu));
-        properties.setProperty("arayuz.tema", this.uiTema == null ? "klasik" : this.uiTema);
+        properties.setProperty("arayuz.tema", "alev".equals(this.uiTema) ? "alev" : "klasik");
         properties.setProperty("arayuz.tema-surum", Integer.toString(this.temaSurum));
         properties.setProperty("menu.arka", this.backdropStyle == null ? "random" : this.backdropStyle);
         properties.setProperty(PERFORMANCE_DEFAULTS_KEY, Integer.toString(this.performanceDefaultsVersion));

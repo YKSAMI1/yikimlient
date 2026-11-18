@@ -5,26 +5,25 @@ import net.minecraft.class_310;
 import net.minecraft.class_327;
 import net.minecraft.class_332;
 import net.minecraft.class_437;
-import net.minecraft.class_442;
 
 /**
- * ARAYÜZ TEMASI SEÇİMİ (v1.28.0).
+ * ARAYÜZ GÖRÜNÜMÜ SEÇİMİ — v1.28.0, v1.34.0'da güncellendi.
  *
- * Güncellemeden sonraki İLK açılışta kendiliğinden açılır: iki tema yan yana,
- * gerçek düzenlerinin küçük ön izlemeleriyle. Seçim yikimlient.cfg'ye yazılır
+ * Güncellemeden sonraki İLK açılışta kendiliğinden açılır: iki görünüm yan
+ * yana, gerçek panelin küçük ön izlemeleriyle. Seçim yikimlient.cfg'ye yazılır
  * (`arayuz.tema`) ve bir daha sorulmaz; panel → Görünüm sekmesinden her zaman
  * değiştirilebilir.
  *
- *   klasik : mevcut pano — sol tuş sütunu + sağ bilgi paneli + alt şerit
- *   sade   : yeni tema — karakter + tek sütun, süssüz
+ *   klasik : bugüne kadarki pano düzeni
+ *   alev   : AYNI düzen + seçili öğenin altında kor, açık anahtarlarda sıcak geçiş
  */
 public final class YikimTemaEkrani extends class_437 {
-    private static final String[] SECENEKLER = new String[]{"klasik", "sade"};
-    private static final String[] BASLIKLAR = new String[]{"Klasik", "Sade"};
-    private static final String[] ETIKETLER = new String[]{"şu anki düzen", "yeni tema"};
+    private static final String[] SECENEKLER = new String[]{"klasik", "alev"};
+    private static final String[] BASLIKLAR = new String[]{"Klasik", "Alev"};
+    private static final String[] ETIKETLER = new String[]{"şu anki düzen", "kor vurgusu"};
     private static final String[][] SATIRLAR = new String[][]{
-        {"Sol tuş sütunu + sağ bilgi paneli", "Alt şerit: FPS, sürüm, ipuçları", "Mod tuşları sağ altta"},
-        {"Karakter önde, tek sütun tuş", "Süssüz, sakin arka plan", "Büyük katalog logoları"}
+        {"Sol tuş sütunu + sağ bilgi paneli", "Alt şerit: FPS, sürüm, ipuçları", "Seçimler düz vurgu renginde"},
+        {"Aynı düzen, daha sıcak", "Seçili sekmenin altında küçük kor", "Açık anahtarlarda kor geçişi"}
     };
     private static boolean aciliyor;
     private int[] kartX = new int[2];
@@ -88,9 +87,9 @@ public final class YikimTemaEkrani extends class_437 {
         YikimDraw.roundedFill(graphics, 0, 0, sw, 3, YikimTheme.accent);
 
         String secili = YikimConfig.get().uiTema;
-        YikimAdapter.textCentered(graphics, font, "ARAYÜZ TEMASI", sw / 2, 22, YikimTheme.TEXT, true);
+        YikimAdapter.textCentered(graphics, font, "ARAYÜZ GÖRÜNÜMÜ", sw / 2, 22, YikimTheme.TEXT, true);
         YikimAdapter.textCentered(graphics, font,
-            "Yeni sürümde iki düzen var — istediğini seç, sonra Görünüm sekmesinden değiştirebilirsin.",
+            "İki görünüm var — istediğini seç, sonra Görünüm sekmesinden değiştirebilirsin.",
             sw / 2, 38, YikimTheme.TEXT_DIM, false);
 
         int bosluk = 18;
@@ -132,54 +131,87 @@ public final class YikimTemaEkrani extends class_437 {
             }
         }
 
-        String hint = "Tıkla → tema değişir ve kaydedilir. Esc: şu anki temada kal.";
+        String hint = "Tıkla → görünüm değişir ve kaydedilir. Esc: şu anki görünümde kal.";
         YikimAdapter.textCentered(graphics, font, hint, sw / 2, this.kartY + this.kartH + 16, YikimTheme.TEXT_MUTED, false);
     }
 
-    /** İki düzenin küçük canlı ön izlemesi (aynı renk/ikon dili, farklı iskelet). */
-    private void onizleme(class_332 graphics, class_327 font, int x, int y, int w, int h, boolean sade) {
+    /**
+     * İki görünümün küçük canlı ön izlemesi. İskelet ikisinde de AYNI; fark
+     * yalnızca seçili sekmenin altındaki kor ve açık anahtarların sıcak geçişi.
+     * 3B model çizilmez — ön izleme ekranı kare bütçesini yemesin.
+     */
+    private void onizleme(class_332 graphics, class_327 font, int x, int y, int w, int h, boolean alev) {
         YikimDraw.roundedFill(graphics, x, y, x + w, y + h, 0xFF0B0B0E);
         YikimDraw.outline(graphics, x, y, w, h, 0x22FFFFFF);
-        // pencere içi tekrar ölçek: 640×360 varsayımıyla çiz
         float olcek = Math.min(w / 320.0f, h / 180.0f);
         int icX = x + (w - (int)(320 * olcek)) / 2;
         int icY = y + (h - (int)(180 * olcek)) / 2;
         YikimAdapter.push(graphics, icX, icY, olcek);
         graphics.method_25294(0, 0, 320, 180, 0xFF0D0D11);
-        YikimAdapter.text(graphics, font, "YIKIM", 12, 12, YikimTheme.TEXT, true);
-        YikimAdapter.text(graphics, font, "v" + YikimClient.MOD_VERSION, 12, 24, YikimTheme.TEXT_MUTED, false);
-        if (sade) {
-            // v1.33.0 — 3B model kendi kutusuna çizilir (ertelenen GUI görevi),
-            // bu yüzden ekran koordinatına çevrilir.
-            YikimKarakter.draw(graphics, icX + Math.round(236.0f * olcek), icY + Math.round(26.0f * olcek),
-                Math.max(28, Math.round(108.0f * olcek)), YikimTheme.backdrop);
-            String[] tuşlar = new String[]{"Tek Oyunculu", "Çok Oyunculu", "YIKIM Menüsü", "Modlar", "Ayarlar"};
-            for (int i = 0; i < tuşlar.length; i++) {
-                int ry = 52 + i * 20;
-                YikimDraw.roundedFill(graphics, 12, ry, 158, ry + 17, i == 0 ? YikimTheme.alpha(YikimTheme.accent, 210) : 0x33000000);
-                YikimMenuIcons.draw(graphics, i + 1, 18, ry + 4, 9, i == 0 ? 0xFFFFFFFF : YikimTheme.accent);
-                YikimAdapter.text(graphics, font, tuşlar[i], 32, ry + 5, i == 0 ? 0xFFFFFFFF : YikimTheme.TEXT, true);
+        YikimAdapter.text(graphics, font, "YIKIM", 12, 10, YikimTheme.TEXT, true);
+        YikimAdapter.text(graphics, font, "v" + YikimClient.MOD_VERSION, 12, 22, YikimTheme.TEXT_MUTED, false);
+
+        // panel gövdesi
+        YikimDraw.roundedFill(graphics, 8, 34, 312, 164, 0xFF121218);
+
+        // üst sekmeler — gerçek panonun ilk dört sekmesi, "Görünüm" seçili
+        String[] sekmeler = new String[]{"Performans", "Görünüm", "HUD", "Ekstra"};
+        int tw = (312 - 16 - (sekmeler.length - 1) * 4) / sekmeler.length;
+        int tx = 16;
+        for (int i = 0; i < sekmeler.length; i++) {
+            boolean aktif = i == 1;
+            YikimDraw.roundedFill(graphics, tx, 40, tx + tw, 58, aktif ? YikimTheme.alpha(YikimTheme.accent, 46) : 0x22FFFFFF);
+            YikimAdapter.textCentered(graphics, font, sekmeler[i], tx + tw / 2, 46,
+                aktif ? YikimTheme.TEXT : YikimTheme.TEXT_MUTED, false);
+            if (aktif) {
+                if (alev) {
+                    YikimDraw.alevCizgi(graphics, tx, 58, tw);
+                } else {
+                    graphics.method_25294(tx, 56, tx + tw, 58, YikimTheme.accent);
+                }
             }
-            graphics.method_25294(0, 168, 320, 169, YikimTheme.alpha(YikimTheme.accent, 90));
-            YikimAdapter.text(graphics, font, "Sağ Shift  •  YIKIM menüsü", 12, 172, YikimTheme.TEXT_MUTED, false);
-        } else {
-            String[] tuşlar = new String[]{"Tek Oyunculu", "Çok Oyunculu", "YIKIM Menüsü", "Modlar", "Ayarlar", "Çıkış"};
-            for (int i = 0; i < tuşlar.length; i++) {
-                int ry = 46 + i * 18;
-                YikimDraw.roundedFill(graphics, 12, ry, 140, ry + 15, i == 0 ? YikimTheme.alpha(YikimTheme.accent, 220) : 0x44101016);
-                YikimMenuIcons.draw(graphics, i + 1, 18, ry + 3, 9, i == 0 ? 0xFFFFFFFF : YikimTheme.accent);
-                YikimAdapter.text(graphics, font, tuşlar[i], 32, ry + 4, i == 0 ? 0xFFFFFFFF : YikimTheme.TEXT, true);
-            }
-            YikimDraw.roundedFill(graphics, 168, 46, 306, 124, 0xFF101016);
-            graphics.method_25294(168, 46, 170, 124, YikimTheme.accent);
-            YikimAdapter.text(graphics, font, "SEN", 176, 52, YikimTheme.accent, false);
-            YikimAdapter.text(graphics, font, "Oyuncu", 176, 64, YikimTheme.TEXT, true);
-            YikimAdapter.text(graphics, font, "Yüklü mod   32", 176, 84, YikimTheme.TEXT_DIM, false);
-            YikimAdapter.text(graphics, font, "HUD         açık", 176, 95, YikimTheme.TEXT_DIM, false);
-            YikimAdapter.text(graphics, font, "İPUCU", 176, 110, YikimTheme.accent, false);
-            graphics.method_25294(0, 166, 320, 180, 0xFF08080A);
-            YikimAdapter.text(graphics, font, "YIKIMLient  •  60 FPS", 12, 170, YikimTheme.TEXT_MUTED, false);
+            tx += tw + 4;
         }
+
+        // ayar satırları + anahtarlar
+        String[] satirlar = new String[]{"HUD", "Bildirim", "Ana menü"};
+        boolean[] acik = new boolean[]{true, true, false};
+        for (int i = 0; i < satirlar.length; i++) {
+            int ry = 68 + i * 22;
+            YikimDraw.roundedFill(graphics, 16, ry, 304, ry + 18, 0x22FFFFFF);
+            YikimAdapter.text(graphics, font, satirlar[i], 24, ry + 5, YikimTheme.TEXT_DIM, false);
+            int sx = 274;
+            int sy = ry + 4;
+            if (acik[i]) {
+                if (alev) {
+                    YikimDraw.alevAnahtar(graphics, sx, sy, 22, 11, YikimTheme.accent2);
+                } else {
+                    YikimDraw.roundedFill(graphics, sx, sy, sx + 22, sy + 11, YikimTheme.accent);
+                }
+            } else {
+                YikimDraw.roundedFill(graphics, sx, sy, sx + 22, sy + 11, 0xFF31313A);
+            }
+            int kx = acik[i] ? sx + 12 : sx + 2;
+            YikimDraw.roundedFill(graphics, kx, sy + 2, kx + 8, sy + 9, YikimTheme.TEXT);
+        }
+
+        // arayüz segmenti — kartın kendi görünümü seçili
+        YikimAdapter.text(graphics, font, "Arayüz", 16, 142, YikimTheme.TEXT_MUTED, false);
+        String[] segmentler = new String[]{"Klasik", "Alev"};
+        for (int i = 0; i < segmentler.length; i++) {
+            int sx = 68 + i * 58;
+            boolean secili = alev ? i == 1 : i == 0;
+            YikimDraw.roundedFill(graphics, sx, 138, sx + 54, 154, secili ? YikimTheme.accent : 0x33111118);
+            YikimAdapter.text(graphics, font, segmentler[i], sx + 11, 142,
+                secili ? 0xFF151515 : YikimTheme.TEXT_DIM, false);
+            if (secili && alev) {
+                YikimDraw.alevCizgi(graphics, sx, 154, 54);
+            }
+        }
+
+        // alt şerit
+        graphics.method_25294(0, 166, 320, 167, YikimTheme.alpha(YikimTheme.accent, 70));
+        YikimAdapter.text(graphics, font, "Sağ Shift  •  YIKIM menüsü", 12, 171, YikimTheme.TEXT_MUTED, false);
         YikimAdapter.pop(graphics);
     }
 

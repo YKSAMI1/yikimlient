@@ -90,7 +90,7 @@ function impHome(root: HTMLElement): void {
   const satirHost = root.querySelector("#i-profil-satirlar") as HTMLElement;
   for (const inst of profiller) {
     const row = el(`
-      <div class="imp-satir${launch.activeId === inst.id ? " oyunda" : ""}" role="button" tabindex="0" data-id="${inst.id}">
+      <div class="imp-satir${launch.activeId === inst.id ? " oyunda" : ""}${inst.id === selectedInstanceId ? " secili" : ""}" role="button" tabindex="0" data-id="${inst.id}">
         <span class="imp-satir-ikon">${iconIsFile(inst.icon)
           ? `<img src="${fileSrc(inst.icon)}" draggable="false" />`
           : `<span class="emoji">${inst.icon || "🔥"}</span>`}</span>
@@ -213,7 +213,7 @@ export function renderHome(root: HTMLElement): void {
   root.innerHTML = `
     <div class="page-wrap">
     <!-- HERO HAT: seçili kurulum tek satırda — lamba, ad, ölçümler, OYNA şalteri -->
-    <section class="home-hero${heroKapak ? " has-cover" : ""}"${heroCover}>
+    <section class="home-hero${heroKapak ? " has-cover" : ""}${sel ? " secili-var" : ""}"${heroCover}>
       <div class="vitrin" aria-label="Karakter vitrini">
         <canvas id="sahne-arka" class="sahne-arka"></canvas>
         <canvas id="sahne-katman"></canvas>

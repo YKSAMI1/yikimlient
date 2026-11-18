@@ -1745,3 +1745,75 @@ input.search-in.input, .search-in.input {
 /* Modal içindeki uyarı: başlık ile liste arası */
 .modal .ram-uyari { margin: 4px 0 14px; }
 
+/* ============================================================
+   ALEV — yalnızca ana sayfada seçili öğenin altında küçük kor.
+   Ayar/keşfet/kurulum sayfaları klasik kalır. Renk dünyanın
+   vurgusundan türetilir (kor ucu her zaman altına kayar), böylece
+   mavi "standart" dünyasında da uyumlu kalır. Animasyon sadece
+   opacity + transform; blur, filtre ve layout değişimi yok.
+   ============================================================ */
+@keyframes alev-nefes {
+  0%, 100% { opacity: 0.82; transform: scaleX(1); }
+  50%      { opacity: 1;    transform: scaleX(1.06); }
+}
+
+/* standart ana sayfa: seçili kurulumun adı (kurulum yoksa alev çizilmez) */
+.home-hero.secili-var h1 { position: relative; }
+.home-hero.secili-var h1::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -9px;
+  width: 78px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg,
+    var(--accent-deep) 0%,
+    var(--accent) 52%,
+    color-mix(in srgb, var(--accent) 52%, #ffd36b) 100%);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 34%, transparent);
+  transform-origin: left center;
+  animation: alev-nefes 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.home-hero.secili-var h1::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  bottom: -12px;
+  width: 46px;
+  height: 10px;
+  background: radial-gradient(ellipse at 50% 100%,
+    color-mix(in srgb, var(--accent) 26%, transparent), transparent 72%);
+  pointer-events: none;
+}
+
+/* Sahne (Imperial) ana sayfası: seçili profil satırı */
+:root[data-world="sahne"] .imp-satir.secili {
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent-soft) 10%, transparent);
+}
+:root[data-world="sahne"] .imp-satir.secili .imp-satir-ad { position: relative; }
+:root[data-world="sahne"] .imp-satir.secili .imp-satir-ad::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 56px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg,
+    var(--accent-deep) 0%,
+    var(--accent) 55%,
+    color-mix(in srgb, var(--accent) 52%, #ffd36b) 100%);
+  box-shadow: 0 0 9px color-mix(in srgb, var(--accent) 30%, transparent);
+  transform-origin: left center;
+  animation: alev-nefes 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-hero.secili-var h1::after,
+  :root[data-world="sahne"] .imp-satir.secili .imp-satir-ad::after { animation: none; }
+}
+
