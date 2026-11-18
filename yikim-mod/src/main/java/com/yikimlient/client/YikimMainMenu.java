@@ -167,27 +167,27 @@ public final class YikimMainMenu {
             YikimAdapter.optionsScreen(screen, class_310.method_1551().field_1690));
 
         this.modernLinkler[0] = new Button[]{
-            new Button("\u00c7ok Oyunculu", "Sunucu listesi", YikimMenuIcons.GLOBE, -1,
+            new Button("Sunucular", "Sunucu listesi", YikimMenuIcons.GLOBE, -1,
                 () -> YikimMainMenu.open(YikimAdapter.multiplayerScreen(screen))),
-            new Button("YIKIM Men\u00fcs\u00fc", "Performans, g\u00f6r\u00fcn\u00fcm, HUD", YikimMenuIcons.BOLT, -1,
+            new Button("YIKIM", "Performans, g\u00f6r\u00fcn\u00fcm, HUD", YikimMenuIcons.BOLT, -1,
                 () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_PERFORMANCE)),
             new Button("At\u00f6lye", "Pelerin ve kanat tasarla", YikimMenuIcons.IMAGE, -1,
                 () -> YikimMainMenu.open(new YikimAtolyeEkrani()))};
         this.modernLinkler[1] = new Button[]{
-            new Button("Kozmetik ekran\u0131", "Deri, pelerin, elitra", YikimMenuIcons.EYE, -1,
+            new Button("Kozmetik", "Deri, pelerin, elitra", YikimMenuIcons.EYE, -1,
                 () -> YikimMainMenu.open(new YikimKozmetikEkrani())),
             new Button("At\u00f6lye", "Pelerin ve kanat tasarla", YikimMenuIcons.IMAGE, -1,
                 () -> YikimMainMenu.open(new YikimAtolyeEkrani()))};
         this.modernLinkler[2] = new Button[]{
-            new Button("YIKIM Men\u00fcs\u00fc", "Mod listesi ve ayarlar", YikimMenuIcons.BOLT, -1,
+            new Button("YIKIM", "Mod listesi ve ayarlar", YikimMenuIcons.BOLT, -1,
                 () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_MODS)),
-            new Button("Mod katalo\u011fu", "Mod ara ve kur", YikimMenuIcons.SEARCH, -1,
+            new Button("Katalog", "Mod ara ve kur", YikimMenuIcons.SEARCH, -1,
                 () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_MODS))};
         this.modernLinkler[3] = new Button[]{
-            new Button("Hesap ekran\u0131", "Premium / \u00e7evrimd\u0131\u015f\u0131", YikimMenuIcons.KULLANICI, -1,
+            new Button("Hesap", "Premium / \u00e7evrimd\u0131\u015f\u0131", YikimMenuIcons.KULLANICI, -1,
                 () -> YikimMainMenu.open(new YikimHesapEkrani()))};
         this.modernLinkler[4] = new Button[]{
-            new Button("Vanilla men\u00fc", "Minecraft ana men\u00fcs\u00fc", YikimMenuIcons.ARROW, -1,
+            new Button("Vanilla", "Minecraft ana men\u00fcs\u00fc", YikimMenuIcons.ARROW, -1,
                 this.chipVanilla),
             new Button("G\u00f6r\u00fcn\u00fcm", "Klasik / Alev", YikimMenuIcons.EYE, -1,
                 () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_LOOK))};
