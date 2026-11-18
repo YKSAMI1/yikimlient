@@ -55,13 +55,9 @@ Write-Host "[3/6] sicak.json yaziliyor (gomulu manifest'teki tum mc surumleri ka
 # bulunamadi ile oyun acilmiyordu. Artik ayni jar sadece AYNI AILEYE yazilir;
 # diger aileler (26.x) gomulu jar'larina guvenir (launcher zaten 26.x jar'larini
 # kendi manifestinden kuruyor).
-$mcp = Get-Content "$kok\src-tauri\resources\mods\manifest.json" -Raw | ConvertFrom-Json
-$mods = @()
-$ojar = "yikimlient-$MV+$McVersion.jar"
-$url = "https://github.com/YKSAMI1/yikimlient/releases/download/sicak/$ojar"
 # Bu derlemenin ait oldugu aile.
 # ONEMLI: "1.21" TEK AILE DEGIL. 1.21.1-1.21.8 legacy jar (1.3.1) kullanir,
-# 1.21.9-1.21.11 ise 1.33.x jar kullanir. Ikisini ayni aileye koymak 1.21.5
+# 1.21.9-1.21.11 ise 1.3x jar kullanir. Ikisini ayni aileye koymak 1.21.5
 # kullanicisina 1.21.11 jar'i kuruyordu -> oyun acilmiyordu.
 function Aile([string]$mc) {
     if ($mc -eq "1.21.9" -or $mc -eq "1.21.10" -or $mc -eq "1.21.11") { return "1.21yeni" }
@@ -74,10 +70,28 @@ if ($McVersion -like "26*") {
     Write-Host "DURDURULDU: 26.x jar'lari bu script ile yayinlanmaz - tools\sicak-26.ps1 kullan."
     exit 1
 }
+$mcp = Get-Content "$kok\src-tauri\resources\mods\manifest.json" -Raw | ConvertFrom-Json
+$mods = @()
+# 1.21.9/10/11 AYNI AILE ama AYNI JAR DEGIL: BeyazGlif'in donus tipi
+# 1.21.11'de daraldi (class_11767$class_12238). 1.21.11 jar'i 1.21.9'a
+# kurulursa rozet sinifi yuklenemez. Her surum icin kendi jar'i varsa onu
+# yayinla; yoksa (eski akis) birincil jar'a dus.
+$birincil = "yikimlient-$MV+$McVersion.jar"
+$yuklenecek = New-Object System.Collections.ArrayList
 foreach ($m in $mcp.mods) {
     $mc = $m.mcVersion
     if ((Aile $mc) -ne $benimAilem) { continue }   # baska aileye dokunma
-    $mods += @{ mcVersion = $mc; file = $ojar; modVersion = $MV; url = $url; sha256 = $sha }
+    $aday = "yikimlient-$MV+$mc.jar"
+    $adayYol = Join-Path $kok "yikim-mod\derleme\$aday"
+    $dosya = if (Test-Path $adayYol) { $aday } else { $birincil }
+    $tam = Join-Path $kok "yikim-mod\derleme\$dosya"
+    $shaM = (Get-FileHash -Path $tam -Algorithm SHA256).Hash.ToLower()
+    $urlM = "https://github.com/YKSAMI1/yikimlient/releases/download/sicak/$dosya"
+    $mods += @{ mcVersion = $mc; file = $dosya; modVersion = $MV; url = $urlM; sha256 = $shaM }
+    if (-not $yuklenecek.Contains($dosya)) { [void]$yuklenecek.Add($dosya) }
+}
+if ($yuklenecek.Count -gt 1) {
+    Write-Host ("      surum basina jar: {0}" -f ($yuklenecek -join ", "))
 }
 $exp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
@@ -159,11 +173,13 @@ if (-not $olali) {
     # kullanir; sicak release'i "Latest" isaretlenirse guncelleyici kirilir.
     gh release create sicak --title "sicak kanal" --notes "Derlemesiz guncelleme kanali (her zaman guncel)" --latest=false | Select-Object -First 1
 }
-gh release upload sicak (Join-Path $env:TEMP "sicak.json") $jar --clobber | Select-Object -First 2
+$yukArgs = @("sicak", (Join-Path $env:TEMP "sicak.json"))
+foreach ($dosya in $yuklenecek) { $yukArgs += (Join-Path $kok "yikim-mod\derleme\$dosya") }
+gh release upload @yukArgs --clobber | Select-Object -First 2
 
 Write-Host "[5/6] dogrulama (API uzerinden - CDN onbellekten kacin)"
 $rel = gh api "repos/YKSAMI1/yikimlient/releases/tags/sicak" | ConvertFrom-Json
-foreach ($ad in @("sicak.json", $ojar)) {
+foreach ($ad in (@("sicak.json") + @($yuklenecek))) {
     $a = $rel.assets | Where-Object { $_.name -eq $ad }
     if (-not $a) { Write-Host "ASSET YOK: $ad"; exit 1 }
     Write-Host ("      {0} var ({1} MB, {2})" -f $ad, [Math]::Round($a.size/1MB,2), $a.updated_at)
