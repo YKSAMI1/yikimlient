@@ -6,6 +6,7 @@ import "./system-ui.css";
 import "./world-afis.css";
 import "./world-layouts.css";
 import "./world-extra.css";
+import "./world-modern.css";
 import "@fontsource/pixelify-sans/400.css";
 import "@fontsource/pixelify-sans/700.css";
 import "@fontsource/pixelify-sans/latin-ext-400.css";
@@ -292,6 +293,14 @@ export function navigate(page: string, param?: string): void {
 }
 
 // ---------- Kabuk: ikon rayı + üst bar ----------
+/** Modern dünyanın üst sekme adları (Sosyal/Market yok). */
+const MODERN_LABEL: Record<string, string> = {
+  home: "Oyna",
+  kozmetik: "Kozmetik",
+  explore: "Modlar",
+  news: "Haberler",
+  settings: "Ayarlar",
+};
 const RAIL = [
   { page: "home", icon: "home", label: "Ana Sayfa" },
   { page: "instances", icon: "grid", label: "Mod Paketleri" },
@@ -323,7 +332,7 @@ export function setupShell(): void {
       <nav class="rail">
         <div class="rail-logo"><img src="/logo.png" draggable="false" /></div>
         ${RAIL.map((r) => `
-          <button class="rail-item" data-page="${r.page}">
+          <button class="rail-item" data-page="${r.page}" data-md="${MODERN_LABEL[r.page] || r.label}">
             ${icon(r.icon, "ri-icon")}
             <span class="ri-label">${r.label}</span>
           </button>`).join("")}
@@ -665,12 +674,68 @@ listen("yikim:yetki", () => {
 });
 
 // ---------- Başlangıç ----------
+/** İlk açılışta tek seferlik görünüm seçimi: Klasik mi, Modern mi?
+ *  Seçim `state.config.theme` içine yazılır; sonradan Ayarlar → Görsel Dünya
+ *  kartlarından her an değiştirilebilir. */
+function maybeModernSecim(): void {
+  try {
+    if ((window as any).__MOCK_AYAR__) return; // mock harness: ekran görüntüsünü kapatma
+    if (localStorage.getItem("yikim-modern-secim")) return;
+    if (!state.instances.length) return; // ilk kurulum sihirbazı önce bitsin
+    if (state.config?.onboarding_done === false) return;
+  } catch {
+    return;
+  }
+  localStorage.setItem("yikim-modern-secim", "1");
+
+  const { root, close } = openModal(`
+    <h2>Yeni görünüm: Modern</h2>
+    <p class="sub">OneClient'tan esinlenen tam sahne düzeni. İstediğin an
+      Ayarlar → Görsel Dünya'dan geri dönebilirsin.</p>
+    <div class="md-secim">
+      <button class="md-secim-kart" id="md-evet">
+        <span class="md-secim-onizle modern">
+          <i class="m-nav"></i><i class="m-stage"></i><i class="m-card"></i><i class="m-foot"></i>
+        </span>
+        <b>Modern</b>
+        <small>Üst sekmeler, tam sahne, sağ kart, alt durum çubuğu</small>
+      </button>
+      <button class="md-secim-kart" id="md-hayir">
+        <span class="md-secim-onizle klasik">
+          <i class="k-rail"></i><i class="k-line"></i><i class="k-line short"></i><i class="k-card"></i>
+        </span>
+        <b>Klasik kalsın</b>
+        <small>Şu anki düzen — hiçbir şey değişmez</small>
+      </button>
+    </div>
+    <p class="md-secim-not">Seçimini daha sonra Görsel Dünya kartlarından değiştirebilirsin.</p>
+  `);
+
+  const sec = async (modern: boolean) => {
+    close();
+    if (modern) state.config.theme = "modern";
+    else if (state.config?.theme === "modern") state.config.theme = "sahne";
+    try {
+      await invoke("cmd_save_settings", { config: state.config });
+      await refreshState();
+    } catch { /* ayar yazılamazsa oturumluk uygula */ }
+    applyWorld();
+    navigate("home");
+    toast(modern
+      ? "Modern görünüm açık — Ayarlar'dan geri dönebilirsin"
+      : "Klasik görünümde kaldın");
+  };
+  root.querySelector("#md-evet")?.addEventListener("click", () => void sec(true));
+  root.querySelector("#md-hayir")?.addEventListener("click", () => void sec(false));
+}
+
 export async function boot(): Promise<void> {
   try {
     await refreshState();
     registerPages();
     setupShell();
     navigate("home");
+    maybeModernSecim();
     // Rol/doğrulama yoklaması: "Yol Silindiri" düşünce kozmetikler ANINDA
     // kilitlenir (launcher + oyun), yeniden başlatma gerekmez.
     rolYoklamayiBaslat();

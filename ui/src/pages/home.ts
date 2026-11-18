@@ -1,13 +1,15 @@
-import { $, currentAccount, el, fileSrc, fmtDuration, headAttrs, headUrl, icon, invoke, lamp, launch, navigate, openLoginModal, state } from "../main";
+import { $, currentAccount, el, fileSrc, fmtDuration, headAttrs, headUrl, icon, invoke, lamp, launch, navigate, openLoginModal, state, toast } from "../main";
 import { hesapCarpi } from "../guvenlik";
 import { enterRows, switchPress } from "../motion";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import { emoteParca } from "../sahne/emote";
-import { sahneArkaCiz } from "../sahne/arkaplan";
+import { SAHNE_ARTLARI, sahneArkaCiz, sahneArtiBul } from "../sahne/arkaplan";
+import wavingIcerik from "../orn/emote/waving.json?raw";
 
 let selectedInstanceId: string | null = null;
 
 const sahneDunyasi = (): boolean => document.documentElement.getAttribute("data-world") === "sahne";
+const modernDunyasi = (): boolean => document.documentElement.getAttribute("data-world") === "modern";
 const timeAgo = (t: number | null | undefined): string => {
   if (!t) return "hiç";
   const dk = Math.round((Date.now() - t) / 60000);
@@ -181,11 +183,209 @@ async function impNewsYukle(root: HTMLElement): Promise<void> {
   } catch { /* çevrimdışı: sessiz geç */ }
 }
 
+/** MODERN ana sayfa: tam ekran piksel sahne + sağ cam kart + alt durum çubuğu.
+ *  Karakter sahneye yürüyerek girer (CSS), ardından el sallama emotesi oynar. */
+function modernHome(root: HTMLElement): void {
+  const lastInstance = state.instances[0];
+  if (!selectedInstanceId || !state.instances.find((i) => i.id === selectedInstanceId)) {
+    selectedInstanceId = lastInstance?.id || null;
+  }
+  const sel = state.instances.find((i) => i.id === selectedInstanceId) || null;
+  const acc = currentAccount();
+  const iconIsFile = (v: string) => !!v && (v.includes("/") || v.includes("\\"));
+  const son = [...state.instances].sort((a, b) => (b.last_played || 0) - (a.last_played || 0));
+  const art = sahneArtiBul(String(state.config?.sahne_arka || "nether"));
+  const toplamMb = state.sys?.total_ram_mb || 16384;
+  const ramPct = sel ? Math.min(100, Math.round((sel.ram_mb / toplamMb) * 100)) : 0;
+  const durdur = !!sel && launch.activeId === sel.id;
+  const selIkon = sel
+    ? (iconIsFile(sel.icon)
+        ? `<img src="${fileSrc(sel.icon)}" alt="" draggable="false" />`
+        : `<span class="emoji">${sel.icon || "🔥"}</span>`)
+    : "";
+
+  root.innerHTML = `
+    <div class="md-root">
+      <div class="md-stage" aria-hidden="true">
+        <canvas id="sahne-arka" class="sahne-arka"></canvas>
+        <div class="md-scrim"></div>
+        <canvas id="sahne-katman"></canvas>
+      </div>
+
+      <div class="md-main">
+        <div class="md-stage-head">
+          <span class="md-kicker">YIKIM Lient · Modern</span>
+          <h1>${acc ? `${hesapCarpi(acc.id)}${acc.name}` : "Hoş geldin"}</h1>
+          <p>${art.ad} — ${art.etiket}</p>
+          <button class="md-scene" id="md-scene" title="Sahneyi değiştir">
+            ${icon("image")} <span>Sahneyi değiştir</span>
+          </button>
+        </div>
+
+        <aside class="md-card" aria-label="Kurulum kartı">
+          <div class="md-tabs" role="tablist">
+            <button class="md-tab on" data-mdtab="kurulum" role="tab" aria-selected="true">Kurulumlar</button>
+            <button class="md-tab" data-mdtab="son" role="tab" aria-selected="false">Son Oynanan</button>
+          </div>
+
+          <div class="md-pane on" data-mdpane="kurulum">
+            ${sel ? `
+              <div class="md-inst">
+                <span class="md-inst-icon">${selIkon}</span>
+                <span class="md-inst-text">
+                  <b>${sel.name}</b>
+                  <small>${loaderName(sel.mod_loader)} · ${sel.mc_version}</small>
+                </span>
+                ${durdur ? `<span class="md-live">AÇIK</span>` : ""}
+              </div>
+              <div class="md-meters">
+                <div class="md-mrow"><span>Bellek</span><b>${(sel.ram_mb / 1024).toFixed(1)} GB / ${(toplamMb / 1024).toFixed(0)} GB</b></div>
+                <div class="md-bar"><span style="width:${ramPct}%"></span></div>
+                <div class="md-mrow"><span>Mod seti</span><b>${sel.standard_mods ? "Optimize" : "Sade"}</b></div>
+                <div class="md-mrow"><span>Son oyun</span><b>${sel.last_played ? new Date(sel.last_played).toLocaleDateString("tr-TR") : "—"}</b></div>
+              </div>
+              ${durdur
+                ? `<button class="md-play md-stop" id="h-stop">${icon("stop")} DURDUR</button>`
+                : `<button class="md-play" id="h-play" ${launch.activeId ? "disabled" : ""}>${icon("play")} ${launch.activeId ? "OYUN AÇIK" : "OYNA"}</button>`}
+              <div class="md-links">
+                <button class="md-link" id="h-manage">${icon("gear")} Yönet</button>
+                <button class="md-link" id="h-new">${icon("plus")} Yeni</button>
+                <button class="md-link" id="h-all">${icon("grid")} Tümü</button>
+              </div>
+            ` : `
+              <p class="md-empty-p">Henüz kurulum yok. İlk kurulumunu oluştur — sürümü seç,
+                gerisini YIKIM halleder.</p>
+              <button class="md-play" id="h-new">${icon("plus")} KURULUM OLUŞTUR</button>
+            `}
+          </div>
+
+          <div class="md-pane" data-mdpane="son">
+            ${son.length ? son.slice(0, 5).map((i) => {
+              const ik = iconIsFile(i.icon)
+                ? `<img src="${fileSrc(i.icon)}" alt="" draggable="false" />`
+                : `<span class="emoji">${i.icon || "🔥"}</span>`;
+              return `
+              <button class="md-recent" data-id="${i.id}">
+                <span class="md-recent-icon">${ik}</span>
+                <span class="md-recent-text">
+                  <b>${i.name}</b>
+                  <small>${loaderName(i.mod_loader)} · ${i.mc_version}</small>
+                </span>
+                <span class="md-recent-time">${timeAgo(i.last_played)}</span>
+                <span class="md-recent-play" role="button" title="Oyna">${icon("play")}</span>
+              </button>`;
+            }).join("") : `<p class="md-empty-p">Henüz oynanmış kurulum yok.</p>`}
+          </div>
+        </aside>
+      </div>
+
+      <footer class="md-status">
+        <button class="md-acc" id="md-acc" title="Hesabı yönet">
+          ${acc
+            ? `<img src="${headUrl(acc)}" alt="" draggable="false" ${headAttrs(acc)} />`
+            : `<span class="md-acc-ph">${icon("user")}</span>`}
+          <span>${acc ? `${hesapCarpi(acc.id)}${acc.name}` : "Giriş yap"}</span>
+        </button>
+        <span class="md-dot" data-durum="${launch.activeId ? "oyun" : "hazir"}"></span>
+        <span class="md-hint">${launch.activeId
+          ? "Oyun açık — pencereyi kapatmak launcher'ı küçültür."
+          : "Sağ Shift: oyun içi menü · Sağ Ctrl: HUD"}</span>
+        <span class="md-grow"></span>
+        <span class="md-meta">${state.instances.length} kurulum</span>
+        <span class="md-meta">RAM <b>${sel ? `${(sel.ram_mb / 1024).toFixed(1)} GB` : "—"}</b></span>
+        <span class="md-meta" id="md-ver">v?</span>
+      </footer>
+    </div>
+  `;
+
+  // sürüm etiketi: Tauri'nin kendi getVersion'ından (yoksa "v?")
+  try {
+    const app = (window as any).__TAURI__?.app;
+    if (app?.getVersion) {
+      app.getVersion().then((v: string) => {
+        const ver = root.querySelector("#md-ver");
+        if (ver) ver.textContent = `v${v}`;
+      }).catch(() => { /* sessiz */ });
+    }
+  } catch { /* sessiz */ }
+
+  wireModern(root);
+  void baslatVitrin(root, acc);
+}
+
+/** Modern ana sayfanın olayları — OYNA/DURDUR, sekmeler, sahne değiştirme. */
+function wireModern(root: HTMLElement): void {
+  root.querySelector("#h-play")?.addEventListener("click", async () => {
+    if (!selectedInstanceId) { navigate("instances"); return; }
+    if (!state.accounts.length) { openLoginModal(); return; }
+    const btn = root.querySelector(".md-play") as HTMLElement | null;
+    if (btn) switchPress(btn);
+    const { launchInstance } = await import("../main");
+    void launchInstance(selectedInstanceId);
+  });
+  root.querySelector("#h-stop")?.addEventListener("click", () => void stopOyun());
+  root.querySelector("#h-manage")?.addEventListener("click", () => {
+    navigate("instances", selectedInstanceId || undefined);
+  });
+  root.querySelector("#h-new")?.addEventListener("click", () => navigate("instances"));
+  root.querySelector("#h-all")?.addEventListener("click", () => navigate("instances"));
+  root.querySelector("#md-acc")?.addEventListener("click", () => {
+    if (state.accounts.length) navigate("settings");
+    else openLoginModal();
+  });
+
+  root.querySelectorAll<HTMLElement>(".md-tab").forEach((t) =>
+    t.addEventListener("click", () => {
+      root.querySelectorAll<HTMLElement>(".md-tab").forEach((x) => {
+        const on = x === t;
+        x.classList.toggle("on", on);
+        x.setAttribute("aria-selected", String(on));
+      });
+      root.querySelectorAll<HTMLElement>(".md-pane").forEach((p) => {
+        p.classList.toggle("on", p.dataset.mdpane === t.dataset.mdtab);
+      });
+    })
+  );
+
+  root.querySelectorAll<HTMLElement>(".md-recent").forEach((row) =>
+    row.addEventListener("click", async (e) => {
+      const id = row.dataset.id || "";
+      if ((e.target as HTMLElement).closest(".md-recent-play")) {
+        if (!state.accounts.length) { openLoginModal(); return; }
+        const { launchInstance } = await import("../main");
+        void launchInstance(id);
+        return;
+      }
+      navigate("instances", id);
+    })
+  );
+
+  // Sahne arkası: Nether → diğer hazır manzaralar arasında tek tıkla döner.
+  root.querySelector("#md-scene")?.addEventListener("click", async () => {
+    const simdiki = String(state.config?.sahne_arka || "nether");
+    const i = SAHNE_ARTLARI.findIndex((a) => a.id === simdiki);
+    const art = SAHNE_ARTLARI[(i + 1) % SAHNE_ARTLARI.length];
+    state.config.sahne_arka = art.id;
+    const arka = root.querySelector("#sahne-arka") as HTMLCanvasElement | null;
+    if (arka) sahneArkaCiz(arka, art.id);
+    const p = root.querySelector(".md-stage-head p");
+    if (p) p.textContent = `${art.ad} — ${art.etiket}`;
+    try {
+      await invoke("cmd_save_settings", { config: state.config });
+    } catch { /* oturumluk değişiklik yeter */ }
+    toast(`Sahne: ${art.ad}`);
+  });
+}
+
 export function renderHome(root: HTMLElement): void {
   sahneKapat(); // eski canvas/renderer'ı temizle (sayfa yenileniyor)
   if (sahneDunyasi()) {
     impHome(root);
     void impNewsYukle(root);
+    return;
+  }
+  if (modernDunyasi()) {
+    modernHome(root);
     return;
   }
   const lastInstance = state.instances[0];
@@ -399,10 +599,11 @@ window.addEventListener("yikim:yetki", () => {
 async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string } | null | undefined): Promise<void> {
   const canvas = root.querySelector("#sahne-katman") as HTMLCanvasElement | null;
   if (!canvas) return;
-  // Arka plan yalnız Sahne dünyasında: karakterin arkasındaki piksel manzara.
+  // Piksel manzara: Sahne (varsayılan kiraz) ve Modern (varsayılan Nether).
+  const dunya = document.documentElement.getAttribute("data-world");
   const arka = root.querySelector("#sahne-arka") as HTMLCanvasElement | null;
-  if (arka && document.documentElement.getAttribute("data-world") === "sahne") {
-    sahneArkaCiz(arka, String(state.config?.sahne_arka || "kiraz"));
+  if (arka && (dunya === "sahne" || dunya === "modern")) {
+    sahneArkaCiz(arka, String(state.config?.sahne_arka || (dunya === "modern" ? "nether" : "kiraz")));
     arka.classList.add("on");
   }
   const sah = sahneGetir();
@@ -434,6 +635,19 @@ async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string }
       try { liste.push(emoteParca(e.icerik)); } catch { /* bozuk emote atlanır */ }
     }
     sah.emoteleriKur(liste, hiz);
+    // Modern açılış: karakter sahneye yürüdükten sonra bir kez el sallar.
+    if (dunya === "modern") {
+      let dalga = liste.find((e) => /wave|sall|el ?salla/i.test(`${e.adi} ${e.aciklama}`)) || null;
+      // Kullanıcı listesinde el sallama yoksa gömülü waving.json devreye girer.
+      if (!dalga) {
+        try { dalga = emoteParca(wavingIcerik); } catch { dalga = null; }
+      }
+      if (dalga) {
+        window.setTimeout(() => {
+          if (canvas.isConnected) sah.emoteOynat(dalga);
+        }, 1500);
+      }
+    }
   } catch {
     sah.emoteleriKur([]);
   }

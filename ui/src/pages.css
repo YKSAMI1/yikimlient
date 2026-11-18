@@ -476,6 +476,49 @@ input.search-in.input, .search-in.input {
 .wc-preview .wc-row { position: absolute; height: 3px; border-radius: 2px; }
 .wc-preview .wc-lamp { position: absolute; width: 5px; height: 5px; border-radius: 50%; }
 
+/* Modern kart önizlemesi: gerçek düzenin küçük iskeleti */
+.wc-preview.wc-modern { overflow: hidden; }
+.wc-md-nav {
+  position: absolute; top: 0; left: 0; right: 0; height: 13px;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  background: linear-gradient(180deg, rgba(9, 7, 6, 0.92), rgba(9, 7, 6, 0));
+}
+.wc-md-nav i {
+  display: block; width: 12px; height: 2px; border-radius: 2px;
+  background: rgba(244, 236, 226, 0.22);
+}
+.wc-md-nav i.on { width: 14px; box-shadow: 0 0 6px rgba(255, 90, 31, 0.6); }
+.wc-md-stage { position: absolute; inset: 0; }
+.wc-md-char {
+  position: absolute; left: 30%; bottom: 23px; width: 13px; height: 32px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #d9c3a8 0 22%, #8a5a3c 22% 100%);
+  box-shadow: 0 0 10px rgba(255, 106, 26, 0.35);
+}
+.wc-md-card {
+  position: absolute; right: 7px; top: 21px; bottom: 20px; width: 40%;
+  border: 1px solid; border-radius: 5px;
+  display: flex; flex-direction: column; gap: 3px; padding: 5px;
+  backdrop-filter: blur(4px);
+}
+.wc-md-card i { display: block; border-radius: 2px; }
+.wc-md-card .bar { height: 2px; opacity: 0.9; }
+.wc-md-card .bar.kisa { width: 62%; opacity: 0.6; }
+.wc-md-card .btn { margin-top: auto; height: 8px; border-radius: 3px; }
+.wc-md-foot {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 11px;
+}
+
+/* "YENİ" rozeti — seçili rozetiyle çakışmasın diye sol üstte */
+.world-card .yeni-tag {
+  position: absolute; top: 8px; left: 8px;
+  font-size: 9px; font-weight: 800; letter-spacing: 1px;
+  padding: 2px 6px; border-radius: 4px;
+  color: #ffd8c2;
+  background: color-mix(in srgb, #ff5a1f 22%, rgba(0, 0, 0, 0.5));
+  border: 1px solid color-mix(in srgb, #ff5a1f 55%, transparent);
+}
+
 /* ---------- Dünya özelleştirme paneli ---------- */
 .tema-ozel {
   margin-top: 14px; padding: 14px;

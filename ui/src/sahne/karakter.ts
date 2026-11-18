@@ -1120,6 +1120,17 @@ export class Sahne {
         this.durumBitis = this.zaman + 0.6;
     }
 
+    /** Tek bir emote'u hemen oynat — modern menü açılışındaki el sallama.
+     *  Döngülü emote 3.2 sn sonra kendiliğinden idle'a döner. */
+    emoteOynat(parca: Emote | null): void {
+        if (!parca || !this.kemikler) return;
+        this.aktif = parca;
+        this.sonOynananAd = parca.adi;
+        this.durum = "emote";
+        this.tEmote = parca.baslangicTick;
+        this.durumBitis = this.zaman + (parca.dongu ? 3.2 : 0);
+    }
+
     private baslatDongu(): void {
         const adim = () => {
             // canvas DOM'dan çekildiyse (sayfa değişimi) kendini temizle — sızıntı yok

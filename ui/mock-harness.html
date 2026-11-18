@@ -7,6 +7,7 @@
        ?hesap=offline   → çevrimdışı hesap; "Orijinal hesap ile girmen lazım" kapısı
        ?sayfa=skins     → açılışta skin merkezine git
        ?onboarding=1    → ilk kurulum sihirbazını göster (hesap yok / kurulum yok)
+       ?dunya=modern    → Modern dünyayı aç (üst sekmeler + tam sahne)
 -->
 <html lang="tr">
 <head>
@@ -30,6 +31,7 @@
     var hesapTuru = premium ? "microsoft" : "offline";
     var onboarding = q.get("onboarding") === "1";
     var sayfa = q.get("sayfa") || "";
+    var dunya = q.get("dunya") || "";
 
     // Güvenlik durumu — ekran görüntüsü/deneme için URL'den de verilebilir:
     //   ?gvdog=1&gvrol=1   → doğrulandı + "Yol Silindiri" (tam kozmetik)
@@ -165,7 +167,7 @@
 
     var state = {
       config: {
-        theme: "orange", last_selected_account: "a1", default_ram_mb: 4096,
+        theme: dunya || "orange", last_selected_account: "a1", default_ram_mb: 4096,
         keep_launcher_open: true, show_news: true, stats_enabled: true,
         download_concurrency: 32, java_dir: null, custom_accent: "#ff7a1a",
         onboarding_done: !onboarding, guided_tour_done: true,

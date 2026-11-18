@@ -2,12 +2,16 @@ import { currentAccount, headAttrs, headUrl, icon, invoke, openModal, openLoginM
 import { guvenlikKartiCiz, guvenlikYoklamayiDurdur, hesapCarpi } from "../guvenlik";
 import { SAHNE_ARTLARI, sahneArkaCiz } from "../sahne/arkaplan";
 
-/* Beş dünya — her kart o dünyanın kendi zemininde mini önizleme taşır.
+/* Altı dünya — her kart o dünyanın kendi zemininde mini önizleme taşır.
    Diğer denemeler (Devre Panosu, Kategori Standardı, Karanlık Oda, Kumaş,
    Perde, Buzul, Skala) kaldırıldı: hepsi aynı düzenin sadece farklı arka
    planıydı. Kalan her dünya kendi kimliğini taşır; rengi ve köşesi ayrıca
    özelleştirilebilir (aşağıdaki "Bu dünyayı özelleştir" paneli). */
 const WORLDS = [
+  {
+    id: "modern", name: "Modern", desc: "OneClient uslübü — üst sekme şeridi, tam sahne, sağ kart, alt durum çubuğu",
+    bg: "#0c0a09", panel: "#17120f", line: "#2c241e", text: "#f4ece2", dim: "#8a7b6c", accent: "#ff5a1f",
+  },
   {
     id: "sahne", name: "Sahne", desc: "Imperial uslübü — ortada karakter, piksel yazı, sarı blok butonlar",
     bg: "#0d0e12", panel: "#17181f", line: "#2a2c3a", text: "#f2edde", dim: "#71695c", accent: "#ffd83d",
@@ -37,6 +41,27 @@ const KALDIRILAN: Record<string, string> = {
 
 /// Dünyanın mini önizlemesi: kendi paletiyle pano + 3 hat + lambalar
 function worldPreview(w: typeof WORLDS[number]): string {
+  // Modern dünyanın kendi iskeleti var: üst sekme şeridi, tam sahne,
+  // sağ cam kart, alt durum çubuğu. Jenerik cetvel önizlemesi burada
+  // yanıltıcı olurdu, bu yüzden ayrı çizilir.
+  if (w.id === "modern") {
+    return `
+      <span class="wc-preview wc-modern" style="background:${w.bg}; border-bottom:1px solid ${w.line}">
+        <span class="wc-md-nav">
+          <i></i><i class="on" style="background:${w.accent}"></i><i></i><i></i><i></i>
+        </span>
+        <span class="wc-md-stage" style="background:
+          radial-gradient(60px 34px at 34% 74%, rgba(255,106,26,0.42), transparent 72%),
+          linear-gradient(180deg, #2a0d13 0%, #4a1119 46%, ${w.bg} 100%)"></span>
+        <span class="wc-md-char"></span>
+        <span class="wc-md-card" style="background:${w.panel}; border-color:${w.line}">
+          <i class="bar" style="background:${w.line}"></i>
+          <i class="bar kisa" style="background:${w.line}"></i>
+          <i class="btn" style="background:${w.accent}"></i>
+        </span>
+        <span class="wc-md-foot" style="background:${w.panel}; border-top:1px solid ${w.line}"></span>
+      </span>`;
+  }
   const row = (y: number, wpx: number, lampColor: string, alpha = 1) => `
     <div class="wc-row" style="top:${y}px; left:14px; width:${wpx}%; background:${w.dim}; opacity:${alpha}"></div>
     <div class="wc-lamp" style="top:${y - 1}px; left:6px; background:${lampColor}"></div>`;
@@ -120,6 +145,7 @@ export function renderSettings(root: HTMLElement): void {
               <span>${w.desc}</span>
             </span>
             ${activeTheme === w.id ? `<span class="sel-tag">SEÇİLİ</span>` : ""}
+            ${w.id === "modern" ? `<span class="yeni-tag">YENİ</span>` : ""}
           </button>`).join("")}
       </div>
       <div class="row-between" style="margin-top:14px">
