@@ -81,15 +81,15 @@ public final class YikimMainMenu {
         this.buttons.add(new Button("YIKIM Men\u00fcs\u00fc", "Performans, g\u00f6r\u00fcn\u00fcm, HUD, modlar", 0, 0, () -> YikimPanel.open(class_310.method_1551(), 0)));
         this.buttons.add(new Button("HUD'u d\u00fczenle", "\u00d6\u011feleri yerle\u015ftir", 3, 2, () -> YikimPanel.open(class_310.method_1551(), 2)));
         this.buttons.add(new Button("Modlar", "Mod ara ve kur", 4, 4, () -> YikimPanel.open(class_310.method_1551(), 4)));
-        // v1.27.0: oyun i├ği hesap de─şi┼ştirme (launcher hesaplar─▒)
+        // v1.27.0: oyun içi hesap değiştirme (launcher hesapları)
         String hesapAdi = YikimHesaplar.aktifAd(class_310.method_1551());
-        this.buttons.add(new Button("Hesap: " + (hesapAdi.isEmpty() ? "de─şi┼ştir" : hesapAdi),
-            "Premium / ├ğevrimd─▒┼ş─▒ aras─▒nda an─▒nda ge├ği┼ş", YikimMenuIcons.KULLANICI, -1,
+        this.buttons.add(new Button("Hesap: " + (hesapAdi.isEmpty() ? "değiştir" : hesapAdi),
+            "Premium / çevrimdışı arasında anında geçiş", YikimMenuIcons.KULLANICI, -1,
             () -> YikimMainMenu.open(new YikimHesapEkrani())));
         this.buttons.add(new Button("Ayarlar", "Minecraft ayarlar\u0131", 5, -1, () -> YikimMainMenu.open(YikimAdapter.optionsScreen(screen, class_310.method_1551().field_1690))));
         this.buttons.add(new Button("\u00c7\u0131k\u0131\u015f", "Oyundan ayr\u0131l", 8, -1, () -> class_310.method_1551().method_1592()));
-        // D─░─ŞER MODLARIN TU┼ŞLARI (Flashback, Mod Menu vb.): vanilla men├╝ye mixin ile
-        // eklenen tu┼şlar OTURUM BOYUNCA B─░R KEZ yakalan─▒r ve sa─ş panelde listelenir.
+        // DİĞER MODLARIN TUŞLARI (Flashback, Mod Menu vb.): vanilla menüye mixin ile
+        // eklenen tuşlar OTURUM BOYUNCA BİR KEZ yakalanır ve sağ panelde listelenir.
         this.modButtons = YikimModButtons.scanOnce(class_310.method_1551());
         this.chipBackdrop = () -> {
             YikimBackdrop.invalidate();
@@ -139,7 +139,7 @@ public final class YikimMainMenu {
         float eased = 1.0f - (1.0f - appear) * (1.0f - appear);
         int slide = (int)((1.0f - eased) * 24.0f);
         YikimBackdrop.render(graphics, screenWidth, screenHeight, now);
-        // G├£NCELLEME SONRASI ─░LK A├çILI┼Ş: aray├╝z temas─▒n─▒ ├Ân izlemeli olarak sor
+        // GÜNCELLEME SONRASI İLK AÇILIŞ: arayüz temasını ön izlemeli olarak sor
         YikimTemaEkrani.ilkAcilisKontrol();
         if (YikimTemaEkrani.acik()) {
             YikimUiMetrics.menuEnd(started);
@@ -196,12 +196,12 @@ public final class YikimMainMenu {
             this.drawChips(graphics, font, this.buttonsTop + blockHeight + 8, buttonWidth, mouseX, mouseY);
         }
         if (this.cardWidth > 0 && this.cardX - (this.columnX + this.columnWidth) >= 24) {
-            // v1.29.0: sa─ş ├╝stteki "SEN" bilgi paneli KALDIRILDI ÔÇö yerine
-            // d├Ânen 3B karakter + deri/pelerin/elitra se├ğicisi geldi.
+            // v1.29.0: sağ üstteki "SEN" bilgi paneli KALDIRILDI — yerine
+            // dönen 3B karakter + deri/pelerin/elitra seçicisi geldi.
             int altSinir = screenHeight - footerHeight - margin - this.modDockYukseklik();
             this.drawKarakterPaneli(graphics, font, this.cardX, this.cardY, this.cardWidth, altSinir, mouseX, mouseY);
         }
-        // v1.15.0: di─şer modlarin tuslari ARTIK yan panelin icinde degil ÔÇö
+        // v1.15.0: diğer modlarin tuslari ARTIK yan panelin icinde degil —
         // ekranin SAG ALTINDA kendi piksel bloku olarak duruyorlar.
         this.drawModDock(graphics, font, screenWidth, screenHeight, mouseX, mouseY, footerHeight, margin);
         this.drawFooter(graphics, font, screenWidth, screenHeight, footerHeight);
@@ -243,16 +243,16 @@ public final class YikimMainMenu {
     }
 
     /**
-     * SADE TEMA ANA MEN├£ (v1.28.0).
+     * SADE TEMA ANA MENÜ (v1.28.0).
      *
-     * Yeni d├╝zen: solda tek s├╝tun sade tu┼şlar, sa─şda oyuncunun KARAKTER─░
-     * (launcher'─▒n oyun ├Âncesi yazd─▒─ş─▒ deri), altta ince ┼şerit. Pano/yan panel
-     * yok ÔÇö "karma┼ş─▒k" geri bildiriminin hedefi tam olarak buydu.
+     * Yeni düzen: solda tek sütun sade tuşlar, sağda oyuncunun KARAKTERİ
+     * (launcher'ın oyun öncesi yazdığı deri), altta ince şerit. Pano/yan panel
+     * yok — "karmaşık" geri bildiriminin hedefi tam olarak buydu.
      */
     private void drawSade(class_332 graphics, class_327 font, class_310 client,
                           int screenWidth, int screenHeight, int mouseX, int mouseY, long started) {
-        // G├£VENL─░K A─ŞI: yeni tema ├ğizimi beklenmedik bir ┼şey y├╝z├╝nden patlarsa
-        // oyun kilitlenmesin; tema klasik'e d├Âner ve men├╝ normal ├ğizilir.
+        // GÜVENLİK AĞI: yeni tema çizimi beklenmedik bir şey yüzünden patlarsa
+        // oyun kilitlenmesin; tema klasik'e döner ve menü normal çizilir.
         try {
             this.drawSadeGovde(graphics, font, client, screenWidth, screenHeight, mouseX, mouseY, started);
         }
@@ -261,7 +261,7 @@ public final class YikimMainMenu {
             cfg.uiTema = YikimTema.KLASIK;
             cfg.save();
             YikimLog.info("sade tema cizilemedi, klasik temaya donuldu: " + sorun);
-            YikimMetrics.notify("Sade tema ├ğizilemedi ÔÇö Klasik temaya d├Ân├╝ld├╝");
+            YikimMetrics.notify("Sade tema çizilemedi — Klasik temaya dönüldü");
         }
     }
 
@@ -270,7 +270,7 @@ public final class YikimMainMenu {
         YikimMetrics.frame(3);
         this.hitCount = 0;
         int margin = screenWidth < 640 ? 16 : 34;
-        // sakin ├Ârt├╝: arka plan g├Âr├╝n├╝r ama s├╝ss├╝z
+        // sakin örtü: arka plan görünür ama süssüz
         graphics.method_25294(0, 0, screenWidth, screenHeight, 0x77000000);
         float wordScale = screenHeight >= 320 ? 2.0f : 1.6f;
         int logoY = margin;
@@ -279,10 +279,10 @@ public final class YikimMainMenu {
         int altCizgi = logoY + (int)(8.0f * wordScale) + 4;
         YikimDraw.horizontalGradient(graphics, margin, altCizgi, margin + wordWidth, altCizgi + 3,
             YikimTheme.accent, YikimTheme.accent2, 6);
-        YikimAdapter.text(graphics, font, "CLIENT  ÔÇó  v" + YikimClient.MOD_VERSION, margin + 1, altCizgi + 8,
+        YikimAdapter.text(graphics, font, "CLIENT  •  v" + YikimClient.MOD_VERSION, margin + 1, altCizgi + 8,
             YikimTheme.TEXT_MUTED, true);
 
-        // ---- tu┼ş s├╝tunu ----
+        // ---- tuş sütunu ----
         int sutun = Math.min(310, Math.max(180, screenWidth / 3));
         int satirH = 30;
         int bosluk = 6;
@@ -313,18 +313,18 @@ public final class YikimMainMenu {
             this.addHit(margin, y, sutun, satirH, button.action());
         }
 
-        // ---- karakter + kozmetik se├ğici (sa─ş s├╝tun) ----
+        // ---- karakter + kozmetik seçici (sağ sütun) ----
         int panelG = Math.min(320, Math.max(200, screenWidth / 3));
         int panelX = Math.max(margin + sutun + 24, screenWidth - margin - panelG);
         this.drawKarakterPaneli(graphics, font, panelX, tepe, panelG, screenHeight - 66, mouseX, mouseY);
 
-        // ---- alt: k├╝├ğ├╝k anahtarlar + ┼şerit ----
+        // ---- alt: küçük anahtarlar + şerit ----
         int anahtarY = screenHeight - 46;
         this.drawChips(graphics, font, anahtarY, sutun, mouseX, mouseY);
         graphics.method_25294(0, screenHeight - 20, screenWidth, screenHeight - 19,
             YikimTheme.alpha(YikimTheme.accent, 60));
         YikimAdapter.text(graphics, font, this.cacheFooterLeft, margin, screenHeight - 14, YikimTheme.TEXT_MUTED, false);
-        String sag = "Sa─ş Shift  ÔÇó  YIKIM men├╝s├╝  ÔÇó  Tema: Sade";
+        String sag = "Sağ Shift  •  YIKIM menüsü  •  Tema: Sade";
         if (screenWidth - margin - font.method_1727(sag) > margin + sutun + 8) {
             YikimAdapter.text(graphics, font, sag, screenWidth - margin - font.method_1727(sag),
                 screenHeight - 14, YikimTheme.TEXT_MUTED, false);
@@ -332,7 +332,7 @@ public final class YikimMainMenu {
         YikimUiMetrics.menuEnd(started);
     }
 
-    /** Sa─ş alt mod blo─şunun kaplad─▒─ş─▒ y├╝kseklik (karakter paneli ├╝st├╝ne binmesin). */
+    /** Sağ alt mod bloğunun kapladığı yükseklik (karakter paneli üstüne binmesin). */
     private int modDockYukseklik() {
         int count = this.modButtons.size();
         if (count == 0) {
@@ -345,10 +345,10 @@ public final class YikimMainMenu {
     }
 
     /**
-     * SA─Ş S├£TUN (v1.31.0) ÔÇö her iki temada da ayn─▒: karakter (kendili─şinden
-     * d├Ânmez, fareyle s├╝r├╝kleyerek d├Ând├╝r├╝l├╝r), alt─▒nda hesap ad─▒ ve
-     * "├ûzelle┼ştirme" d├╝─şmesi. Deri/pelerin/elitra se├ğimi ayr─▒ ekranda
-     * yap─▒l─▒r; b├Âylece ana men├╝de doku ve kart kalabal─▒─ş─▒ yok.
+     * SAĞ SÜTUN (v1.31.0) — her iki temada da aynı: karakter (kendiliğinden
+     * dönmez, fareyle sürükleyerek döndürülür), altında hesap adı ve
+     * "Özelleştirme" düğmesi. Deri/pelerin/elitra seçimi ayrı ekranda
+     * yapılır; böylece ana menüde doku ve kart kalabalığı yok.
      */
     private void drawKarakterPaneli(class_332 graphics, class_327 font, int x, int ust, int genislik,
                                     int alt, int mouseX, int mouseY) {
@@ -360,7 +360,7 @@ public final class YikimMainMenu {
         int cx = x + genislik / 2;
         YikimKarakter.draw(graphics, cx, ust + 2, boy, YikimTheme.backdrop);
         int isimY = ust + boy + 8;
-        String isim = this.cacheUser.isEmpty() ? "ÔÇö" : this.cacheUser;
+        String isim = this.cacheUser.isEmpty() ? "—" : this.cacheUser;
         float olcek = 1.15f;
         YikimAdapter.push(graphics, cx - (int)((float)font.method_1727(isim) * olcek) / 2.0f, isimY, olcek);
         YikimAdapter.text(graphics, font, isim, 0, 0, -723722, true);
@@ -375,13 +375,13 @@ public final class YikimMainMenu {
         int dugmeG = Math.min(genislik, 190);
         int dugmeX = cx - dugmeG / 2;
         boolean uzerinde = YikimDraw.inside(mouseX, mouseY, dugmeX, dugmeY, dugmeG, dugmeYukseklik);
-        YikimDraw.button(graphics, font, dugmeX, dugmeY, dugmeG, dugmeYukseklik, "├ûZELLE┼ŞT─░RME", true, uzerinde);
-        // karakter alan─▒ ├ûNCE yaz─▒l─▒r: d├╝─şme ├╝stte kals─▒n
+        YikimDraw.button(graphics, font, dugmeX, dugmeY, dugmeG, dugmeYukseklik, "ÖZELLEŞTİRME", true, uzerinde);
+        // karakter alanı ÖNCE yazılır: düğme üstte kalsın
         this.addHit(x, ust, genislik, Math.max(24, boy), () -> this.surukleme = true);
         this.addHit(dugmeX, dugmeY, dugmeG, dugmeYukseklik, () -> YikimMainMenu.open(new YikimKozmetikEkrani()));
     }
 
-    /** S├╝r├╝kleme s─▒ras─▒nda karakteri d├Ând├╝r (v1.31.0). */
+    /** Sürükleme sırasında karakteri döndür (v1.31.0). */
     boolean drag(double x, double y, double farkX) {
         if (!this.surukleme) {
             return false;
@@ -398,7 +398,7 @@ public final class YikimMainMenu {
         this.surukleme = false;
     }
 
-    /** Tu┼şlar s─▒─şs─▒n diye sat─▒r y├╝ksekli─şi (en az 20 px). */
+    /** Tuşlar sığsın diye satır yüksekliği (en az 20 px). */
     private static int saldir(int alan, int adet, int bosluk) {
         if (adet <= 0) {
             return 24;
@@ -465,7 +465,7 @@ public final class YikimMainMenu {
         int headerHeight = 49;
         int rowHeight = 21;
         int tipHeight = 9 + this.cacheTipLines.size() * 11;
-        // MOD TU┼ŞLARI sa─ş alta ta┼ş─▒nd─▒ (drawModDock) ÔÇö panelde yer a├ğ─▒lm─▒yor.
+        // MOD TUŞLARI sağ alta taşındı (drawModDock) — panelde yer açılmıyor.
         int modSectionHeight = 0;
         int maxRows = Math.max(0, (availableHeight - pad * 2 - headerHeight - 6 - 10 - tipHeight - modSectionHeight) / rowHeight);
         shownRows = Math.min(rows.length, maxRows);
@@ -498,13 +498,13 @@ public final class YikimMainMenu {
     }
 
     /**
-     * SA─Ş ALT MOD BLO─ŞU (v1.15.0).
+     * SAĞ ALT MOD BLOĞU (v1.15.0).
      *
-     * Di─şer modlar─▒n ana men├╝ye mixin ile ekledi─şi tu┼şlar (Flashback Essentials
-     * vb.) daha ├Ânce YIKIM yan panelinin i├ğinde d├╝z sat─▒rlar h├ólinde duruyordu;
-     * art─▒k ekran─▒n sa─ş alt─▒nda, kendi piksel bloklar─▒nda: koyu zemin, turuncu
-     * k├Â┼şe ├ğizgisi, modun GER├çEK logosu (launcher'─▒n indirdi─şi PNG) ve etiket.
-     * T─▒klama davran─▒┼ş─▒ ayn─▒: modun ger├ğek onPress handler'─▒ ├ğal─▒┼ş─▒r.
+     * Diğer modların ana menüye mixin ile eklediği tuşlar (Flashback Essentials
+     * vb.) daha önce YIKIM yan panelinin içinde düz satırlar hâlinde duruyordu;
+     * artık ekranın sağ altında, kendi piksel bloklarında: koyu zemin, turuncu
+     * köşe çizgisi, modun GERÇEK logosu (launcher'ın indirdiği PNG) ve etiket.
+     * Tıklama davranışı aynı: modun gerçek onPress handler'ı çalışır.
      */
     private void drawModDock(class_332 graphics, class_327 font, int screenWidth, int screenHeight,
                              int mouseX, int mouseY, int footerHeight, int margin) {
@@ -515,18 +515,18 @@ public final class YikimMainMenu {
         int rowH = 18;
         int gap = 3;
         int bottom = screenHeight - footerHeight - 10;
-        // S─▒─şmayanlar─▒ k─▒rp (k├╝├ğ├╝k pencerede men├╝y├╝ kaplamas─▒n)
+        // Sığmayanları kırp (küçük pencerede menüyü kaplamasın)
         int maxRows = Math.max(1, (bottom - 40) / (rowH + gap));
         int shown = Math.min(count, maxRows);
         int dockW = Math.min(250, Math.max(150, screenWidth / 3));
         int x = screenWidth - margin - dockW;
-        // Sol s├╝tunla ├ğak─▒┼şmas─▒n
+        // Sol sütunla çakışmasın
         if (x <= this.columnX + this.columnWidth + 12) {
             return;
         }
         int toplam = shown * (rowH + gap) - gap;
         int y = bottom - toplam;
-        // blok zemini + ├ğer├ğeve (piksel g├Âr├╝n├╝m: 2px k├Â┼şe aksanlar─▒)
+        // blok zemini + çerçeve (piksel görünüm: 2px köşe aksanları)
         YikimDraw.roundedFill(graphics, x - 7, y - 18, x + dockW + 7, bottom + 7, -1728053248);
         YikimDraw.outline(graphics, x - 7, y - 18, dockW + 14, toplam + 25, YikimTheme.alpha(YikimTheme.accent, 70));
         graphics.method_25294(x - 7, y - 18, x - 4, y - 15, YikimTheme.accent);
@@ -626,9 +626,9 @@ public final class YikimMainMenu {
     /**
      * Bu konumda tiklanabilir bir sey var mi? (v1.33.14)
      *
-     * NEDEN VAR: 26.x'te t─▒klama koordinatlar─▒ cizimdeki koordinatlarla ayn─▒
-     * olmuyor (├Âlcek fark─▒). Tiklama hangi setin "isabet ettigini" gormek icin
-     * bu yuzden once deniyoruz ÔÇö bosa duserse diger set denenir.
+     * NEDEN VAR: 26.x'te tıklama koordinatları cizimdeki koordinatlarla aynı
+     * olmuyor (ölcek farkı). Tiklama hangi setin "isabet ettigini" gormek icin
+     * bu yuzden once deniyoruz — bosa duserse diger set denenir.
      */
     boolean ilkVurus(double mouseX, double mouseY) {
         for (int index = this.hitCount - 1; index >= 0; --index) {
