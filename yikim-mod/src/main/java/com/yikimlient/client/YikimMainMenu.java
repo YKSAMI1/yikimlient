@@ -109,8 +109,11 @@ public final class YikimMainMenu {
     private static final int[] MD_IKON = {
         YikimMenuIcons.PLAY, YikimMenuIcons.EYE, YikimMenuIcons.BLOCKS,
         YikimMenuIcons.KULLANICI, YikimMenuIcons.GEAR};
+// NOT: BÜYÜK HARF Türkçe glifler (Ğ/Ş/Ü/Ö/Ç/İ) piksel fontta bozuk çıkıyor —
+    // "DÜNYALARI AÃŸ" taşmasının tam kökü budur. Bu yüzden tüm etiketler
+    // harf karışık yazılıyor (OneClient 16 px / 450 ağırlık hissi korunuyor).
     private static final String[] MD_BUTON = {
-        "DÃœNYALARI AÃ‡", "KOZMETÄ°K EKRANI", "MOD KATALOÄU", "HESAP DEÄÄ°ÅTÄ°R", "MÄ°NECRAFT AYARLARI"};
+        "Dünyaları aç", "Kozmetik ekranı", "Mod kataloğu", "Hesap değiştir", "Minecraft ayarları"};
 
     // OneClient paletinin YIKIM karÅŸÄ±lÄ±ÄŸÄ± (page/card/component/border/text/â€¦)
     private static final int MD_PAGE = 0xFF0B0705;
@@ -163,35 +166,22 @@ public final class YikimMainMenu {
 
     /** Kare baÅŸÄ±na yeniden hesaplanmayan Ã¶lÃ§Ã¼ kÃ¼mesi (web px â†’ Minecraft birimi). */
     private static final class Olcek {
-        private float u;
-        private int navbarH;      // 80 px
-        private int navPad;       // 40 px
-        private int navLinkH;     // 36 px
-        private int navLinkPad;   // 17 px (yarÄ±)
-        private int navGap;       // 23 px (gÃ¶rsel aralÄ±k)
-        private int markYuk;      // 44 px
-        private int avatar;       // 28 px
-        private int rozet;        // 16 px
-        private int iconBtn;      // 32 px
-        private int iconBtnIkon;  // 20 px
-        private int bosluk;       // 48 px
-        private int butonH;       // ~38 px
-        private int butonPad;     // 24 px
-        private int hayaletBtn;   // 32 px
-        private int hayaletIkon;  // 20 px
-        private int seritH;       // 208 px
-        private int kartAralik;   // 24 px
-        private int kartYari;     // 12 px
-        private int kartMin;      // 300 px
-        private int kartEn;       // 480 px
-        private int kartBaslik;   // 32 px
-        private int dahaFazla;    // 96 px
+        private float s;
+        private int navH;
+        private int pad;
+        private int navPad;
+        private int navGap;
+        private int ikonBtn;
+        private int ikon;
+        private int butonH;
+        private int butonPad;
+        private int hayaletBtn;
+        private int seritH;
+        private int kartAralik;
+        private float markaOlcek;
         private float baslikOlcek;
-        private float altBaslikOlcek;
-        private float butonOlcek;
+        private float altOlcek;
         private float kartBaslikOlcek;
-        private float kartDurumOlcek;
-        private int markIkon;     // 32 px logo iÅŸareti
     }
 
     public YikimMainMenu(class_437 screen) {
@@ -442,322 +432,301 @@ public final class YikimMainMenu {
     }
 
     /* ============================================================
-ONECLIENT ANA SAYFA — çizim yardımcıları
+ONECLIENT ANA SAYFA — çizim yardımcıları (sade düzen)
+       ============================================================
+
+       Tipografi yalnızca ÜÇ kademe: gövde 1.0 (Minecraft'in kendi yazısı),
+       kelime işareti 1.5, başlık 2.4. Aralaranki ölçekler kaldırıldı —
+       "font uyumsuzluğu" tam olarak buydu.
+
+       Turuncu YALNIZCA şu dört yerde: seçili bağlantının altındaki çizgi,
+       birincil düğme, kartların hover kenarlığı, Alev temasındaki küçük kor.
+       Kart arka planları nötr koyu; görsel alanda kor gradyan YOK (ekranı
+       kırmızımsı yapıyordu).
+
+       Metinler BÜYÜK HARF Türkçe glif (Ğ/Ş/Ü/Ö/Ç/İ) içermiyor — o glifler
+       piksel fontta bozuk çıkıp taşmaya yol açıyordu. Her yazı ölçülen
+       genişliğe göre kırpılıyor (clip).
        ============================================================ */
 
-    /** OneClient hareket eğrisi (motion.rs): 440/460 ms, Ease::Out + Cubic. */
+    /** OneClient hareket eğrisi: 200 ms, Ease::Out + Cubic (tek geçiş, karmaşa yok). */
     private static float ocEase(float p) {
         float t = Math.max(0.0f, Math.min(1.0f, p));
         return 1.0f - (1.0f - t) * (1.0f - t) * (1.0f - t);
     }
 
-    /** web_px → Minecraft birimi (ekran yüksekliği / 900). */
-    private static int px(Olcek o, float web) {
-        return Math.max(1, Math.round(o.u * web));
+    /** Yazıyı verilen ölçekle çiz (ölçü lenmiş genişlik döner). */
+    private static int mdYazi(class_332 g, class_327 font, String text, int x, int y,
+                              float olcek, int renk, boolean golge) {
+        YikimAdapter.push(g, x, y, olcek);
+        YikimAdapter.text(g, font, text, 0, 0, renk, golge);
+        YikimAdapter.pop(g);
+        return (int)((float)font.method_1727(text) * olcek);
     }
 
-    private static void olcekVer(Olcek o, float u) {
-        o.u = u;
-        o.navbarH = px(o, 80f);
-        o.navPad = px(o, 40f);
-        o.navLinkH = px(o, 36f);
-        o.navLinkPad = px(o, 17f);
-        o.navGap = px(o, 23f);
-        o.markYuk = px(o, 44f);
-        o.markIkon = px(o, 32f);
-        o.avatar = px(o, 28f);
-        o.rozet = px(o, 16f);
-        o.iconBtn = px(o, 32f);
-        o.iconBtnIkon = px(o, 20f);
-        o.bosluk = px(o, 48f);
-        o.butonH = Math.max(20, px(o, 38f));
-        o.butonPad = px(o, 24f);
-        o.hayaletBtn = px(o, 32f);
-        o.hayaletIkon = px(o, 20f);
-        o.seritH = px(o, 208f);
-        o.kartAralik = px(o, 24f);
-        o.kartYari = px(o, 12f);
-        o.kartMin = px(o, 300f);
-        o.kartEn = px(o, 480f);
-        o.kartBaslik = px(o, 32f);
-        o.dahaFazla = px(o, 96f);
-        // metin ölçekleri: hedef satır yüksekliği / 9 (Minecraft satır adımı)
-        o.baslikOlcek = Math.max(1.6f, Math.min(4.2f, (61.6f * u) / 9.0f));   // 56 px × 1.1
-        o.altBaslikOlcek = (16f * u) / 9.0f;
-        o.butonOlcek = (16f * u) / 9.0f;
-        o.kartBaslikOlcek = (32f * u) / 9.0f;
-        o.kartDurumOlcek = (12f * u) / 9.0f;
+    /** Ölçeğe göre genişlik. */
+    private static int mdGen(class_327 font, String text, float olcek) {
+        return (int)((float)font.method_1727(text) * olcek);
     }
 
     private void drawModernGovde(class_332 graphics, class_327 font, class_310 client,
                                  int screenWidth, int screenHeight, int mouseX, int mouseY) {
         this.refresh(client, font, 220);
         long now = System.currentTimeMillis();
-        float u = Math.max(0.30f, Math.min(1.25f, (float)screenHeight / 900.0f));
+        float s = Math.max(0.70f, Math.min(1.35f, (float)screenHeight / 540.0f));
         Olcek o = new Olcek();
-        olcekVer(o, u);
+        o.s = s;
+        o.navH = Math.max(16, Math.round(20.0f * s));
+        o.pad = Math.max(10, Math.round(14.0f * s));
+        o.navPad = Math.max(5, Math.round(7.0f * s));
+        o.navGap = Math.max(8, Math.round(12.0f * s));
+        o.ikonBtn = Math.max(14, Math.round(16.0f * s));
+        o.ikon = Math.max(8, Math.round(10.0f * s));
+        o.butonH = Math.max(18, Math.round(20.0f * s));
+        o.butonPad = Math.max(8, Math.round(10.0f * s));
+        o.hayaletBtn = o.ikonBtn;
+        o.seritH = Math.max(64, Math.round(96.0f * s));
+        o.kartAralik = Math.max(6, Math.round(8.0f * s));
+        o.markaOlcek = 1.5f;
+        o.baslikOlcek = Math.max(1.8f, Math.min(2.6f, 2.4f * s));
+        o.altOlcek = 1.0f;
+        o.kartBaslikOlcek = 1.5f;
 
-        // ---- OneClient vinyeti (app_shell.rs): merkez (0.80, 0.45), sol ölçek
-        //      1.8 / sağ 4.5, dikey 2.2, pow 1.3, en çok %80 karartma.
-        //      Shader yerine dört gradyan — kare başına 22 düz dolgu.
+        // ---- vinyet: hafif (önceki sürüm ekranı kırmızımsı yapıyordu)
         YikimDraw.horizontalGradient(graphics, 0, 0, (int)((float)screenWidth * 0.55f), screenHeight,
-            YikimTheme.alpha(MD_PAGE, 60), 0x00070505, 6);
+            YikimTheme.alpha(MD_PAGE, 34), 0x00070505, 6);
         YikimDraw.horizontalGradient(graphics, (int)((float)screenWidth * 0.45f), 0, screenWidth, screenHeight,
-            0x00070505, YikimTheme.alpha(MD_PAGE, 185), 6);
-        YikimDraw.verticalGradient(graphics, 0, 0, screenWidth, (int)((float)screenHeight * 0.42f),
-            YikimTheme.alpha(MD_PAGE, 66), 0x00070505, 5);
-        YikimDraw.verticalGradient(graphics, 0, (int)((float)screenHeight * 0.58f), screenWidth, screenHeight,
-            0x00070505, YikimTheme.alpha(MD_PAGE, 150), 5);
+            0x00070505, YikimTheme.alpha(MD_PAGE, 110), 6);
+        YikimDraw.verticalGradient(graphics, 0, 0, screenWidth, (int)((float)screenHeight * 0.40f),
+            YikimTheme.alpha(MD_PAGE, 40), 0x00070505, 4);
 
-        int pad = o.navPad;
-        int seritTop = screenHeight - o.bosluk - o.seritH;
-        int heroUst = o.navbarH + pad;
-        int heroAlt = seritTop - 6;
+        int seritTop = screenHeight - o.pad - o.seritH;
+        int heroUst = o.navH + o.pad;
+        int heroAlt = seritTop - 4;
         int heroOrta = (heroUst + Math.max(heroUst, heroAlt)) / 2;
 
-        // ---- lobi sahnesi: karakter sağda, ayakları şeridin üstünde hizalı
-        //      (OneClient'ın 3B modeli gibi yalnızca menü açıkken çizilir).
-        if (screenWidth >= 700 && heroAlt - heroUst > 120) {
-            int boy = Math.min(heroAlt - heroUst - 6, (int)((float)screenHeight * 0.52f));
-            if (boy >= 90) {
-                float p = ocEase((float)(now - this.openedAt) / 460.0f);
-                int ayak = heroAlt + 4 + (int)((1.0f - p) * 24.0f);
-                int cx = (int)((float)screenWidth * 0.74f);
-                YikimKarakter.draw(graphics, cx, ayak - boy, boy, YikimTheme.backdrop);
-                this.addHit(cx - boy / 3, ayak - boy, boy * 2 / 3, boy, this.surukleBaslat);
+        // ---- lobi sahnesi: karakter sağda (yalnızca menü açıkken)
+        if (screenWidth >= 660 && heroAlt - heroUst > 110) {
+            int boy = Math.min(heroAlt - heroUst - 6, (int)((float)screenHeight * 0.50f));
+            if (boy >= 80) {
+                float p = ocEase((float)(now - this.openedAt) / 200.0f);
+                int ayak = heroAlt + 2 + (int)((1.0f - p) * 16.0f);
+                YikimKarakter.draw(graphics, (int)((float)screenWidth * 0.76f), ayak - boy, boy,
+                    YikimTheme.backdrop);
+                this.addHit((int)((float)screenWidth * 0.76f) - boy / 3, ayak - boy,
+                    boy * 2 / 3, boy, this.surukleBaslat);
             }
         }
 
         this.cizNavbar(graphics, font, client, screenWidth, o, mouseX, mouseY);
         this.cizBaslik(graphics, font, client, screenWidth, o, heroOrta, mouseX, mouseY);
-        this.cizSerit(graphics, font, client, screenWidth, o, pad, seritTop, mouseX, mouseY);
+        this.cizSerit(graphics, font, client, screenWidth, o, seritTop, mouseX, mouseY);
         if (now < this.hintUntil && !this.hint.isEmpty()) {
-            YikimAdapter.text(graphics, font, YikimDraw.clip(font, this.hint, screenWidth - pad * 2),
-                pad, Math.max(heroAlt + 4, seritTop - 12), MD_TEXT2, false);
+            // ipucu yalnızca gerektiğinde: şeridin üstünde, tek satır
+            YikimAdapter.text(graphics, font, YikimDraw.clip(font, this.hint, screenWidth - o.pad * 2),
+                o.pad, Math.max(heroAlt, seritTop - 10), MD_TEXT2, false);
         }
     }
 
-    /** Üst gezinme şeridi: işaret + kelime işareti, bağlantılar, sağ blok. */
+    /** Üst şerit: kelime işareti + bağlantılar + sağda hesap/çıkış. */
     private void cizNavbar(class_332 graphics, class_327 font, class_310 client, int screenWidth,
                            Olcek o, int mouseX, int mouseY) {
-        int h = o.navbarH;
-        float p = ocEase((float)(System.currentTimeMillis() - this.openedAt) / 460.0f);
+        int h = o.navH;
+        float p = ocEase((float)(System.currentTimeMillis() - this.openedAt) / 200.0f);
         int slide = (int)((1.0f - p) * (float)h);
-        YikimDraw.verticalGradient(graphics, 0, 0, screenWidth, h + 10, 0x660B0705, 0x000B0705, 5);
+        YikimDraw.verticalGradient(graphics, 0, 0, screenWidth, h + 4, 0x550B0705, 0x000B0705, 4);
 
-        int orta = slide + (h - o.navLinkH) / 2;
-        boolean kelime = screenWidth >= 660;              // OneClient: < 1100 px → işaret
-        int sol = o.navPad;
-        int markX = -1;
+        int orta = slide + (h - o.ikonBtn) / 2;
+        boolean kelime = screenWidth >= 620;
+        int sol = o.pad;
         if (kelime) {
-            int ik = o.markIkon;
-            int my = orta + (o.navLinkH - ik) / 2;
-            YikimDraw.roundedFill(graphics, sol, my, sol + ik, my + ik, YikimTheme.accent);
-            YikimAdapter.textCentered(graphics, font, "Y", sol + ik / 2, my + (ik - 8) / 2 + 1,
-                0xFFFFFFFF, true);
-            markX = sol;
-            float ms = (float)o.markYuk / 9.0f;
-            int tx = sol + ik + o.navGap / 2;
-            int ty = orta + (o.navLinkH - (int)(9.0f * ms)) / 2;
-            YikimAdapter.push(graphics, tx, ty, ms);
-            YikimAdapter.text(graphics, font, "YIKIM", 0, 0, MD_TEXT, true);
-            YikimAdapter.pop(graphics);
-            int w1 = (int)((float)font.method_1727("YIKIM") * ms);
-            YikimAdapter.text(graphics, font, "LIENT", tx + w1 + 2, orta + (o.navLinkH - 8) / 2 + 1,
-                MD_TEXT2, false);
-            sol = tx + w1 + 2 + font.method_1727("LIENT") + o.navGap / 2;
-            this.addHit(markX, orta, Math.max(1, sol - markX), o.navLinkH, this.modernSekmeSec[0]);
+            // küçük kor kare + YIKIM (kelime işareti 1.5)
+            YikimDraw.roundedFill(graphics, sol, orta + 3, sol + 5, orta + o.ikonBtn - 3,
+                YikimTheme.accent);
+            int tw = mdYazi(graphics, font, "YIKIM", sol + 9, orta, o.markaOlcek, MD_TEXT, false);
+            sol += 9 + tw + o.navGap;
         }
 
-        int gap = kelime ? o.navGap : Math.max(8, px(o, 12f));
-        int sagBlok = o.iconBtn + o.avatar + Math.max(8, px(o, 8f)) + 6;
+        int linkTop = slide + (h - o.ikonBtn) / 2;
+        int gap = o.navGap;
         int toplam = -gap;
         for (String ad : MD_SEKME) {
-            toplam += font.method_1727(ad) + o.navLinkPad * 2 + gap;
+            toplam += font.method_1727(ad) + o.navPad * 2 + gap;
         }
         int x = (screenWidth - toplam) / 2;
-        int solSinir = kelime ? sol + 4 : o.navPad;
+        int solSinir = kelime ? sol + 2 : o.pad;
+        int sagBlok = o.ikonBtn * 2 + Math.max(4, Math.round(4.0f * o.s)) + 2;
         if (x < solSinir) {
             x = solSinir;
         }
-        int sagSinir = screenWidth - o.navPad - sagBlok - 8;
+        int sagSinir = screenWidth - o.pad - sagBlok - 4;
         if (x + toplam > sagSinir) {
             x = Math.max(solSinir, sagSinir - toplam);
         }
         for (int i = 0; i < MD_SEKME.length; ++i) {
-            int tw = font.method_1727(MD_SEKME[i]) + o.navLinkPad * 2;
+            int tw = font.method_1727(MD_SEKME[i]) + o.navPad * 2;
             boolean aktif = i == YikimMainMenu.sekme;
-            boolean uzerinde = YikimDraw.inside(mouseX, mouseY, x, orta, tw, o.navLinkH);
-            int dolgu = aktif ? MD_HAYALET : (uzerinde ? MD_HAYALET_UST : 0x00000000);
-            if (dolgu != 0x00000000) {
-                YikimDraw.roundedFill(graphics, x, orta, x + tw, orta + o.navLinkH, dolgu);
-            }
+            boolean uzerinde = YikimDraw.inside(mouseX, mouseY, x, linkTop, tw, h);
             int renk = aktif ? MD_TEXT : (uzerinde ? MD_TEXT : MD_TEXT2);
-            YikimAdapter.textCentered(graphics, font, MD_SEKME[i], x + tw / 2,
-                orta + (o.navLinkH - 8) / 2 + 1, renk, aktif);
+            YikimAdapter.textCentered(graphics, font, MD_SEKME[i], x + tw / 2, linkTop + (h - 8) / 2 + 1,
+                renk, false);
             if (aktif) {
-                YikimDraw.outline(graphics, x, orta, tw, o.navLinkH, MD_BORDER);
-                // Klasik'te turuncu çizgi, Alev'de kor: iki tema da aynı yerde çalışır.
+                // seçili bağlantı: 2 px kor çizgi (Alev temasında gerçek kor)
                 if (YikimTema.alev()) {
-                    YikimDraw.alevCizgi(graphics, x + o.navLinkPad, orta + o.navLinkH + 2,
-                        tw - o.navLinkPad * 2);
+                    YikimDraw.alevCizgi(graphics, x + o.navPad, linkTop + h - 1, tw - o.navPad * 2);
                 } else {
-                    YikimDraw.horizontalGradient(graphics, x + o.navLinkPad, orta + o.navLinkH,
-                        x + tw - o.navLinkPad, orta + o.navLinkH + 2,
-                        YikimTheme.accent, YikimTheme.accent2, 4);
+                    YikimDraw.horizontalGradient(graphics, x + o.navPad, linkTop + h - 2,
+                        x + tw - o.navPad, linkTop + h, YikimTheme.accent, YikimTheme.accent2, 4);
                 }
+            } else if (uzerinde) {
+                YikimDraw.roundedFill(graphics, x, linkTop, x + tw, linkTop + h, MD_HAYALET);
             }
-            this.addHit(x, orta, tw, o.navLinkH, this.modernSekmeSec[i]);
+            this.addHit(x, linkTop, tw, h, this.modernSekmeSec[i]);
             x += tw + gap;
         }
 
-        // sağ blok: güç + avatar(yanında dişli rozet)
-        int rX = screenWidth - o.navPad - o.iconBtn;
-        int rY = orta + (o.navLinkH - o.iconBtn) / 2;
-        boolean gHover = YikimDraw.inside(mouseX, mouseY, rX, rY, o.iconBtn, o.iconBtn);
-        YikimDraw.roundedFill(graphics, rX, rY, rX + o.iconBtn, rY + o.iconBtn,
-            gHover ? MD_HAYALET_UST : MD_HAYALET);
-        YikimDraw.outline(graphics, rX, rY, o.iconBtn, o.iconBtn, gHover ? MD_BORDER_GUC : MD_BORDER);
-        YikimMenuIcons.draw(graphics, YikimMenuIcons.POWER,
-            rX + (o.iconBtn - o.iconBtnIkon) / 2, rY + (o.iconBtn - o.iconBtnIkon) / 2,
-            o.iconBtnIkon, gHover ? 0xFFFF9A7A : MD_TEXT2);
-        this.addHit(rX, rY, o.iconBtn, o.iconBtn, this.modernCikis);
+        // sağ blok: hesap + çıkış (düz ikon düğmeleri, fazlası yok)
+        int rX = screenWidth - o.pad - o.ikonBtn;
+        boolean hHover = YikimDraw.inside(mouseX, mouseY, screenWidth - o.pad - o.ikonBtn * 2
+            - Math.max(4, Math.round(4.0f * o.s)), orta, o.ikonBtn, o.ikonBtn);
+        int hX = rX - Math.max(4, Math.round(4.0f * o.s)) - o.ikonBtn;
+        YikimDraw.roundedFill(graphics, hX, orta, hX + o.ikonBtn, orta + o.ikonBtn,
+            hHover ? MD_HAYALET_UST : MD_HAYALET);
+        YikimDraw.outline(graphics, hX, orta, o.ikonBtn, o.ikonBtn, MD_BORDER);
+        YikimMenuIcons.draw(graphics, YikimMenuIcons.KULLANICI, hX + 3, orta + 3, o.ikonBtn - 6,
+            hHover ? MD_TEXT : MD_TEXT2);
+        this.addHit(hX, orta, o.ikonBtn, o.ikonBtn, this.modernSekmeSec[3]);
 
-        int aX = rX - Math.max(8, px(o, 8f)) - o.avatar;
-        int aY = orta + (o.navLinkH - o.avatar) / 2;
-        boolean aHover = YikimDraw.inside(mouseX, mouseY, aX, aY, o.avatar, o.avatar);
-        YikimDraw.roundedFill(graphics, aX, aY, aX + o.avatar, aY + o.avatar,
-            aHover ? MD_HAYALET_BAS : MD_HAYALET_UST);
-        YikimDraw.outline(graphics, aX, aY, o.avatar, o.avatar, aHover ? MD_BORDER_GUC : MD_BORDER);
-        YikimMenuIcons.draw(graphics, YikimMenuIcons.KULLANICI, aX + 2, aY + 2, o.avatar - 4,
-            aHover ? MD_TEXT : MD_TEXT2);
-        int zX = aX + o.avatar - o.rozet + 2;
-        int zY = aY + o.avatar - o.rozet + 2;
-        YikimDraw.roundedFill(graphics, zX, zY, zX + o.rozet, zY + o.rozet, MD_ELEV);
-        YikimDraw.outline(graphics, zX, zY, o.rozet, o.rozet, MD_BORDER);
-        YikimMenuIcons.draw(graphics, YikimMenuIcons.GEAR, zX + 1, zY + 1, o.rozet - 2, MD_TEXT2);
-        this.addHit(aX, aY, o.avatar + o.rozet / 2, o.avatar + o.rozet / 2, this.modernSekmeSec[3]);
+        boolean gHover = YikimDraw.inside(mouseX, mouseY, rX, orta, o.ikonBtn, o.ikonBtn);
+        YikimDraw.roundedFill(graphics, rX, orta, rX + o.ikonBtn, orta + o.ikonBtn,
+            gHover ? MD_HAYALET_UST : MD_HAYALET);
+        YikimDraw.outline(graphics, rX, orta, o.ikonBtn, o.ikonBtn, MD_BORDER);
+        YikimMenuIcons.draw(graphics, YikimMenuIcons.POWER, rX + 3, orta + 3, o.ikonBtn - 6,
+            gHover ? 0xFFFF9A7A : MD_TEXT2);
+        this.addHit(rX, orta, o.ikonBtn, o.ikonBtn, this.modernCikis);
     }
 
-    /** Başlık bloğu (active_cluster_panel): 56 kalın + 16 alt başlık + eylemler. */
+    /** Başlık bloğu: başlık 2.4 + alt başlık 1.0 + birincil/hayalet düğme. */
     private void cizBaslik(class_332 graphics, class_327 font, class_310 client, int screenWidth,
                            Olcek o, int orta, int mouseX, int mouseY) {
-        float p = ocEase((float)(System.currentTimeMillis() - this.openedAt) / 440.0f);
-        int slide = (int)((1.0f - p) * px(o, 48f));
-        int x = o.navPad + slide;
+        float p = ocEase((float)(System.currentTimeMillis() - this.openedAt) / 200.0f);
+        int slide = (int)((1.0f - p) * Math.round(16.0f * o.s));
+        int x = o.pad + slide;
         int maxW = (int)((float)screenWidth * 0.55f);
-        int titleH = (int)(9.0f * o.baslikOlcek);
-        int subH = 10;
-        int blokH = titleH + 3 + subH + px(o, 8f) + o.butonH;
-        int y = orta - blokH / 2;
+        int baslikH = (int)(9.0f * o.baslikOlcek);
+        int altH = 10;
+        int blok = baslikH + 4 + altH + Math.max(6, Math.round(8.0f * o.s)) + o.butonH;
+        int y = orta - blok / 2;
+        if (y < o.navH + 4) {
+            y = o.navH + 4;
+        }
 
-        YikimAdapter.push(graphics, x, y, o.baslikOlcek);
-        YikimAdapter.text(graphics, font, YikimDraw.clip(font, this.baslikAdi(), maxW), 0, 0,
-            MD_TEXT, true);
-        YikimAdapter.pop(graphics);
+        // başlık (2.4) + altında kor çizgi
+        int bw = mdYazi(graphics, font, YikimDraw.clip(font, this.baslikAdi(), maxW), x, y,
+            o.baslikOlcek, MD_TEXT, false);
+        int cizgiY = y + baslikH + 1;
+        YikimDraw.horizontalGradient(graphics, x, cizgiY, x + Math.min(bw, maxW), cizgiY + 2,
+            YikimTheme.accent, YikimTheme.accent2, Math.max(3, Math.min(bw, maxW) / 4 + 1));
+        // alt başlık (1.0)
+        mdYazi(graphics, font, YikimDraw.clip(font, this.altBaslik(), maxW), x,
+            cizgiY + 5, o.altOlcek, MD_TEXT2, false);
 
-        int y2 = y + titleH + 3;
-        YikimAdapter.push(graphics, x, y2, o.altBaslikOlcek);
-        YikimAdapter.text(graphics, font, YikimDraw.clip(font, this.altBaslik(), maxW), 0, 0,
-            MD_TEXT2, false);
-        YikimAdapter.pop(graphics);
-
-        int y3 = y2 + subH + px(o, 8f);
+        int y3 = cizgiY + 5 + altH + Math.max(4, Math.round(6.0f * o.s));
+        // birincil düğme (gövde yazısı, büyük harf yok)
         String etiket = MD_BUTON[YikimMainMenu.sekme];
-        int bw = (int)((float)font.method_1727(etiket) * o.butonOlcek) + o.butonPad * 2;
-        int bh = o.butonH;
-        boolean hover = YikimDraw.inside(mouseX, mouseY, x, y3, bw, bh);
+        int tw = mdGen(font, etiket, 1.0f);
+        int bW = tw + o.butonPad * 2;
+        int bH = o.butonH;
+        boolean hover = YikimDraw.inside(mouseX, mouseY, x, y3, bW, bH);
         int marka = YikimTheme.accent;
-        YikimDraw.roundedFill(graphics, x, y3, x + bw, y3 + bh, hover
-            ? YikimDraw.blend(marka, 0xFF000000, 0.13f)
-            : marka);
-        YikimDraw.outline(graphics, x, y3, bw, bh,
-            hover ? 0x66FFFFFF : YikimTheme.alpha(YikimTheme.accent2, 120));
-        YikimAdapter.push(graphics, x + o.butonPad, y3 + (bh - (int)(9.0f * o.butonOlcek)) / 2,
-            o.butonOlcek);
-        YikimAdapter.text(graphics, font, etiket, 0, 0, 0xFFFFFFFF, true);
-        YikimAdapter.pop(graphics);
-        this.addHit(x, y3, bw, bh, this.modernEylemler[YikimMainMenu.sekme]);
+        YikimDraw.roundedFill(graphics, x, y3, x + bW, y3 + bH,
+            hover ? YikimDraw.blend(marka, 0xFF000000, 0.13f) : marka);
+        YikimDraw.outline(graphics, x, y3, bW, bH,
+            hover ? 0x55FFFFFF : YikimTheme.alpha(YikimTheme.accent2, 90));
+        YikimAdapter.textCentered(graphics, font, etiket, x + bW / 2, y3 + (bH - 8) / 2 + 1,
+            0xFFFFFFFF, false);
+        this.addHit(x, y3, bW, bH, this.modernEylemler[YikimMainMenu.sekme]);
 
-        int gx = x + bw + Math.max(8, px(o, 8f));
-        int gy = y3 + (bh - o.hayaletBtn) / 2;
-        boolean gh = YikimDraw.inside(mouseX, mouseY, gx, gy, o.hayaletBtn, o.hayaletBtn);
-        YikimDraw.roundedFill(graphics, gx, gy, gx + o.hayaletBtn, gy + o.hayaletBtn,
-            gh ? MD_HAYALET_UST : MD_HAYALET);
-        YikimDraw.outline(graphics, gx, gy, o.hayaletBtn, o.hayaletBtn,
+        // hayalet ayar düğmesi
+        int gX = x + bW + Math.max(6, Math.round(6.0f * o.s));
+        boolean gh = YikimDraw.inside(mouseX, mouseY, gX, y3 + (bH - o.hayaletBtn) / 2,
+            o.hayaletBtn, o.hayaletBtn);
+        int gY = y3 + (bH - o.hayaletBtn) / 2;
+        if (gh) {
+            YikimDraw.roundedFill(graphics, gX, gY, gX + o.hayaletBtn, gY + o.hayaletBtn, MD_HAYALET_UST);
+        }
+        YikimDraw.outline(graphics, gX, gY, o.hayaletBtn, o.hayaletBtn,
             gh ? MD_BORDER_GUC : MD_BORDER);
         YikimMenuIcons.draw(graphics, YikimMenuIcons.GEAR,
-            gx + (o.hayaletBtn - o.hayaletIkon) / 2, gy + (o.hayaletBtn - o.hayaletIkon) / 2,
-            o.hayaletIkon, gh ? MD_TEXT : MD_TEXT2);
-        this.addHit(gx, gy, o.hayaletBtn, o.hayaletBtn, this.modernGorunum);
+            gX + (o.hayaletBtn - o.ikon) / 2, gY + (o.hayaletBtn - o.ikon) / 2, o.ikon,
+            gh ? MD_TEXT : MD_TEXT2);
+        this.addHit(gX, gY, o.hayaletBtn, o.hayaletBtn, this.modernGorunum);
     }
 
-    /** Alt şerit (recents_row): 208 px, esnek kartlar + "Tümü" kutucuğu. */
+    /** Alt şerit: nötr kartlar + "Tümü" kutucuğu (başlık 1.5, durum 1.0). */
     private void cizSerit(class_332 graphics, class_327 font, class_310 client, int screenWidth,
-                          Olcek o, int pad, int top, int mouseX, int mouseY) {
+                          Olcek o, int top, int mouseX, int mouseY) {
         int h = o.seritH;
         long now = System.currentTimeMillis();
+        float p = ocEase((float)(now - this.openedAt) / 200.0f);
+        int rise = (int)((1.0f - p) * Math.round(12.0f * o.s));
         Kart[] liste = this.modernKartlar[YikimMainMenu.sekme];
         int n = Math.max(1, Math.min(liste.length, this.modernKartSayi[YikimMainMenu.sekme]));
-        int alan = screenWidth - pad * 2;
+        int alan = screenWidth - o.pad * 2;
+        int daha = Math.max(44, Math.round(58.0f * o.s));
         int goster = n;
-        while (goster > 1 && (alan - o.dahaFazla - o.kartAralik * goster) / goster < o.kartMin) {
+        while (goster > 1 && (alan - daha - o.kartAralik * goster) / goster < Math.round(96.0f * o.s)) {
             --goster;
         }
-        // kartlar + aralıklar + "Tümü" tam olarak alana yayılır
-        int kartW = Math.max(60, (alan - o.dahaFazla - o.kartAralik * goster) / goster);
+        int kartW = Math.max(56, (alan - daha - o.kartAralik * goster) / goster);
         for (int i = 0; i < goster; ++i) {
-            float p = ocEase((float)(now - this.openedAt - (long)i * 85L) / 460.0f);
-            int rise = (int)((1.0f - p) * px(o, 48f));
-            int cx = pad + i * (kartW + o.kartAralik);
-            this.cizKart(graphics, font, client, o, liste[i], cx, top + rise, kartW, h,
-                mouseX, mouseY);
+            this.cizKart(graphics, font, client, o, liste[i], o.pad + i * (kartW + o.kartAralik),
+                top + rise, kartW, h, mouseX, mouseY);
         }
-        // "Tümü" kutucuğu (96 px): kartların dışında kalan her şey panele gider
-        float pt = ocEase((float)(now - this.openedAt - (long)goster * 85L) / 460.0f);
-        int dx = pad + goster * (kartW + o.kartAralik);
-        int dy = top + (int)((1.0f - pt) * px(o, 48f));
-        boolean dh = YikimDraw.inside(mouseX, mouseY, dx, dy, o.dahaFazla, h);
-        YikimDraw.roundedFill(graphics, dx, dy, dx + o.dahaFazla, dy + h,
-            dh ? MD_HAYALET_UST : MD_COMP);
-        YikimDraw.outline(graphics, dx, dy, o.dahaFazla, h, dh ? MD_BORDER_GUC : MD_BORDER);
-        int di = px(o, 20f);
+        int dx = o.pad + goster * (kartW + o.kartAralik);
+        int dy = top + rise;
+        boolean dh = YikimDraw.inside(mouseX, mouseY, dx, dy, daha, h);
+        YikimDraw.roundedFill(graphics, dx, dy, dx + daha, dy + h, dh ? MD_ELEV : MD_COMP);
+        YikimDraw.outline(graphics, dx, dy, daha, h, dh ? MD_BORDER_GUC : MD_BORDER);
+        int di = Math.max(10, Math.round(14.0f * o.s));
         YikimMenuIcons.draw(graphics, YikimMenuIcons.BARS,
-            dx + (o.dahaFazla - di) / 2, dy + (h - di) / 2 - 4, di, dh ? MD_TEXT : MD_TEXT2);
-        YikimAdapter.textCentered(graphics, font, "Tümü", dx + o.dahaFazla / 2,
-            dy + h / 2 + 6, MD_TEXT2, false);
-        this.addHit(dx, dy, o.dahaFazla, h, this.modernPanel);
+            dx + (daha - di) / 2, dy + (h - di) / 2 - 5, di, dh ? MD_TEXT : MD_TEXT2);
+        YikimAdapter.textCentered(graphics, font, "Tümü", dx + daha / 2, dy + h / 2 + 6, MD_TEXT2, false);
+        this.addHit(dx, dy, daha, h, this.modernPanel);
     }
 
-    /** Bir kart: görsel alanı + alttan karartma gradyanı + 32 px başlık. */
+    /** Bir kart: nötr zemin, tepede hafif iç ışık, altta başlık + durum. */
     private void cizKart(class_332 graphics, class_327 font, class_310 client, Olcek o, Kart kart,
                          int x, int y, int w, int h, int mouseX, int mouseY) {
         boolean hover = YikimDraw.inside(mouseX, mouseY, x, y, w, h);
         YikimDraw.roundedFill(graphics, x, y, x + w, y + h, hover ? MD_ELEV : MD_CARD);
-        int gorselH = Math.max(18, (int)((float)h * 0.62f));
-        YikimDraw.verticalGradient(graphics, x + 2, y + 2, x + w - 2, y + gorselH,
-            YikimTheme.alpha(YikimTheme.accent, 120), YikimTheme.alpha(YikimTheme.accent2, 10), 6);
-        int ik = Math.max(10, Math.min(w / 3, px(o, 56f)));
-        YikimMenuIcons.draw(graphics, kart.ikon, x + (w - ik) / 2, y + (gorselH - ik) / 2, ik,
-            YikimTheme.alpha(MD_TEXT, 210));
-        YikimDraw.verticalGradient(graphics, x + 2, y + gorselH - 8, x + w - 2, y + h - 2,
-            0x00000000, YikimTheme.alpha(MD_PAGE, 235), 5);
-        if (hover) {
-            YikimDraw.roundedFill(graphics, x + 2, y + 2, x + w - 2, y + h - 2, 0x33000000);
-        }
+        // tepede 1 px iç ışık (derinlik hissi, gölge/blur yok)
+        graphics.method_25294(x + 3, y + 2, x + w - 3, y + 3, 0x14FFFFFF);
+        // görsel alanı: nötr koyu + ortada ikon
+        int gorselH = (int)((float)h * 0.56f);
+        YikimDraw.verticalGradient(graphics, x + 2, y + 3, x + w - 2, y + gorselH,
+            0x0FFFFFFF, 0x00000000, 4);
+        int ik = Math.max(10, Math.min(w / 4, Math.round(22.0f * o.s)));
+        YikimMenuIcons.draw(graphics, kart.ikon, x + (w - ik) / 2, y + (gorselH - ik) / 2 + 2, ik,
+            YikimTheme.alpha(MD_TEXT, 200));
+        // alttan karartma: başlık okunsun
+        YikimDraw.verticalGradient(graphics, x + 2, y + h - Math.max(14, (int)((float)h * 0.34f)),
+            x + w - 2, y + h - 2, 0x00000000, YikimTheme.alpha(MD_PAGE, 200), 4);
         YikimDraw.outline(graphics, x, y, w, h, hover ? MD_BORDER_GUC : MD_BORDER);
-        int tx = x + px(o, 24f);
-        int by = y + h - px(o, 12f) - (int)(9.0f * o.kartBaslikOlcek);
-        YikimAdapter.push(graphics, tx, by, o.kartBaslikOlcek);
-        YikimAdapter.text(graphics, font, YikimDraw.clip(font, kart.etiket, w - px(o, 36f)), 0, 0,
-            MD_TEXT, true);
-        YikimAdapter.pop(graphics);
-        YikimAdapter.text(graphics, font, YikimDraw.clip(font, kart.durum, w - px(o, 36f)),
-            tx, by + (int)(9.0f * o.kartBaslikOlcek) + 2, MD_TEXT2, false);
+        if (hover) {
+            graphics.method_25294(x + 2, y + 2, x + w - 2, y + h - 2, 0x14FFFFFF);
+        }
+        int tx = x + Math.max(8, Math.round(10.0f * o.s));
+        int ic = w - Math.max(8, Math.round(10.0f * o.s)) * 2;
+        int by = y + h - Math.max(8, Math.round(9.0f * o.s)) - (int)(9.0f * o.kartBaslikOlcek);
+        mdYazi(graphics, font, YikimDraw.clip(font, kart.etiket, ic), tx, by, o.kartBaslikOlcek,
+            MD_TEXT, false);
+        YikimAdapter.text(graphics, font, YikimDraw.clip(font, kart.durum, ic), tx,
+            by + (int)(9.0f * o.kartBaslikOlcek) + 2, MD_TEXT2, false);
         this.addHit(x, y, w, h, kart.eylem == null ? this.modernPanel : kart.eylem);
     }
 
-    /** Başlık: aktif "kluster" (OneClient = cluster adı). */
+    /** Başlık: aktif "kluster" adı (OneClient = cluster adı). */
     private String baslikAdi() {
         return switch (YikimMainMenu.sekme) {
             case 0 -> this.cacheKurulum;
@@ -768,35 +737,35 @@ ONECLIENT ANA SAYFA — çizim yardımcıları
         };
     }
 
-    /** Alt başlık: OneClient'ın "sürüm + yükleyici + meta" satırı. */
+    /** Alt başlık: tek satır, gövde boyu. */
     private String altBaslik() {
         return switch (YikimMainMenu.sekme) {
-            case 0 -> "Minecraft " + YikimVideo.gameVersion() + "  \u2022  " + this.cacheMods
-                + "  \u2022  " + this.cacheBellek;
-            case 1 -> this.cacheSkin + "  \u2022  Pelerin " + this.cachePelerin
-                + "  \u2022  Elitra " + this.cacheElitra;
-            case 2 -> this.cacheMods + "  \u2022  " + YikimConfig.get().catalogSource
-                + "  \u2022  " + this.modButtons.size() + " tuş";
-            case 3 -> this.cacheAccount + "  \u2022  " + this.cacheLauncher;
-            default -> "Tema " + YikimTema.ad() + "  \u2022  HUD " + this.cacheHud
-                + "  \u2022  " + YikimBackdrop.sessionLabel();
+            case 0 -> "Minecraft " + YikimVideo.gameVersion() + "  ·  " + this.cacheMods
+                + "  ·  " + this.cacheBellek;
+            case 1 -> this.cacheSkin + "  ·  Pelerin " + this.cachePelerin
+                + "  ·  Elitra " + this.cacheElitra;
+            case 2 -> this.cacheMods + "  ·  " + YikimConfig.get().catalogSource
+                + "  ·  " + this.modButtons.size() + " tuş";
+            case 3 -> this.cacheAccount + "  ·  " + this.cacheLauncher;
+            default -> "Tema " + YikimTema.ad() + "  ·  HUD " + this.cacheHud
+                + "  ·  " + YikimBackdrop.sessionLabel();
         };
     }
 
     /**
-     * Kartların metinleri — saniyede bir (refresh içinden) tazelenir.
-     * Eylemler kurucuda bir kez kurulur; burada yalnız yazı yazılır.
+     * Kart metinleri — saniyede bir tazelenir; eylemler kurucuda kuruludur.
+     * Etiketler BÜYÜK HARF Türkçe glif içermeyen kısa yazılar.
      */
     private void kartlariDoldur() {
         Kart[] oyna = this.modernKartlar[0];
-        oyna[0].etiket = "Tek Oyunculu";
+        oyna[0].etiket = "Tek oyunculu";
         oyna[0].durum = "dünyalarını aç";
-        oyna[1].etiket = "\u00c7ok Oyunculu";
+        oyna[1].etiket = "\u00c7ok oyunculu";
         oyna[1].durum = "sunucu listesi";
-        oyna[2].etiket = "YIKIM Men\u00fcs\u00fc";
+        oyna[2].etiket = "YIKIM menüsü";
         oyna[2].durum = "panel";
         oyna[3].etiket = "Kozmetik";
-        oyna[3].durum = "deri \u00b7 pelerin \u00b7 elitra";
+        oyna[3].durum = "deri · pelerin · elitra";
         oyna[4].etiket = "Modlar";
         oyna[4].durum = this.cacheMods;
         oyna[5].etiket = "Hesap";
@@ -812,14 +781,14 @@ ONECLIENT ANA SAYFA — çizim yardımcıları
         koz[2].durum = this.cacheElitra;
         koz[3].etiket = "Mojang";
         koz[3].durum = this.cacheMojang;
-        koz[4].etiket = "Kozmetik ekran\u0131";
-        koz[4].durum = "t\u00fcm se\u00e7enekler";
+        koz[4].etiket = "Kozmetik ekranı";
+        koz[4].durum = "tüm seçenekler";
         this.modernKartSayi[1] = 5;
 
         Kart[] mod = this.modernKartlar[2];
-        mod[0].etiket = "Mod katalo\u011fu";
+        mod[0].etiket = "Mod kataloğu";
         mod[0].durum = "mod ara ve kur";
-        mod[1].etiket = "Y\u00fcklenenler";
+        mod[1].etiket = "Yüklenenler";
         mod[1].durum = this.cacheMods;
         int k = 2;
         for (int i = 0; i < this.modButtons.size() && k < 6; ++i) {
@@ -836,30 +805,29 @@ ONECLIENT ANA SAYFA — çizim yardımcıları
         this.modernKartSayi[2] = k;
 
         Kart[] hes = this.modernKartlar[3];
-        hes[0].etiket = "Hesap de\u011fi\u015ftir";
+        hes[0].etiket = "Hesap değiştir";
         hes[0].durum = this.cacheAccount;
-        hes[1].etiket = "Vanilla men\u00fc";
+        hes[1].etiket = "Vanilla menü";
         hes[1].durum = "minecraft";
         hes[2].etiket = "HUD";
         hes[2].durum = this.cacheHud;
-        hes[3].etiket = "YIKIM Men\u00fcs\u00fc";
+        hes[3].etiket = "YIKIM menüsü";
         hes[3].durum = "panel";
         this.modernKartSayi[3] = 4;
 
         Kart[] aya = this.modernKartlar[4];
-        aya[0].etiket = "Minecraft ayarlar\u0131";
+        aya[0].etiket = "Minecraft ayarları";
         aya[0].durum = "vanilla";
         aya[1].etiket = "Arka plan";
         aya[1].durum = YikimBackdrop.sessionLabel();
         aya[2].etiket = "HUD";
         aya[2].durum = this.cacheHud;
-        aya[3].etiket = "G\u00f6r\u00fcn\u00fcm";
+        aya[3].etiket = "Görünüm";
         aya[3].durum = YikimTema.ad();
-        aya[4].etiket = "Vanilla men\u00fc";
-        aya[4].durum = "ge\u00e7";
+        aya[4].etiket = "Vanilla menü";
+        aya[4].durum = "geç";
         this.modernKartSayi[4] = 5;
     }
-
     private void refresh(class_310 client, class_327 font, int tipWidth) {
         String uuid;
         long now = System.currentTimeMillis();
