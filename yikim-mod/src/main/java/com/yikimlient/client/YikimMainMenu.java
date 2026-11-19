@@ -543,7 +543,7 @@ ONECLIENT ANA SAYFA — çizim yardımcıları
         int h = o.navbarH;
         float p = ocEase((float)(System.currentTimeMillis() - this.openedAt) / 460.0f);
         int slide = (int)((1.0f - p) * (float)h);
-        YikimDraw.verticalGradient(graphics, 0, -6, screenWidth, h + 10, 0x660B0705, 0x000B0705, 5);
+        YikimDraw.verticalGradient(graphics, 0, 0, screenWidth, h + 10, 0x660B0705, 0x000B0705, 5);
 
         int orta = slide + (h - o.navLinkH) / 2;
         boolean kelime = screenWidth >= 660;              // OneClient: < 1100 px → işaret
@@ -701,10 +701,11 @@ ONECLIENT ANA SAYFA — çizim yardımcıları
         int n = Math.max(1, Math.min(liste.length, this.modernKartSayi[YikimMainMenu.sekme]));
         int alan = screenWidth - pad * 2;
         int goster = n;
-        while (goster > 1 && (alan - o.dahaFazla - o.kartAralik) / goster < o.kartMin) {
+        while (goster > 1 && (alan - o.dahaFazla - o.kartAralik * goster) / goster < o.kartMin) {
             --goster;
         }
-        int kartW = Math.max(60, (alan - o.dahaFazla - o.kartAralik) / goster);
+        // kartlar + aralıklar + "Tümü" tam olarak alana yayılır
+        int kartW = Math.max(60, (alan - o.dahaFazla - o.kartAralik * goster) / goster);
         for (int i = 0; i < goster; ++i) {
             float p = ocEase((float)(now - this.openedAt - (long)i * 85L) / 460.0f);
             int rise = (int)((1.0f - p) * px(o, 48f));
