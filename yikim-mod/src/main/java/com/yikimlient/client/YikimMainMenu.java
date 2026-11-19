@@ -74,29 +74,58 @@ public final class YikimMainMenu {
     private int cacheTipWidth = -1;
     private List<String> cacheTipLines = List.of();
 
-    /* ---------------- MODERN DÜZEN (v1.35.0) ----------------
-       Launcher'ın "Modern" dünyasının oyun içi karşılığı: üstte yüzen
-       sekme şeridi, tam ekran sahne, sağda cam kart, altta durum çubuğu.
-       Renkler launcher'ın turuncu-kor paletinden; kare başına yalnızca
-       düz dikdörtgen + metin çizilir (blur, gölge dokusu, parçacık yok). */
+    /* ============================================================
+       ONECLIENT ANA SAYFA DÃœZENÄ° (v1.36.0) â€” turuncu-kor palet
+
+       Ã–lÃ§Ã¼ler OneClient/Polyfrost launcher'Ä±nÄ±n kendi kodundan birebir
+       alÄ±ndÄ± (packages/oneclient_app/src: theme, navbar, active_cluster_panel,
+       recents_row, layout/app_shell):
+
+         navbar yÃ¼ksekliÄŸi ............ 80 px
+         navbar yan boÅŸluÄŸu .......... 40 px  (kelime iÅŸareti < 1100 px gizli)
+         kelime iÅŸareti ............... 214 Ã— 44
+         baÄŸlantÄ± ...................... 36 px yÃ¼ksek, yarÄ±Ã§ap 10, 16 px yazÄ±,
+                                         geniÅŸlik = harf Ã— 10 + 34
+         ana sayfa boÅŸluÄŸu ............ 48 px
+         baÅŸlÄ±k ....................... 56 px kalÄ±n, satÄ±r yÃ¼ksekliÄŸi 1.1
+         alt baÅŸlÄ±k ................... 16 px yarÄ± kalÄ±n
+         birincil dÃ¼ÄŸme ................ 16 px / 450, boÅŸluk 8 dikey 24 yatay
+         hayalet ayar dÃ¼ÄŸmesi ......... 32 Ã— 32, 20 px ikon
+         son oynananlar ÅŸeridi ........ 208 px
+         kart .......................... 300â€“480 esnek, aralÄ±k 24, yarÄ±Ã§ap 12,
+                                         1 px kenarlÄ±k (hover 1.6), baÅŸlÄ±k 32
+         "daha fazla" kutucuÄŸu ........ 96 px
+         giriÅŸ: navbar 460 ms (-80 px) Â· baÅŸlÄ±k 440 ms (48 px saÄŸdan) Â·
+                 kart 460 ms + 85 ms gecikme (48 px aÅŸaÄŸÄ±dan)
+
+       Minecraft birimi = web_px Ã— (ekran yÃ¼ksekliÄŸi / 900); bÃ¶ylece her
+       Ã§Ã¶zÃ¼nÃ¼rlÃ¼kte aynÄ± oranlar korunur.
+
+       Renk: OneClient'Ä±n 8 jetonunun YIKIM karÅŸÄ±lÄ±ÄŸÄ± (is + kor turuncusu).
+       Blur/shader/parÃ§acÄ±k YOK: kare baÅŸÄ±na yalnÄ±z dÃ¼z dikdÃ¶rtgen + gradyan.
+       ============================================================ */
+
     private static final String[] MD_SEKME = {"Oyna", "Kozmetik", "Modlar", "Hesap", "Ayarlar"};
     private static final int[] MD_IKON = {
         YikimMenuIcons.PLAY, YikimMenuIcons.EYE, YikimMenuIcons.BLOCKS,
         YikimMenuIcons.KULLANICI, YikimMenuIcons.GEAR};
     private static final String[] MD_BUTON = {
-        "DÜNYALARI AÇ", "ÖZELLEŞTİRME", "MODLARI AÇ", "HESAP DEĞİŞTİR", "MİNECRAFT AYARLARI"};
-    private static final int MD_TEXT = 0xFFF4ECE2;
-    private static final int MD_DIM = 0xFFB3A495;
-    private static final int MD_FAINT = 0xFF8A7B6C;
-    private static final int MD_CARD = 0xE815110F;
-    private static final int MD_LINE = 0x1FFFFFFF;
-    private static final int MD_LINE_GUC = 0x33FFFFFF;
-    private static final int MD_HOVER = 0x14FFFFFF;
-    private static final int MD_SCRIM_TOP = 0xE0070504;
-    private static final int MD_SCRIM_BOTTOM = 0xE6070504;
-    private static final int MD_SCRIM_LEFT = 0xA6070504;
+        "DÃœNYALARI AÃ‡", "KOZMETÄ°K EKRANI", "MOD KATALOÄU", "HESAP DEÄÄ°ÅTÄ°R", "MÄ°NECRAFT AYARLARI"};
 
-    /** Seçili üst sekme — ekranlar arasında korunur (menüye dönünce aynı yer). */
+    // OneClient paletinin YIKIM karÅŸÄ±lÄ±ÄŸÄ± (page/card/component/border/text/â€¦)
+    private static final int MD_PAGE = 0xFF0B0705;
+    private static final int MD_ELEV = 0xFF140C08;
+    private static final int MD_CARD = 0xE61B0F09;
+    private static final int MD_COMP = 0xE622130B;
+    private static final int MD_BORDER = 0x2EFFB066;
+    private static final int MD_BORDER_GUC = 0x49FFB066;
+    private static final int MD_TEXT = 0xFFFFE9D6;
+    private static final int MD_TEXT2 = 0xFFB08A72;
+    private static final int MD_HAYALET = 0x0C000000;
+    private static final int MD_HAYALET_UST = 0x1A000000;
+    private static final int MD_HAYALET_BAS = 0x26000000;
+
+    /** SeÃ§ili Ã¼st sekme â€” ekranlar arasÄ±nda korunur (menÃ¼ye dÃ¶nÃ¼nce aynÄ± yer). */
     private static int sekme;
     private String cacheBellek = "";
     private float cacheBellekOran;
@@ -104,17 +133,66 @@ public final class YikimMainMenu {
     private String cachePelerin = "";
     private String cacheElitra = "";
     private String cacheMojang = "";
+    private String cacheKurulum = "";
 
-    /** Üst sekme tıklamaları — kare başına lambda üretmemek için önceden kurulu. */
+    /** Ãœst sekme tÄ±klamalarÄ± â€” kare baÅŸÄ±na lambda Ã¼retmemek iÃ§in Ã¶nceden kurulu. */
     private final Runnable[] modernSekmeSec = new Runnable[MD_SEKME.length];
-    /** Kartın altındaki büyük eylem düğmesi (sekmeye göre). */
+    /** BaÅŸlÄ±k bloÄŸunun altÄ±ndaki bÃ¼yÃ¼k eylem dÃ¼ÄŸmesi (sekmeye gÃ¶re). */
     private final Runnable[] modernEylemler = new Runnable[MD_SEKME.length];
-    /** Kart içindeki küçük bağlantı düğmeleri (sekmeye göre, boş olabilir). */
-    private final Button[][] modernLinkler = new Button[MD_SEKME.length][];
     private final Runnable modernCikis;
     private final Runnable surukleBaslat;
-    /** Mod tuşu tıklamaları — kare başına lambda üretmemek için bir kez kurulur. */
+    /** "TÃ¼mÃ¼" kutucuÄŸu ve baÅŸlÄ±ÄŸÄ±n yanÄ±ndaki hayalet ayar dÃ¼ÄŸmesi. */
+    private final Runnable modernPanel;
+    private final Runnable modernGorunum;
+    /** Mod tuÅŸu tÄ±klamalarÄ± â€” kare baÅŸÄ±na lambda Ã¼retmemek iÃ§in bir kez kurulur. */
     private final List<Runnable> modernModTiklama = new ArrayList<Runnable>();
+
+    /**
+     * "Son oynananlar" ÅŸeridindeki bir kart â€” OneClient recents_row kartÄ±.
+     * Etiket/durum saniyede bir tazelenir; eylem Ã¶nceden kurulmuÅŸtur.
+     */
+    private static final class Kart {
+        private String etiket = "";
+        private String durum = "";
+        private int ikon;
+        private Runnable eylem;
+    }
+
+    private final Kart[][] modernKartlar = new Kart[MD_SEKME.length][6];
+    private final int[] modernKartSayi = new int[MD_SEKME.length];
+
+    /** Kare baÅŸÄ±na yeniden hesaplanmayan Ã¶lÃ§Ã¼ kÃ¼mesi (web px â†’ Minecraft birimi). */
+    private static final class Olcek {
+        private float u;
+        private int navbarH;      // 80 px
+        private int navPad;       // 40 px
+        private int navLinkH;     // 36 px
+        private int navLinkPad;   // 17 px (yarÄ±)
+        private int navGap;       // 23 px (gÃ¶rsel aralÄ±k)
+        private int markYuk;      // 44 px
+        private int avatar;       // 28 px
+        private int rozet;        // 16 px
+        private int iconBtn;      // 32 px
+        private int iconBtnIkon;  // 20 px
+        private int bosluk;       // 48 px
+        private int butonH;       // ~38 px
+        private int butonPad;     // 24 px
+        private int hayaletBtn;   // 32 px
+        private int hayaletIkon;  // 20 px
+        private int seritH;       // 208 px
+        private int kartAralik;   // 24 px
+        private int kartYari;     // 12 px
+        private int kartMin;      // 300 px
+        private int kartEn;       // 480 px
+        private int kartBaslik;   // 32 px
+        private int dahaFazla;    // 96 px
+        private float baslikOlcek;
+        private float altBaslikOlcek;
+        private float butonOlcek;
+        private float kartBaslikOlcek;
+        private float kartDurumOlcek;
+        private int markIkon;     // 32 px logo iÅŸareti
+    }
 
     public YikimMainMenu(class_437 screen) {
         this.screen = screen;
@@ -123,15 +201,15 @@ public final class YikimMainMenu {
         this.buttons.add(new Button("YIKIM Men\u00fcs\u00fc", "Performans, g\u00f6r\u00fcn\u00fcm, HUD, modlar", 0, 0, () -> YikimPanel.open(class_310.method_1551(), 0)));
         this.buttons.add(new Button("HUD'u d\u00fczenle", "\u00d6\u011feleri yerle\u015ftir", 3, 2, () -> YikimPanel.open(class_310.method_1551(), 2)));
         this.buttons.add(new Button("Modlar", "Mod ara ve kur", 4, 4, () -> YikimPanel.open(class_310.method_1551(), 4)));
-        // v1.27.0: oyun içi hesap değiştirme (launcher hesapları)
+        // v1.27.0: oyun iÃ§i hesap deÄŸiÅŸtirme (launcher hesaplarÄ±)
         String hesapAdi = YikimHesaplar.aktifAd(class_310.method_1551());
-        this.buttons.add(new Button("Hesap: " + (hesapAdi.isEmpty() ? "değiştir" : hesapAdi),
-            "Premium / çevrimdışı arasında anında geçiş", YikimMenuIcons.KULLANICI, -1,
+        this.buttons.add(new Button("Hesap: " + (hesapAdi.isEmpty() ? "deÄŸiÅŸtir" : hesapAdi),
+            "Premium / Ã§evrimdÄ±ÅŸÄ± arasÄ±nda anÄ±nda geÃ§iÅŸ", YikimMenuIcons.KULLANICI, -1,
             () -> YikimMainMenu.open(new YikimHesapEkrani())));
         this.buttons.add(new Button("Ayarlar", "Minecraft ayarlar\u0131", 5, -1, () -> YikimMainMenu.open(YikimAdapter.optionsScreen(screen, class_310.method_1551().field_1690))));
         this.buttons.add(new Button("\u00c7\u0131k\u0131\u015f", "Oyundan ayr\u0131l", 8, -1, () -> class_310.method_1551().method_1592()));
-        // DİĞER MODLARIN TUŞLARI (Flashback, Mod Menu vb.): vanilla menüye mixin ile
-        // eklenen tuşlar OTURUM BOYUNCA BİR KEZ yakalanır ve sağ panelde listelenir.
+        // DÄ°ÄER MODLARIN TUÅLARI (Flashback, Mod Menu vb.): vanilla menÃ¼ye mixin ile
+        // eklenen tuÅŸlar OTURUM BOYUNCA BÄ°R KEZ yakalanÄ±r ve saÄŸ panelde listelenir.
         this.modButtons = YikimModButtons.scanOnce(class_310.method_1551());
         for (class_4185 dugme : this.modButtons) {
             this.modernModTiklama.add(() -> YikimModButtons.press(dugme));
@@ -154,7 +232,10 @@ public final class YikimMainMenu {
             class_310.method_1551().method_1507(new class_442());
         };
 
-        // ---- MODERN DÜZEN: sekmeler, büyük eylemler, kart bağlantıları ----
+        // ---- ONECLIENT DÃœZEN: sekmeler, bÃ¼yÃ¼k eylemler ----
+        // NOT: AtÃ¶lye (piksel rozet tasarÄ±mcÄ±sÄ±) bilerek YOK â€” o sistem
+        // launcher Ã¼zerinden Ã§alÄ±ÅŸÄ±r ve oyun iÃ§i menÃ¼de normal kullanÄ±cÄ±ya
+        // aÃ§Ä±lmaz. TuÅŸu da kapalÄ± (bkz. YikimKeys.poll).
         for (int i = 0; i < MD_SEKME.length; ++i) {
             final int hedef = i;
             this.modernSekmeSec[i] = () -> YikimMainMenu.sekme = hedef;
@@ -166,33 +247,69 @@ public final class YikimMainMenu {
         this.modernEylemler[4] = () -> YikimMainMenu.open(
             YikimAdapter.optionsScreen(screen, class_310.method_1551().field_1690));
 
-        this.modernLinkler[0] = new Button[]{
-            new Button("Sunucular", "Sunucu listesi", YikimMenuIcons.GLOBE, -1,
-                () -> YikimMainMenu.open(YikimAdapter.multiplayerScreen(screen))),
-            new Button("YIKIM", "Performans, g\u00f6r\u00fcn\u00fcm, HUD", YikimMenuIcons.BOLT, -1,
-                () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_PERFORMANCE)),
-            new Button("At\u00f6lye", "Pelerin ve kanat tasarla", YikimMenuIcons.IMAGE, -1,
-                () -> YikimMainMenu.open(new YikimAtolyeEkrani()))};
-        this.modernLinkler[1] = new Button[]{
-            new Button("Kozmetik", "Deri, pelerin, elitra", YikimMenuIcons.EYE, -1,
-                () -> YikimMainMenu.open(new YikimKozmetikEkrani())),
-            new Button("At\u00f6lye", "Pelerin ve kanat tasarla", YikimMenuIcons.IMAGE, -1,
-                () -> YikimMainMenu.open(new YikimAtolyeEkrani()))};
-        this.modernLinkler[2] = new Button[]{
-            new Button("YIKIM", "Mod listesi ve ayarlar", YikimMenuIcons.BOLT, -1,
-                () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_MODS)),
-            new Button("Katalog", "Mod ara ve kur", YikimMenuIcons.SEARCH, -1,
-                () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_MODS))};
-        this.modernLinkler[3] = new Button[]{
-            new Button("Hesap", "Premium / \u00e7evrimd\u0131\u015f\u0131", YikimMenuIcons.KULLANICI, -1,
-                () -> YikimMainMenu.open(new YikimHesapEkrani()))};
-        this.modernLinkler[4] = new Button[]{
-            new Button("Vanilla", "Minecraft ana men\u00fcs\u00fc", YikimMenuIcons.ARROW, -1,
-                this.chipVanilla),
-            new Button("G\u00f6r\u00fcn\u00fcm", "Klasik / Alev", YikimMenuIcons.EYE, -1,
-                () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_LOOK))};
+        for (int p = 0; p < MD_SEKME.length; ++p) {
+            for (int k = 0; k < 6; ++k) {
+                this.modernKartlar[p][k] = new Kart();
+            }
+        }
+        // KartlarÄ±n eylemleri sabit; etiket/durum metni refresh() iÃ§inde
+        // saniyede bir yazÄ±lÄ±r (kare baÅŸÄ±na dizi/nesne Ã¼retimi olmaz).
+        this.modernKartlar[0][0].eylem = () -> YikimMainMenu.open(YikimAdapter.worldSelectScreen(screen));
+        this.modernKartlar[0][0].ikon = YikimMenuIcons.PLAY;
+        this.modernKartlar[0][1].eylem = () -> YikimMainMenu.open(YikimAdapter.multiplayerScreen(screen));
+        this.modernKartlar[0][1].ikon = YikimMenuIcons.GLOBE;
+        this.modernKartlar[0][2].eylem = () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_PERFORMANCE);
+        this.modernKartlar[0][2].ikon = YikimMenuIcons.BOLT;
+        this.modernKartlar[0][3].eylem = () -> YikimMainMenu.open(new YikimKozmetikEkrani());
+        this.modernKartlar[0][3].ikon = YikimMenuIcons.EYE;
+        this.modernKartlar[0][4].eylem = () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_MODS);
+        this.modernKartlar[0][4].ikon = YikimMenuIcons.BLOCKS;
+        this.modernKartlar[0][5].eylem = () -> YikimMainMenu.open(new YikimHesapEkrani());
+        this.modernKartlar[0][5].ikon = YikimMenuIcons.KULLANICI;
+
+        Runnable koz = () -> YikimMainMenu.open(new YikimKozmetikEkrani());
+        this.modernKartlar[1][0].eylem = koz;
+        this.modernKartlar[1][0].ikon = YikimMenuIcons.EYE;
+        this.modernKartlar[1][1].eylem = koz;
+        this.modernKartlar[1][1].ikon = YikimMenuIcons.HEART;
+        this.modernKartlar[1][2].eylem = koz;
+        this.modernKartlar[1][2].ikon = YikimMenuIcons.IMAGE;
+        this.modernKartlar[1][3].eylem = koz;
+        this.modernKartlar[1][3].ikon = YikimMenuIcons.GLOBE;
+        this.modernKartlar[1][4].eylem = () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_LOOK);
+        this.modernKartlar[1][4].ikon = YikimMenuIcons.BOLT;
+
+        this.modernKartlar[2][0].eylem = () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_MODS);
+        this.modernKartlar[2][0].ikon = YikimMenuIcons.SEARCH;
+        this.modernKartlar[2][1].eylem = () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_MODS);
+        this.modernKartlar[2][1].ikon = YikimMenuIcons.BLOCKS;
+        this.modernKartlar[2][4].eylem = () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_SYSTEM);
+        this.modernKartlar[2][4].ikon = YikimMenuIcons.BOLT;
+
+        this.modernKartlar[3][0].eylem = () -> YikimMainMenu.open(new YikimHesapEkrani());
+        this.modernKartlar[3][0].ikon = YikimMenuIcons.KULLANICI;
+        this.modernKartlar[3][1].eylem = this.chipVanilla;
+        this.modernKartlar[3][1].ikon = YikimMenuIcons.ARROW;
+        this.modernKartlar[3][2].eylem = this.chipHud;
+        this.modernKartlar[3][2].ikon = YikimMenuIcons.EYE;
+        this.modernKartlar[3][3].eylem = () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_PERFORMANCE);
+        this.modernKartlar[3][3].ikon = YikimMenuIcons.BOLT;
+
+        this.modernKartlar[4][0].eylem = () -> YikimMainMenu.open(
+            YikimAdapter.optionsScreen(screen, class_310.method_1551().field_1690));
+        this.modernKartlar[4][0].ikon = YikimMenuIcons.GEAR;
+        this.modernKartlar[4][1].eylem = this.chipBackdrop;
+        this.modernKartlar[4][1].ikon = YikimMenuIcons.IMAGE;
+        this.modernKartlar[4][2].eylem = this.chipHud;
+        this.modernKartlar[4][2].ikon = YikimMenuIcons.EYE;
+        this.modernKartlar[4][3].eylem = () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_LOOK);
+        this.modernKartlar[4][3].ikon = YikimMenuIcons.BOLT;
+        this.modernKartlar[4][4].eylem = this.chipVanilla;
+        this.modernKartlar[4][4].ikon = YikimMenuIcons.ARROW;
 
         this.modernCikis = () -> class_310.method_1551().method_1592();
+        this.modernPanel = () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_PERFORMANCE);
+        this.modernGorunum = () -> YikimPanel.open(class_310.method_1551(), YikimPanel.TAB_LOOK);
         this.surukleBaslat = () -> this.surukleme = true;
     }
 
@@ -222,7 +339,7 @@ public final class YikimMainMenu {
         long now = System.currentTimeMillis();
         class_310 client = class_310.method_1551();
         YikimBackdrop.render(graphics, screenWidth, screenHeight, now);
-        // GÜNCELLEME SONRASI İLK AÇILIŞ: arayüz temasını ön izlemeli olarak sor
+        // GÃœNCELLEME SONRASI Ä°LK AÃ‡ILIÅ: arayÃ¼z temasÄ±nÄ± Ã¶n izlemeli olarak sor
         YikimTemaEkrani.ilkAcilisKontrol();
         if (YikimTemaEkrani.acik()) {
             YikimUiMetrics.menuEnd(started);
@@ -236,10 +353,10 @@ public final class YikimMainMenu {
     }
 
     /**
-     * MODERN ANA MENÜ (v1.35.0) — bu sürümden itibaren varsayılan düzen.
+     * MODERN ANA MENÃœ (v1.35.0) â€” bu sÃ¼rÃ¼mden itibaren varsayÄ±lan dÃ¼zen.
      *
-     * Güvenlik ağı: modern çizim beklenmedik bir istisna atarsa oyun kilitlenmez;
-     * eski (klasik) düzen bir kez çizilir ve günlüğe yazılır.
+     * GÃ¼venlik aÄŸÄ±: modern Ã§izim beklenmedik bir istisna atarsa oyun kilitlenmez;
+     * eski (klasik) dÃ¼zen bir kez Ã§izilir ve gÃ¼nlÃ¼ÄŸe yazÄ±lÄ±r.
      */
     private void drawModern(class_332 graphics, class_327 font, class_310 client,
                             int screenWidth, int screenHeight, int mouseX, int mouseY, long started) {
@@ -253,7 +370,7 @@ public final class YikimMainMenu {
         YikimUiMetrics.menuEnd(started);
     }
 
-    /** ESKİ DÜZEN — modern çizim patlarsa kullanılan yedek yol. */
+    /** ESKÄ° DÃœZEN â€” modern Ã§izim patlarsa kullanÄ±lan yedek yol. */
     private void drawKlasik(class_332 graphics, class_327 font, class_310 client,
                             int screenWidth, int screenHeight, int mouseX, int mouseY) {
         long now = System.currentTimeMillis();
@@ -307,12 +424,12 @@ public final class YikimMainMenu {
             this.drawChips(graphics, font, this.buttonsTop + blockHeight + 8, buttonWidth, mouseX, mouseY);
         }
         if (this.cardWidth > 0 && this.cardX - (this.columnX + this.columnWidth) >= 24) {
-            // v1.29.0: sağ üstteki "SEN" bilgi paneli KALDIRILDI — yerine
-            // dönen 3B karakter + deri/pelerin/elitra seçicisi geldi.
+            // v1.29.0: saÄŸ Ã¼stteki "SEN" bilgi paneli KALDIRILDI â€” yerine
+            // dÃ¶nen 3B karakter + deri/pelerin/elitra seÃ§icisi geldi.
             int altSinir = screenHeight - footerHeight - margin - this.modDockYukseklik();
             this.drawKarakterPaneli(graphics, font, this.cardX, this.cardY, this.cardWidth, altSinir, mouseX, mouseY);
         }
-        // v1.15.0: diğer modlarin tuslari ARTIK yan panelin icinde degil —
+        // v1.15.0: diÄŸer modlarin tuslari ARTIK yan panelin icinde degil â€”
         // ekranin SAG ALTINDA kendi piksel bloku olarak duruyorlar.
         this.drawModDock(graphics, font, screenWidth, screenHeight, mouseX, mouseY, footerHeight, margin);
         this.drawFooter(graphics, font, screenWidth, screenHeight, footerHeight);
@@ -325,436 +442,421 @@ public final class YikimMainMenu {
     }
 
     /* ============================================================
-       MODERN DÜZEN — çizim yardımcıları
+ONECLIENT ANA SAYFA — çizim yardımcıları
        ============================================================ */
+
+    /** OneClient hareket eğrisi (motion.rs): 440/460 ms, Ease::Out + Cubic. */
+    private static float ocEase(float p) {
+        float t = Math.max(0.0f, Math.min(1.0f, p));
+        return 1.0f - (1.0f - t) * (1.0f - t) * (1.0f - t);
+    }
+
+    /** web_px → Minecraft birimi (ekran yüksekliği / 900). */
+    private static int px(Olcek o, float web) {
+        return Math.max(1, Math.round(o.u * web));
+    }
+
+    private static void olcekVer(Olcek o, float u) {
+        o.u = u;
+        o.navbarH = px(o, 80f);
+        o.navPad = px(o, 40f);
+        o.navLinkH = px(o, 36f);
+        o.navLinkPad = px(o, 17f);
+        o.navGap = px(o, 23f);
+        o.markYuk = px(o, 44f);
+        o.markIkon = px(o, 32f);
+        o.avatar = px(o, 28f);
+        o.rozet = px(o, 16f);
+        o.iconBtn = px(o, 32f);
+        o.iconBtnIkon = px(o, 20f);
+        o.bosluk = px(o, 48f);
+        o.butonH = Math.max(20, px(o, 38f));
+        o.butonPad = px(o, 24f);
+        o.hayaletBtn = px(o, 32f);
+        o.hayaletIkon = px(o, 20f);
+        o.seritH = px(o, 208f);
+        o.kartAralik = px(o, 24f);
+        o.kartYari = px(o, 12f);
+        o.kartMin = px(o, 300f);
+        o.kartEn = px(o, 480f);
+        o.kartBaslik = px(o, 32f);
+        o.dahaFazla = px(o, 96f);
+        // metin ölçekleri: hedef satır yüksekliği / 9 (Minecraft satır adımı)
+        o.baslikOlcek = Math.max(1.6f, Math.min(4.2f, (61.6f * u) / 9.0f));   // 56 px × 1.1
+        o.altBaslikOlcek = (16f * u) / 9.0f;
+        o.butonOlcek = (16f * u) / 9.0f;
+        o.kartBaslikOlcek = (32f * u) / 9.0f;
+        o.kartDurumOlcek = (12f * u) / 9.0f;
+    }
 
     private void drawModernGovde(class_332 graphics, class_327 font, class_310 client,
                                  int screenWidth, int screenHeight, int mouseX, int mouseY) {
-        long now = System.currentTimeMillis();
-        float appear = Math.min(1.0f, (float)(now - this.openedAt) / 420.0f);
-        float eased = 1.0f - (1.0f - appear) * (1.0f - appear);
-        int slide = (int)((1.0f - eased) * 18.0f);
-
-        int margin = screenWidth < 640 ? 12 : 26;
-        int footerY = screenHeight - 22;
-        int navY = margin;
-        int navH = 26;
-
         this.refresh(client, font, 220);
+        long now = System.currentTimeMillis();
+        float u = Math.max(0.30f, Math.min(1.25f, (float)screenHeight / 900.0f));
+        Olcek o = new Olcek();
+        olcekVer(o, u);
 
-        // Sahne örtüsü: üç gradyan, her biri 6 bant = 18 düz dolgu.
-        // Bulanıklık yok; yalnızca yazının okunması için kenarlar koyulaşır.
-        YikimDraw.verticalGradient(graphics, 0, 0, screenWidth, Math.min(screenHeight, 132),
-            MD_SCRIM_TOP, 0x00070504, 6);
-        YikimDraw.verticalGradient(graphics, 0, Math.max(0, screenHeight - 150), screenWidth, screenHeight,
-            0x00070504, MD_SCRIM_BOTTOM, 6);
+        // ---- OneClient vinyeti (app_shell.rs): merkez (0.80, 0.45), sol ölçek
+        //      1.8 / sağ 4.5, dikey 2.2, pow 1.3, en çok %80 karartma.
+        //      Shader yerine dört gradyan — kare başına 22 düz dolgu.
         YikimDraw.horizontalGradient(graphics, 0, 0, (int)((float)screenWidth * 0.55f), screenHeight,
-            MD_SCRIM_LEFT, 0x00070504, 6);
+            YikimTheme.alpha(MD_PAGE, 60), 0x00070505, 6);
+        YikimDraw.horizontalGradient(graphics, (int)((float)screenWidth * 0.45f), 0, screenWidth, screenHeight,
+            0x00070505, YikimTheme.alpha(MD_PAGE, 185), 6);
+        YikimDraw.verticalGradient(graphics, 0, 0, screenWidth, (int)((float)screenHeight * 0.42f),
+            YikimTheme.alpha(MD_PAGE, 66), 0x00070505, 5);
+        YikimDraw.verticalGradient(graphics, 0, (int)((float)screenHeight * 0.58f), screenWidth, screenHeight,
+            0x00070505, YikimTheme.alpha(MD_PAGE, 150), 5);
 
-        boolean dar = screenWidth < 660;
-        int cardW = Math.min(390, Math.max(268, (int)((float)screenWidth * 0.34f)));
-        int cardX = screenWidth - margin - cardW + slide / 2;
-        int cardTop = navY + navH + 28;
-        if (dar) {
-            cardW = screenWidth - margin * 2;
-            cardX = margin;
-            cardTop = navY + navH + 10;
-        }
-        int cardBottom = footerY - 8;
-        int solGenislik = cardX - margin - 28;
+        int pad = o.navPad;
+        int seritTop = screenHeight - o.bosluk - o.seritH;
+        int heroUst = o.navbarH + pad;
+        int heroAlt = seritTop - 6;
+        int heroOrta = (heroUst + Math.max(heroUst, heroAlt)) / 2;
 
-        // Karakter: sol metin ile kart arasındaki boşlukta durur, ayakları
-        // kartın altına hizalı. Açılışta 24 px aşağıdan yukarı süzülür.
-        if (!dar && solGenislik > 190 && cardBottom - cardTop > 180) {
-            int alanSol = margin + Math.min(280, solGenislik / 2);
-            int cx = alanSol + Math.max(0, (cardX - alanSol) / 2);
-            int boy = Math.min(cardBottom - cardTop - 8, (int)((float)screenHeight * 0.52f));
-            if (boy >= 110) {
-                // karakter kartın üstüne taşmasın
-                cx = Math.min(cx, cardX - boy / 3 - 8);
-                int ayak = cardBottom + (int)((1.0f - eased) * 24.0f);
+        // ---- lobi sahnesi: karakter sağda, ayakları şeridin üstünde hizalı
+        //      (OneClient'ın 3B modeli gibi yalnızca menü açıkken çizilir).
+        if (screenWidth >= 700 && heroAlt - heroUst > 120) {
+            int boy = Math.min(heroAlt - heroUst - 6, (int)((float)screenHeight * 0.52f));
+            if (boy >= 90) {
+                float p = ocEase((float)(now - this.openedAt) / 460.0f);
+                int ayak = heroAlt + 4 + (int)((1.0f - p) * 24.0f);
+                int cx = (int)((float)screenWidth * 0.74f);
                 YikimKarakter.draw(graphics, cx, ayak - boy, boy, YikimTheme.backdrop);
                 this.addHit(cx - boy / 3, ayak - boy, boy * 2 / 3, boy, this.surukleBaslat);
             }
         }
 
-        this.drawModernBaslik(graphics, font, margin + 2, cardTop + 4, solGenislik, mouseX, mouseY, dar);
-        this.drawModernNav(graphics, font, screenWidth, navY, navH, margin, mouseX, mouseY);
-        this.drawModernHesap(graphics, font, screenWidth, margin, navY, navH, mouseX, mouseY);
-        this.drawModernKart(graphics, font, client, cardX, cardTop, cardW, cardBottom, mouseX, mouseY);
-        this.drawModernDurum(graphics, font, screenWidth, screenHeight, margin, mouseX, mouseY);
-    }
-
-    private void drawModernBaslik(class_332 graphics, class_327 font, int x, int y, int maxWidth,
-                                  int mouseX, int mouseY, boolean dar) {
-        if (dar || maxWidth < 170) {
-            return;
+        this.cizNavbar(graphics, font, client, screenWidth, o, mouseX, mouseY);
+        this.cizBaslik(graphics, font, client, screenWidth, o, heroOrta, mouseX, mouseY);
+        this.cizSerit(graphics, font, client, screenWidth, o, pad, seritTop, mouseX, mouseY);
+        if (now < this.hintUntil && !this.hint.isEmpty()) {
+            YikimAdapter.text(graphics, font, YikimDraw.clip(font, this.hint, screenWidth - pad * 2),
+                pad, Math.max(heroAlt + 4, seritTop - 12), MD_TEXT2, false);
         }
-        // ince kor çizgisi + üst etiket
-        YikimDraw.horizontalGradient(graphics, x, y + 5, x + 18, y + 7,
-            YikimTheme.accent, YikimTheme.accent2, 4);
-        YikimAdapter.text(graphics, font, "YIKIM LIENT  \u2022  MODERN", x + 24, y + 2,
-            YikimDraw.blend(YikimTheme.accent, -1, 0.35f), true);
-
-        float olcek = Math.min(2.9f, Math.max(2.0f, (float)maxWidth / 130.0f));
-        int markY = y + 16;
-        YikimMainMenu.bigText(graphics, font, "YIKIM", x, markY, MD_TEXT, olcek);
-        int markW = (int)((float)font.method_1727("YIKIM") * olcek);
-        int cizgi = markY + (int)(8.0f * olcek) + 5;
-        YikimDraw.horizontalGradient(graphics, x, cizgi, x + Math.min(markW, maxWidth - 6), cizgi + 3,
-            YikimTheme.accent, YikimTheme.accent2, 6);
-        YikimAdapter.text(graphics, font, this.cacheSubtitle, x + 1, cizgi + 8, MD_DIM, true);
-
-        int isimY = cizgi + 26;
-        String isim = this.cacheUser.isEmpty() ? "Ho\u015f geldin" : this.cacheUser;
-        YikimAdapter.push(graphics, x, isimY, 1.5f);
-        YikimAdapter.text(graphics, font, YikimDraw.clip(font, isim, (int)((float)maxWidth / 1.5f)),
-            0, 0, MD_TEXT, true);
-        YikimAdapter.pop(graphics);
-
-        // Launcher'daki "Sahneyi değiştir" hapının oyun içi karşılığı.
-        int pillY = isimY + 20;
-        String etiket = "Sahne: " + YikimBackdrop.sessionLabel();
-        int pillW = Math.min(maxWidth, font.method_1727(etiket) + 34);
-        boolean uzerinde = YikimDraw.inside(mouseX, mouseY, x, pillY, pillW, 17);
-        YikimDraw.roundedFill(graphics, x, pillY, x + pillW, pillY + 17, uzerinde ? 0x40070504 : 0x33070504);
-        YikimDraw.outline(graphics, x, pillY, pillW, 17,
-            uzerinde ? YikimTheme.alpha(YikimTheme.accent, 140) : MD_LINE);
-        YikimMenuIcons.draw(graphics, YikimMenuIcons.IMAGE, x + 8, pillY + 4, 9, YikimTheme.accent);
-        YikimAdapter.text(graphics, font, YikimDraw.clip(font, etiket, pillW - 26), x + 22, pillY + 5,
-            uzerinde ? MD_TEXT : MD_DIM, true);
-        this.addHit(x, pillY, pillW, 17, this.chipBackdrop);
     }
 
-    private void drawModernNav(class_332 graphics, class_327 font, int screenWidth, int navY, int navH,
-                               int margin, int mouseX, int mouseY) {
-        YikimDraw.verticalGradient(graphics, 0, Math.max(0, navY - 8), screenWidth, navY + navH + 12,
-            0x99070504, 0x00070504, 5);
-        int toplam = (MD_SEKME.length - 1) * 2;
+    /** Üst gezinme şeridi: işaret + kelime işareti, bağlantılar, sağ blok. */
+    private void cizNavbar(class_332 graphics, class_327 font, class_310 client, int screenWidth,
+                           Olcek o, int mouseX, int mouseY) {
+        int h = o.navbarH;
+        float p = ocEase((float)(System.currentTimeMillis() - this.openedAt) / 460.0f);
+        int slide = (int)((1.0f - p) * (float)h);
+        YikimDraw.verticalGradient(graphics, 0, -6, screenWidth, h + 10, 0x660B0705, 0x000B0705, 5);
+
+        int orta = slide + (h - o.navLinkH) / 2;
+        boolean kelime = screenWidth >= 660;              // OneClient: < 1100 px → işaret
+        int sol = o.navPad;
+        int markX = -1;
+        if (kelime) {
+            int ik = o.markIkon;
+            int my = orta + (o.navLinkH - ik) / 2;
+            YikimDraw.roundedFill(graphics, sol, my, sol + ik, my + ik, YikimTheme.accent);
+            YikimAdapter.textCentered(graphics, font, "Y", sol + ik / 2, my + (ik - 8) / 2 + 1,
+                0xFFFFFFFF, true);
+            markX = sol;
+            float ms = (float)o.markYuk / 9.0f;
+            int tx = sol + ik + o.navGap / 2;
+            int ty = orta + (o.navLinkH - (int)(9.0f * ms)) / 2;
+            YikimAdapter.push(graphics, tx, ty, ms);
+            YikimAdapter.text(graphics, font, "YIKIM", 0, 0, MD_TEXT, true);
+            YikimAdapter.pop(graphics);
+            int w1 = (int)((float)font.method_1727("YIKIM") * ms);
+            YikimAdapter.text(graphics, font, "LIENT", tx + w1 + 2, orta + (o.navLinkH - 8) / 2 + 1,
+                MD_TEXT2, false);
+            sol = tx + w1 + 2 + font.method_1727("LIENT") + o.navGap / 2;
+            this.addHit(markX, orta, Math.max(1, sol - markX), o.navLinkH, this.modernSekmeSec[0]);
+        }
+
+        int gap = kelime ? o.navGap : Math.max(8, px(o, 12f));
+        int sagBlok = o.iconBtn + o.avatar + Math.max(8, px(o, 8f)) + 6;
+        int toplam = -gap;
         for (String ad : MD_SEKME) {
-            toplam += font.method_1727(ad) + 24;
+            toplam += font.method_1727(ad) + o.navLinkPad * 2 + gap;
         }
         int x = (screenWidth - toplam) / 2;
-        if (x < margin) {
-            x = margin;
+        int solSinir = kelime ? sol + 4 : o.navPad;
+        if (x < solSinir) {
+            x = solSinir;
+        }
+        int sagSinir = screenWidth - o.navPad - sagBlok - 8;
+        if (x + toplam > sagSinir) {
+            x = Math.max(solSinir, sagSinir - toplam);
         }
         for (int i = 0; i < MD_SEKME.length; ++i) {
-            int tw = font.method_1727(MD_SEKME[i]) + 24;
+            int tw = font.method_1727(MD_SEKME[i]) + o.navLinkPad * 2;
             boolean aktif = i == YikimMainMenu.sekme;
-            boolean uzerinde = YikimDraw.inside(mouseX, mouseY, x, navY, tw, navH);
-            if (aktif) {
-                YikimDraw.roundedFill(graphics, x, navY, x + tw, navY + navH, 0x1AFFFFFF);
-            } else if (uzerinde) {
-                YikimDraw.roundedFill(graphics, x, navY, x + tw, navY + navH, 0x0DFFFFFF);
+            boolean uzerinde = YikimDraw.inside(mouseX, mouseY, x, orta, tw, o.navLinkH);
+            int dolgu = aktif ? MD_HAYALET : (uzerinde ? MD_HAYALET_UST : 0x00000000);
+            if (dolgu != 0x00000000) {
+                YikimDraw.roundedFill(graphics, x, orta, x + tw, orta + o.navLinkH, dolgu);
             }
-            int renk = aktif ? MD_TEXT : (uzerinde ? MD_DIM : MD_FAINT);
-            YikimAdapter.textCentered(graphics, font, MD_SEKME[i], x + tw / 2, navY + (navH - 8) / 2 + 1, renk, true);
+            int renk = aktif ? MD_TEXT : (uzerinde ? MD_TEXT : MD_TEXT2);
+            YikimAdapter.textCentered(graphics, font, MD_SEKME[i], x + tw / 2,
+                orta + (o.navLinkH - 8) / 2 + 1, renk, aktif);
             if (aktif) {
-                // Seçili sekmenin altında kor: Alev temasında gerçek alev,
-                // Klasik'te düz kor çizgisi. İkisi de kare başına birkaç dolgu.
+                YikimDraw.outline(graphics, x, orta, tw, o.navLinkH, MD_BORDER);
+                // Klasik'te turuncu çizgi, Alev'de kor: iki tema da aynı yerde çalışır.
                 if (YikimTema.alev()) {
-                    YikimDraw.alevCizgi(graphics, x + 10, navY + navH + 3, tw - 20);
+                    YikimDraw.alevCizgi(graphics, x + o.navLinkPad, orta + o.navLinkH + 2,
+                        tw - o.navLinkPad * 2);
                 } else {
-                    YikimDraw.horizontalGradient(graphics, x + 10, navY + navH + 1,
-                        x + tw - 10, navY + navH + 3, YikimTheme.accent, YikimTheme.accent2, 4);
+                    YikimDraw.horizontalGradient(graphics, x + o.navLinkPad, orta + o.navLinkH,
+                        x + tw - o.navLinkPad, orta + o.navLinkH + 2,
+                        YikimTheme.accent, YikimTheme.accent2, 4);
                 }
             }
-            this.addHit(x, navY, tw, navH, this.modernSekmeSec[i]);
-            x += tw + 2;
+            this.addHit(x, orta, tw, o.navLinkH, this.modernSekmeSec[i]);
+            x += tw + gap;
         }
+
+        // sağ blok: güç + avatar(yanında dişli rozet)
+        int rX = screenWidth - o.navPad - o.iconBtn;
+        int rY = orta + (o.navLinkH - o.iconBtn) / 2;
+        boolean gHover = YikimDraw.inside(mouseX, mouseY, rX, rY, o.iconBtn, o.iconBtn);
+        YikimDraw.roundedFill(graphics, rX, rY, rX + o.iconBtn, rY + o.iconBtn,
+            gHover ? MD_HAYALET_UST : MD_HAYALET);
+        YikimDraw.outline(graphics, rX, rY, o.iconBtn, o.iconBtn, gHover ? MD_BORDER_GUC : MD_BORDER);
+        YikimMenuIcons.draw(graphics, YikimMenuIcons.POWER,
+            rX + (o.iconBtn - o.iconBtnIkon) / 2, rY + (o.iconBtn - o.iconBtnIkon) / 2,
+            o.iconBtnIkon, gHover ? 0xFFFF9A7A : MD_TEXT2);
+        this.addHit(rX, rY, o.iconBtn, o.iconBtn, this.modernCikis);
+
+        int aX = rX - Math.max(8, px(o, 8f)) - o.avatar;
+        int aY = orta + (o.navLinkH - o.avatar) / 2;
+        boolean aHover = YikimDraw.inside(mouseX, mouseY, aX, aY, o.avatar, o.avatar);
+        YikimDraw.roundedFill(graphics, aX, aY, aX + o.avatar, aY + o.avatar,
+            aHover ? MD_HAYALET_BAS : MD_HAYALET_UST);
+        YikimDraw.outline(graphics, aX, aY, o.avatar, o.avatar, aHover ? MD_BORDER_GUC : MD_BORDER);
+        YikimMenuIcons.draw(graphics, YikimMenuIcons.KULLANICI, aX + 2, aY + 2, o.avatar - 4,
+            aHover ? MD_TEXT : MD_TEXT2);
+        int zX = aX + o.avatar - o.rozet + 2;
+        int zY = aY + o.avatar - o.rozet + 2;
+        YikimDraw.roundedFill(graphics, zX, zY, zX + o.rozet, zY + o.rozet, MD_ELEV);
+        YikimDraw.outline(graphics, zX, zY, o.rozet, o.rozet, MD_BORDER);
+        YikimMenuIcons.draw(graphics, YikimMenuIcons.GEAR, zX + 1, zY + 1, o.rozet - 2, MD_TEXT2);
+        this.addHit(aX, aY, o.avatar + o.rozet / 2, o.avatar + o.rozet / 2, this.modernSekmeSec[3]);
     }
 
-    private void drawModernHesap(class_332 graphics, class_327 font, int screenWidth, int margin,
-                                 int navY, int navH, int mouseX, int mouseY) {
-        if (screenWidth < 720) {
-            return;
-        }
-        String ad = this.cacheUser.isEmpty() ? "Hesap" : this.cacheUser;
-        int pw = Math.min(170, font.method_1727(ad) + 36);
-        int px = screenWidth - margin - pw;
-        int py = navY + (navH - 20) / 2;
-        boolean uzerinde = YikimDraw.inside(mouseX, mouseY, px, py, pw, 20);
-        YikimDraw.roundedFill(graphics, px, py, px + pw, py + 20, uzerinde ? 0x1FFFFFFF : 0x12000000);
-        YikimDraw.outline(graphics, px, py, pw, 20, uzerinde ? MD_LINE_GUC : MD_LINE);
-        YikimMenuIcons.draw(graphics, YikimMenuIcons.KULLANICI, px + 7, py + 5, 10, YikimTheme.accent);
-        YikimAdapter.text(graphics, font, YikimDraw.clip(font, ad, pw - 30), px + 22, py + 6,
-            uzerinde ? MD_TEXT : MD_DIM, true);
-        this.addHit(px, py, pw, 20, this.modernSekmeSec[3]);
+    /** Başlık bloğu (active_cluster_panel): 56 kalın + 16 alt başlık + eylemler. */
+    private void cizBaslik(class_332 graphics, class_327 font, class_310 client, int screenWidth,
+                           Olcek o, int orta, int mouseX, int mouseY) {
+        float p = ocEase((float)(System.currentTimeMillis() - this.openedAt) / 440.0f);
+        int slide = (int)((1.0f - p) * px(o, 48f));
+        int x = o.navPad + slide;
+        int maxW = (int)((float)screenWidth * 0.55f);
+        int titleH = (int)(9.0f * o.baslikOlcek);
+        int subH = 10;
+        int blokH = titleH + 3 + subH + px(o, 8f) + o.butonH;
+        int y = orta - blokH / 2;
+
+        YikimAdapter.push(graphics, x, y, o.baslikOlcek);
+        YikimAdapter.text(graphics, font, YikimDraw.clip(font, this.baslikAdi(), maxW), 0, 0,
+            MD_TEXT, true);
+        YikimAdapter.pop(graphics);
+
+        int y2 = y + titleH + 3;
+        YikimAdapter.push(graphics, x, y2, o.altBaslikOlcek);
+        YikimAdapter.text(graphics, font, YikimDraw.clip(font, this.altBaslik(), maxW), 0, 0,
+            MD_TEXT2, false);
+        YikimAdapter.pop(graphics);
+
+        int y3 = y2 + subH + px(o, 8f);
+        String etiket = MD_BUTON[YikimMainMenu.sekme];
+        int bw = (int)((float)font.method_1727(etiket) * o.butonOlcek) + o.butonPad * 2;
+        int bh = o.butonH;
+        boolean hover = YikimDraw.inside(mouseX, mouseY, x, y3, bw, bh);
+        int marka = YikimTheme.accent;
+        YikimDraw.roundedFill(graphics, x, y3, x + bw, y3 + bh, hover
+            ? YikimDraw.blend(marka, 0xFF000000, 0.13f)
+            : marka);
+        YikimDraw.outline(graphics, x, y3, bw, bh,
+            hover ? 0x66FFFFFF : YikimTheme.alpha(YikimTheme.accent2, 120));
+        YikimAdapter.push(graphics, x + o.butonPad, y3 + (bh - (int)(9.0f * o.butonOlcek)) / 2,
+            o.butonOlcek);
+        YikimAdapter.text(graphics, font, etiket, 0, 0, 0xFFFFFFFF, true);
+        YikimAdapter.pop(graphics);
+        this.addHit(x, y3, bw, bh, this.modernEylemler[YikimMainMenu.sekme]);
+
+        int gx = x + bw + Math.max(8, px(o, 8f));
+        int gy = y3 + (bh - o.hayaletBtn) / 2;
+        boolean gh = YikimDraw.inside(mouseX, mouseY, gx, gy, o.hayaletBtn, o.hayaletBtn);
+        YikimDraw.roundedFill(graphics, gx, gy, gx + o.hayaletBtn, gy + o.hayaletBtn,
+            gh ? MD_HAYALET_UST : MD_HAYALET);
+        YikimDraw.outline(graphics, gx, gy, o.hayaletBtn, o.hayaletBtn,
+            gh ? MD_BORDER_GUC : MD_BORDER);
+        YikimMenuIcons.draw(graphics, YikimMenuIcons.GEAR,
+            gx + (o.hayaletBtn - o.hayaletIkon) / 2, gy + (o.hayaletBtn - o.hayaletIkon) / 2,
+            o.hayaletIkon, gh ? MD_TEXT : MD_TEXT2);
+        this.addHit(gx, gy, o.hayaletBtn, o.hayaletBtn, this.modernGorunum);
     }
 
-    private void drawModernKart(class_332 graphics, class_327 font, class_310 client,
-                                int x, int y, int w, int alt, int mouseX, int mouseY) {
-        int pad = 12;
-        // cam kart: tek yarı saydam dolgu + 1 px çerçeve + üst iç ışık
-        YikimDraw.roundedFill(graphics, x, y, x + w, alt, MD_CARD);
-        YikimDraw.outline(graphics, x, y, w, alt - y, MD_LINE);
-        graphics.method_25294(x + 3, y + 3, x + w - 3, y + 4, 0x1AFFFFFF);
-        graphics.method_25294(x, y + 12, x + 2, y + 46, YikimTheme.accent);
-
-        int ix = x + pad;
-        int iw = w - pad * 2;
-        YikimMenuIcons.draw(graphics, MD_IKON[YikimMainMenu.sekme], ix, y + pad + 1, 11, YikimTheme.accent);
-        YikimAdapter.text(graphics, font, MD_SEKME[YikimMainMenu.sekme].toUpperCase(Locale.ROOT),
-            ix + 16, y + pad + 3, MD_TEXT, true);
-        String rozet = YikimDraw.clip(font, this.modernRozet(), iw / 2);
-        if (!rozet.isEmpty()) {
-            int bw = font.method_1727(rozet) + 12;
-            int bx = x + w - pad - bw;
-            YikimDraw.roundedFill(graphics, bx, y + pad - 1, bx + bw, y + pad + 11,
-                YikimTheme.alpha(YikimTheme.accent, 40));
-            YikimAdapter.text(graphics, font, rozet, bx + 6, y + pad + 2,
-                YikimDraw.blend(YikimTheme.accent2, -1, 0.25f), false);
+    /** Alt şerit (recents_row): 208 px, esnek kartlar + "Tümü" kutucuğu. */
+    private void cizSerit(class_332 graphics, class_327 font, class_310 client, int screenWidth,
+                          Olcek o, int pad, int top, int mouseX, int mouseY) {
+        int h = o.seritH;
+        long now = System.currentTimeMillis();
+        Kart[] liste = this.modernKartlar[YikimMainMenu.sekme];
+        int n = Math.max(1, Math.min(liste.length, this.modernKartSayi[YikimMainMenu.sekme]));
+        int alan = screenWidth - pad * 2;
+        int goster = n;
+        while (goster > 1 && (alan - o.dahaFazla - o.kartAralik) / goster < o.kartMin) {
+            --goster;
         }
-        int ayrac = y + pad + 20;
-        YikimDraw.separator(graphics, ix, ayrac, iw);
-
-        int dugmeH = 34;
-        int dugmeY = alt - pad - dugmeH;
-        boolean yerVar = alt - y >= 190;
-        int linkY = dugmeY - (yerVar ? 24 : 0);
-        int icerikUst = ayrac + 8;
-        int icerikAlt = (yerVar ? linkY : dugmeY) - 6;
-
-        switch (YikimMainMenu.sekme) {
-            case 0 -> this.modernPaneOyna(graphics, font, ix, icerikUst, iw, icerikAlt, mouseX, mouseY);
-            case 1 -> this.modernPaneKozmetik(graphics, font, ix, icerikUst, iw, icerikAlt, mouseX, mouseY);
-            case 2 -> this.modernPaneModlar(graphics, font, client, ix, icerikUst, iw, icerikAlt, mouseX, mouseY);
-            case 3 -> this.modernPaneHesap(graphics, font, ix, icerikUst, iw, icerikAlt);
-            default -> this.modernPaneAyarlar(graphics, font, ix, icerikUst, iw, icerikAlt, mouseX, mouseY);
+        int kartW = Math.max(60, (alan - o.dahaFazla - o.kartAralik) / goster);
+        for (int i = 0; i < goster; ++i) {
+            float p = ocEase((float)(now - this.openedAt - (long)i * 85L) / 460.0f);
+            int rise = (int)((1.0f - p) * px(o, 48f));
+            int cx = pad + i * (kartW + o.kartAralik);
+            this.cizKart(graphics, font, client, o, liste[i], cx, top + rise, kartW, h,
+                mouseX, mouseY);
         }
-
-        if (yerVar) {
-            this.modernLinkleri(graphics, font, ix, linkY, iw, mouseX, mouseY);
-        }
-
-        boolean hovered = YikimDraw.inside(mouseX, mouseY, ix, dugmeY, iw, dugmeH);
-        this.modernBuyukDugme(graphics, font, ix, dugmeY, iw, dugmeH,
-            MD_BUTON[YikimMainMenu.sekme], MD_IKON[YikimMainMenu.sekme], hovered);
-        this.addHit(ix, dugmeY, iw, dugmeH, this.modernEylemler[YikimMainMenu.sekme]);
+        // "Tümü" kutucuğu (96 px): kartların dışında kalan her şey panele gider
+        float pt = ocEase((float)(now - this.openedAt - (long)goster * 85L) / 460.0f);
+        int dx = pad + goster * (kartW + o.kartAralik);
+        int dy = top + (int)((1.0f - pt) * px(o, 48f));
+        boolean dh = YikimDraw.inside(mouseX, mouseY, dx, dy, o.dahaFazla, h);
+        YikimDraw.roundedFill(graphics, dx, dy, dx + o.dahaFazla, dy + h,
+            dh ? MD_HAYALET_UST : MD_COMP);
+        YikimDraw.outline(graphics, dx, dy, o.dahaFazla, h, dh ? MD_BORDER_GUC : MD_BORDER);
+        int di = px(o, 20f);
+        YikimMenuIcons.draw(graphics, YikimMenuIcons.BARS,
+            dx + (o.dahaFazla - di) / 2, dy + (h - di) / 2 - 4, di, dh ? MD_TEXT : MD_TEXT2);
+        YikimAdapter.textCentered(graphics, font, "Tümü", dx + o.dahaFazla / 2,
+            dy + h / 2 + 6, MD_TEXT2, false);
+        this.addHit(dx, dy, o.dahaFazla, h, this.modernPanel);
     }
 
-    private String modernRozet() {
+    /** Bir kart: görsel alanı + alttan karartma gradyanı + 32 px başlık. */
+    private void cizKart(class_332 graphics, class_327 font, class_310 client, Olcek o, Kart kart,
+                         int x, int y, int w, int h, int mouseX, int mouseY) {
+        boolean hover = YikimDraw.inside(mouseX, mouseY, x, y, w, h);
+        YikimDraw.roundedFill(graphics, x, y, x + w, y + h, hover ? MD_ELEV : MD_CARD);
+        int gorselH = Math.max(18, (int)((float)h * 0.62f));
+        YikimDraw.verticalGradient(graphics, x + 2, y + 2, x + w - 2, y + gorselH,
+            YikimTheme.alpha(YikimTheme.accent, 120), YikimTheme.alpha(YikimTheme.accent2, 10), 6);
+        int ik = Math.max(10, Math.min(w / 3, px(o, 56f)));
+        YikimMenuIcons.draw(graphics, kart.ikon, x + (w - ik) / 2, y + (gorselH - ik) / 2, ik,
+            YikimTheme.alpha(MD_TEXT, 210));
+        YikimDraw.verticalGradient(graphics, x + 2, y + gorselH - 8, x + w - 2, y + h - 2,
+            0x00000000, YikimTheme.alpha(MD_PAGE, 235), 5);
+        if (hover) {
+            YikimDraw.roundedFill(graphics, x + 2, y + 2, x + w - 2, y + h - 2, 0x33000000);
+        }
+        YikimDraw.outline(graphics, x, y, w, h, hover ? MD_BORDER_GUC : MD_BORDER);
+        int tx = x + px(o, 24f);
+        int by = y + h - px(o, 12f) - (int)(9.0f * o.kartBaslikOlcek);
+        YikimAdapter.push(graphics, tx, by, o.kartBaslikOlcek);
+        YikimAdapter.text(graphics, font, YikimDraw.clip(font, kart.etiket, w - px(o, 36f)), 0, 0,
+            MD_TEXT, true);
+        YikimAdapter.pop(graphics);
+        YikimAdapter.text(graphics, font, YikimDraw.clip(font, kart.durum, w - px(o, 36f)),
+            tx, by + (int)(9.0f * o.kartBaslikOlcek) + 2, MD_TEXT2, false);
+        this.addHit(x, y, w, h, kart.eylem == null ? this.modernPanel : kart.eylem);
+    }
+
+    /** Başlık: aktif "kluster" (OneClient = cluster adı). */
+    private String baslikAdi() {
         return switch (YikimMainMenu.sekme) {
-            case 0 -> this.cacheFps + " FPS";
-            case 1 -> this.cacheSkin;
-            case 2 -> this.cacheMods;
-            case 3 -> this.cacheAccount;
-            default -> YikimTema.ad();
+            case 0 -> this.cacheKurulum;
+            case 1 -> "Kozmetik";
+            case 2 -> "Modlar";
+            case 3 -> this.cacheUser.isEmpty() ? "Hesap" : this.cacheUser;
+            default -> "Ayarlar";
         };
     }
 
-    private void modernPaneOyna(class_332 graphics, class_327 font, int x, int y, int w, int alt,
-                                int mouseX, int mouseY) {
-        int satir = 18;
-        int n = Math.max(0, (alt - y) / satir);
-        if (n > 0) {
-            this.modernSatir(graphics, font, x, y, w, "S\u00fcr\u00fcm",
-                "Minecraft " + YikimVideo.gameVersion(), MD_TEXT, mouseX, mouseY, null);
-        }
-        if (n > 1) {
-            this.modernSatir(graphics, font, x, y + satir, w, "Profil", this.cacheProfile, MD_TEXT, mouseX, mouseY, null);
-        }
-        if (n > 2) {
-            this.modernSatir(graphics, font, x, y + satir * 2, w, "Mod", this.cacheMods, MD_TEXT, mouseX, mouseY, null);
-        }
-        if (n > 3) {
-            this.modernSatir(graphics, font, x, y + satir * 3, w, "Bellek", this.cacheBellek, MD_TEXT, mouseX, mouseY, null);
-            YikimDraw.bar(graphics, x, y + satir * 3 + 11, w, 3, this.cacheBellekOran, YikimTheme.accent);
-        }
+    /** Alt başlık: OneClient'ın "sürüm + yükleyici + meta" satırı. */
+    private String altBaslik() {
+        return switch (YikimMainMenu.sekme) {
+            case 0 -> "Minecraft " + YikimVideo.gameVersion() + "  \u2022  " + this.cacheMods
+                + "  \u2022  " + this.cacheBellek;
+            case 1 -> this.cacheSkin + "  \u2022  Pelerin " + this.cachePelerin
+                + "  \u2022  Elitra " + this.cacheElitra;
+            case 2 -> this.cacheMods + "  \u2022  " + YikimConfig.get().catalogSource
+                + "  \u2022  " + this.modButtons.size() + " tuş";
+            case 3 -> this.cacheAccount + "  \u2022  " + this.cacheLauncher;
+            default -> "Tema " + YikimTema.ad() + "  \u2022  HUD " + this.cacheHud
+                + "  \u2022  " + YikimBackdrop.sessionLabel();
+        };
     }
 
-    private void modernPaneKozmetik(class_332 graphics, class_327 font, int x, int y, int w, int alt,
-                                    int mouseX, int mouseY) {
-        int satir = 18;
-        int n = Math.max(0, (alt - y) / satir);
-        if (n > 0) {
-            this.modernSatir(graphics, font, x, y, w, "Skin", this.cacheSkin, MD_TEXT, mouseX, mouseY, null);
-        }
-        if (n > 1) {
-            this.modernSatir(graphics, font, x, y + satir, w, "Pelerin", this.cachePelerin, MD_TEXT, mouseX, mouseY, null);
-        }
-        if (n > 2) {
-            this.modernSatir(graphics, font, x, y + satir * 2, w, "Elitra", this.cacheElitra, MD_TEXT, mouseX, mouseY, null);
-        }
-        if (n > 3) {
-            this.modernSatir(graphics, font, x, y + satir * 3, w, "Mojang", this.cacheMojang, MD_TEXT, mouseX, mouseY, null);
-        }
-    }
+    /**
+     * Kartların metinleri — saniyede bir (refresh içinden) tazelenir.
+     * Eylemler kurucuda bir kez kurulur; burada yalnız yazı yazılır.
+     */
+    private void kartlariDoldur() {
+        Kart[] oyna = this.modernKartlar[0];
+        oyna[0].etiket = "Tek Oyunculu";
+        oyna[0].durum = "dünyalarını aç";
+        oyna[1].etiket = "\u00c7ok Oyunculu";
+        oyna[1].durum = "sunucu listesi";
+        oyna[2].etiket = "YIKIM Men\u00fcs\u00fc";
+        oyna[2].durum = "panel";
+        oyna[3].etiket = "Kozmetik";
+        oyna[3].durum = "deri \u00b7 pelerin \u00b7 elitra";
+        oyna[4].etiket = "Modlar";
+        oyna[4].durum = this.cacheMods;
+        oyna[5].etiket = "Hesap";
+        oyna[5].durum = this.cacheUser.isEmpty() ? "giriş yap" : this.cacheUser;
+        this.modernKartSayi[0] = 6;
 
-    private void modernPaneModlar(class_332 graphics, class_327 font, class_310 client,
-                                  int x, int y, int w, int alt, int mouseX, int mouseY) {
-        int satir = 18;
-        int n = Math.max(0, (alt - y) / satir);
-        if (n > 0) {
-            this.modernSatir(graphics, font, x, y, w, "Y\u00fckl\u00fc", this.cacheMods, MD_TEXT, mouseX, mouseY, null);
-        }
-        if (n > 1) {
-            this.modernSatir(graphics, font, x, y + satir, w, "Katalog",
-                YikimConfig.get().catalogSource, MD_TEXT, mouseX, mouseY, null);
-        }
-        if (n > 2) {
-            this.modernSatir(graphics, font, x, y + satir * 2, w, "Di\u011fer tu\u015flar",
-                String.valueOf(this.modButtons.size()), MD_TEXT, mouseX, mouseY, null);
-        }
-        // Diğer modların tuşları: klasik düzendeki sağ alt blok yerine kartın içinde.
-        int listeY = y + satir * 3 + 4;
-        int goster = Math.min(Math.max(0, (alt - listeY) / 17), this.modButtons.size());
-        for (int i = 0; i < goster; ++i) {
-            class_4185 dugme = this.modButtons.get(i);
-            String etiket = YikimModButtons.label(dugme);
-            int ry = listeY + i * 17;
-            boolean uzerinde = YikimDraw.inside(mouseX, mouseY, x, ry, w, 16);
-            YikimDraw.roundedFill(graphics, x, ry, x + w, ry + 16,
-                uzerinde ? YikimTheme.alpha(YikimTheme.accent, 200) : 0x0DFFFFFF);
-            YikimDraw.outline(graphics, x, ry, w, 16,
-                uzerinde ? YikimTheme.alpha(YikimTheme.accent, 190) : MD_LINE);
-            String jar = YikimModButtons.jarIconFor(etiket);
-            if (jar != null) {
-                YikimIcons.draw(graphics, font, jar, null, etiket, x + 1, ry + 1, 14);
-            } else {
-                YikimMenuIcons.draw(graphics, YikimMenuIcons.BLOCKS, x + 4, ry + 4, 8,
-                    uzerinde ? 0xFFFFFFFF : YikimTheme.accent);
+        Kart[] koz = this.modernKartlar[1];
+        koz[0].etiket = "Deri";
+        koz[0].durum = this.cacheSkin;
+        koz[1].etiket = "Pelerin";
+        koz[1].durum = this.cachePelerin;
+        koz[2].etiket = "Elitra";
+        koz[2].durum = this.cacheElitra;
+        koz[3].etiket = "Mojang";
+        koz[3].durum = this.cacheMojang;
+        koz[4].etiket = "Kozmetik ekran\u0131";
+        koz[4].durum = "t\u00fcm se\u00e7enekler";
+        this.modernKartSayi[1] = 5;
+
+        Kart[] mod = this.modernKartlar[2];
+        mod[0].etiket = "Mod katalo\u011fu";
+        mod[0].durum = "mod ara ve kur";
+        mod[1].etiket = "Y\u00fcklenenler";
+        mod[1].durum = this.cacheMods;
+        int k = 2;
+        for (int i = 0; i < this.modButtons.size() && k < 6; ++i) {
+            String etiket = YikimModButtons.label(this.modButtons.get(i));
+            if (etiket.isEmpty()) {
+                continue;
             }
-            YikimAdapter.text(graphics, font, YikimDraw.clip(font, etiket, w - 24), x + 20, ry + 4,
-                uzerinde ? 0xFFFFFFFF : MD_TEXT, !uzerinde);
-            this.addHit(x, ry, w, 16, this.modernModTiklama.get(i));
+            mod[k].etiket = etiket;
+            mod[k].durum = "mod tuşu";
+            mod[k].ikon = YikimMenuIcons.BLOCKS;
+            mod[k].eylem = this.modernModTiklama.get(i);
+            ++k;
         }
-        if (this.modButtons.size() > goster) {
-            YikimAdapter.text(graphics, font, "+" + (this.modButtons.size() - goster) + " tu\u015f panelde",
-                x, listeY + goster * 17 + 1, MD_FAINT, false);
-        }
-    }
+        this.modernKartSayi[2] = k;
 
-    private void modernPaneHesap(class_332 graphics, class_327 font, int x, int y, int w, int alt) {
-        int satir = 18;
-        int n = Math.max(0, (alt - y) / satir);
-        if (n > 0) {
-            this.modernSatir(graphics, font, x, y, w, "Oyuncu",
-                this.cacheUser.isEmpty() ? "\u2014" : this.cacheUser, MD_TEXT, 0, 0, null);
-        }
-        if (n > 1) {
-            this.modernSatir(graphics, font, x, y + satir, w, "Hesap", this.cacheAccount, MD_TEXT, 0, 0, null);
-        }
-        if (n > 2) {
-            this.modernSatir(graphics, font, x, y + satir * 2, w, "Ba\u015flat\u0131c\u0131", this.cacheLauncher, MD_TEXT, 0, 0, null);
-        }
-        if (n > 3) {
-            this.modernSatir(graphics, font, x, y + satir * 3, w, "Tema", YikimTema.ad(), MD_TEXT, 0, 0, null);
-        }
-    }
+        Kart[] hes = this.modernKartlar[3];
+        hes[0].etiket = "Hesap de\u011fi\u015ftir";
+        hes[0].durum = this.cacheAccount;
+        hes[1].etiket = "Vanilla men\u00fc";
+        hes[1].durum = "minecraft";
+        hes[2].etiket = "HUD";
+        hes[2].durum = this.cacheHud;
+        hes[3].etiket = "YIKIM Men\u00fcs\u00fc";
+        hes[3].durum = "panel";
+        this.modernKartSayi[3] = 4;
 
-    private void modernPaneAyarlar(class_332 graphics, class_327 font, int x, int y, int w, int alt,
-                                   int mouseX, int mouseY) {
-        int satir = 20;
-        if (alt - y >= satir) {
-            this.modernIkonluSatir(graphics, font, x, y, w, YikimMenuIcons.IMAGE,
-                "Arka plan", YikimBackdrop.sessionLabel(), mouseX, mouseY, this.chipBackdrop);
-        }
-        if (alt - y >= satir * 2) {
-            boolean uzerinde = YikimDraw.inside(mouseX, mouseY, x, y + satir, w, 16);
-            YikimDraw.toggle(graphics, font, x, y + satir, w, 16, "HUD",
-                YikimConfig.get().hudEnabled, uzerinde);
-            this.addHit(x, y + satir, w, 16, this.chipHud);
-        }
-        if (alt - y >= satir * 3) {
-            this.modernIkonluSatir(graphics, font, x, y + satir * 2, w, YikimMenuIcons.ARROW,
-                "Vanilla men\u00fc", "ge\u00e7", mouseX, mouseY, this.chipVanilla);
-        }
-    }
-
-    private void modernSatir(class_332 graphics, class_327 font, int x, int y, int w,
-                             String etiket, String deger, int renk,
-                             int mouseX, int mouseY, Runnable action) {
-        boolean uzerinde = action != null && YikimDraw.inside(mouseX, mouseY, x, y, w, 16);
-        if (uzerinde) {
-            YikimDraw.roundedFill(graphics, x - 3, y - 1, x + w + 3, y + 15, MD_HOVER);
-        }
-        YikimAdapter.text(graphics, font, etiket, x, y + 2, uzerinde ? MD_DIM : MD_FAINT, false);
-        String sag = YikimDraw.clip(font, deger == null ? "" : deger, w / 2);
-        YikimAdapter.text(graphics, font, sag, x + w - font.method_1727(sag), y + 2, renk, true);
-        if (action != null) {
-            this.addHit(x, y - 1, w, 16, action);
-        }
-    }
-
-    private void modernIkonluSatir(class_332 graphics, class_327 font, int x, int y, int w, int ikon,
-                                   String etiket, String deger, int mouseX, int mouseY, Runnable action) {
-        boolean uzerinde = YikimDraw.inside(mouseX, mouseY, x, y, w, 16);
-        if (uzerinde) {
-            YikimDraw.roundedFill(graphics, x - 3, y - 1, x + w + 3, y + 15, MD_HOVER);
-        }
-        YikimMenuIcons.draw(graphics, ikon, x + 1, y + 4, 8, uzerinde ? MD_TEXT : YikimTheme.accent);
-        YikimAdapter.text(graphics, font, etiket, x + 14, y + 2, uzerinde ? MD_TEXT : MD_DIM, false);
-        String sag = YikimDraw.clip(font, deger, w / 2);
-        YikimAdapter.text(graphics, font, sag, x + w - font.method_1727(sag), y + 2, MD_FAINT, false);
-        this.addHit(x, y - 1, w, 16, action);
-    }
-
-    private void modernLinkleri(class_332 graphics, class_327 font, int x, int y, int w,
-                                int mouseX, int mouseY) {
-        Button[] liste = this.modernLinkler[YikimMainMenu.sekme];
-        if (liste.length == 0) {
-            return;
-        }
-        int bosluk = 5;
-        int bw = (w - (liste.length - 1) * bosluk) / liste.length;
-        for (int i = 0; i < liste.length; ++i) {
-            Button bag = liste[i];
-            int bx = x + i * (bw + bosluk);
-            boolean uzerinde = YikimDraw.inside(mouseX, mouseY, bx, y, bw, 17);
-            YikimDraw.roundedFill(graphics, bx, y, bx + bw, y + 17, uzerinde ? 0x1FFFFFFF : 0x0DFFFFFF);
-            YikimDraw.outline(graphics, bx, y, bw, 17, uzerinde ? MD_LINE_GUC : MD_LINE);
-            int ikon = 9;
-            int tw = font.method_1727(bag.label());
-            int ic = Math.max(2, (bw - (ikon + 5 + tw)) / 2);
-            YikimMenuIcons.draw(graphics, bag.icon(), bx + ic, y + 4, ikon, uzerinde ? MD_TEXT : MD_FAINT);
-            YikimAdapter.text(graphics, font, YikimDraw.clip(font, bag.label(), Math.max(0, bw - ic - ikon - 8)),
-                bx + ic + ikon + 5, y + 5, uzerinde ? MD_TEXT : MD_DIM, false);
-            this.addHit(bx, y, bw, 17, bag.action());
-        }
-    }
-
-    private void modernBuyukDugme(class_332 graphics, class_327 font, int x, int y, int w, int h,
-                                  String label, int ikon, boolean hovered) {
-        int taban = YikimMainMenu.sekme == 4 ? 0xFF3A1610 : YikimTheme.accent;
-        int ust = YikimDraw.blend(taban, -1, 0.28f);
-        int altRenk = YikimDraw.blend(taban, 0xFF000000, 0.30f);
-        YikimDraw.roundedFill(graphics, x, y, x + w, y + h, taban);
-        YikimDraw.verticalGradient(graphics, x + 2, y + 1, x + w - 2, y + h - 1, ust, altRenk, 5);
-        YikimDraw.outline(graphics, x, y, w, h, hovered ? 0x66FFFFFF : YikimTheme.alpha(YikimTheme.accent2, 120));
-        graphics.method_25294(x + 8, y + h - 2, x + w - 8, y + h - 1, 0xB3FFD36B);
-        int boy = 11;
-        int tw = font.method_1727(label);
-        int bas = x + Math.max(4, (w - (boy + 6 + tw)) / 2);
-        YikimMenuIcons.draw(graphics, ikon, bas, y + (h - boy) / 2, boy, 0xFFFFFFFF);
-        YikimAdapter.text(graphics, font, label, bas + boy + 6, y + (h - 8) / 2 + 1, 0xFFFFFFFF, true);
-    }
-
-    private void drawModernDurum(class_332 graphics, class_327 font, int screenWidth, int screenHeight,
-                                 int margin, int mouseX, int mouseY) {
-        int y = screenHeight - 22;
-        YikimDraw.verticalGradient(graphics, 0, y - 8, screenWidth, screenHeight, 0x00070504, 0xE6070504, 4);
-        graphics.method_25294(0, y, screenWidth, y + 1, 0x1FFFFFFF);
-        YikimAdapter.text(graphics, font, this.cacheFooterLeft, margin, y + 7, MD_FAINT, false);
-
-        boolean ipucu = System.currentTimeMillis() < this.hintUntil && !this.hint.isEmpty();
-        String orta = ipucu
-            ? this.hint
-            : "Sa\u011f Shift: YIKIM men\u00fcs\u00fc  \u2022  Sa\u011f Ctrl: HUD  \u2022  Sa\u011f Alt: profil";
-        int ortaW = font.method_1727(orta);
-        int ox = (screenWidth - ortaW) / 2;
-        int solW = font.method_1727(this.cacheFooterLeft);
-        if (ox > margin + solW + 24 && ox + ortaW < screenWidth - margin - 90) {
-            YikimAdapter.text(graphics, font, orta, ox, y + 7, ipucu ? 0xFFFFB627 : MD_FAINT, false);
-        }
-
-        String cikis = "\u00c7\u0131k\u0131\u015f";
-        int cw = font.method_1727(cikis);
-        int ex = screenWidth - margin - cw - 15;
-        boolean uzerinde = YikimDraw.inside(mouseX, mouseY, ex, y + 3, cw + 15, 16);
-        YikimMenuIcons.draw(graphics, YikimMenuIcons.POWER, ex, y + 6, 10, uzerinde ? 0xFFFF6B5E : MD_FAINT);
-        YikimAdapter.text(graphics, font, cikis, ex + 13, y + 7, uzerinde ? 0xFFFF6B5E : MD_FAINT, false);
-        this.addHit(ex, y + 3, cw + 15, 16, this.modernCikis);
+        Kart[] aya = this.modernKartlar[4];
+        aya[0].etiket = "Minecraft ayarlar\u0131";
+        aya[0].durum = "vanilla";
+        aya[1].etiket = "Arka plan";
+        aya[1].durum = YikimBackdrop.sessionLabel();
+        aya[2].etiket = "HUD";
+        aya[2].durum = this.cacheHud;
+        aya[3].etiket = "G\u00f6r\u00fcn\u00fcm";
+        aya[3].durum = YikimTema.ad();
+        aya[4].etiket = "Vanilla men\u00fc";
+        aya[4].durum = "ge\u00e7";
+        this.modernKartSayi[4] = 5;
     }
 
     private void refresh(class_310 client, class_327 font, int tipWidth) {
@@ -774,8 +876,8 @@ public final class YikimMainMenu {
         String launcherPreset = System.getProperty("yikimlient.presetName", "");
         String memory = System.getProperty("yikimlient.memoryMb", "");
         this.cacheLauncher = launcherPreset.isEmpty() ? "ba\u015flat\u0131c\u0131 bilgisi yok" : launcherPreset + (String)(memory.isEmpty() ? "" : " \u2022 " + memory + " MB");
-        // Modern kart: canlı bellek + kozmetik durumu (saniyede bir tazelenir,
-        // böylece her karede Runtime sorgusu ve dosya erişimi olmaz).
+        // Modern kart: canlÄ± bellek + kozmetik durumu (saniyede bir tazelenir,
+        // bÃ¶ylece her karede Runtime sorgusu ve dosya eriÅŸimi olmaz).
         long enCokMb = Runtime.getRuntime().maxMemory() / 1048576L;
         long kullanilanMb = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1048576L;
         this.cacheBellek = kullanilanMb + " / " + enCokMb + " MB";
@@ -785,6 +887,13 @@ public final class YikimMainMenu {
         this.cacheElitra = YikimKozmetikSecim.aktifId(YikimKozmetikSecim.ELITRA).isEmpty() ? "yok" : "tak\u0131l\u0131";
         this.cacheMojang = YikimKozmetikSecim.aktifId(YikimKozmetikSecim.MOJANG).isEmpty() ? "yok" : "tak\u0131l\u0131";
         this.cacheUser = client.method_1548() != null ? client.method_1548().method_1676() : "";
+        // OneClient'daki "kluster" adının karşılığı: başlatıcının verdiği kurulum adı
+        this.cacheKurulum = System.getProperty("yikimlient.presetName", "");
+        if (this.cacheKurulum.isEmpty()) {
+            this.cacheKurulum = "YIKIMLient";
+        }
+        // kart metinleri (saniyede bir)
+        this.kartlariDoldur();
         String string = uuid = client.method_1548() != null && client.method_1548().method_44717() != null ? client.method_1548().method_44717().toString() : null;
         this.cacheAccount = uuid == null || uuid.isEmpty() ? "\u00e7evrimd\u0131\u015f\u0131 hesap" : (uuid.length() > 8 ? uuid.substring(0, 8) + "\u2026" : uuid);
         int tipIndex = (int)(now / 6000L % (long)TIPS.length);
@@ -796,16 +905,16 @@ public final class YikimMainMenu {
     }
 
     /**
-     * SADE TEMA ANA MENÜ (v1.28.0).
+     * SADE TEMA ANA MENÃœ (v1.28.0).
      *
-     * Yeni düzen: solda tek sütun sade tuşlar, sağda oyuncunun KARAKTERİ
-     * (launcher'ın oyun öncesi yazdığı deri), altta ince şerit. Pano/yan panel
-     * yok — "karmaşık" geri bildiriminin hedefi tam olarak buydu.
+     * Yeni dÃ¼zen: solda tek sÃ¼tun sade tuÅŸlar, saÄŸda oyuncunun KARAKTERÄ°
+     * (launcher'Ä±n oyun Ã¶ncesi yazdÄ±ÄŸÄ± deri), altta ince ÅŸerit. Pano/yan panel
+     * yok â€” "karmaÅŸÄ±k" geri bildiriminin hedefi tam olarak buydu.
      */
     private void drawSade(class_332 graphics, class_327 font, class_310 client,
                           int screenWidth, int screenHeight, int mouseX, int mouseY, long started) {
-        // GÜVENLİK AĞI: yeni tema çizimi beklenmedik bir şey yüzünden patlarsa
-        // oyun kilitlenmesin; tema klasik'e döner ve menü normal çizilir.
+        // GÃœVENLÄ°K AÄI: yeni tema Ã§izimi beklenmedik bir ÅŸey yÃ¼zÃ¼nden patlarsa
+        // oyun kilitlenmesin; tema klasik'e dÃ¶ner ve menÃ¼ normal Ã§izilir.
         try {
             this.drawSadeGovde(graphics, font, client, screenWidth, screenHeight, mouseX, mouseY, started);
         }
@@ -814,7 +923,7 @@ public final class YikimMainMenu {
             cfg.uiTema = YikimTema.KLASIK;
             cfg.save();
             YikimLog.info("sade tema cizilemedi, klasik temaya donuldu: " + sorun);
-            YikimMetrics.notify("Sade tema çizilemedi — Klasik temaya dönüldü");
+            YikimMetrics.notify("Sade tema Ã§izilemedi â€” Klasik temaya dÃ¶nÃ¼ldÃ¼");
         }
     }
 
@@ -823,7 +932,7 @@ public final class YikimMainMenu {
         YikimMetrics.frame(3);
         this.hitCount = 0;
         int margin = screenWidth < 640 ? 16 : 34;
-        // sakin örtü: arka plan görünür ama süssüz
+        // sakin Ã¶rtÃ¼: arka plan gÃ¶rÃ¼nÃ¼r ama sÃ¼ssÃ¼z
         graphics.method_25294(0, 0, screenWidth, screenHeight, 0x77000000);
         float wordScale = screenHeight >= 320 ? 2.0f : 1.6f;
         int logoY = margin;
@@ -832,10 +941,10 @@ public final class YikimMainMenu {
         int altCizgi = logoY + (int)(8.0f * wordScale) + 4;
         YikimDraw.horizontalGradient(graphics, margin, altCizgi, margin + wordWidth, altCizgi + 3,
             YikimTheme.accent, YikimTheme.accent2, 6);
-        YikimAdapter.text(graphics, font, "CLIENT  •  v" + YikimClient.MOD_VERSION, margin + 1, altCizgi + 8,
+        YikimAdapter.text(graphics, font, "CLIENT  â€¢  v" + YikimClient.MOD_VERSION, margin + 1, altCizgi + 8,
             YikimTheme.TEXT_MUTED, true);
 
-        // ---- tuş sütunu ----
+        // ---- tuÅŸ sÃ¼tunu ----
         int sutun = Math.min(310, Math.max(180, screenWidth / 3));
         int satirH = 30;
         int bosluk = 6;
@@ -866,18 +975,18 @@ public final class YikimMainMenu {
             this.addHit(margin, y, sutun, satirH, button.action());
         }
 
-        // ---- karakter + kozmetik seçici (sağ sütun) ----
+        // ---- karakter + kozmetik seÃ§ici (saÄŸ sÃ¼tun) ----
         int panelG = Math.min(320, Math.max(200, screenWidth / 3));
         int panelX = Math.max(margin + sutun + 24, screenWidth - margin - panelG);
         this.drawKarakterPaneli(graphics, font, panelX, tepe, panelG, screenHeight - 66, mouseX, mouseY);
 
-        // ---- alt: küçük anahtarlar + şerit ----
+        // ---- alt: kÃ¼Ã§Ã¼k anahtarlar + ÅŸerit ----
         int anahtarY = screenHeight - 46;
         this.drawChips(graphics, font, anahtarY, sutun, mouseX, mouseY);
         graphics.method_25294(0, screenHeight - 20, screenWidth, screenHeight - 19,
             YikimTheme.alpha(YikimTheme.accent, 60));
         YikimAdapter.text(graphics, font, this.cacheFooterLeft, margin, screenHeight - 14, YikimTheme.TEXT_MUTED, false);
-        String sag = "Sağ Shift  •  YIKIM menüsü  •  Tema: Sade";
+        String sag = "SaÄŸ Shift  â€¢  YIKIM menÃ¼sÃ¼  â€¢  Tema: Sade";
         if (screenWidth - margin - font.method_1727(sag) > margin + sutun + 8) {
             YikimAdapter.text(graphics, font, sag, screenWidth - margin - font.method_1727(sag),
                 screenHeight - 14, YikimTheme.TEXT_MUTED, false);
@@ -885,7 +994,7 @@ public final class YikimMainMenu {
         YikimUiMetrics.menuEnd(started);
     }
 
-    /** Sağ alt mod bloğunun kapladığı yükseklik (karakter paneli üstüne binmesin). */
+    /** SaÄŸ alt mod bloÄŸunun kapladÄ±ÄŸÄ± yÃ¼kseklik (karakter paneli Ã¼stÃ¼ne binmesin). */
     private int modDockYukseklik() {
         int count = this.modButtons.size();
         if (count == 0) {
@@ -898,10 +1007,10 @@ public final class YikimMainMenu {
     }
 
     /**
-     * SAĞ SÜTUN (v1.31.0) — her iki temada da aynı: karakter (kendiliğinden
-     * dönmez, fareyle sürükleyerek döndürülür), altında hesap adı ve
-     * "Özelleştirme" düğmesi. Deri/pelerin/elitra seçimi ayrı ekranda
-     * yapılır; böylece ana menüde doku ve kart kalabalığı yok.
+     * SAÄ SÃœTUN (v1.31.0) â€” her iki temada da aynÄ±: karakter (kendiliÄŸinden
+     * dÃ¶nmez, fareyle sÃ¼rÃ¼kleyerek dÃ¶ndÃ¼rÃ¼lÃ¼r), altÄ±nda hesap adÄ± ve
+     * "Ã–zelleÅŸtirme" dÃ¼ÄŸmesi. Deri/pelerin/elitra seÃ§imi ayrÄ± ekranda
+     * yapÄ±lÄ±r; bÃ¶ylece ana menÃ¼de doku ve kart kalabalÄ±ÄŸÄ± yok.
      */
     private void drawKarakterPaneli(class_332 graphics, class_327 font, int x, int ust, int genislik,
                                     int alt, int mouseX, int mouseY) {
@@ -913,7 +1022,7 @@ public final class YikimMainMenu {
         int cx = x + genislik / 2;
         YikimKarakter.draw(graphics, cx, ust + 2, boy, YikimTheme.backdrop);
         int isimY = ust + boy + 8;
-        String isim = this.cacheUser.isEmpty() ? "—" : this.cacheUser;
+        String isim = this.cacheUser.isEmpty() ? "â€”" : this.cacheUser;
         float olcek = 1.15f;
         YikimAdapter.push(graphics, cx - (int)((float)font.method_1727(isim) * olcek) / 2.0f, isimY, olcek);
         YikimAdapter.text(graphics, font, isim, 0, 0, -723722, true);
@@ -928,13 +1037,13 @@ public final class YikimMainMenu {
         int dugmeG = Math.min(genislik, 190);
         int dugmeX = cx - dugmeG / 2;
         boolean uzerinde = YikimDraw.inside(mouseX, mouseY, dugmeX, dugmeY, dugmeG, dugmeYukseklik);
-        YikimDraw.button(graphics, font, dugmeX, dugmeY, dugmeG, dugmeYukseklik, "ÖZELLEŞTİRME", true, uzerinde);
-        // karakter alanı ÖNCE yazılır: düğme üstte kalsın
+        YikimDraw.button(graphics, font, dugmeX, dugmeY, dugmeG, dugmeYukseklik, "Ã–ZELLEÅTÄ°RME", true, uzerinde);
+        // karakter alanÄ± Ã–NCE yazÄ±lÄ±r: dÃ¼ÄŸme Ã¼stte kalsÄ±n
         this.addHit(x, ust, genislik, Math.max(24, boy), () -> this.surukleme = true);
         this.addHit(dugmeX, dugmeY, dugmeG, dugmeYukseklik, () -> YikimMainMenu.open(new YikimKozmetikEkrani()));
     }
 
-    /** Sürükleme sırasında karakteri döndür (v1.31.0). */
+    /** SÃ¼rÃ¼kleme sÄ±rasÄ±nda karakteri dÃ¶ndÃ¼r (v1.31.0). */
     boolean drag(double x, double y, double farkX) {
         if (!this.surukleme) {
             return false;
@@ -951,7 +1060,7 @@ public final class YikimMainMenu {
         this.surukleme = false;
     }
 
-    /** Tuşlar sığsın diye satır yüksekliği (en az 20 px). */
+    /** TuÅŸlar sÄ±ÄŸsÄ±n diye satÄ±r yÃ¼ksekliÄŸi (en az 20 px). */
     private static int saldir(int alan, int adet, int bosluk) {
         if (adet <= 0) {
             return 24;
@@ -1018,7 +1127,7 @@ public final class YikimMainMenu {
         int headerHeight = 49;
         int rowHeight = 21;
         int tipHeight = 9 + this.cacheTipLines.size() * 11;
-        // MOD TUŞLARI sağ alta taşındı (drawModDock) — panelde yer açılmıyor.
+        // MOD TUÅLARI saÄŸ alta taÅŸÄ±ndÄ± (drawModDock) â€” panelde yer aÃ§Ä±lmÄ±yor.
         int modSectionHeight = 0;
         int maxRows = Math.max(0, (availableHeight - pad * 2 - headerHeight - 6 - 10 - tipHeight - modSectionHeight) / rowHeight);
         shownRows = Math.min(rows.length, maxRows);
@@ -1051,13 +1160,13 @@ public final class YikimMainMenu {
     }
 
     /**
-     * SAĞ ALT MOD BLOĞU (v1.15.0).
+     * SAÄ ALT MOD BLOÄU (v1.15.0).
      *
-     * Diğer modların ana menüye mixin ile eklediği tuşlar (Flashback Essentials
-     * vb.) daha önce YIKIM yan panelinin içinde düz satırlar hâlinde duruyordu;
-     * artık ekranın sağ altında, kendi piksel bloklarında: koyu zemin, turuncu
-     * köşe çizgisi, modun GERÇEK logosu (launcher'ın indirdiği PNG) ve etiket.
-     * Tıklama davranışı aynı: modun gerçek onPress handler'ı çalışır.
+     * DiÄŸer modlarÄ±n ana menÃ¼ye mixin ile eklediÄŸi tuÅŸlar (Flashback Essentials
+     * vb.) daha Ã¶nce YIKIM yan panelinin iÃ§inde dÃ¼z satÄ±rlar hÃ¢linde duruyordu;
+     * artÄ±k ekranÄ±n saÄŸ altÄ±nda, kendi piksel bloklarÄ±nda: koyu zemin, turuncu
+     * kÃ¶ÅŸe Ã§izgisi, modun GERÃ‡EK logosu (launcher'Ä±n indirdiÄŸi PNG) ve etiket.
+     * TÄ±klama davranÄ±ÅŸÄ± aynÄ±: modun gerÃ§ek onPress handler'Ä± Ã§alÄ±ÅŸÄ±r.
      */
     private void drawModDock(class_332 graphics, class_327 font, int screenWidth, int screenHeight,
                              int mouseX, int mouseY, int footerHeight, int margin) {
@@ -1068,18 +1177,18 @@ public final class YikimMainMenu {
         int rowH = 18;
         int gap = 3;
         int bottom = screenHeight - footerHeight - 10;
-        // Sığmayanları kırp (küçük pencerede menüyü kaplamasın)
+        // SÄ±ÄŸmayanlarÄ± kÄ±rp (kÃ¼Ã§Ã¼k pencerede menÃ¼yÃ¼ kaplamasÄ±n)
         int maxRows = Math.max(1, (bottom - 40) / (rowH + gap));
         int shown = Math.min(count, maxRows);
         int dockW = Math.min(250, Math.max(150, screenWidth / 3));
         int x = screenWidth - margin - dockW;
-        // Sol sütunla çakışmasın
+        // Sol sÃ¼tunla Ã§akÄ±ÅŸmasÄ±n
         if (x <= this.columnX + this.columnWidth + 12) {
             return;
         }
         int toplam = shown * (rowH + gap) - gap;
         int y = bottom - toplam;
-        // blok zemini + çerçeve (piksel görünüm: 2px köşe aksanları)
+        // blok zemini + Ã§erÃ§eve (piksel gÃ¶rÃ¼nÃ¼m: 2px kÃ¶ÅŸe aksanlarÄ±)
         YikimDraw.roundedFill(graphics, x - 7, y - 18, x + dockW + 7, bottom + 7, -1728053248);
         YikimDraw.outline(graphics, x - 7, y - 18, dockW + 14, toplam + 25, YikimTheme.alpha(YikimTheme.accent, 70));
         graphics.method_25294(x - 7, y - 18, x - 4, y - 15, YikimTheme.accent);
@@ -1179,9 +1288,9 @@ public final class YikimMainMenu {
     /**
      * Bu konumda tiklanabilir bir sey var mi? (v1.33.14)
      *
-     * NEDEN VAR: 26.x'te tıklama koordinatları cizimdeki koordinatlarla aynı
-     * olmuyor (ölcek farkı). Tiklama hangi setin "isabet ettigini" gormek icin
-     * bu yuzden once deniyoruz — bosa duserse diger set denenir.
+     * NEDEN VAR: 26.x'te tÄ±klama koordinatlarÄ± cizimdeki koordinatlarla aynÄ±
+     * olmuyor (Ã¶lcek farkÄ±). Tiklama hangi setin "isabet ettigini" gormek icin
+     * bu yuzden once deniyoruz â€” bosa duserse diger set denenir.
      */
     boolean ilkVurus(double mouseX, double mouseY) {
         for (int index = this.hitCount - 1; index >= 0; --index) {
