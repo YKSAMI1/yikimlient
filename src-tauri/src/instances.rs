@@ -27,7 +27,6 @@ pub struct Instance {
     pub custom_vm_args: Option<String>, // boşluk/satır ile ayrılmış JVM argümanları (None = yok)
     /// Son girilen sunucu adresi (mod yazar) — hızlı giriş için. Kalıcı DEĞİL:
     /// her okumada `.yikim/son-sunucu.txt` dosyasından tazelenir.
-    #[serde(skip)]
     pub last_server: Option<String>,
 }
 
