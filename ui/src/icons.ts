@@ -119,11 +119,15 @@ const redo = `<svg ${A}><path d="m15 14 5-5-5-5"/><path d="M20 9h-9a6 6 0 0 0 0 
 const lock = `<svg ${A}><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>`;
 const share = `<svg ${A}><circle cx="6" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="M8.2 10.8 14.8 7.2M8.2 13.2l6.6 3.6"/></svg>`;
 
+/** lucide "rotate-cw" — karakteri sürükleyerek döndürme ipucu */
+const don = `<svg ${A}><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>`;
+
 export const ICONS: Record<string, string> = {
   home, grid, compass, news, gear, plus, search, play, image, folder,
   trash, eraser, copy, back, check, user, puzzle, box, cpu, args, term, chart,
   dl, mug, globe, sparkle, file, info, clock, stop,
   shirt, brush, bucket, picker, undo, redo, lock, share,
+  don,
 };
 
 /** içine gömülü SVG üretir; span'a sarılırsa .ic ile hizalanır */

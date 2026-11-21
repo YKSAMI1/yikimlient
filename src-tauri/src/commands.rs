@@ -1459,6 +1459,7 @@ pub async fn cmd_pick_scene_image(app: AppHandle) -> Result<YikimConfig, String>
     copy_image_to(&picked, &dest, 1920)?;
     let mut cfg = YikimConfig::load_or_default();
     cfg.sahne_arka = "ozel".into();
+    cfg.sahne_arka_elle = true; // kullanıcı seçti → sabit kalsın
     cfg.sahne_arka_ozel = Some(dest.to_string_lossy().to_string());
     cfg.save()?;
     Ok(cfg)

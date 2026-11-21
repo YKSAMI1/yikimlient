@@ -185,6 +185,20 @@
   animation: md-yuruyus 1.6s cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
+/* sahne ipucu + döndürme imleci */
+.md-ipucu {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  color: var(--text-faint, #8a7b6c);
+}
+.md-ipucu .ic { width: 13px; height: 13px; }
+.md-stage #sahne-katman { cursor: grab; }
+.md-stage #sahne-katman:active { cursor: grabbing; }
+
 /* karakter soldan yürüyerek gelir, iki küçük adımda yerleşir */
 @keyframes md-yuruyus {
   0%   { opacity: 0; transform: translateX(-30%) translateY(2.5%); }

@@ -1,6 +1,6 @@
 import { currentAccount, headAttrs, headUrl, icon, invoke, fileSrc, openModal, openLoginModal, state, toast, applyWorld, refreshState, openPath, openExternal, navigate } from "../main";
 import { guvenlikKartiCiz, guvenlikYoklamayiDurdur, hesapCarpi } from "../guvenlik";
-import { SAHNE_ARTLARI, sahneArkaCiz } from "../sahne/arkaplan";
+import { SAHNE_ARTLARI, sahneArkaCiz, rastgeleSahne } from "../sahne/arkaplan";
 
 /* Altı dünya — her kart o dünyanın kendi zemininde mini önizleme taşır.
    Diğer denemeler (Devre Panosu, Kategori Standardı, Karanlık Oda, Kumaş,
@@ -188,7 +188,7 @@ export function renderSettings(root: HTMLElement): void {
       <div class="sahne-art-secim" id="sahne-art-secim">
         <div class="sas-bas">
           <b>Sahne arka planı</b>
-          <span>Karakterin arkasındaki piksel manzara — yalnız Sahne dünyasında görünür.</span>
+          <span>Karakterin arkasındaki piksel manzara. Bir sahneye basıp seçersen sabit kalır; "Rastgele"da her menü açılışında başka bir sahne gelir.</span>
         </div>
         <div class="sas-izgara" id="sas-izgara"></div>
       </div>
@@ -376,7 +376,8 @@ export function renderSettings(root: HTMLElement): void {
   // ---- sahne arka planı: piksel manzara seçimi (canlı minik önizleme) ----
   const artIzgara = root.querySelector("#sas-izgara") as HTMLElement | null;
   if (artIzgara) {
-    const seciliArt = String(cfg.sahne_arka || "kiraz");
+    // "Rastgele" seçiliyse (kullanıcı elle seçim yapmadıysa) o kart seçili görünür.
+    const seciliArt = cfg.sahne_arka_elle === false ? "rastgele" : String(cfg.sahne_arka || "kiraz");
     artIzgara.innerHTML = SAHNE_ARTLARI.map((a) => `
       <button class="sas-kart${a.id === seciliArt ? " sel" : ""}" data-art="${a.id}">
         <span class="sas-tuval"><canvas data-ciz="${a.id}"></canvas></span>
@@ -424,15 +425,29 @@ export function renderSettings(root: HTMLElement): void {
           let yeni: any = null;
           try { yeni = await invoke("cmd_pick_scene_image"); } catch { return; }
           state.config.sahne_arka = "ozel";
+          state.config.sahne_arka_elle = true;
           state.config.sahne_arka_ozel = yeni.sahne_arka_ozel || null;
-          cfg = { ...cfg, sahne_arka: "ozel", sahne_arka_ozel: yeni.sahne_arka_ozel || null };
+          cfg = { ...cfg, sahne_arka: "ozel", sahne_arka_elle: true, sahne_arka_ozel: yeni.sahne_arka_ozel || null };
           ozelOnizle();
           artIzgara.querySelectorAll(".sas-kart").forEach((x) => x.classList.toggle("sel", x === k));
           await save();
           toast("Sahne fotoğrafı seçildi");
           return;
         }
+        // "Rastgele": kullanıcı seçimini geri al → her açılışta farklı sahne.
+        if (id === "rastgele") {
+          state.config.sahne_arka_elle = false;
+          const yeni = rastgeleSahne(String(cfg.sahne_arka || ""));
+          state.config.sahne_arka = yeni;
+          cfg = { ...cfg, sahne_arka_elle: false, sahne_arka: yeni };
+          artIzgara.querySelectorAll(".sas-kart").forEach((x) => x.classList.toggle("sel", x === k));
+          await save();
+          toast("Sahne rastgele seçilecek");
+          return;
+        }
         state.config.sahne_arka = id;
+        state.config.sahne_arka_elle = true;
+        cfg = { ...cfg, sahne_arka: id, sahne_arka_elle: true };
         artIzgara.querySelectorAll(".sas-kart").forEach((x) => x.classList.toggle("sel", x === k));
         await save();
         toast("Sahne arka planı değişti");

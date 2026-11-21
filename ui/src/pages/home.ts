@@ -3,7 +3,15 @@ import { hesapCarpi } from "../guvenlik";
 import { enterRows, switchPress } from "../motion";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import { emoteParca } from "../sahne/emote";
-import { SAHNE_ARTLARI, sahneArkaCiz, sahneArtiBul } from "../sahne/arkaplan";
+import { SAHNE_ARTLARI, PIXEL_SAHNELERI, sahneArkaCiz, sahneArtiBul, sahneArkaFotograf, rastgeleSahne } from "../sahne/arkaplan";
+
+/** Menüde gösterilecek sahne: kullanıcı seçmediyse rastgele (her render'da yeni). */
+function etkinSahne(): string {
+  const kayitli = String(state.config?.sahne_arka || "nether");
+  if (state.config?.sahne_arka_elle === true) return kayitli;
+  if (kayitli === "ozel" && state.config?.sahne_arka_ozel) return "ozel";
+  return rastgeleSahne(kayitli);
+}
 import wavingIcerik from "../orn/emote/waving.json?raw";
 
 let selectedInstanceId: string | null = null;
@@ -196,7 +204,8 @@ function modernHome(root: HTMLElement): void {
   const acc = currentAccount();
   const iconIsFile = (v: string) => !!v && (v.includes("/") || v.includes("\\"));
   const son = [...state.instances].sort((a, b) => (b.last_played || 0) - (a.last_played || 0));
-  const art = sahneArtiBul(String(state.config?.sahne_arka || "nether"));
+  // Sahne metni de gerçekten çizilenle aynı olsun (rastgele seçim uyumsuzluğu vardı)
+    const art = sahneArtiBul(etkinSahne());
   const toplamMb = state.sys?.total_ram_mb || 16384;
   const ramPct = sel ? Math.min(100, Math.round((sel.ram_mb / toplamMb) * 100)) : 0;
   const durdur = !!sel && launch.activeId === sel.id;
@@ -222,6 +231,7 @@ function modernHome(root: HTMLElement): void {
           <button class="md-scene" id="md-scene" title="Sahneyi değiştir">
             ${icon("image")} <span>Sahneyi değiştir</span>
           </button>
+          <span class="md-ipucu">${icon("don")} Karakteri sürükleyerek döndürebilirsin</span>
         </div>
 
         <aside class="md-card" aria-label="Kurulum kartı">
@@ -362,12 +372,15 @@ function wireModern(root: HTMLElement): void {
     })
   );
 
-  // Sahne arkası: Nether → diğer hazır manzaralar arasında tek tıkla döner.
+  // Sahne arkası: Nether → hazır manzaralar arasında tek tıkla döner.
+  // Döngü YALNIZCA piksel sahnelerde; fotoğraf/rastgele kartına çıkmaz ve
+  // bu düğmeye basmak bilinçli seçim demektir (artık sahne sabit kalır).
   root.querySelector("#md-scene")?.addEventListener("click", async () => {
-    const simdiki = String(state.config?.sahne_arka || "nether");
-    const i = SAHNE_ARTLARI.findIndex((a) => a.id === simdiki);
-    const art = SAHNE_ARTLARI[(i + 1) % SAHNE_ARTLARI.length];
+    const simdiki = etkinSahne();
+    const i = PIXEL_SAHNELERI.findIndex((a) => a.id === simdiki);
+    const art = PIXEL_SAHNELERI[(i + 1) % PIXEL_SAHNELERI.length];
     state.config.sahne_arka = art.id;
+    state.config.sahne_arka_elle = true;
     const arka = root.querySelector("#sahne-arka") as HTMLCanvasElement | null;
     if (arka) sahneArkaCiz(arka, art.id);
     const p = root.querySelector(".md-stage-head p");
@@ -605,21 +618,23 @@ async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string }
   const dunya = document.documentElement.getAttribute("data-world");
   const arka = root.querySelector("#sahne-arka") as HTMLCanvasElement | null;
   if (arka && (dunya === "sahne" || dunya === "modern")) {
-    const art = String(state.config?.sahne_arka || (dunya === "modern" ? "nether" : "kiraz"));
+    // Kullanıcı ayarlardan elle seçim yapmadıysa her menü açılışında rastgele
+    // bir piksel sahne; seçtiyse onu koru (sahne_arka_elle = true).
+    const art = etkinSahne();
     if (art === "ozel" && state.config?.sahne_arka_ozel) {
-      // Kullanıcının kendi fotoğrafı: piksel tuvali boş kalır, fotoğraf
-      // CSS arka planı olarak tuvalin arkasında görünür (cover + saydamlık korunur).
-      sahneArkaCiz(arka, "ozel");
-      arka.style.backgroundImage = `url("${fileSrc(String(state.config.sahne_arka_ozel))}")`;
-      arka.style.backgroundSize = "cover";
-      arka.style.backgroundPosition = "center";
+      // Kullanıcının fotoğrafı: tuvalin kendi piksellerine çizilir (boşluk yok)
+      sahneArkaFotograf(arka, fileSrc(String(state.config.sahne_arka_ozel)));
+      arka.style.imageRendering = "auto";
     } else {
       sahneArkaCiz(arka, art);
-      arka.style.backgroundImage = "";
+      arka.style.imageRendering = "";
     }
     arka.classList.add("on");
   }
   const sah = sahneGetir();
+  // Kozmetik/skin editöründen dönüldüğünde "etkileşim kapalı" bayrağı
+  // sızabiliyordu → ana menüde karakter döndürülemiyordu. Burada açık zorla.
+  sah.etkilesimKapali = false;
   sah.kur(canvas);
   canvas.classList.add("on");
   try {

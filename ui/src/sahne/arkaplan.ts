@@ -411,21 +411,21 @@ const ARTLar: SahneArti[] = [
     etiket: "Turuncu gökyüzü, kuğular",
     ciz(g) {
       gok(g, ["#3b1d3f", "#6b2b45", "#a8453f", "#d96b36", "#f0a03c"], 64);
-      // güneş: bantlı yuvarlak
+      // güneş: tam yuvarlak (yarıçap 7) — hafif bantlar
       const gx = 84; const gy = 58;
-      for (let i = 6; i >= 0; i--) {
-        px(g, gx - 7 + (6 - i) * 0.4, gy - i, 14 - (6 - i) * 0.8, 1, i % 2 ? "#ffd27a" : "#fff3c4");
+      for (let yy = -7; yy <= 7; yy++) {
+        const w = Math.round(Math.sqrt(Math.max(0, 49 - yy * yy)) * 2);
+        px(g, gx - w / 2, gy + yy, w, 1, Math.abs(yy) < 3 ? "#fff3c4" : "#ffd27a");
       }
-      for (let i = 5; i >= 0; i--) {
-        px(g, gx - 5, gy - i + 1, 10, 1, "#ffe6a3");
-      }
+      // ufuk çizgisi
+      px(g, 0, 74, W, 1, "#ffcf8a");
       // uzak sıra sıra dağlar (parlaklık azalarak)
       daglar(g, 66, "#8c3a4d", "#d98a63", 7);
       daglar(g, 72, "#5f2a44", "#a45c60", 13);
       daglar(g, 78, "#3b1c33", "#7a3b50", 29);
       // göl: yatay bantlar + güneş yansıması
-      px(g, 0, 74, W, H - 74, "#2a1730");
-      for (let y = 74; y < 92; y += 2) {
+      px(g, 0, 75, W, H - 75, "#2a1730");
+      for (let y = 75; y < 92; y += 2) {
         px(g, 0, y, W, 1, y % 4 === 0 ? "#4a2440" : "#351a33");
       }
       for (let i = 0; i < 9; i++) {
@@ -494,15 +494,19 @@ const ARTLar: SahneArti[] = [
     ciz(g) {
       gok(g, ["#030617", "#061029", "#0a1a38", "#0d2044"], 58);
       parilti(g, 40, ["#e8f0ff", "#a8bce0"], 3, 6);
-      // aurora bantları
-      for (let b = 0; b < 3; b++) {
-        const renk = b === 0 ? "rgba(90,255,190," : b === 1 ? "rgba(90,200,255," : "rgba(190,140,255,";
-        for (let x = 0; x < W; x++) {
-          const y = 8 + b * 7 + Math.round(Math.sin(x * 0.12 + b) * 5) + Math.round(Math.sin(x * 0.05) * 3);
-          const h = 3 + Math.round(Math.abs(Math.sin(x * 0.09 + b * 2)) * 2);
-          for (let k = 0; k < h; k++) {
-            px(g, x, y + k, 1, 1, renk + (0.34 - k * 0.09).toFixed(2) + ")");
-          }
+      // aurora: düz dikey bantlar (üstte parlak, altta sönen) — şekilsiz, temiz
+      const bantlar: { x: number; w: number; renk: string }[] = [
+        { x: 8, w: 10, renk: "90,255,190" },
+        { x: 34, w: 8, renk: "90,200,255" },
+        { x: 62, w: 12, renk: "190,140,255" },
+        { x: 94, w: 9, renk: "90,255,190" },
+      ];
+      for (const b of bantlar) {
+        for (let k = 0; k < 34; k++) {
+          // genişlik altta daralır, parlaklık söner
+          const gen = Math.max(2, Math.round(b.w * (1 - k / 34)));
+          const alfa = (0.4 * (1 - k / 34)).toFixed(2);
+          px(g, b.x - gen / 2 + k * 0.05, 6 + k, gen, 1, `rgba(${b.renk},${alfa})`);
         }
       }
       // kar tepeleri
@@ -566,6 +570,26 @@ const ARTLar: SahneArti[] = [
     },
   },
   {
+    // Rastgele: bu karta basınca kullanıcı seçimi geri alınır ve her menü
+    // açılışında farklı bir sahne gösterilir (ciz() yalnız önizleme için).
+    id: "rastgele",
+    ad: "Rastgele",
+    etiket: "Her açılışta farklı sahne",
+    ciz(g) {
+      gok(g, ["#12151c", "#1b1f27", "#242935", "#2d333f"], 60);
+      // soru işareti benzeri bloklar
+      px(g, 58, 30, 12, 4, "#f4ece2");
+      px(g, 66, 34, 4, 4, "#f4ece2");
+      px(g, 66, 44, 4, 4, "#f4ece2");
+      px(g, 66, 56, 4, 4, "#f4ece2");
+      // alttan sıcak şerit
+      for (let x = 0; x < W; x += 8) {
+        px(g, x, 74, 6, 2, x % 16 === 0 ? "#ff5a1f" : "#ffb627");
+      }
+      px(g, 0, 78, W, H - 78, "#0b0705");
+    },
+  },
+  {
     // Kullanıcının kendi fotoğrafı: piksel çizimi yok — tuval şeffaf bırakılır,
     // fotoğraf CSS arka planı olarak tuvalin arkasında görünür (settings.ts).
     id: "ozel",
@@ -583,6 +607,27 @@ export function sahneArtiBul(id: string): SahneArti {
   return ARTLar.find((a) => a.id === id) || ARTLar[0];
 }
 
+/** Tüm piksel sahneler (özel fotoğraf ve "rastgele" hariç). */
+export const PIXEL_SAHNELERI: SahneArti[] = ARTLar.filter(
+  (a) => a.id !== "ozel" && a.id !== "rastgele",
+);
+
+/**
+ * Rastgele sahne seç. Kullanıcı ayarlardan elle seçim yapmadıysa her menü
+ * açılışında farklı bir sahne çıkar (seçim config'te saklanmaz).
+ */
+export function rastgeleSahne(onceki?: string | null): string {
+  const liste = PIXEL_SAHNELERI;
+  if (!liste.length) return "kiraz";
+  let secim = liste[Math.floor(Math.random() * liste.length)].id;
+  // arka arkaya aynı sahne gelmesin (en az 2 sahne varsa)
+  if (liste.length > 1 && secim === onceki) {
+    const diger = liste.filter((a) => a.id !== onceki);
+    secim = diger[Math.floor(Math.random() * diger.length)].id;
+  }
+  return secim;
+}
+
 /** Sahneyi verilen tuvale çiz (tuval 128×96'ya ayarlanır). */
 export function sahneArkaCiz(canvas: HTMLCanvasElement, id: string): void {
   const g = canvas.getContext("2d");
@@ -592,6 +637,38 @@ export function sahneArkaCiz(canvas: HTMLCanvasElement, id: string): void {
     canvas.height = H;
   }
   g.imageSmoothingEnabled = false;
-  g.clearRect(0, 0, W, H);
+  // BOŞLUK KAPANMASI: bazı sahneler gökyüzünü tam çizmiyordu; zemini
+  // önceden doldurduğumuz için tuvalde hiçbir yerde saydam alan kalmaz.
+  if (id !== "ozel") {
+    g.fillStyle = "#0b0705";
+    g.fillRect(0, 0, W, H);
+  } else {
+    g.clearRect(0, 0, W, H);
+  }
   sahneArtiBul(id).ciz(g);
+}
+
+/**
+ * Kullanıcının kendi fotoğrafını sahne olarak çiz (tam kaplama, boşluk yok).
+ * Fotoğraf tuvalin kendi piksellerine çizilir — CSS arka planı kullanmayız,
+ * böylece hiçbir yer boş kalmaz ve saydamlık/piksel ayarları tutarlı olur.
+ */
+export function sahneArkaFotograf(canvas: HTMLCanvasElement, yol: string): void {
+  const g = canvas.getContext("2d");
+  if (!g) return;
+  if (canvas.width !== W || canvas.height !== H) {
+    canvas.width = W;
+    canvas.height = H;
+  }
+  g.imageSmoothingEnabled = true;
+  g.clearRect(0, 0, W, H);
+  const im = new Image();
+  im.onload = () => {
+    // cover: en küçük ölçeği baz al, taşmayı kırp
+    const olcek = Math.max(W / im.width, H / im.height);
+    const w = im.width * olcek;
+    const h = im.height * olcek;
+    g.drawImage(im, (W - w) / 2, (H - h) / 2, w, h);
+  };
+  im.src = yol;
 }
