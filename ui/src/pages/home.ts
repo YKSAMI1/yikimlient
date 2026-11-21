@@ -78,8 +78,8 @@ function impHome(root: HTMLElement): void {
           <div class="imp-hizli-bas">${icon("play")} HIZLI GİRİŞ</div>
           ${hizli ? `
           <button class="imp-hizli-satir${launch.activeId === hizli.id ? " durdur" : ""}" id="i-hizli-oyla" ${launch.activeId && launch.activeId !== hizli.id ? "disabled data-kilitli=\"1\"" : ""}>
-            <b>${hizli.name}${launch.activeId === hizli.id ? " — AÇIK" : ""}</b>
-            <small>${loaderName(hizli.mod_loader)} · ${hizli.mc_version}</small>
+            <b>${hizli.last_server ? hizli.last_server : hizli.name}${launch.activeId === hizli.id ? " — AÇIK" : ""}</b>
+            <small>${hizli.last_server ? `${hizli.name} · ${loaderName(hizli.mod_loader)} · ${hizli.mc_version}` : `${loaderName(hizli.mod_loader)} · ${hizli.mc_version}`}</small>
           </button>
           <button class="imp-hizli-satir pas" id="i-hizli-liste">Tümünü gör →</button>` : `
           <button class="imp-hizli-satir pas" id="i-hizli-liste">İlk kurulumu oluştur</button>`}
@@ -145,7 +145,9 @@ function impHome(root: HTMLElement): void {
     if (launch.activeId === hizli.id) return stopOyun();
     if (!state.accounts.length) return openLoginModal();
     const { launchInstance } = await import("../main");
-    void launchInstance(hizli.id);
+    // HIZLI GİRİŞ: oyunu en son kapattığımızda içinde olduğumuz sunucu varsa
+    // o paketle o sunucuya direkt gir (mod adresi .yikim/son-sunucu.txt'e yazar).
+    void launchInstance(hizli.id, hizli.last_server || null);
   });
 
   // vitrin motoru + skin + emote (eski akışla aynı)

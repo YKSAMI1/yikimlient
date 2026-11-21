@@ -2968,7 +2968,12 @@ pub struct LaunchResponse {
 }
 
 #[tauri::command]
-pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<LaunchResponse, String> {
+pub async fn cmd_launch_instance(
+    app: AppHandle,
+    instance_id: String,
+    // Hızlı giriş (v1.38.0): bazı durumlarda doğrudan sunucuya gir
+    server: Option<String>,
+) -> Result<LaunchResponse, String> {
     let mut inst = Instance::load(&instance_id).ok_or("kurulum yok")?;
     let account = selected_account()?;
 
@@ -3067,7 +3072,7 @@ pub async fn cmd_launch_instance(app: AppHandle, instance_id: String) -> Result<
 
     // canlı oturum (istatistik)
     let session = Arc::new(stats::LiveSession::new(&inst.id, &version_id));
-    let pid = launcher::launch_game(app.clone(), inst.clone(), &version_id, account, &java_dir, session).await?;
+    let pid = launcher::launch_game(app.clone(), inst.clone(), &version_id, account, &java_dir, session, server).await?;
 
     // NOT: Normal açılışta perde YOK. Perde yalnızca oyun içi YIKIM modundan gelen
     // mod değişikliği (restart) akışında açılır — bkz. cmd_restart_curtain_open.

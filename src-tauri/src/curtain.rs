@@ -567,7 +567,7 @@ pub async fn handle_game_exit(app: &AppHandle, instance_id: &str) {
                 &serde_json::json!({ "phase": "relaunching", "instance": view.instance_name }),
             );
             let _ = app.emit("game-started", &view.instance_id);
-            match crate::commands::cmd_launch_instance(app.clone(), view.instance_id.clone()).await {
+            match crate::commands::cmd_launch_instance(app.clone(), view.instance_id.clone(), None).await {
                 Ok(_) => {
                     // BAYAT "ready" TEMİZLİĞİ: önceki oturumdan kalan dosya varsa
                     // perde açılır açılmaz kapanırdı (kullanıcı "hiçbir şey olmadı"

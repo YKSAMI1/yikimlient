@@ -700,8 +700,12 @@ async function tabJava(content: HTMLElement, inst: any): Promise<void> {
                 <span class="chip gray">${p.recommended_ram_mb} MB öneri</span>
               </div>
               <p>${p.description}</p>
-              <details><summary>JVM bayraklarını göster</summary><pre>${p.args.join("\n").replace(/\{ram_mb\}/g, String(inst.ram_mb))}</pre></details>
+              ${p.args.length
+                ? `<details><summary>JVM bayraklarını göster</summary><pre>${p.args.join("\n").replace(/\{ram_mb\}/g, String(inst.ram_mb))}</pre></details>`
+                : `<div style="font-size:11.5px; color:var(--text-faint); margin-top:6px">JVM bayrağı yok — istisnasız her şey oyunun kendi varsayılanında.</div>`}
             </div>`).join("")}
+            ${inst.java_preset_id === "hicbir" ? `<div class="warn-box" style="margin-top:10px">"Hiçbiri" seçili: launcher <b>-Xmx / -Xms</b> bile eklemez. RAM sürgüsü ve chunk mesafesi bu ölçüde kullanılmaz; Java güvenli varsayılanıyla (fiziksel RAM'in bir bölümü) açılır. Mod paketi kendi başlatma argümanlarını zorunlu kılıyorsa bu doğru seçimdir.</div>` : ""}
+            ${inst.java_preset_id === "ozel" ? `<div class="warn-box" style="margin-top:10px">"Özel" seçili: RAM, chunk mesafesi ve JVM argümanlarını aşağıdan sen yazarsın. Launcher hiçbir bayrak eklemez — yazdıkların bozuksa oyun açılmaz, buradan düzeltebilirsin.</div>` : ""}
         </div>
       </div>
       <div class="card" id="ozel-card" ${ozelAcik ? "" : 'style="opacity:0.55"'}>

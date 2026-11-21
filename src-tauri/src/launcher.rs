@@ -1379,6 +1379,7 @@ pub async fn launch_game(
     account: crate::auth::Account,
     java_dir: &Path,
     session: std::sync::Arc<crate::stats::LiveSession>,
+    quick_play_server: Option<String>,
 ) -> Result<u32, String> {
     // Forge/NeoForge: Fabric modu (YIKIM) mods/ içinde kalırsa oyun/loader hata
     // verebilir — başlatmadan önce temizle (eski sürümlerin açtığı yarayı kapatır).
@@ -1510,7 +1511,9 @@ pub async fn launch_game(
         ("resolution_height".into(), String::new()),
         ("quickPlayPath".into(), String::new()),
         ("quickPlaySingleplayer".into(), String::new()),
-        ("quickPlayMultiplayer".into(), String::new()),
+        // Hızlı giriş (v1.38.0): mod'un yazdığı son sunucu adresi. Boşsa
+        // placeholder'lar atlanır, oyun normal ana menüde açılır.
+        ("quickPlayMultiplayer".into(), quick_play_server.unwrap_or_default()),
         ("quickPlayRealms".into(), String::new()),
     ];
 

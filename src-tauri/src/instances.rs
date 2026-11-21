@@ -25,6 +25,10 @@ pub struct Instance {
     // "Özel" preset (v0.3.15): her şeyi oyuncu ayarlar, launcher değerlere karışmaz.
     pub view_distance: Option<u32>,     // doğrudan options.txt renderDistance (None = dokunma)
     pub custom_vm_args: Option<String>, // boşluk/satır ile ayrılmış JVM argümanları (None = yok)
+    /// Son girilen sunucu adresi (mod yazar) — hızlı giriş için. Kalıcı DEĞİL:
+    /// her okumada `.yikim/son-sunucu.txt` dosyasından tazelenir.
+    #[serde(skip)]
+    pub last_server: Option<String>,
 }
 
 impl Default for Instance {
@@ -47,11 +51,21 @@ impl Default for Instance {
             cover: None,
             view_distance: None,
             custom_vm_args: None,
+            last_server: None,
         }
     }
 }
 
 impl Instance {
+    /// Hızlı giriş: mod'un yazdığı son sunucu adresini oku (yoksa None).
+    pub fn son_sunucu_oku(&mut self) {
+        let dosya = self.dir().join(".yikim").join("son-sunucu.txt");
+        self.last_server = std::fs::read_to_string(&dosya)
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+    }
+
     pub fn dir(&self) -> PathBuf {
         instances_dir().join(&self.id)
     }
@@ -66,6 +80,10 @@ impl Instance {
     }
     pub fn load(id: &str) -> Option<Instance> {
         read_json(&instances_dir().join(id).join("yikimlient.json"))
+            .map(|mut i: Instance| {
+                i.son_sunucu_oku();
+                i
+            })
     }
 }
 

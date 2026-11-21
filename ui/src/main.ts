@@ -501,7 +501,8 @@ export function openLoginModal(onSuccess?: () => void): void {
 
 // ---------- Başlatma akışı (progress modal) ----------
 let launchSeq = 0;
-export async function launchInstance(instanceId: string): Promise<void> {
+/** Hızlı giriş: verilen sunucuya direkt girecek şekilde başlat. */
+export async function launchInstance(instanceId: string, serverAddress?: string | null): Promise<void> {
   if (!state.accounts.length) {
     openLoginModal();
     return;
@@ -559,7 +560,7 @@ export async function launchInstance(instanceId: string): Promise<void> {
   mo.observe(document.body, { childList: true });
 
   try {
-    await invoke("cmd_launch_instance", { instanceId });
+    await invoke("cmd_launch_instance", { instanceId, server: serverAddress ?? null });
     // Oyun süreci başarıyla başladı → modal açık kalmasın.
     // (Eskiden yalnızca 'game-exit'te kapanıyordu; oyun çalıştığı sürece ekranda kalıyordu.)
     stage.textContent = "Oyun çalışıyor";

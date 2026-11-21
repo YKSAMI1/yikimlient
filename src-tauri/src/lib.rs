@@ -228,7 +228,7 @@ pub fn run() {
                 let h = handle.clone();
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                    match commands::cmd_launch_instance(h.clone(), inst_id.clone()).await {
+                    match commands::cmd_launch_instance(h.clone(), inst_id.clone(), None).await {
                         Ok(r) => core::yikim_log(format!("probe: launch pid={} id={inst_id}", r.pid)),
                         Err(e) => core::yikim_log(format!("probe: launch hatası: {e}")),
                     }

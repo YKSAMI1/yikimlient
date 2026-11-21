@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public final class YikimClient
 implements ClientModInitializer {
     public static final String MOD_ID = "yikimlient";
-    public static final String MOD_VERSION = "1.37.2";
+    public static final String MOD_VERSION = "1.38.0";
     /** Arayüz teması seçim sürümü: config'teki değer bundan küçükse ilk açılışta sorulur. */
     public static final int TEMA_SURUM = 2;
     public static final Logger LOGGER = LoggerFactory.getLogger((String)"YIKIM");
@@ -94,6 +94,7 @@ implements ClientModInitializer {
             YikimDogrulama.tazele(false);
         }
         // HAFİF işlemler her tick'te (yer bellek, disk YOK):
+        YikimSonSunucu.tick(client);  // son girilen sunucu adresini kaydet (yalnızca değişimde yazar)
         YikimMetrics.tick(client);   // FPS sayacı + CPS + bildirimler (1 sn'de bir gerçek iş — v1.8.2'de yanlışlıkla çıkarılmıştı, HUD 0 gösteriyordu)
         YikimAbTest.tick(client);    // A/B faz ilerlemesi (çalışmıyorken anında döner)
         try {

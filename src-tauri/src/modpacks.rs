@@ -163,6 +163,13 @@ pub fn java_presets() -> Vec<JavaPreset> {
             ],
         },
         JavaPreset {
+            id: "hicbir".into(),
+            name: "Hiçbiri (JVM argümanı yok)".into(),
+            description: "Launcher hiçbir -X/-XX bayrağı eklemez; oyun Java'nın varsayılan ayarlarıyla açılır. Mod paketi kendi argümanlarını zorunlu kılıyorsa (bazı paketler öyle) veya JVM bayrakları çakışıyorsa bunu seç.".into(),
+            recommended_ram_mb: 4096,
+            args: vec![],
+        },
+        JavaPreset {
             id: "ozel".into(),
             name: "Özel".into(),
             description: "Her şeyi kendin ayarla: RAM, chunk mesafesi ve JVM argümanlarını sen yazarsın — launcher değerlere karışmaz.".into(),
