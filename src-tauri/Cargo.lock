@@ -6548,7 +6548,7 @@ dependencies = [
 
 [[package]]
 name = "yikimlient"
-version = "0.9.12"
+version = "0.10.0"
 dependencies = [
  "argon2",
  "base64 0.23.1",
