@@ -231,7 +231,6 @@ function modernHome(root: HTMLElement): void {
           <button class="md-scene" id="md-scene" title="Sahneyi değiştir">
             ${icon("image")} <span>Sahneyi değiştir</span>
           </button>
-          <span class="md-ipucu">${icon("don")} Karakteri sürükleyerek döndürebilirsin</span>
         </div>
 
         <aside class="md-card" aria-label="Kurulum kartı">

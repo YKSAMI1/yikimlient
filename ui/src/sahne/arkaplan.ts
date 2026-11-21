@@ -570,6 +570,179 @@ const ARTLar: SahneArti[] = [
     },
   },
   {
+    id: "kanyon",
+    ad: "Kanyon Kıyısı",
+    etiket: "Katmanlı kayalar, nehir, sıcak hava",
+    ciz(g) {
+      gok(g, ["#f2c078", "#e8a862", "#d98a4e", "#c4713c"], 60);
+      // uzak sıradağlar
+      daglar(g, 62, "#a45b3c", "#e0a878", 5);
+      // kanyon katmanları: alttan üste koyulaşan yatay bloklar
+      const katman = [
+        { y: 62, h: 10, renk: "#8f3f2c", isik: "#b5623f" },
+        { y: 72, h: 10, renk: "#7a3426", isik: "#9c4a31" },
+        { y: 82, h: 10, renk: "#652a1f", isik: "#833c2a" },
+        { y: 92, h: 4, renk: "#4d1f18", isik: "#6b2c22" },
+      ];
+      for (const k of katman) {
+        px(g, 0, k.y, W, k.h, k.renk);
+        px(g, 0, k.y, W, 1, k.isik);
+      }
+      // kaya çıkıntıları (eğimli bloklar)
+      for (let i = 0; i < 7; i++) {
+        const x = 6 + i * 18;
+        const h = 8 + ((i * 7) % 12);
+        for (let k = 0; k < h; k++) {
+          px(g, x + k, 62 + h - k - 1, 6, 1, k % 3 === 0 ? "#b5623f" : "#8f3f2c");
+        }
+      }
+      // nehir: koyu mavi şerit + köpük
+      px(g, 0, 88, W, 6, "#1f5f7a");
+      for (let x = 0; x < W; x += 7) {
+        px(g, x, 88, 4, 1, "#8fd4e8");
+        px(g, x + 3, 92, 3, 1, "rgba(255,255,255,0.35)");
+      }
+      // kıyı çakılları
+      const r = rastgele(29);
+      for (let i = 0; i < 26; i++) {
+        px(g, Math.floor(r() * W), 82 + Math.floor(r() * 6), 2, 1, "#5c3a2a");
+      }
+      // leşel kuşları
+      const kus = (x: number, y: number) => { px(g, x, y, 3, 1, "#3a2118"); px(g, x + 4, y, 3, 1, "#3a2118"); };
+      kus(26, 22); kus(38, 17); kus(52, 24); kus(64, 19);
+    },
+  },
+  {
+    id: "zirve",
+    ad: "Karlı Zirve",
+    etiket: "Kar tepeler, çamlar, kar yağışı",
+    ciz(g) {
+      gok(g, ["#0f2436", "#17364a", "#1f4a63", "#2b6480"], 56);
+      bulut(g, 12, 10, 24, "#4a7a94", "#2b6480");
+      bulut(g, 66, 18, 28, "#4a7a94", "#2b6480");
+      // kar sıradağları: iki ton (ışık/klipsiz)
+      daglar(g, 64, "#3d6b86", "#8fd0e8", 3);
+      daglar(g, 70, "#2a4a60", "#6fb2cc", 17);
+      // kar örtüsü (tepe çizgisi)
+      for (let x = 0; x < W; x++) {
+        const kapak = (Math.sin(x * 0.11) + 1) * 6 + 58;
+        px(g, x, Math.round(kapak), 1, 3, "rgba(255,255,255,0.7)");
+      }
+      // çam ağaçları
+      const cam = (x: number, boy: number) => {
+        const taban = 84;
+        px(g, x, taban - boy, 2, boy, "#2b1c14");
+        for (let i = 0; i < 4; i++) {
+          const yy = taban - boy + i * 4;
+          const gen = 5 + i * 3;
+          px(g, x - gen / 2 + 1, yy, gen, 3, i % 2 ? "#14432f" : "#1b5b3c");
+        }
+      };
+      cam(14, 22); cam(30, 28); cam(44, 18); cam(96, 24); cam(108, 20);
+      // kar zemin
+      px(g, 0, 84, W, H - 84, "#cfe4f0");
+      px(g, 0, 84, W, 2, "#ffffff");
+      for (let x = 0; x < W; x += 9) px(g, x, 90, 5, 1, "rgba(255,255,255,0.6)");
+      // kar yağışı
+      const r = rastgele(11);
+      for (let i = 0; i < 40; i++) {
+        px(g, Math.floor(r() * W), Math.floor(r() * 70), 1, 1, "rgba(255,255,255,0.75)");
+      }
+    },
+  },
+  {
+    id: "zifiri",
+    ad: "Zifiri Orman",
+    etiket: "Dev mantarlar, ateş böcekleri",
+    ciz(g) {
+      gok(g, ["#05070c", "#080d15", "#0b1220", "#101a2c"], 52);
+      // uzak gövde siluetleri
+      const r = rastgele(33);
+      for (let i = 0; i < 7; i++) {
+        const x = i * 20;
+        const h = 30 + Math.floor(r() * 20);
+        px(g, x, 52 - h, 5, h + 4, "#070b12");
+      }
+      // dev mantarlar
+      const mantar = (x: number, govdeH: number, capW: number) => {
+        const taban = 80;
+        px(g, x, taban - govdeH, 6, govdeH, "#d9d3c4");
+        px(g, x + 2, taban - govdeH, 2, govdeH, "#f2ede0");
+        // şapka: kubbeli
+        const cy = taban - govdeH;
+        for (let k = 0; k < 7; k++) {
+          const gen = Math.round((capW / 2) * Math.sqrt(Math.max(0, 1 - (k / 7) * (k / 7))));
+          px(g, x + 3 - gen, cy - k, gen * 2, 1, k < 3 ? "#c4453f" : "#a53833");
+        }
+        // şapak noktaları
+        px(g, x + 1, cy - 6, 2, 2, "#f2ede0");
+        px(g, x + 5, cy - 5, 2, 2, "#f2ede0");
+      };
+      mantar(16, 26, 20); mantar(58, 34, 26); mantar(100, 22, 18);
+      // küçük mantarlar
+      for (let i = 0; i < 8; i++) {
+        const x = 4 + Math.floor(r() * 120);
+        px(g, x, 84, 2, 3, "#d9d3c4");
+        px(g, x - 1, 82, 4, 2, "#c4453f");
+      }
+      // orman tabanı
+      px(g, 0, 88, W, H - 88, "#050810");
+      px(g, 0, 88, W, 1, "#16202e");
+      // ateş böcekleri
+      for (let i = 0; i < 22; i++) {
+        const x = Math.floor(r() * W);
+        const y = 40 + Math.floor(r() * 44);
+        px(g, x, y, 1, 1, "#ffe27a");
+        px(g, x, y + 1, 1, 1, "rgba(255,226,122,0.35)");
+      }
+    },
+  },
+  {
+    id: "liman",
+    ad: "Liman Feneri",
+    etiket: "Deniz, kayıklar, fener ışığı",
+    ciz(g) {
+      gok(g, ["#1b2a44", "#24395a", "#2f4a72", "#3d5d8a"], 54);
+      const r = rastgele(7);
+      // yıldızlar + ay
+      parilti(g, 26, ["#e8f0ff", "#a8bce0"], 3, 6);
+      px(g, 104, 14, 8, 8, "#f2ead0");
+      px(g, 106, 16, 4, 4, "rgba(0,0,0,0.12)");
+      // uzak ada
+      px(g, 8, 58, 26, 6, "#0e1728");
+      px(g, 14, 54, 4, 4, "#0e1728");
+      // fener kulesi
+      const kuleX = 40;
+      for (let i = 0; i < 24; i++) {
+        const gen = 14 - i;
+        px(g, kuleX - gen / 2, 78 - i, Math.max(3, gen), 1, i % 4 === 3 ? "#c9453f" : "#e8e2d4");
+      }
+      px(g, kuleX - 5, 78, 10, 3, "#8a8478");
+      // fener ışığı (konik bantlar)
+      for (let i = 0; i < 4; i++) {
+        const y = 54 + i;
+        px(g, kuleX + 6, y, 22 + i * 8, 1, `rgba(255,226,150,${0.28 - i * 0.06})`);
+      }
+      // iskele + kayıklar
+      px(g, 0, 80, W, 2, "#4a3524");
+      const kayik = (x: number) => {
+        px(g, x, 84, 14, 2, "#6b4a30");
+        px(g, x + 2, 80, 2, 4, "#4a3524");
+        px(g, x + 10, 79, 1, 6, "#d8cdb4");
+      };
+      kayik(10); kayik(70); kayik(96);
+      // deniz
+      px(g, 0, 86, W, H - 86, "#101d33");
+      for (let y = 86; y < 96; y += 2) {
+        px(g, 0, y, W, 1, y % 4 === 0 ? "#1a2c4a" : "#152238");
+      }
+      for (let i = 0; i < 18; i++) {
+        const x = Math.floor(r() * W);
+        px(g, x, 88 + (i % 5), 3, 1, "rgba(150,190,255,0.18)");
+      }
+    },
+  },
+  {
     // Rastgele: bu karta basınca kullanıcı seçimi geri alınır ve her menü
     // açılışında farklı bir sahne gösterilir (ciz() yalnız önizleme için).
     id: "rastgele",

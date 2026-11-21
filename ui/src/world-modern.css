@@ -185,17 +185,12 @@
   animation: md-yuruyus 1.6s cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
-/* sahne ipucu + döndürme imleci */
-.md-ipucu {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  font-size: 11px;
-  letter-spacing: 0.2px;
-  color: var(--text-faint, #8a7b6c);
-}
-.md-ipucu .ic { width: 13px; height: 13px; }
+/* KARAKTER SÜRÜKLEME: .md-main zemini tıklamaları yutuyordu ve karakter
+   döndürülemiyordu. Artık zeminden geç (none), gerçek kontroller açık. */
+.md-main { pointer-events: none; }
+.md-main .md-card,
+.md-main button { pointer-events: auto; }
+
 .md-stage #sahne-katman { cursor: grab; }
 .md-stage #sahne-katman:active { cursor: grabbing; }
 

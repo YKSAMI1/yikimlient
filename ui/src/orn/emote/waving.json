@@ -37,73 +37,71 @@
                 "tick": 8,
                 "easing": "OutBack",
                 "rightArm": {
-                    "yaw": 90
+                    "yaw": -90,
+                    "roll": -90
                 }
             },
             {
                 "tick": 10,
                 "easing": "InOutSine",
                 "rightArm": {
-                    "roll": 185
-                },
-                "leftArm": {
-                    "roll": -5
+                    "roll": -185
                 }
             },
             {
                 "tick": 15,
                 "easing": "InOutSine",
                 "rightArm": {
-                    "roll": 95
+                    "roll": -95
                 }
             },
             {
                 "tick": 20,
                 "easing": "InOutSine",
                 "rightArm": {
-                    "roll": 185
+                    "roll": -185
                 }
             },
             {
                 "tick": 25,
                 "easing": "InOutSine",
                 "rightArm": {
-                    "roll": 95
+                    "roll": -95
                 }
             },
             {
                 "tick": 30,
                 "easing": "InOutSine",
                 "rightArm": {
-                    "roll": 185
+                    "roll": -185
                 }
             },
             {
                 "tick": 35,
                 "easing": "InOutSine",
                 "rightArm": {
-                    "roll": 95
+                    "roll": -95
                 }
             },
             {
                 "tick": 40,
                 "easing": "InOutSine",
                 "rightArm": {
-                    "roll": 185
+                    "roll": -185
                 }
             },
             {
                 "tick": 46,
                 "easing": "InOutSine",
                 "rightArm": {
-                    "roll": 95
+                    "roll": -95
                 }
             },
             {
                 "tick": 49,
-                "easing": "InOutSine",
+                "easing": "OutBack",
                 "rightArm": {
-                    "yaw": 90
+                    "yaw": -90
                 }
             },
             {
