@@ -58,8 +58,10 @@ pub struct YikimConfig {
     /// Boş alan = dünyanın kendi rengi/köşesi kullanılır.
     pub tema_ozel: std::collections::HashMap<String, TemaOzel>,
     /// Sahne dünyasında karakterin arkasındaki piksel manzara
-    /// (kiraz | nether | end | bastion | mantar | buz | col | okyanus)
+    /// (kiraz | nether | end | bastion | mantar | buz | col | okyanus | ozel)
     pub sahne_arka: String,
+    /// "ozel" sahne seçiliyse kullanıcının seçtiği fotoğrafın yolu (dosya).
+    pub sahne_arka_ozel: Option<String>,
     /// Ana menü karakter animasyonları (emote) oynasın mı?
     pub menu_animasyon: bool,
     /// Animasyon oynatma sıklığı: "sakin" | "normal" | "canli"
@@ -108,6 +110,7 @@ impl Default for YikimConfig {
             rozet_renk: "#ffd83d".into(),
             tema_ozel: std::collections::HashMap::new(),
             sahne_arka: "kiraz".into(),
+            sahne_arka_ozel: None,
             menu_animasyon: true,
             menu_animasyon_hiz: "normal".into(),
         }

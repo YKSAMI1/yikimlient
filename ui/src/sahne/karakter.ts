@@ -1111,13 +1111,15 @@ export class Sahne {
         }
     }
 
-    /** Emote listesini bağlar; rastgele çalar hemen başlar.
+    /** Emote listesini bağlar; `gecikme` sn kadar idle bekler, sonra rastgele çalar.
+     *  `gecikme`: açılıştaki el sallamasının bitmesini beklemek için kullanılır —
+     *  dalga emote'u bu sürenin içinde oynar, böylece normal emote SONRA başlar.
      *  `hiz`: 0.5 sakin · 1 normal · 1.8 canlı — bekleme sürelerini böler. */
-    emoteleriKur(liste: Emote[], hiz = 1): void {
+    emoteleriKur(liste: Emote[], hiz = 1, gecikme = 0): void {
         this.emoteListe = liste;
         this.hiz = hiz > 0 ? hiz : 1;
         this.durum = "idle";
-        this.durumBitis = this.zaman + 0.6;
+        this.durumBitis = this.zaman + (0.6 + gecikme) / (this.hiz > 0 ? this.hiz : 1);
     }
 
     /** Tek bir emote'u hemen oynat — modern menü açılışındaki el sallama.

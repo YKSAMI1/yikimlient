@@ -691,7 +691,7 @@ function maybeModernSecim(): void {
 
   const { root, close } = openModal(`
     <h2>Yeni görünüm: Modern</h2>
-    <p class="sub">OneClient'tan esinlenen tam sahne düzeni. İstediğin an
+    <p class="sub">Tam sahne düzeni. İstediğin an
       Ayarlar → Görsel Dünya'dan geri dönebilirsin.</p>
     <div class="md-secim">
       <button class="md-secim-kart" id="md-evet">

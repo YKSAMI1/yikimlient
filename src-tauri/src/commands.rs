@@ -1435,6 +1435,50 @@ pub async fn cmd_pick_instance_cover(app: AppHandle, instance_id: String) -> Res
     }
 }
 
+/// Sahne arka planı için kullanıcının kendi fotoğrafını seç (herkes için açık).
+/// Dosya <app>/sahne/ozel-arka.<ext> altına kopyalanır ve config'e yazılır.
+#[tauri::command]
+pub async fn cmd_pick_scene_image(app: AppHandle) -> Result<YikimConfig, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = std::sync::mpsc::channel::<Option<String>>();
+    app.dialog()
+        .file()
+        .set_title("Sahne fotoğrafı seç (PNG/JPG)")
+        .add_filter("Görsel", &["png", "jpg", "jpeg", "webp"])
+        .pick_file(move |path| {
+            let _ = tx.send(path.map(|p| p.to_string()));
+        });
+    let picked = rx.recv().ok().flatten().ok_or("seçim iptal edildi")?;
+    let ext = std::path::Path::new(&picked)
+        .extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .filter(|e| matches!(e.as_str(), "png" | "jpg" | "jpeg" | "webp"))
+        .unwrap_or_else(|| "png".into());
+    let dest = crate::core::ensure_subdir(&crate::core::app_dir(), "sahne")
+        .join(format!("ozel-arka.{}", ext));
+    copy_image_to(&picked, &dest, 1920)?;
+    let mut cfg = YikimConfig::load_or_default();
+    cfg.sahne_arka = "ozel".into();
+    cfg.sahne_arka_ozel = Some(dest.to_string_lossy().to_string());
+    cfg.save()?;
+    Ok(cfg)
+}
+
+/// Sahne fotoğrafını kaldır → piksel manzaralardan birine dön.
+#[tauri::command]
+pub async fn cmd_clear_scene_image() -> Result<YikimConfig, String> {
+    let mut cfg = YikimConfig::load_or_default();
+    if let Some(p) = cfg.sahne_arka_ozel.take() {
+        let _ = std::fs::remove_file(p);
+    }
+    cfg.sahne_arka_ozel = None;
+    if cfg.sahne_arka == "ozel" {
+        cfg.sahne_arka = "kiraz".into();
+    }
+    cfg.save()?;
+    Ok(cfg)
+}
+
 /// Paket logosunu (URL) kurulum klasörüne media/icon.png olarak indir (256px).
 async fn download_pack_icon(url: &str, inst_dir: &std::path::Path) -> Result<String, String> {
     let resp = crate::core::http_client()

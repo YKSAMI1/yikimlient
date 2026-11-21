@@ -405,6 +405,176 @@ const ARTLar: SahneArti[] = [
       parilti(g, 30, ["#8fe8dd", "#c8fff6"], 11, 8);
     },
   },
+  {
+    id: "gunbatimi",
+    ad: "Kızıl Gün Batımı",
+    etiket: "Turuncu gökyüzü, kuğular",
+    ciz(g) {
+      gok(g, ["#3b1d3f", "#6b2b45", "#a8453f", "#d96b36", "#f0a03c"], 64);
+      // güneş: bantlı yuvarlak
+      const gx = 84; const gy = 58;
+      for (let i = 6; i >= 0; i--) {
+        px(g, gx - 7 + (6 - i) * 0.4, gy - i, 14 - (6 - i) * 0.8, 1, i % 2 ? "#ffd27a" : "#fff3c4");
+      }
+      for (let i = 5; i >= 0; i--) {
+        px(g, gx - 5, gy - i + 1, 10, 1, "#ffe6a3");
+      }
+      // uzak sıra sıra dağlar (parlaklık azalarak)
+      daglar(g, 66, "#8c3a4d", "#d98a63", 7);
+      daglar(g, 72, "#5f2a44", "#a45c60", 13);
+      daglar(g, 78, "#3b1c33", "#7a3b50", 29);
+      // göl: yatay bantlar + güneş yansıması
+      px(g, 0, 74, W, H - 74, "#2a1730");
+      for (let y = 74; y < 92; y += 2) {
+        px(g, 0, y, W, 1, y % 4 === 0 ? "#4a2440" : "#351a33");
+      }
+      for (let i = 0; i < 9; i++) {
+        const w = 10 - i;
+        px(g, gx - w / 2 + (i % 2 ? 1 : -1), 76 + i * 2, Math.max(2, w), 1, "rgba(255,196,110,0.5)");
+      }
+      // batık dalga halkaları
+      for (let i = 0; i < 5; i++) {
+        px(g, 20 + i * 26, 80 + (i % 2 ? 2 : 0), 8, 1, "rgba(255,220,180,0.18)");
+      }
+      // kuğular (V biçimi)
+      const kug = (x: number, y: number) => {
+        px(g, x, y, 1, 1, "#3a2130");
+        px(g, x - 3, y - 2, 3, 1, "#3a2130");
+        px(g, x + 1, y - 2, 3, 1, "#3a2130");
+      };
+      kug(30, 26); kug(36, 22); kug(58, 30); kug(21, 33);
+      parilti(g, 22, ["#ffe6b0", "#ffd07a"], 9, 6);
+    },
+  },
+  {
+    id: "sehir",
+    ad: "Neon Şehir Gece",
+    etiket: "Cam kuleler, kırmızı-mavi neon",
+    ciz(g) {
+      gok(g, ["#05070f", "#080d1a", "#0b1526", "#0e1d33"], 54);
+      // yıldızlar
+      parilti(g, 34, ["#cfe0ff", "#8fa8d8"], 3, 6);
+      // uzak silüet
+      const r = rastgele(71);
+      for (let i = 0; i < 9; i++) {
+        const w = 8 + Math.floor(r() * 14);
+        const h = 16 + Math.floor(r() * 22);
+        px(g, i * 15 + (i % 2 ? 2 : 0), 60 - h, w, h + 4, "#0a1120");
+      }
+      // ön kuleler + pencereler
+      const kule = (x: number, w: number, h: number) => {
+        px(g, x, 60 - h, w, h + 4, "#111a2c");
+        px(g, x, 60 - h, w, 1, "#243350");
+        for (let yy = 60 - h + 3; yy < 62; yy += 4) {
+          for (let xx = x + 2; xx < x + w - 2; xx += 4) {
+            const acik = r() > 0.45;
+            if (acik) px(g, xx, yy, 2, 2, r() > 0.6 ? "#ffd479" : "#9fd0ff");
+          }
+        }
+      };
+      kule(4, 16, 34); kule(24, 12, 22); kule(40, 18, 44); kule(62, 10, 28);
+      kule(76, 20, 38); kule(100, 14, 26);
+      // neon tabelalar
+      px(g, 45, 40, 8, 2, "#ff4d6d"); px(g, 45, 45, 4, 2, "#ff4d6d");
+      px(g, 82, 34, 6, 2, "#4dd8ff");
+      // anten + kırmızı ışık
+      px(g, 48, 12, 1, 6, "#243350"); px(g, 47, 11, 3, 2, "#ff5a5a");
+      // zemin + yansımalar
+      px(g, 0, 64, W, H - 64, "#070b14");
+      for (let i = 0; i < 24; i++) {
+        const x = Math.floor(r() * W);
+        px(g, x, 66 + (i % 5) * 5, 3, 1, r() > 0.5 ? "rgba(255,90,120,0.22)" : "rgba(90,180,255,0.18)");
+      }
+    },
+  },
+  {
+    id: "aurora",
+    ad: "Aurora Gölü",
+    etiket: "Kuzey ışıkları, su yansıması",
+    ciz(g) {
+      gok(g, ["#030617", "#061029", "#0a1a38", "#0d2044"], 58);
+      parilti(g, 40, ["#e8f0ff", "#a8bce0"], 3, 6);
+      // aurora bantları
+      for (let b = 0; b < 3; b++) {
+        const renk = b === 0 ? "rgba(90,255,190," : b === 1 ? "rgba(90,200,255," : "rgba(190,140,255,";
+        for (let x = 0; x < W; x++) {
+          const y = 8 + b * 7 + Math.round(Math.sin(x * 0.12 + b) * 5) + Math.round(Math.sin(x * 0.05) * 3);
+          const h = 3 + Math.round(Math.abs(Math.sin(x * 0.09 + b * 2)) * 2);
+          for (let k = 0; k < h; k++) {
+            px(g, x, y + k, 1, 1, renk + (0.34 - k * 0.09).toFixed(2) + ")");
+          }
+        }
+      }
+      // kar tepeleri
+      daglar(g, 60, "#0d1c33", "#1b3555", 19);
+      daglar(g, 66, "#091426", "#132741", 37);
+      // göl + yansıma
+      px(g, 0, 70, W, H - 70, "#050a18");
+      for (let y = 70; y < 96; y += 2) {
+        px(g, 0, y, W, 1, y % 4 === 0 ? "#0b1a30" : "#070f1f");
+      }
+      for (let i = 0; i < 26; i++) {
+        const x = (i * 13) % W;
+        const y = 72 + (i % 4) * 5;
+        px(g, x, y, 2, 1, i % 3 === 0 ? "rgba(90,255,190,0.16)" : "rgba(90,200,255,0.12)");
+      }
+      // kar yağışı
+      const r2 = rastgele(23);
+      for (let i = 0; i < 30; i++) {
+        px(g, Math.floor(r2() * W), Math.floor(r2() * 66), 1, 1, "rgba(255,255,255,0.45)");
+      }
+    },
+  },
+  {
+    id: "cicek",
+    ad: "Çiçek Vadisi",
+    etiket: "Güneşli çayır, kelebekler",
+    ciz(g) {
+      gok(g, ["#bfe9ff", "#a8dcff", "#cdeeff", "#e8f6d8"], 50);
+      bulut(g, 16, 12, 22, "#ffffff", "#d6ecff");
+      bulut(g, 70, 20, 26, "#ffffff", "#d6ecff");
+      bulut(g, 44, 8, 16, "#ffffff", "#e2f2ff");
+      // güneş ışınları
+      for (let i = 0; i < 5; i++) {
+        px(g, 10 + i * 26, 30 + i, 1, 20, "rgba(255,240,180,0.14)");
+      }
+      // tepe
+      daglar(g, 54, "#8fbf6a", "#c6e39a", 11);
+      daglar(g, 60, "#6da356", "#a5cf84", 27);
+      // çayır zemin: bantlı tonlar
+      px(g, 0, 64, W, 10, "#7fb35c");
+      px(g, 0, 74, W, 10, "#6da356");
+      px(g, 0, 84, W, H - 84, "#5c8f4c");
+      // çiçekler
+      const r = rastgele(61);
+      for (let i = 0; i < 34; i++) {
+        const x = Math.floor(r() * W);
+        const y = 66 + Math.floor(r() * 30);
+        const boy = 3 + Math.floor(r() * 3);
+        px(g, x, y - boy, 1, boy, "#4a7a3c");
+        const renk = ["#ffd85e", "#ff8fa3", "#ffffff", "#c79bff", "#ff9a4d"][Math.floor(r() * 5)];
+        px(g, x - 1, y - boy - 1, 3, 2, renk);
+        px(g, x, y - boy - 1, 1, 1, "#fff3b0");
+      }
+      // kelebekler
+      const kelebek = (x: number, y: number) => {
+        px(g, x, y, 2, 1, "#ffffff");
+        px(g, x - 2, y, 2, 1, "#ffe6a3");
+        px(g, x + 2, y + 1, 2, 1, "#ffe6a3");
+      };
+      kelebek(26, 40); kelebek(72, 46); kelebek(94, 34);
+    },
+  },
+  {
+    // Kullanıcının kendi fotoğrafı: piksel çizimi yok — tuval şeffaf bırakılır,
+    // fotoğraf CSS arka planı olarak tuvalin arkasında görünür (settings.ts).
+    id: "ozel",
+    ad: "Özel fotoğraf",
+    etiket: "Kendi seçtiğin resim",
+    ciz(g) {
+      g.clearRect(0, 0, W, H);
+    },
+  },
 ];
 
 export const SAHNE_ARTLARI: SahneArti[] = ARTLar;

@@ -1,4 +1,4 @@
-import { currentAccount, headAttrs, headUrl, icon, invoke, openModal, openLoginModal, state, toast, applyWorld, refreshState, openPath, openExternal, navigate } from "../main";
+import { currentAccount, headAttrs, headUrl, icon, invoke, fileSrc, openModal, openLoginModal, state, toast, applyWorld, refreshState, openPath, openExternal, navigate } from "../main";
 import { guvenlikKartiCiz, guvenlikYoklamayiDurdur, hesapCarpi } from "../guvenlik";
 import { SAHNE_ARTLARI, sahneArkaCiz } from "../sahne/arkaplan";
 
@@ -9,7 +9,7 @@ import { SAHNE_ARTLARI, sahneArkaCiz } from "../sahne/arkaplan";
    özelleştirilebilir (aşağıdaki "Bu dünyayı özelleştir" paneli). */
 const WORLDS = [
   {
-    id: "modern", name: "Modern", desc: "OneClient uslübü — üst sekme şeridi, tam sahne, sağ kart, alt durum çubuğu",
+    id: "modern", name: "Modern", desc: "Üst sekme şeridi, tam sahne, sağ kart, alt durum çubuğu",
     bg: "#0c0a09", panel: "#17120f", line: "#2c241e", text: "#f4ece2", dim: "#8a7b6c", accent: "#ff5a1f",
   },
   {
@@ -227,6 +227,8 @@ export function renderSettings(root: HTMLElement): void {
       <h3>${icon("sparkle")} Ana Menü Animasyonları</h3>
       <p class="set-sub">Karakter vitrininde rastgele oynayan hareketler. Paketle gelenler herkeste hazır; kendin de ekleyebilirsin — eklediklerin yalnız sende görünür.</p>
       ${toggleRow("menu-anim", "Animasyonlar oynasın", cfg.menu_animasyon !== false)}
+      ${toggleRow("menu-anim-bizim", "Yalnızca kendi kurulumlarımda", cfg.menu_animasyon_sadece_bizim !== false)}
+      <p style="font-size:11px; color:var(--text-faint); margin-top:-4px">Dışarıdan eklediğin mod paketlerinde (kendi menüleri var) emoteler varsayılan olarak kapalıdır.</p>
       <div class="row-between" style="margin-top:8px">
         <span>Tempo</span>
         <select class="input" id="menu-anim-hiz" style="width:150px">
@@ -381,12 +383,56 @@ export function renderSettings(root: HTMLElement): void {
         <b>${a.ad}</b>
         <small>${a.etiket}</small>
       </button>`).join("");
+    // "Özel fotoğraf" kartı: seçili dosyayı minik önizlemede göster
+    const ozelOnizle = () => {
+      const c = artIzgara.querySelector(`.sas-kart[data-art="ozel"] canvas`) as HTMLCanvasElement | null;
+      if (!c) return;
+      const g = c.getContext("2d");
+      if (!g) return;
+      c.width = 128; c.height = 96;
+      g.fillStyle = "#1a1210";
+      g.fillRect(0, 0, 128, 96);
+      const yol = state.config.sahne_arka_ozel || cfg.sahne_arka_ozel;
+      if (!yol) {
+        g.fillStyle = "#6b5a50";
+        g.fillRect(0, 38, 128, 2);
+        g.fillRect(63, 30, 2, 20);
+        return;
+      }
+      const im = new Image();
+      im.onload = () => {
+        const olcek = Math.max(128 / im.width, 96 / im.height);
+        const w = im.width * olcek; const h = im.height * olcek;
+        g.drawImage(im, (128 - w) / 2, (96 - h) / 2, w, h);
+      };
+      im.src = fileSrc(String(yol));
+    };
+    // "ozel" tuvalini PİKSEL çizimi boş (şeffaf) bırak — çünkü fotoğraf CSS
+    // arka planı olarak tuvalin arkasında görünüyor; burada sadece önizleme var.
     artIzgara.querySelectorAll<HTMLCanvasElement>("canvas[data-ciz]").forEach((c) => {
+      if (c.dataset.ciz === "ozel") return;
       sahneArkaCiz(c, c.dataset.ciz || "kiraz");
     });
+    ozelOnizle();
     artIzgara.querySelectorAll(".sas-kart").forEach((k) =>
-      k.addEventListener("click", async () => {
-        state.config.sahne_arka = (k as HTMLElement).dataset.art!;
+      k.addEventListener("click", async (ev) => {
+        const id = (k as HTMLElement).dataset.art!;
+        // "Özel fotoğraf": karta basınca dosya seçici açılır (dosya yoksa).
+        // Seçim yapılırsa config güncellenir; iptal/kayıtlıysa sadece seçili olur.
+        if (id === "ozel") {
+          ev.preventDefault();
+          let yeni: any = null;
+          try { yeni = await invoke("cmd_pick_scene_image"); } catch { return; }
+          state.config.sahne_arka = "ozel";
+          state.config.sahne_arka_ozel = yeni.sahne_arka_ozel || null;
+          cfg = { ...cfg, sahne_arka: "ozel", sahne_arka_ozel: yeni.sahne_arka_ozel || null };
+          ozelOnizle();
+          artIzgara.querySelectorAll(".sas-kart").forEach((x) => x.classList.toggle("sel", x === k));
+          await save();
+          toast("Sahne fotoğrafı seçildi");
+          return;
+        }
+        state.config.sahne_arka = id;
         artIzgara.querySelectorAll(".sas-kart").forEach((x) => x.classList.toggle("sel", x === k));
         await save();
         toast("Sahne arka planı değişti");
@@ -430,6 +476,7 @@ export function renderSettings(root: HTMLElement): void {
   wireToggle(root, "use-java25", "use_java25");
   wireToggle(root, "discord-rpc", "discord_rpc");
   wireToggle(root, "menu-anim", "menu_animasyon");
+  wireToggle(root, "menu-anim-bizim", "menu_animasyon_sadece_bizim");
 
   // ---- ana menü animasyonları ----
   root.querySelector("#menu-anim-hiz")?.addEventListener("change", async (e) => {

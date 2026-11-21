@@ -605,7 +605,18 @@ async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string }
   const dunya = document.documentElement.getAttribute("data-world");
   const arka = root.querySelector("#sahne-arka") as HTMLCanvasElement | null;
   if (arka && (dunya === "sahne" || dunya === "modern")) {
-    sahneArkaCiz(arka, String(state.config?.sahne_arka || (dunya === "modern" ? "nether" : "kiraz")));
+    const art = String(state.config?.sahne_arka || (dunya === "modern" ? "nether" : "kiraz"));
+    if (art === "ozel" && state.config?.sahne_arka_ozel) {
+      // Kullanıcının kendi fotoğrafı: piksel tuvali boş kalır, fotoğraf
+      // CSS arka planı olarak tuvalin arkasında görünür (cover + saydamlık korunur).
+      sahneArkaCiz(arka, "ozel");
+      arka.style.backgroundImage = `url("${fileSrc(String(state.config.sahne_arka_ozel))}")`;
+      arka.style.backgroundSize = "cover";
+      arka.style.backgroundPosition = "center";
+    } else {
+      sahneArkaCiz(arka, art);
+      arka.style.backgroundImage = "";
+    }
     arka.classList.add("on");
   }
   const sah = sahneGetir();
@@ -628,6 +639,15 @@ async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string }
     sah.emoteleriKur([]);
     return;
   }
+  // Dışarıdan içe aktarılan mod paketlerinde (kendi menüleri/karakteri var)
+  // emote çalıştırmayalım — varsayılan olarak YALNIZCA bizim kurulumlarımızda.
+  if (state.config?.menu_animasyon_sadece_bizim !== false) {
+    const secili = state.instances.find((i) => i.id === selectedInstanceId);
+    if (secili && secili.source_pack) {
+      sah.emoteleriKur([]);
+      return;
+    }
+  }
   const tempo: Record<string, number> = { sakin: 0.6, normal: 1, canli: 1.8 };
   const hiz = tempo[String(state.config?.menu_animasyon_hiz || "normal")] || 1;
   try {
@@ -636,8 +656,9 @@ async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string }
     for (const e of emotes) {
       try { liste.push(emoteParca(e.icerik)); } catch { /* bozuk emote atlanır */ }
     }
-    sah.emoteleriKur(liste, hiz);
-    // Modern açılış: karakter sahneye yürüdükten sonra bir kez el sallar.
+    // Normal emote'lar el sallaması bitince başlasın (açılışta sırayla oynasın).
+    sah.emoteleriKur(liste, hiz, dunya === "modern" ? 3.2 : 0);
+    // Modern açılış: karakter sahneye yürüdükten hemen sonra bir kez el sallar.
     if (dunya === "modern") {
       let dalga = liste.find((e) => /wave|sall|el ?salla/i.test(`${e.adi} ${e.aciklama}`)) || null;
       // Kullanıcı listesinde el sallama yoksa gömülü waving.json devreye girer.
@@ -647,7 +668,7 @@ async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string }
       if (dalga) {
         window.setTimeout(() => {
           if (canvas.isConnected) sah.emoteOynat(dalga);
-        }, 1500);
+        }, 380);
       }
     }
   } catch {

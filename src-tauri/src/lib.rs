@@ -133,6 +133,8 @@ pub fn run() {
             commands::cmd_set_instance_icon,
             commands::cmd_pick_instance_icon,
             commands::cmd_pick_instance_cover,
+    commands::cmd_pick_scene_image,
+    commands::cmd_clear_scene_image,
             commands::cmd_set_instance_cover,
             commands::cmd_resolve_mod_icons,
             commands::cmd_list_java_arg_presets,
