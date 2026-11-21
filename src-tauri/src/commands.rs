@@ -1436,7 +1436,8 @@ pub async fn cmd_pick_instance_cover(app: AppHandle, instance_id: String) -> Res
 }
 
 /// Sahne arka planı için kullanıcının kendi fotoğrafını seç (herkes için açık).
-/// Dosya <app>/sahne/ozel-arka.<ext> altına kopyalanır ve config'e yazılır.
+/// Dosya <app>/sahne/kaynak.<ext> altına OLDUĞU GİBİ kopyalanır (kalite düşmez);
+/// kullanıcı ardından kırpma penceresinde istediği bölgeyi seçer.
 #[tauri::command]
 pub async fn cmd_pick_scene_image(app: AppHandle) -> Result<YikimConfig, String> {
     use tauri_plugin_dialog::DialogExt;
@@ -1454,12 +1455,31 @@ pub async fn cmd_pick_scene_image(app: AppHandle) -> Result<YikimConfig, String>
         .map(|e| e.to_string_lossy().to_lowercase())
         .filter(|e| matches!(e.as_str(), "png" | "jpg" | "jpeg" | "webp"))
         .unwrap_or_else(|| "png".into());
-    let dest = crate::core::ensure_subdir(&crate::core::app_dir(), "sahne")
-        .join(format!("ozel-arka.{}", ext));
-    copy_image_to(&picked, &dest, 1920)?;
+    // KALİTE: yeniden sıkıştırma/yeniden boyutlandırma YOK — dosya birebir kopyalanır.
+    let dest = crate::core::ensure_subdir(&crate::core::app_dir(), "sahne").join(format!("kaynak.{}", ext));
+    std::fs::copy(&picked, &dest).map_err(|e| format!("fotoğraf kopyalanamadı: {e}"))?;
+    let mut cfg = YikimConfig::load_or_default();
+    cfg.sahne_arka_kaynak = Some(dest.to_string_lossy().to_string());
+    cfg.save()?;
+    Ok(cfg)
+}
+
+/// Kırpma sonucunu kaydet (PNG dataURL, tam çözünürlük) → ozel-arka.png.
+#[tauri::command]
+pub async fn cmd_save_scene_image(veri: String) -> Result<YikimConfig, String> {
+    use base64::Engine as _;
+    let govde = veri
+        .splitn(2, ',')
+        .nth(1)
+        .ok_or_else(|| "bozuk görsel verisi".to_string())?;
+    let bayt = base64::engine::general_purpose::STANDARD
+        .decode(govde)
+        .map_err(|e| format!("görsel çözümlenemedi: {e}"))?;
+    let dest = crate::core::ensure_subdir(&crate::core::app_dir(), "sahne").join("ozel-arka.png");
+    std::fs::write(&dest, &bayt).map_err(|e| format!("kaydedilemedi: {e}"))?;
     let mut cfg = YikimConfig::load_or_default();
     cfg.sahne_arka = "ozel".into();
-    cfg.sahne_arka_elle = true; // kullanıcı seçti → sabit kalsın
+    cfg.sahne_arka_elle = true;
     cfg.sahne_arka_ozel = Some(dest.to_string_lossy().to_string());
     cfg.save()?;
     Ok(cfg)

@@ -66,13 +66,16 @@
 :root[data-world="modern"] .rail-item .ri-icon { display: none; }
 
 /* yalnız beş sekme: Oyna · Kozmetik · Modlar · Haberler · Ayarlar */
-:root[data-world="modern"] .rail-item[data-page="instances"],
+/* Skin merkezi modern gezinmede kapalı (kozmik menü zaten var);
+   MOD PAKETLERİ (instances) sekme olarak GÖRÜNÜR — kullanıcı mod paketini
+   buradan bulamazsa kafası karışıyordu. */
 :root[data-world="modern"] .rail-item[data-page="skins"] { display: none; }
 :root[data-world="modern"] .rail-item[data-page="home"] { order: 1; }
-:root[data-world="modern"] .rail-item[data-page="kozmetik"] { order: 2; }
-:root[data-world="modern"] .rail-item[data-page="explore"] { order: 3; }
-:root[data-world="modern"] .rail-item[data-page="news"] { order: 4; }
-:root[data-world="modern"] .rail-item[data-page="settings"] { order: 5; }
+:root[data-world="modern"] .rail-item[data-page="instances"] { order: 2; }
+:root[data-world="modern"] .rail-item[data-page="kozmetik"] { order: 3; }
+:root[data-world="modern"] .rail-item[data-page="explore"] { order: 4; }
+:root[data-world="modern"] .rail-item[data-page="news"] { order: 5; }
+:root[data-world="modern"] .rail-item[data-page="settings"] { order: 6; }
 
 :root[data-world="modern"] .rail-item {
   flex-direction: row;
@@ -110,7 +113,7 @@
   height: 2px;
   margin-left: -14px;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--accent-deep) 0%, var(--accent) 55%, #ffd36b 100%);
+  background: linear-gradient(90deg, var(--accent-deep) 0%, var(--accent) 55%, color-mix(in srgb, var(--accent) 60%, #fff) 100%);
   box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 45%, transparent);
   transform-origin: center;
   animation: alev-nefes 2.8s ease-in-out infinite;
@@ -294,7 +297,7 @@
   flex-shrink: 0;
   margin-top: auto;
   padding: 14px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(180deg, rgba(26, 21, 18, 0.9), rgba(13, 10, 9, 0.94));
   backdrop-filter: blur(18px) saturate(1.15);
@@ -306,7 +309,7 @@
   gap: 4px;
   padding: 4px;
   margin-bottom: 14px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.045);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -314,7 +317,7 @@
   flex: 1;
   padding: 8px 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-faint);
   font-family: var(--font);
@@ -340,7 +343,7 @@
   height: 2px;
   margin-left: -12px;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--accent-deep), var(--accent) 55%, #ffd36b);
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent) 55%, color-mix(in srgb, var(--accent) 60%, #fff));
   box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 40%, transparent);
   animation: alev-nefes 2.8s ease-in-out infinite;
 }
@@ -356,7 +359,7 @@
 .md-inst-icon {
   width: 46px;
   height: 46px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   display: inline-flex;
@@ -433,10 +436,10 @@
   justify-content: center;
   gap: 9px;
   padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--accent) 70%, #ffd36b);
-  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 65%, #fff);
+  border-radius: var(--radius);
   cursor: pointer;
-  background: linear-gradient(180deg, #ff7a3d 0%, var(--accent) 52%, var(--accent-deep) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 74%, #fff) 0%, var(--accent) 52%, var(--accent-deep) 100%);
   color: #fff;
   font-family: var(--font);
   font-size: 14px;
@@ -458,14 +461,14 @@
   bottom: 0;
   height: 2px;
   border-radius: 2px;
-  background: linear-gradient(90deg, transparent, #ffd36b, transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 65%, #fff), transparent);
   opacity: 0.85;
 }
 .md-play:hover { filter: brightness(1.07); }
 .md-play:active { transform: translateY(1px); }
 .md-play:disabled { filter: grayscale(0.35); opacity: 0.55; cursor: not-allowed; }
 .md-play.md-stop {
-  background: linear-gradient(180deg, #4a1c14, #2a100b);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-deep) 55%, #160b08), color-mix(in srgb, var(--accent-deep) 30%, #0b0705));
   border-color: color-mix(in srgb, var(--danger) 55%, transparent);
   color: #ffb4a4;
   box-shadow: none;
@@ -483,7 +486,7 @@
   gap: 6px;
   padding: 7px 6px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-faint);
   font-family: var(--font);
@@ -513,7 +516,7 @@
   gap: 10px;
   padding: 8px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--text);
   font-family: var(--font);
@@ -525,7 +528,7 @@
 .md-recent-icon {
   width: 32px;
   height: 32px;
-  border-radius: 9px;
+  border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.06);
   display: inline-flex;
   align-items: center;
@@ -589,7 +592,7 @@
   margin-left: -6px;
   padding: 4px 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-dim);
   font-family: var(--font);
@@ -602,14 +605,14 @@
 .md-acc img {
   width: 22px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   object-fit: cover;
   image-rendering: pixelated;
 }
 .md-acc-ph {
   width: 22px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.06);
   display: inline-flex;
   align-items: center;
@@ -655,7 +658,7 @@
   gap: 3px;
   padding: 10px;
   border: 1px solid var(--hairline-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--bg1);
   color: var(--text);
   font-family: var(--font);
@@ -672,7 +675,7 @@
   display: block;
   height: 74px;
   margin-bottom: 7px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background: #0b0908;
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -698,7 +701,7 @@
   top: 21px; right: 7px; width: 42px; height: 44px;
   background: rgba(255, 255, 255, 0.09);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
 }
 .md-secim-onizle.modern .m-foot {
   left: 0; right: 0; bottom: 0; height: 8px;
@@ -719,7 +722,7 @@
   left: 25px; right: 8px; bottom: 8px; height: 24px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 .md-secim-not { font-size: 11px; color: var(--text-faint); line-height: 1.5; }
 

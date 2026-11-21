@@ -65,6 +65,8 @@ pub struct YikimConfig {
     pub sahne_arka_elle: bool,
     /// "ozel" sahne seçiliyse kullanıcının seçtiği fotoğrafın yolu (dosya).
     pub sahne_arka_ozel: Option<String>,
+    /// Kırpma öncesi kullanıcının seçtiği ham fotoğraf (kalite korunur).
+    pub sahne_arka_kaynak: Option<String>,
     /// Ana menü karakter animasyonları (emote) oynasın mı?
     pub menu_animasyon: bool,
     /// Animasyon oynatma sıklığı: "sakin" | "normal" | "canli"
@@ -115,6 +117,7 @@ impl Default for YikimConfig {
             sahne_arka: "kiraz".into(),
             sahne_arka_elle: false,
             sahne_arka_ozel: None,
+            sahne_arka_kaynak: None,
             menu_animasyon: true,
             menu_animasyon_hiz: "normal".into(),
         }

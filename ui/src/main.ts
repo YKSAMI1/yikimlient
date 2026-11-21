@@ -293,9 +293,10 @@ export function navigate(page: string, param?: string): void {
 }
 
 // ---------- Kabuk: ikon rayı + üst bar ----------
-/** Modern dünyanın üst sekme adları (Sosyal/Market yok). */
+/** Modern dünyanın üst sekme adları. Paketler = instances (mod paketleri). */
 const MODERN_LABEL: Record<string, string> = {
   home: "Oyna",
+  instances: "Paketler",
   kozmetik: "Kozmetik",
   explore: "Modlar",
   news: "Haberler",

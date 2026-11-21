@@ -3,7 +3,7 @@ import { hesapCarpi } from "../guvenlik";
 import { enterRows, switchPress } from "../motion";
 import { sahneGetir, sahneKapat } from "../sahne/karakter";
 import { emoteParca } from "../sahne/emote";
-import { SAHNE_ARTLARI, PIXEL_SAHNELERI, sahneArkaCiz, sahneArtiBul, sahneArkaFotograf, rastgeleSahne } from "../sahne/arkaplan";
+import { SAHNE_ARTLARI, PIXEL_SAHNELERI, sahneArkaCiz, sahneArtiBul, rastgeleSahne } from "../sahne/arkaplan";
 
 /** Menüde gösterilecek sahne: kullanıcı seçmediyse rastgele (her render'da yeni). */
 function etkinSahne(): string {
@@ -621,9 +621,17 @@ async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string }
     // bir piksel sahne; seçtiyse onu koru (sahne_arka_elle = true).
     const art = etkinSahne();
     if (art === "ozel" && state.config?.sahne_arka_ozel) {
-      // Kullanıcının fotoğrafı: tuvalin kendi piksellerine çizilir (boşluk yok)
-      sahneArkaFotograf(arka, fileSrc(String(state.config.sahne_arka_ozel)));
-      arka.style.imageRendering = "auto";
+      // KULLANICI FOTOĞRAFI: tam çözünürlükte. 128×96 tuvaline çizilmek kaliteyi
+      // mahsul ediyordu (şikayet bu ydi); fotoğraf doğrudan resim olarak tam
+      // ekrana yayılır — tarayıcı kırpmayı kendisi yapar (cover).
+      const yolu = fileSrc(String(state.config.sahne_arka_ozel));
+      const img = new Image();
+      img.onload = () => {
+        arka.style.backgroundImage = `url("${yolu}")`;
+        arka.style.backgroundSize = "cover";
+        arka.style.backgroundPosition = "center";
+      };
+      img.src = yolu;
     } else {
       sahneArkaCiz(arka, art);
       arka.style.imageRendering = "";
