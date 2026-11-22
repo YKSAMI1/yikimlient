@@ -3,6 +3,7 @@ use crate::{
     stats, util::write_json, yikim_mod,
 };
 use base64::Engine as _;
+use image::ImageDecoder as _;
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -1464,20 +1465,47 @@ pub async fn cmd_pick_scene_image(app: AppHandle) -> Result<YikimConfig, String>
     Ok(cfg)
 }
 
-/// Kırpma sonucunu kaydet (PNG dataURL, tam çözünürlük) → ozel-arka.png.
+/// Seçilen bölgeyi kaynak fotoğraftan tam çözünürlükte kes → ozel-arka.png.
+/// Kırpma Rust'ta yapılır: tarayıcı canvas'ı asset protokolünde "tainted"
+/// olduğu için oradan piksel okumak güvenilir değildi.
 #[tauri::command]
-pub async fn cmd_save_scene_image(veri: String) -> Result<YikimConfig, String> {
-    use base64::Engine as _;
-    let govde = veri
-        .splitn(2, ',')
-        .nth(1)
-        .ok_or_else(|| "bozuk görsel verisi".to_string())?;
-    let bayt = base64::engine::general_purpose::STANDARD
-        .decode(govde)
-        .map_err(|e| format!("görsel çözümlenemedi: {e}"))?;
-    let dest = crate::core::ensure_subdir(&crate::core::app_dir(), "sahne").join("ozel-arka.png");
-    std::fs::write(&dest, &bayt).map_err(|e| format!("kaydedilemedi: {e}"))?;
+pub async fn cmd_crop_scene_image(x: u32, y: u32, w: u32, h: u32) -> Result<YikimConfig, String> {
     let mut cfg = YikimConfig::load_or_default();
+    let kaynak = cfg
+        .sahne_arka_kaynak
+        .clone()
+        .ok_or_else(|| "önce bir fotoğraf seç".to_string())?;
+    // EXIF yönü: tarayıcı fotoğrafı yönüne göre döndürüp gösterir, ancak
+    // `image::open` ham piksel matrisini olduğu gibi okur. Telefonların dikey
+    // çekimlerinde (EXIF 6/8) bu yüzden yanlış bölge kesiliyordu. Kırpmadan
+    // ÖNCE yönü uygula ki seçim koordinatları tarayıcıdaki görüntüyle birebir
+    // örtüşsün.
+    let mut okuyucu = image::ImageReader::open(&kaynak)
+        .map_err(|e| format!("fotoğraf açılamadı: {e}"))?
+        .with_guessed_format()
+        .map_err(|e| format!("fotoğraf okunamadı: {e}"))?;
+    let mut cozucu = okuyucu
+        .into_decoder()
+        .map_err(|e| format!("fotoğraf açılamadı: {e}"))?;
+    let yon = cozucu
+        .orientation()
+        .unwrap_or(image::metadata::Orientation::NoTransforms);
+    let mut img = image::DynamicImage::from_decoder(cozucu)
+        .map_err(|e| format!("fotoğraf açılamadı: {e}"))?;
+    img.apply_orientation(yon);
+    let (iw, ih) = (img.width(), img.height());
+    if iw == 0 || ih == 0 {
+        return Err("fotoğraf boş".into());
+    }
+    // Sınırları kırp: seçim her zaman fotoğrafın içinde kalır.
+    let x = x.min(iw.saturating_sub(1));
+    let y = y.min(ih.saturating_sub(1));
+    let w = w.clamp(1, iw - x);
+    let h = h.clamp(1, ih - y);
+    let kirp = img.crop_imm(x, y, w, h);
+    let dest = crate::core::ensure_subdir(&crate::core::app_dir(), "sahne").join("ozel-arka.png");
+    kirp.save_with_format(&dest, image::ImageFormat::Png)
+        .map_err(|e| format!("kaydedilemedi: {e}"))?;
     cfg.sahne_arka = "ozel".into();
     cfg.sahne_arka_elle = true;
     cfg.sahne_arka_ozel = Some(dest.to_string_lossy().to_string());

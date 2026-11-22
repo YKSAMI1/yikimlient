@@ -22,7 +22,7 @@
 .brand-word { color: var(--text); font-weight: 700; }
 .brand-suffix { color: var(--text-faint); font-weight: 500; }
 .titlebar .logo-img {
-  width: 20px; height: 20px; border-radius: 5px;
+  width: 20px; height: 20px; border-radius: var(--radius-sm);
   -webkit-user-drag: none;
 }
 .tb-center {
@@ -42,7 +42,7 @@
 .pill.account { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
 .pill.account:hover { border-color: var(--text-faint); background: var(--bg2); }
 .pa-head {
-  width: 18px; height: 18px; border-radius: 4px; image-rendering: pixelated;
+  width: 18px; height: 18px; border-radius: var(--radius-sm); image-rendering: pixelated;
   -webkit-user-drag: none;
 }
 .pa-name { color: var(--text); font-weight: 600; font-size: 11.5px; }
@@ -52,11 +52,11 @@
 
 /* RAM göstergesi — pano ampermetresi */
 .ram-bar {
-  display: inline-block; width: 48px; height: 4px; border-radius: 3px;
+  display: inline-block; width: 48px; height: 4px; border-radius: var(--radius-sm);
   background: var(--bg4); overflow: hidden; margin-left: 2px;
 }
 .ram-bar > span {
-  display: block; height: 100%; border-radius: 3px;
+  display: block; height: 100%; border-radius: var(--radius-sm);
   background: var(--accent);
   transform-origin: left center;
 }
@@ -88,7 +88,7 @@
   border: 1px solid var(--hairline);
 }
 .rail-logo img {
-  width: 30px; height: 30px; border-radius: 5px;
+  width: 30px; height: 30px; border-radius: var(--radius-sm);
   -webkit-user-drag: none;
 }
 .rail-item {
@@ -194,7 +194,7 @@
   z-index: 900;
   background: var(--bg2);
   border: 1px solid var(--hairline-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: 0 12px 40px rgba(0,0,0,.45);
   padding: 12px 14px;
   animation: smIn .18s ease-out;

@@ -1,0 +1,107 @@
+/* ============================================================
+   KÖŞE ÖLÇEĞİ — tek kaynak.
+   Bütün "kutulu" bileşenler (kart, düğme, sekme, giriş, çip,
+   rozet, modal, sahne kartı...) köşeyi BURADAN alır.
+
+   Ayarlar → Görsel Dünya → Köşe:
+     Dünya    → dünyanın kendi köşe dili (aşağıdaki data-world blokları)
+     Keskin   → her şey 0
+     Yumuşak  → orta yuvarlak
+     Hap      → küçük parçalar tam hap (999px), büyük kartlar yuvarlak
+
+   Not: Bu dosya EN SON import edilir; böylece hem tema dosyalarının
+   hem de dünya dosyalarının sabit köşelerini güvenle ezer.
+   ============================================================ */
+
+:root {
+  --radius-xs: 2px;   /* mini göstergeler, tutamaklar, ince şeritler */
+  --radius-sm: 4px;   /* küçük düğme, rozet, giriş alanı */
+  --radius: 6px;      /* varsayılan kutu */
+  --radius-lg: 14px;  /* kart / panel */
+  --radius-xl: 20px;  /* büyük yüzey */
+  --radius-pill: 999px;
+}
+
+/* --- dünya varsayılanları (Köşe = "Dünya") --- */
+:root[data-world="pano"] {
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+}
+:root[data-world="sokum"] {
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+}
+:root[data-world="standart"] {
+  --radius-xs: 3px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+:root[data-world="sahne"] {
+  --radius-xs: 2px;
+  --radius-sm: 5px;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+}
+:root[data-world="modern"] {
+  --radius-xs: 3px;
+  --radius-sm: 7px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+}
+
+/* --- kullanıcı seçimi (data-radius) --- */
+:root[data-radius="keskin"] {
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-pill: 0px;
+}
+:root[data-radius="yumusak"] {
+  --radius-xs: 4px;
+  --radius-sm: 7px;
+  --radius: 10px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+}
+:root[data-radius="hap"] {
+  --radius-xs: 6px;
+  --radius-sm: 999px;
+  --radius: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+}
+
+/* "Hap": düğme benzeri her şey tam hap. Modern dünyanın kendi
+   bileşenleri de dahil — aksi hâlde üst şerit/kart köşeleri
+   seçime uymuyordu. */
+:root[data-radius="hap"] .btn,
+:root[data-radius="hap"] .input,
+:root[data-radius="hap"] .chip,
+:root[data-radius="hap"] .seg-btn,
+:root[data-radius="hap"] .rail-item,
+:root[data-radius="hap"] .md-oyna,
+:root[data-radius="hap"] .md-tab,
+:root[data-radius="hap"] .md-scene,
+:root[data-radius="hap"] .md-mini,
+:root[data-radius="hap"] .md-kart,
+:root[data-radius="hap"] .md-inst,
+:root[data-radius="hap"] .md-row,
+:root[data-radius="hap"] .md-hizli-satir,
+:root[data-radius="hap"] .md-secim-kart,
+:root[data-radius="hap"] .tab {
+  border-radius: 999px;
+}

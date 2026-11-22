@@ -379,6 +379,9 @@ function renderDetail(root: HTMLElement, id: string, ilkSekme?: TabId): void {
     if (!state.accounts.length) return openLoginModal();
     const { launchInstance } = await import("../main");
     launchInstance(inst.id);
+    // Oyun açılınca doğrudan Log sekmesi: kullanıcı "başladı mı, hata var mı?"
+    // sorusunun cevabını sekmeleri karıştırmadan görsün.
+    (root.querySelector('.tab[data-tab="log"]') as HTMLElement | null)?.click();
   });
   root.querySelector("#detail-stop")?.addEventListener("click", async () => {
     try { await invoke("cmd_kill_game"); } catch { /* zaten kapalıysa sorun değil */ }
@@ -395,9 +398,9 @@ function renderDetail(root: HTMLElement, id: string, ilkSekme?: TabId): void {
       ({ mods: tabMods, content: tabContent, java: tabJava, log: tabLog, analytics: tabAnalytics, settings: tabSettings })[tab](content, inst);
     });
   });
-  // Paket yeni kurulduysa LOG sekmesi açılsın (kullanıcı "ne oldu?" diye
-  // sekmeleri tek tek açmak zorunda kalmasın).
-  const hedefSekme = ilkSekme && SEKME_SIRA.includes(ilkSekme) ? ilkSekme : "mods";
+  // Paket açılınca LOG sekmesi gelsin (kullanıcı isteği): "ne oldu / başladı mı"
+  // cevabı ilk ekranda görünür. Yeni kurulumda gelen `ilkSekme` yine öncelikli.
+  const hedefSekme = ilkSekme && SEKME_SIRA.includes(ilkSekme) ? ilkSekme : "log";
   const hedef = [...root.querySelectorAll<HTMLElement>(".tab")].find((t) => t.dataset.tab === hedefSekme)
     ?? (root.querySelectorAll(".tab")[0] as HTMLElement);
   hedef.click();

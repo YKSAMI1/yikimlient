@@ -81,7 +81,7 @@
   flex-direction: row;
   gap: 0;
   padding: 8px 15px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-dim);
   position: relative;
@@ -112,7 +112,7 @@
   width: 28px;
   height: 2px;
   margin-left: -14px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(90deg, var(--accent-deep) 0%, var(--accent) 55%, color-mix(in srgb, var(--accent) 60%, #fff) 100%);
   box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 45%, transparent);
   transform-origin: center;
@@ -140,10 +140,17 @@
   margin-left: 0;
   margin-right: 0;
 }
-:root[data-world="modern"] #content > :not(.md-root) {
-  max-width: 1160px;
-  margin: 0 auto;
+/* Modern ana sayfa dışındaki sayfalar: dolgu TEK bir kapta (scroll alanı
+   olan #content) verilir. Daha önce bu kural #content'in HER çocuğuna
+   uygulanıyordu; kurulum detayında başlık, sekmeler ve içerik ayrı ayrı
+   86px dolgu alıp arada devasa boşluk bırakıyordu. */
+:root[data-world="modern"] #content:not(:has(> .md-root)) {
   padding: 86px 34px 48px;
+}
+:root[data-world="modern"] #content:not(:has(> .md-root)) > * {
+  max-width: 1160px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ---------- modern ana sayfa ---------- */
@@ -250,7 +257,7 @@
   content: "";
   width: 18px;
   height: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(90deg, var(--accent), transparent);
 }
 .md-stage-head h1 {
@@ -273,7 +280,7 @@
   align-items: center;
   gap: 7px;
   padding: 7px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(12, 9, 8, 0.5);
   backdrop-filter: blur(8px);
@@ -342,7 +349,7 @@
   width: 24px;
   height: 2px;
   margin-left: -12px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(90deg, var(--accent-deep), var(--accent) 55%, color-mix(in srgb, var(--accent) 60%, #fff));
   box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 40%, transparent);
   animation: alev-nefes 2.8s ease-in-out infinite;
@@ -393,7 +400,7 @@
   color: var(--accent-soft);
   background: var(--accent-dim);
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   flex-shrink: 0;
 }
 
@@ -418,14 +425,14 @@
 }
 .md-bar {
   height: 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 .md-bar > span {
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: linear-gradient(90deg, var(--accent-deep), var(--accent));
 }
 
@@ -460,7 +467,7 @@
   right: 14%;
   bottom: 0;
   height: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 65%, #fff), transparent);
   opacity: 0.85;
 }
@@ -680,14 +687,14 @@
   background: #0b0908;
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
-.md-secim-onizle i { position: absolute; display: block; border-radius: 2px; }
+.md-secim-onizle i { position: absolute; display: block; border-radius: var(--radius-xs); }
 .md-secim-onizle.modern .m-nav {
   top: 0; left: 0; right: 0; height: 13px;
   background: rgba(255, 255, 255, 0.05);
 }
 .md-secim-onizle.modern .m-nav::after {
   content: ""; position: absolute; top: 5px; left: 50%; width: 26px; height: 3px;
-  margin-left: -13px; border-radius: 2px; background: #ff5a1f;
+  margin-left: -13px; border-radius: var(--radius-xs); background: #ff5a1f;
   box-shadow: 0 0 8px rgba(255, 90, 31, 0.55);
 }
 .md-secim-onizle.modern .m-stage {

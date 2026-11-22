@@ -209,7 +209,7 @@
 }
 /* kenar rayı: Imperial'in yuvarlak kare ikon düğmeleri */
 :root[data-world="sahne"] .nav-item {
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 1px solid transparent;
 }
 :root[data-world="sahne"] .nav-item.sel {
@@ -222,11 +222,11 @@
 }
 /* kartlar: Imperial'in yumuşak köşeli blokları */
 :root[data-world="sahne"] .card {
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 /* vitrin: karakterin zemin perdesi hafif dikişli çerçeve + sarı üst şerit */
 :root[data-world="sahne"] .home-hero .vitrin {
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 2px solid var(--bg4);
 }
 /* "DİĞER HATLAR" satırları: piksel isim + yeşil mini OYNA bloğu */
@@ -245,7 +245,7 @@
     var(--oyun-yesil);
   color: #eaffea;
   border: 1px solid #2c7a35;
-  border-radius: 7px;
+  border-radius: var(--radius);
 }
 :root[data-world="sahne"] .vitrin::before {
   content: "";
@@ -284,7 +284,7 @@ h1, h2, h3, h4 { letter-spacing: -0.01em; }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb {
-  background: var(--bg4); border-radius: 6px;
+  background: var(--bg4); border-radius: var(--radius);
   border: 2px solid var(--bg0); background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); border: 2px solid var(--bg0); background-clip: content-box; }
@@ -427,11 +427,11 @@ select.input option { background: var(--bg2); }
 
 /* ---------- İlerleme — pano bara gibi ---------- */
 .progressbar {
-  height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden;
+  height: 5px; background: var(--bg3); border-radius: var(--radius-sm); overflow: hidden;
   position: relative;
 }
 .progressbar > div {
-  height: 100%; width: 100%; border-radius: 3px;
+  height: 100%; width: 100%; border-radius: var(--radius-sm);
   background: var(--accent);
   transform-origin: left center;
   transition: transform 0.25s var(--ease);
@@ -478,7 +478,7 @@ select.input option { background: var(--bg2); }
   font-size: 15px;
   letter-spacing: 0.06em;
   padding: 9px 22px;
-  border-radius: 9px;
+  border-radius: var(--radius);
   line-height: 1;
 }
 :root[data-world="sahne"] .imp-chip.imp-sari {
@@ -503,7 +503,7 @@ select.input option { background: var(--bg2); }
   color: var(--text-dim);
   background: var(--bg2);
   border: 1px solid var(--hairline);
-  border-radius: 7px;
+  border-radius: var(--radius);
   padding: 5px 10px;
 }
 
@@ -511,7 +511,7 @@ select.input option { background: var(--bg2); }
 :root[data-world="sahne"] .imp-banner {
   position: relative;
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(255, 216, 61, 0.2);
   min-height: clamp(320px, 46vh, 560px);
   box-shadow:
@@ -595,7 +595,7 @@ select.input option { background: var(--bg2); }
   gap: 8px;
   background: color-mix(in srgb, var(--bg1) 88%, transparent);
   border: 1px solid var(--hairline-strong);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 8px 14px;
   cursor: pointer;
   backdrop-filter: blur(4px);
@@ -603,7 +603,7 @@ select.input option { background: var(--bg2); }
 }
 :root[data-world="sahne"] .imp-ad-chip b { font-family: var(--piksel); font-size: 12px; color: var(--text); }
 :root[data-world="sahne"] .imp-ad-chip small { font-size: 10px; color: var(--text-dim); }
-:root[data-world="sahne"] .imp-ad-chip img { width: 20px; height: 20px; border-radius: 4px; }
+:root[data-world="sahne"] .imp-ad-chip img { width: 20px; height: 20px; border-radius: var(--radius-sm); }
 
 /* banner sağ üstü: dişli aç/kapat */
 :root[data-world="sahne"] .imp-buyut {
@@ -612,7 +612,7 @@ select.input option { background: var(--bg2); }
   top: 16px;
   background: color-mix(in srgb, var(--bg1) 88%, transparent);
   border: 1px solid var(--hairline-strong);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--text-dim);
   padding: 7px 9px;
   cursor: pointer;
@@ -635,7 +635,7 @@ select.input option { background: var(--bg2); }
 :root[data-world="sahne"] .imp-pill .pill {
   font-size: 10px;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--hairline);
   color: var(--text-dim);
   background: var(--bg2);
@@ -653,13 +653,13 @@ select.input option { background: var(--bg2); }
   gap: 12px;
   background: var(--bg2);
   border: 1px solid var(--hairline);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 12px 14px;
   cursor: pointer;
 }
 :root[data-world="sahne"] .imp-satir:hover { border-color: var(--hairline-strong); background: var(--bg3); }
 :root[data-world="sahne"] .imp-satir-ikon {
-  width: 34px; height: 34px; border-radius: 8px;
+  width: 34px; height: 34px; border-radius: var(--radius);
   background: var(--bg3); border: 1px solid var(--hairline);
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 16px; overflow: hidden; flex-shrink: 0;
@@ -685,7 +685,7 @@ select.input option { background: var(--bg2); }
     var(--oyun-yesil);
   color: #eaffea;
   border: 1px solid #2c7a35;
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 8px 14px;
   cursor: pointer;
   flex-shrink: 0;
@@ -709,7 +709,7 @@ select.input option { background: var(--bg2); }
 :root[data-world="sahne"] .imp-diyis {
   background: var(--bg3);
   border: 1px solid var(--hairline);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--text-dim);
   padding: 8px 9px;
   cursor: pointer;
@@ -729,7 +729,7 @@ select.input option { background: var(--bg2); }
   justify-content: center;
   gap: 8px;
   padding: 11px 16px;
-  border-radius: 9px;
+  border-radius: var(--radius);
   cursor: pointer;
 }
 :root[data-world="sahne"] .imp-sari-tam {
@@ -772,7 +772,7 @@ select.input option { background: var(--bg2); }
 :root[data-world="sahne"] .imp-link:hover { color: var(--accent); }
 :root[data-world="sahne"] .imp-news { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 :root[data-world="sahne"] .imp-news-kart {
-  border-radius: 10px;
+  border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--hairline);
   background: var(--bg2);
@@ -791,7 +791,7 @@ select.input option { background: var(--bg2); }
   font-size: 9px;
   letter-spacing: 0.08em;
   padding: 3px 8px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--hairline);
   color: var(--text-dim);
   align-self: flex-start;
@@ -808,7 +808,7 @@ select.input option { background: var(--bg2); }
 :root[data-world="sahne"] .imp-hizli {
   background: var(--bg2);
   border: 1px solid var(--hairline);
-  border-radius: 10px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 :root[data-world="sahne"] .imp-hizli-bas {
@@ -940,7 +940,7 @@ select.input option { background: var(--bg2); }
 .tooltip-host .tooltip {
   position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) scale(0.95);
   background: var(--bg3); border: 1px solid var(--hairline-strong); color: var(--text);
-  padding: 6px 10px; border-radius: 7px; font-size: 11.5px; white-space: nowrap;
+  padding: 6px 10px; border-radius: var(--radius); font-size: 11.5px; white-space: nowrap;
   opacity: 0; pointer-events: none; transition: opacity 0.15s, transform 0.15s var(--ease);
   z-index: 90; box-shadow: var(--shadow-soft);
 }
@@ -994,13 +994,13 @@ select.input option { background: var(--bg2); }
   gap: 5px;
 }
 :root[data-world="sahne"] .rail-logo {
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(255, 216, 61, 0.24);
   background: radial-gradient(circle at 50% 28%, rgba(255, 216, 61, 0.18), var(--bg2) 72%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 6px 18px -12px rgba(255, 216, 61, 0.55);
 }
 :root[data-world="sahne"] .rail-item {
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 1px solid transparent;
   color: var(--text-faint);
 }
@@ -1026,7 +1026,7 @@ select.input option { background: var(--bg2); }
 :root[data-world="sahne"] .rail-item.active .ri-icon { color: var(--on-accent); }
 :root[data-world="sahne"] .rail-item.active::before { display: none; }
 :root[data-world="sahne"] .rail-account {
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.025);
 }
 
@@ -1059,7 +1059,7 @@ select.input option { background: var(--bg2); }
 :root[data-world="sahne"] .imp-hizli-satir:hover { background: rgba(255, 255, 255, 0.035); }
 
 /* ---- butonlar: piksel basma hissi ---- */
-:root[data-world="sahne"] .btn { border-radius: 9px; }
+:root[data-world="sahne"] .btn { border-radius: var(--radius); }
 :root[data-world="sahne"] .btn:active { transform: translateY(1px); }
 :root[data-world="sahne"] .brand-suffix { color: var(--text-faint); }
 

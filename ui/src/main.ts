@@ -7,6 +7,7 @@ import "./world-afis.css";
 import "./world-layouts.css";
 import "./world-extra.css";
 import "./world-modern.css";
+import "./radius.css";
 import "@fontsource/pixelify-sans/400.css";
 import "@fontsource/pixelify-sans/700.css";
 import "@fontsource/pixelify-sans/latin-ext-400.css";
@@ -1048,7 +1049,7 @@ function fatalBoot(e: unknown): void {
     app.innerHTML = `
       <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:40px; text-align:center">
         <div style="font-size:13px; color:var(--text-dim)">Açılışta bir şeyler ters gitti:</div>
-        <pre style="user-select:text; font-family:var(--font-mono); font-size:11.5px; color:var(--danger); white-space:pre-wrap; word-break:break-word; max-width:640px; background:var(--bg2); border:1px solid var(--hairline-strong); border-radius:10px; padding:14px 18px; margin:0">${msg}</pre>
+        <pre style="user-select:text; font-family:var(--font-mono); font-size:11.5px; color:var(--danger); white-space:pre-wrap; word-break:break-word; max-width:640px; background:var(--bg2); border:1px solid var(--hairline-strong); border-radius:var(--radius); padding:14px 18px; margin:0">${msg}</pre>
       </div>`;
   }
 }

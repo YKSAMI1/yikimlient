@@ -424,22 +424,30 @@ export function renderSettings(root: HTMLElement): void {
           ev.preventDefault();
           let yeni: any = null;
           try { yeni = await invoke("cmd_pick_scene_image"); } catch { return; }
-          // kırpma penceresi: pelerinde olduğu gibi bölge seç (yatay dikdörtgen)
-          const { kirpPenceresiAc, kirpKaydet } = await import("../sahne/fotograf-kirp");
-          const sonuc = await kirpPenceresiAc(
-            invoke,
-            fileSrc(String(yeni.sahne_arka_kaynak || "")),
-            () => {},
-            (m: string) => toast(m),
-          );
-          if (!sonuc) {
+          const kaynak = String(yeni.sahne_arka_kaynak || "");
+          if (!kaynak) { toast("Fotoğraf okunamadı", "err"); return; }
+          // Kırpma penceresi: fotoğrafın üzerinde sürükle / köşeden boyutlandır.
+          const { kirpPenceresiAc } = await import("../sahne/fotograf-kirp");
+          const sec = await kirpPenceresiAc(fileSrc(kaynak), (m: string) => toast(m));
+          if (!sec) {
             await refreshState(); // iptal: eski haline dön
             return;
           }
-          await kirpKaydet(sonuc.veri, invoke);
-          await save();
+          let kayitli: any = null;
+          try {
+            kayitli = await invoke("cmd_crop_scene_image", { x: sec.x, y: sec.y, w: sec.w, h: sec.h });
+          } catch {
+            toast("Kırpma kaydedilemedi", "err");
+            return;
+          }
+          const ozel = (kayitli && kayitli.sahne_arka_ozel) || null;
+          state.config.sahne_arka = "ozel";
+          state.config.sahne_arka_elle = true;
+          state.config.sahne_arka_ozel = ozel;
+          cfg = { ...cfg, sahne_arka: "ozel", sahne_arka_elle: true, sahne_arka_ozel: ozel };
           ozelOnizle();
           artIzgara.querySelectorAll(".sas-kart").forEach((x) => x.classList.toggle("sel", x === k));
+          await save();
           toast("Sahne fotoğrafı hazır");
           return;
         }

@@ -633,6 +633,10 @@ async function baslatVitrin(root: HTMLElement, acc: { id: string; name: string }
       };
       img.src = yolu;
     } else {
+      // Fotoğraftan piksel sahneye dönüldüyse eski arka plan görselini temizle.
+      arka.style.backgroundImage = "";
+      arka.style.backgroundSize = "";
+      arka.style.backgroundPosition = "";
       sahneArkaCiz(arka, art);
       arka.style.imageRendering = "";
     }

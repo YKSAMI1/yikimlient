@@ -39,10 +39,10 @@
   letter-spacing: 0.02em;
 }
 :root[data-world="sira"] .btn {
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-weight: 650;
 }
-:root[data-world="sira"] .card { border-radius: 10px; }
+:root[data-world="sira"] .card { border-radius: var(--radius); }
 
 /* üst şerit yerleşimi */
 :root[data-world="sira"] .body-row { flex-direction: column; }
@@ -59,7 +59,7 @@
 :root[data-world="sira"] .rail-logo {
   width: 34px; height: 34px;
   margin: 0 12px 0 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   flex-shrink: 0;
 }
 :root[data-world="sira"] .rail-logo img { width: 22px; height: 22px; }
@@ -67,7 +67,7 @@
   flex-direction: row;
   gap: 8px;
   padding: 9px 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 :root[data-world="sira"] .rail-item .ri-icon svg { width: 17px; height: 17px; }
 :root[data-world="sira"] .rail-item .ri-label { font-size: 11.5px; }
@@ -109,8 +109,8 @@
 }
 :root[data-world="rihtim"] .rail-item.active .ri-label { font-weight: 700; }
 :root[data-world="rihtim"] .rail-item.active .ri-icon { color: var(--on-accent); }
-:root[data-world="rihtim"] .btn { border-radius: 10px; }
-:root[data-world="rihtim"] .card { border-radius: 14px; }
+:root[data-world="rihtim"] .btn { border-radius: var(--radius); }
+:root[data-world="rihtim"] .card { border-radius: var(--radius-lg); }
 
 /* iskele yerleşimi */
 :root[data-world="rihtim"] .body-row { padding-bottom: 88px; }
@@ -127,7 +127,7 @@
   background: color-mix(in srgb, var(--bg2) 86%, transparent);
   backdrop-filter: blur(16px);
   border: 1px solid var(--hairline-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   box-shadow: var(--shadow-pop);
   z-index: 40;
 }
@@ -136,7 +136,7 @@
 :root[data-world="rihtim"] .rail-item {
   padding: 9px 12px;
   min-width: 62px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 :root[data-world="rihtim"] .rail-account {
   margin-left: 6px;
