@@ -1121,7 +1121,20 @@ async function openCreateWizard(): Promise<void> {
       </button>
       <button class="loader-card" data-l="forge">
         <div class="lc-icon">${loaderIcon("forge")}</div><b>Forge</b><span>Mod paketleri &amp; klasik modlar — ilk oyun açılışında kurulur</span>
+            </button>
+      <button class="loader-card" data-l="neoforge">
+        <div class="lc-icon">${loaderIcon("neoforge")}</div><b>NeoForge</b><span>Modern Forge yerine geçen yükleyici — sürümünü aşağıdan seçersin</span>
       </button>
+    </div>
+
+    <!-- Loader'in KENDİ sürümü: yalnız Forge/NeoForge'da görünür. Fabric her
+         zaman en güncel kararlı loader'ı kullanır (kutucuk orada gereksiz). -->
+    <div class="wiz-loader-surum" id="w-loader-surum-wrap" hidden>
+      <label class="wiz-label">Loader sürümü</label>
+      <select class="input" id="w-loader-ver" disabled>
+        <option value="">Yükleniyor…</option>
+      </select>
+      <div class="wiz-hint" id="w-loader-hint">Forge/NeoForge build'leri Minecraft sürümüne göre değişir.</div>
     </div>
 
     <label class="wiz-label">Bellek</label>
@@ -1162,13 +1175,65 @@ async function openCreateWizard(): Promise<void> {
   let loader = "fabric";
   let stdOn = true;
 
+  // ---- Loader'ın KENDİ sürümü (yalnız Forge/NeoForge) ----
+  // Forge/NeoForge'da her Minecraft sürümünün build'leri ayrıdır; kullanıcı
+  // isterse "en güncel" yerine eski/kararlı bir build seçebilir. Fabric
+  // yükleyicisi her zaman en güncel kararlı sürümü alır.
+  const surumKutu = root.querySelector("#w-loader-surum-wrap") as HTMLElement | null;
+  const loaderVer = root.querySelector("#w-loader-ver") as HTMLSelectElement | null;
+  const loaderIpucu = root.querySelector("#w-loader-hint") as HTMLElement | null;
+  const loaderSurumGerekli = (l: string): boolean => l === "forge" || l === "neoforge";
+  let surumIstekNo = 0;
+
+  async function loaderSurumleriYenile(): Promise<void> {
+    if (!surumKutu || !loaderVer) return;
+    if (!loaderSurumGerekli(loader)) {
+      surumKutu.hidden = true;
+      return;
+    }
+    surumKutu.hidden = false;
+    const mc = (root.querySelector("#w-version") as HTMLSelectElement).value;
+    const istek = ++surumIstekNo;
+    loaderVer.disabled = true;
+    loaderVer.innerHTML = `<option value="">Yükleniyor…</option>`;
+    if (loaderIpucu) loaderIpucu.textContent = "Sürüm listesi alınıyor…";
+    try {
+      const r: any = await invoke("cmd_list_loader_versions", { loader, mcVersion: mc });
+      if (istek !== surumIstekNo) return; // eski seçim/istek gelmişse at
+      const liste: string[] = Array.isArray(r?.versions) ? r.versions : [];
+      const enYeni: string = String(r?.latest || "");
+      loaderVer.innerHTML =
+        `<option value="">${enYeni ? `En güncel (${enYeni})` : "En güncel (önerilen)"}</option>` +
+        liste
+          .slice(0, 50)
+          .map((v) => `<option value="${v}">${v}${enYeni && v === enYeni ? " · önerilen" : ""}</option>`)
+          .join("");
+      loaderVer.disabled = false;
+      if (loaderIpucu) {
+        loaderIpucu.textContent = liste.length
+          ? `${loader === "forge" ? "Forge" : "NeoForge"} ${mc} için ${liste.length} build var — boş bırakırsan en günceli kurulur.`
+          : `Bu Minecraft sürümü için ${loader === "forge" ? "Forge" : "NeoForge"} build bulunamadı — en güncel denenir.`;
+      }
+    } catch {
+      if (istek !== surumIstekNo) return;
+      loaderVer.innerHTML = `<option value="">En güncel (önerilen)</option>`;
+      loaderVer.disabled = false;
+      if (loaderIpucu) loaderIpucu.textContent = "Liste alınamadı — en güncel sürüm kurulacak.";
+    }
+  }
+
   root.querySelectorAll(".loader-card").forEach((c) => {
     c.addEventListener("click", () => {
       if ((c as HTMLElement).classList.contains("disabled")) return;
       root.querySelectorAll(".loader-card").forEach((x) => x.classList.remove("sel"));
       c.classList.add("sel");
       loader = (c as HTMLElement).dataset.l!;
+      void loaderSurumleriYenile();
     });
+  });
+  // Minecraft sürümü değişirse build listesi de değişir.
+  root.querySelector("#w-version")?.addEventListener("change", () => {
+    void loaderSurumleriYenile();
   });
   const ramRange = root.querySelector("#w-ram") as HTMLInputElement;
   ramRange.addEventListener("input", () => {
@@ -1191,6 +1256,10 @@ async function openCreateWizard(): Promise<void> {
         instance: {
           name, mc_version: version, mod_loader: loader, ram_mb: parseInt(ramRange.value),
           java_preset_id: preset, standard_mods: stdOn && loader === "fabric",
+          // Forge/NeoForge'da kullanıcı build seçmişse onu, seçmediyse (boş)
+          // sunucu tarafında en güncel build alınır.
+          loader_version:
+            loaderSurumGerekli(loader) && loaderVer ? loaderVer.value : "",
         },
       });
       await import("../main").then((m) => m.refreshState());

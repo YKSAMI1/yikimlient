@@ -229,6 +229,15 @@ function yarimKutuYap(b: Bölge, alt: boolean, doku: THREE.Texture | null, sayda
     }
     return new THREE.Mesh(geo, kutuMalzeme(doku, saydam));
 }
+/** Tuval gerçekten ekranda mı? (display:none / başka sayfa / 0 px ölçü = hayır) */
+function tuvalGorunur(canvas: HTMLCanvasElement | null): boolean {
+  if (!canvas || !canvas.isConnected) return false;
+  const r = canvas.getBoundingClientRect();
+  if (r.width < 2 || r.height < 2) return false;
+  const g = getComputedStyle(canvas);
+  return g.visibility !== "hidden" && g.display !== "none";
+}
+
 
 export class Sahne {
     private renderer: THREE.WebGLRenderer | null = null;
@@ -289,6 +298,11 @@ export class Sahne {
     private canliDoku: THREE.CanvasTexture | null = null;
     /** Son çizilen karenin zamanı — kare bütçesi (FPS sınırı) için. */
     private sonCizimAt = 0;
+    /** Sahne ekranda mı (CSS ile gizlenmişse 500 ms'de bir yeniden sorulur). */
+    private gorunurMu = true;
+    private sonGorunurKontrol = 0;
+    /** Son etkilesim zamani (dondurma / yakinlastirma / emote) - kare butcesi. */
+    private sonEtkilesim = 0;
     /** Canlı tuval modu: editör tuvalleri modelin dokusunu sahiplenir. */
     private canliMod = false;
     /** En son beslenen pelerin tuvali — model sonradan kurulursa yeniden bağlanır. */
@@ -428,6 +442,15 @@ export class Sahne {
         canvas.addEventListener("pointermove", this.isaretciTasi);
         canvas.addEventListener("pointerup", this.isaretciBirak);
         canvas.addEventListener("pointercancel", this.isaretciBirak);
+        // KARE BÜTÇESİ: etkilesim (dondurma / yakinlastirma) varken tam hiz,
+        // 2.5 sn bekledikten sonra sahne 14 FPS'e düser (bosuna 38 FPS
+        // boyunca 3D çizmemek için) - dokunulunca aninda tam hiza döner.
+        const etkilesim = () => {
+            this.sonEtkilesim = performance.now();
+        };
+        canvas.addEventListener("pointerdown", etkilesim);
+        canvas.addEventListener("pointermove", etkilesim);
+        canvas.addEventListener("wheel", etkilesim, { passive: true });
         // ORTA/SAG TUS: tarayicinin "kaydirma imleci" (autoscroll) devreye
         // girmesin. Aksi halde orta tusla dondururken sayfa kayiyor ve
         // karakter duzgun donmuyordu. Chrome autoscroll'u mousedown'in
@@ -1127,6 +1150,7 @@ export class Sahne {
     emoteOynat(parca: Emote | null): void {
         if (!parca || !this.kemikler) return;
         this.aktif = parca;
+        this.sonEtkilesim = performance.now(); // emote sürerken tam hiz
         this.sonOynananAd = parca.adi;
         this.durum = "emote";
         this.tEmote = parca.baslangicTick;
@@ -1146,12 +1170,28 @@ export class Sahne {
             }
             this.rafId = requestAnimationFrame(adim);
             // ARKA PLANDA: launcher gizli/minimize iken render + animasyonu durdur
-            // (GPU/CPU tasarrufu — görünür olunca kaldığı yerden devam eder)
+            // (GPU/CPU tasarrufu - görünür olunca kaldığı yerden devam eder)
             if (document.hidden) return;
+            // SAHNE EKRANDA DEĞİLSE de durdur: başka sayfada (Kurulumlar,
+            // Ayarlar...) gezinirken sahne CSS ile gizli kalıyor ama canvas
+            // "bağlı" olduğu için döngü 45 FPS boyunca boşuna çiziyordu.
+            // Görünürlük yalnızca 500 ms'de bir ölçülür (getBoundingClientRect
+            // her karede çalışsa layout maliyeti olur).
+            const suAn = performance.now();
+            if (suAn - this.sonGorunurKontrol > 500) {
+              this.sonGorunurKontrol = suAn;
+              this.gorunurMu = tuvalGorunur(this.canvas);
+            }
+            if (!this.gorunurMu) return;
             // KARE BÜTÇESİ (v0.5.5): önizleme 45 FPS'e yeter; pencere odakta
             // değilken (oyun önde) yalnız seyrek kare çizilir → GPU oyuna kalır.
             const simdi = performance.now();
-            const aralik = document.hasFocus() ? 1000 / 45 : 1000 / 4;
+            // AYRICA: kullanıcı 2.5 sn'den uzun süredir dokunmuyorsa sahne
+            // "bekleme"ye düşer — nefes alma 14 FPS'de gözle görülür şekilde
+            // akıcı kalır ama boşuna 38 FPS boyunca 3D çizilmez.
+            const aralik = document.hasFocus()
+              ? (simdi - this.sonEtkilesim < 2500 ? 1000 / 38 : 1000 / 14)
+              : 1000 / 4;
             if (simdi - this.sonCizimAt < aralik) return;
             this.sonCizimAt = simdi;
             const dt = Math.min(0.05, this.saat.getDelta());

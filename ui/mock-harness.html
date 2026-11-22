@@ -242,6 +242,36 @@
       if (cmd === "cmd_get_state") return Promise.resolve(JSON.parse(JSON.stringify(state)));
       if (cmd === "cmd_save_settings") { Object.assign(state.config, args.config || {}); return Promise.resolve(true); }
       if (cmd === "cmd_list_news") return Promise.resolve([]);
+      // Loader'ın kendi sürümleri (kurulum sihirbazı) — sahte liste
+      if (cmd === "cmd_list_loader_versions") {
+        var loader = String(args.loader || "forge");
+        var lv = loader === "neoforge" ? ["21.1.110", "21.1.100", "21.0.167", "21.0.150"]
+          : ["60.0.14", "60.0.12", "59.0.5", "59.0.3"];
+        return Promise.resolve({ latest: lv[0], versions: lv });
+      }
+      // Kurulum sihirbazının bekledikleri listeler (mock)
+      if (cmd === "cmd_list_versions") {
+        return Promise.resolve({
+          all: ["1.21.11", "1.21.10", "1.21.1", "1.20.1", "1.19.4"],
+          latest: "1.21.11",
+        });
+      }
+      if (cmd === "cmd_list_java_arg_presets") {
+        return Promise.resolve([{ id: "standart", name: "Standart", description: "dengeli ayarlar" }]);
+      }
+      if (cmd === "cmd_list_standard_mods") {
+        return Promise.resolve([
+          { name: "Sodium", category: "performans", description: "hiz", enabled_by_default: true },
+          { name: "Iris", category: "gorunum", description: "shader", enabled_by_default: true },
+        ]);
+      }
+      if (cmd === "cmd_create_instance") {
+        var inst = args.instance || {};
+        return Promise.resolve({
+          instance: { id: "mock-" + Date.now(), name: inst.name, mc_version: inst.mc_version, mod_loader: inst.mod_loader, loader_version: inst.loader_version || "" },
+          standard_mods_started: false,
+        });
+      }
       // Modlar sekmesi: liste yerel; logo/güncelleme çağrıları AĞI taklit edip
       // hiç dönmez — liste yine de hemen görünmeli (spinner'da kilitlenmemeli).
       if (cmd === "cmd_list_mods") return Promise.resolve([

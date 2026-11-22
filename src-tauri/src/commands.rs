@@ -1138,6 +1138,61 @@ pub struct CreateInstanceResponse {
     pub standard_mods_started: bool,
 }
 
+/// Bir mod loader'ın KENDİ sürümleri (Forge/NeoForge build'leri gibi).
+/// Kurulum sihirbazında "Loader sürümü" kutusunu doldurur; liste boşsa
+/// arayüz "en güncel"i kullanmaya devam eder.
+#[derive(Serialize)]
+pub struct LoaderSurumler {
+    /// En güncel kararlı sürüm (varsa) — kutunun "En güncel (önerilen)" satırı.
+    pub latest: String,
+    /// Yeni → eski sıralı sürümler.
+    pub versions: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn cmd_list_loader_versions(
+    loader: String,
+    mc_version: String,
+) -> Result<LoaderSurumler, String> {
+    match loader.trim().to_ascii_lowercase().as_str() {
+        "forge" => {
+            let versions = launcher::forge_versions(&mc_version).await.unwrap_or_default();
+            let latest = launcher::forge_latest_build(&mc_version)
+                .await
+                .map(|v| launcher::forge_surum_ayikla(&mc_version, &v))
+                .unwrap_or_default();
+            // latest listede yoksa (ağ yarıştaysa) en baştakini göster
+            let latest = if !latest.is_empty() {
+                latest
+            } else {
+                versions.first().cloned().unwrap_or_default()
+            };
+            Ok(LoaderSurumler { latest, versions })
+        }
+        "neoforge" => {
+            let versions = launcher::neoforge_versions(&mc_version).await.unwrap_or_default();
+            let latest = launcher::neoforge_latest_build(&mc_version)
+                .await
+                .unwrap_or_default();
+            let latest = latest
+                .strip_prefix("neoforge-")
+                .or_else(|| latest.strip_prefix(&format!("{mc_version}-")))
+                .unwrap_or(&latest)
+                .to_string();
+            let latest = if !latest.is_empty() {
+                latest
+            } else {
+                versions.first().cloned().unwrap_or_default()
+            };
+            Ok(LoaderSurumler { latest, versions })
+        }
+        _ => Ok(LoaderSurumler {
+            latest: String::new(),
+            versions: Vec::new(),
+        }),
+    }
+}
+
 #[tauri::command]
 pub async fn cmd_create_instance(
     app: AppHandle,

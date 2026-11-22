@@ -1559,8 +1559,37 @@ input.search-in.input, .search-in.input {
   font-size: 12px; padding: 2px 6px; border-radius: var(--radius); flex: none;
 }
 .pk-kapat:hover { background: var(--bg3, #1c1f26); color: var(--text); }
-.pk-adimlar { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--bg4, #262a33); }
-.pk-kart.pk-acik .pk-adimlar { display: flex; flex-direction: column; gap: 4px; }
+/* KURULUM SİHİRBAZI — loader'ın kendi sürümü (Forge/NeoForge'da açılır) */
+.wiz-loader-surum { margin-top: 6px; }
+.wiz-loader-surum[hidden] { display: none; }
+.wiz-loader-surum .wiz-hint {
+  font-size: 11px; color: var(--text-faint);
+  margin-top: 5px; line-height: 1.45;
+}
+
+/* Tam liste: 0fr → 1fr geçişi (yükseklik animasyonu). Boşluğa tıklayınca
+   kapanırken de yavaşça toplanır — "display:none" ile anında kaybolmaz.
+   Satırlar TEK bir iç kapta: grid'in çalışması için tek satır lazım. */
+.pk-adimlar {
+  display: grid; grid-template-rows: 0fr;
+  overflow: hidden; min-height: 0;
+  opacity: 0; margin-top: 0; padding-top: 0; border-top: 1px solid transparent;
+  transition:
+    grid-template-rows 0.3s var(--ease, ease),
+    opacity 0.24s var(--ease, ease),
+    margin-top 0.3s var(--ease, ease),
+    padding-top 0.3s var(--ease, ease),
+    border-color 0.2s linear;
+}
+.pk-adimlar-ic {
+  display: flex; flex-direction: column; gap: 4px;
+  min-height: 0; overflow: hidden;
+}
+.pk-kart.pk-acik .pk-adimlar {
+  grid-template-rows: 1fr; opacity: 1;
+  margin-top: 8px; padding-top: 8px;
+  border-top-color: var(--bg4, #262a33);
+}
 .pk-adim { display: grid; grid-template-columns: 14px 1fr; gap: 7px; align-items: start; }
 .pk-isaret {
   width: 12px; height: 12px; border-radius: 50%;
@@ -1628,6 +1657,8 @@ input.search-in.input, .search-in.input {
 .share-not { font-size: 11.5px; color: var(--text-faint); margin-top: 10px; }
 
 /* ---------- BİLDİRİM KUTUSU (zilin altından açılır) ---------- */
+/* Kutu her zaman "flex" ama kapalıyken görünmez/hissiz: böylece boşluğa
+   tıklayınca kapanırken YAVAŞÇA solar, anında kaybolmaz. */
 .bildirim-panel {
   position: fixed; right: 12px; top: 46px; z-index: 3950;
   width: 330px; max-width: calc(100vw - 24px); max-height: 60vh;
@@ -1635,10 +1666,23 @@ input.search-in.input, .search-in.input {
   border: 1px solid var(--bg4, #262a33);
   border-radius: var(--radius-lg);
   box-shadow: 0 16px 46px rgba(0, 0, 0, 0.5);
-  display: none; flex-direction: column; overflow: hidden;
+  display: flex; flex-direction: column; overflow: hidden;
   font-size: 12px; color: var(--text-dim);
+  transform-origin: top right;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transform: translateY(-8px) scale(0.97);
+  transition:
+    opacity 0.24s var(--ease, ease),
+    transform 0.24s var(--ease, ease),
+    visibility 0s linear 0.24s;
 }
-.bildirim-panel.bildirim-acik { display: flex; }
+.bildirim-panel.bildirim-acik {
+  opacity: 1; visibility: visible; pointer-events: auto; transform: none;
+  transition:
+    opacity 0.24s var(--ease, ease),
+    transform 0.24s var(--ease, ease),
+    visibility 0s;
+}
 .bild-kafa {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 12px; border-bottom: 1px solid var(--bg4, #262a33);
@@ -1853,6 +1897,9 @@ input.search-in.input, .search-in.input {
 @media (prefers-reduced-motion: reduce) {
   .home-hero.secili-var h1::after,
   :root[data-world="sahne"] .imp-satir.secili .imp-satir-ad::after { animation: none; }
+  /* Boşluğa tıkla kapatma: animasyon istemeyen kullanıcıda anında kapansın */
+  .bildirim-panel,
+  .pk-adimlar { transition-duration: 0.01ms !important; }
 }
 
 

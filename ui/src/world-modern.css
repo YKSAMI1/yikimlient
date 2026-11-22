@@ -192,7 +192,11 @@
 }
 .md-stage #sahne-katman.on {
   opacity: 1;
-  animation: md-yuruyus 1.6s cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  /* Karakter artık "soldan yürüyerek/ışınlanarak" gelmiyor: doğrudan son
+     konumunda (yan yana -6% ofset) duruyor. Giriş animasyonu tamamen
+     kaldırıldı — kullanıcı "launcher açıldığında karakter hareket ediyor,
+     doğrudan yerinde olsun" dedi. */
+  transform: translateX(-6%);
 }
 
 /* KARAKTER SÜRÜKLEME: .md-main zemini tıklamaları yutuyordu ve karakter
@@ -214,6 +218,8 @@
   78%  { transform: translateX(-12%) translateY(-1.2%); }
   100% { opacity: 1; transform: translateX(-6%) translateY(0); }
 }
+/* NOT: md-yuruyus KULLANILMIYOR (yukarıdaki .on kuralı animasyonsuz).
+   Geri getirilmek istenirse .on kuralına animation eklenir. */
 
 .md-scrim {
   position: absolute;
@@ -744,6 +750,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .md-stage #sahne-katman.on { animation: none; }
+  /* giriş animasyonu zaten kaldırıldı */
   .md-tab.on::after,
   :root[data-world="modern"] .rail-item.active::before { animation: none; }
 }

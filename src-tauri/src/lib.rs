@@ -126,6 +126,7 @@ pub fn run() {
             commands::cmd_select_account,
             commands::cmd_remove_account,
             commands::cmd_create_instance,
+    commands::cmd_list_loader_versions,
             commands::cmd_delete_instance,
             commands::cmd_rename_instance,
             commands::cmd_duplicate_instance,

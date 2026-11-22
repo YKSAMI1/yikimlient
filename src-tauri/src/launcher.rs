@@ -247,6 +247,58 @@ pub fn forge_koordinat(mc: &str, ham: &str) -> String {
     format!("{mc}-{}", forge_surum_ayikla(mc, ham))
 }
 
+/// Maven `maven-metadata.xml` içinden `<version>` listesini okur (sıra korunur).
+fn maven_versions(xml: &str) -> Vec<String> {
+    let mut cikti: Vec<String> = Vec::new();
+    for parca in xml.split("<version>").skip(1) {
+        let Some(son) = parca.split("</version>").next() else {
+            continue;
+        };
+        let v = son.trim();
+        if v.is_empty() || cikti.iter().any(|x| x == v) {
+            continue;
+        }
+        cikti.push(v.to_string());
+    }
+    cikti
+}
+
+/// Forge: bir MC sürümü için yayınlanmış build'ler (YENİ → ESKİ).
+/// Değerler saf build no'sudur ("52.0.20"); koordinata çevirme `forge_koordinat`'te.
+pub async fn forge_versions(mc: &str) -> Result<Vec<String>, String> {
+    let resp = http_client()
+        .get("https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("forge metadata hatası: {}", resp.status()));
+    }
+    let xml = resp.text().await.map_err(|e| e.to_string())?;
+    let onek = format!("{mc}-");
+    let mut cikti: Vec<String> = maven_versions(&xml)
+        .into_iter()
+        .filter_map(|v| {
+            v.strip_prefix(&onek)
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty())
+        })
+        .collect();
+    // maven metadata küçükten büyüğe sıralı gelir; kullanıcıya en yeni üstte
+    // görünsün diye ters çeviriyoruz (sayı karşılaştırmasıyla, "9" > "10" tuzağı
+    // yaşanmaması için).
+    cikti.sort_by(|a, b| {
+        if loader_version_lt(a, b) {
+            std::cmp::Ordering::Greater
+        } else if loader_version_lt(b, a) {
+            std::cmp::Ordering::Less
+        } else {
+            std::cmp::Ordering::Equal
+        }
+    });
+    Ok(cikti)
+}
+
 /// Forge/NeoForge installer'ı hedef klasörde `launcher_profiles.json` arıyor
 /// ("There is no minecraft launcher profile ... you need to run the launcher first!").
 /// Launcher böyle bir dosya yazmadığı için installer 1 koduyla düşüyordu.
@@ -436,6 +488,42 @@ pub async fn neoforge_latest_build(mc: &str) -> Result<String, String> {
         }
     }
     en_iyi.ok_or_else(|| format!("NeoForge {mc} için build bulunamadı"))
+}
+
+/// NeoForge: bir MC sürümü için yayınlanmış build'ler (YENİ → ESKİ).
+/// Modern seri → saf build no ("21.1.80"); eski (1.20.1-) → saf build no
+/// ("47.1.106"). Beta/RC/alpha atlanır.
+pub async fn neoforge_versions(mc: &str) -> Result<Vec<String>, String> {
+    let (url, onek) = match neoforge_series(mc) {
+        Some(seri) => (
+            "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml",
+            format!("{seri}."),
+        ),
+        None => (
+            "https://maven.neoforged.net/releases/net/neoforged/forge/maven-metadata.xml",
+            format!("{mc}-"),
+        ),
+    };
+    let resp = http_client().get(url).send().await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("neoforge metadata hatası: {}", resp.status()));
+    }
+    let xml = resp.text().await.map_err(|e| e.to_string())?;
+    let mut cikti: Vec<String> = maven_versions(&xml)
+        .into_iter()
+        .filter(|v| v.starts_with(&onek) && !v.contains("-beta") && !v.contains("-rc") && !v.contains("-alpha"))
+        .map(|v| v.strip_prefix(&onek).unwrap_or(&v).to_string())
+        .collect();
+    cikti.sort_by(|a, b| {
+        if loader_version_lt(a, b) {
+            std::cmp::Ordering::Greater
+        } else if loader_version_lt(b, a) {
+            std::cmp::Ordering::Less
+        } else {
+            std::cmp::Ordering::Equal
+        }
+    });
+    Ok(cikti)
 }
 
 /// NeoForge kurulumu: resmî installer jar + `--installClient <oyun_dizini>`.

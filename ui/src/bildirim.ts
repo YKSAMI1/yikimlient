@@ -6,6 +6,9 @@
 //
 // Depolama: localStorage (hızlı açılış, diske yazma yok).
 // Zile tıklayınca panel açılır; boşsa "Şu an bir şey olmuyor." yazar.
+// Panelin içine tıklamak kapatmaz; BOŞLUĞA tıklamak (ve Esc) paneli kapatır.
+
+import { katmanEkle } from "./dis-kapat";
 
 export type BildirimTur = "kurulum" | "sistem" | "mod" | "genel";
 
@@ -80,6 +83,14 @@ function panelEl(): HTMLElement {
     panel.id = "bildirim-panel";
     panel.className = "bildirim-panel";
     document.body.appendChild(panel);
+    // Boşluğa + Esc ile kapatma (kullanıcı isteği). Tetikleyici zil: kendi
+    // click'i açar/kapatır, boşluk sayılmaz.
+    katmanEkle({
+      acikMi: () => panel!.classList.contains("bildirim-acik"),
+      kapat: () => bildirimKapat(),
+      icindeMi: (hedef) => panel!.contains(hedef),
+      tetikleyici: "#tb-pack",
+    });
   }
   return panel;
 }

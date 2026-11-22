@@ -10,6 +10,7 @@
 
 import { listen, toast } from "./main";
 import { bildirimEkle } from "./bildirim";
+import { katmanEkle } from "./dis-kapat";
 
 export type Durum = "bekliyor" | "aktif" | "bitti" | "hata" | "atlandi";
 
@@ -45,6 +46,9 @@ let dinleyiciOff: (() => void) | null = null;
 let sonKapatlayici: number | null = null;
 /// Aynı anda en fazla bu kadar açık kart tutulur (eskisi gizlenir).
 const MAKS_KART = 4;
+
+// Modül yüklenirken boşluk/Esc kapatma dinleyicisi bir kez kurulur.
+disKapatmaKur();
 
 function detayMetni(done: number, total: number, ayrinti: string): string {
   const sayac = total > 0 ? `${done}/${total}` : "";
@@ -112,6 +116,20 @@ export function packKartDegistir(kimlik = ""): void {
   const kart = kartlar.get(kimlik);
   if (!kart) return;
   kart.root.classList.toggle("pk-acik");
+}
+
+/// Boşluğa tıklayınca açık adım listesi kapanır (kartın küçük hali kalır).
+/// Bir kez kurulur; kartlar sonradan da eklense bile çalışır çünkü dinleyici
+/// kart listesini her tıklamada baştan sorar.
+function disKapatmaKur(): void {
+  katmanEkle({
+    acikMi: () => [...kartlar.values()].some((k) => k.root.classList.contains("pk-acik")),
+    kapat: () => {
+      for (const k of kartlar.values()) k.root.classList.remove("pk-acik");
+    },
+    icindeMi: (hedef) => [...kartlar.values()].some((k) => k.root.contains(hedef)),
+    tetikleyici: "#tb-pack",
+  });
 }
 
 /// Kurulum tamam: kalan adımları kapat, hazır işaretle, X sn sonra gizle.
@@ -244,12 +262,12 @@ function yeniKart(kimlik: string): KartDurum {
       </div>
       <button class="pk-kapat" title="Kapat (kurulum arkada sürer)">✕</button>
     </div>
-    <div class="pk-adimlar"></div>
+    <div class="pk-adimlar"><div class="pk-adimlar-ic"></div></div>
     <div class="pk-ozet">Kurulum başlıyor…</div>
   `;
   const satirlar = new Map<number, HTMLElement>();
   const detaylar = new Map<number, HTMLElement>();
-  const liste = root.querySelector(".pk-adimlar") as HTMLElement;
+  const liste = root.querySelector(".pk-adimlar-ic") as HTMLElement;
   for (const a of ADIMLAR) {
     const satir = document.createElement("div");
     satir.className = "pk-adim pk-bekliyor";
