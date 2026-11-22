@@ -92,10 +92,33 @@ jobs:
           fi
           sha256sum "$EXE"
 
+      # İmza ayari eksikse ilk 4 dakika bekle yerine hemen anlasilsin.
+      - name: Imza ayari kontrolu
+        shell: bash
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          YIKIM_IMZA_PFX_B64: ${{ secrets.YIKIM_IMZA_PFX_B64 }}
+        run: |
+          if [ "${{ vars.SIGNPATH_ENABLED }}" = "true" ]; then
+            [ -n "$SIGNPATH_API_TOKEN" ] || { echo "SIGNPATH_API_TOKEN sırrı eksik"; exit 1; }
+            [ -n "${{ vars.SIGNPATH_ORGANIZATION_ID }}" ] || { echo "SIGNPATH_ORGANIZATION_ID degiskeni eksik"; exit 1; }
+            [ -n "${{ vars.SIGNPATH_PROJECT_SLUG }}" ] || { echo "SIGNPATH_PROJECT_SLUG degiskeni eksik"; exit 1; }
+            [ -n "${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}" ] || { echo "SIGNPATH_SIGNING_POLICY_SLUG degiskeni eksik"; exit 1; }
+            [ -n "${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}" ] || { echo "SIGNPATH_ARTIFACT_CONFIGURATION_SLUG degiskeni eksik"; exit 1; }
+            echo "SignPath imzasi devrede"
+          fi
+          if [ "${{ vars.YIKIM_PFX_ENABLED }}" = "true" ]; then
+            [ -n "$YIKIM_IMZA_PFX_B64" ] || { echo "YIKIM_IMZA_PFX_B64 sırrı eksik"; exit 1; }
+            echo "PFX imzasi devrede"
+          fi
+          if [ "${{ vars.SIGNPATH_ENABLED }}" != "true" ] && [ "${{ vars.YIKIM_PFX_ENABLED }}" != "true" ]; then
+            echo "imza devre disi (SIGNPATH_ENABLED / YIKIM_PFX_ENABLED tanimli degil) - imzasiz derleniyor"
+          fi
+
       # ---- 2) IMZA (SignPath) ----
       - name: Imzasiz kurulum exe'sini yükle (SignPath girdisi)
         id: signpath-girdi
-        if: ${{ vars.SIGNPATH_ENABLED == 'true' && secrets.SIGNPATH_API_TOKEN != '' }}
+        if: ${{ vars.SIGNPATH_ENABLED == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: yikimlient-installer-unsigned
@@ -104,7 +127,7 @@ jobs:
           retention-days: 7
 
       - name: Kurulum exe'sini imzala (SignPath)
-        if: ${{ vars.SIGNPATH_ENABLED == 'true' && secrets.SIGNPATH_API_TOKEN != '' }}
+        if: ${{ vars.SIGNPATH_ENABLED == 'true' }}
         uses: signpath/github-action-submit-signing-request@v3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -118,7 +141,7 @@ jobs:
           output-artifact-directory: imzali
 
       - name: Imzali kurulum exe'sini yerine koy
-        if: ${{ vars.SIGNPATH_ENABLED == 'true' && secrets.SIGNPATH_API_TOKEN != '' }}
+        if: ${{ vars.SIGNPATH_ENABLED == 'true' }}
         shell: bash
         run: |
           AD=$(basename "$EXE")
@@ -131,7 +154,7 @@ jobs:
 
       # ---- 2b) IMZA (PFX) ----
       - name: PFX ile imzala
-        if: ${{ vars.SIGNPATH_ENABLED != 'true' && secrets.YIKIM_IMZA_PFX_B64 != '' }}
+        if: ${{ vars.YIKIM_PFX_ENABLED == 'true' }}
         shell: pwsh
         env:
           YIKIM_IMZA_PFX_B64: ${{ secrets.YIKIM_IMZA_PFX_B64 }}
