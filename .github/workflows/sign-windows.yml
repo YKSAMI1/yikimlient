@@ -43,7 +43,11 @@ jobs:
     timeout-minutes: 90
 
     steps:
+      - uses: actions/checkout@v4
+
+      # Sürüm kontrolünden SONRA yapılmalı: dosyalar checkout'tan sonra var.
       - name: Surumu dogrula
+        id: surum
         shell: bash
         run: |
           V=$(echo "${GITHUB_REF_NAME}" | sed 's/^v//')
@@ -53,9 +57,7 @@ jobs:
             echo "SÜRÜM UYUŞMAZ: tag=$V, tauri.conf.json=$CONF"
             exit 1
           fi
-        id: surum
-
-      - uses: actions/checkout@v4
+          echo "surum dogrulandi: $V"
 
       - uses: actions/setup-node@v4
         with:
