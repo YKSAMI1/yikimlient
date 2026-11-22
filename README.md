@@ -96,8 +96,9 @@ bot bunu fark eder ve **çizme iznini otomatik geri alır**.
 
 ### Windows
 `YIKIMLient_<sürüm>_x64-setup.exe` indir → kur → oyna.
-(Windows Defender "bilinmeyen yayıncı" uyarabilir: *Daha fazla bilgi → Yine de çalıştır*.
-Kod imzalı sertifika alınmadı; dosya kaynağı bu repo'dur.)
+(Windows SmartScreen ilk sürümlerde "bilinmeyen yayıncı" uyarabilir:
+*Daha fazla bilgi → Yine de çalıştır*. Kod imzası ve sertifika durumu için
+aşağıdaki **Kod imza politikası** bölümüne ve `docs/IMZA.md` dosyasına bak.)
 
 ### Linux
 ```bash
@@ -114,6 +115,30 @@ sudo dpkg -i YIKIMLient_<sürüm>_amd64.deb
 npm install
 npm run dist          # src-tauri/target/release/bundle/ altına çıkar
 ```
+
+---
+
+## Kod imza politikası
+
+- **Sertifika:** YIKIMLient sürümleri kod imzalı sertifika ile imzalanır.
+  İmza aktif olana kadar sürümler imzasız dağıtılır. Güncel sertifika durumu:
+  *ücretsiz kod imzası SignPath.io tarafından sağlanır, sertifika SignPath
+  Foundation'a aittir* — bu cümle, SignPath Foundation sertifikası kullanılmaya
+  başlandığında burada görünür. Ayrıntılar ve kurulum: `docs/IMZA.md`.
+- **İmzalayan/birim:** `tools/yayin-genel.ps1` (yerel) ve
+  `.github/workflows/sign-windows.yml` (CI). İki yol da sertifika tanımlıysa
+  imzalar, değilse yayını bozmayıp imzasız devam eder.
+- **Ekip rolleri:**
+  - Değişiklik yazma (Author): YKSAMI1 (https://github.com/YKSAMI1)
+  - İnceleme (Reviewer): YKSAMI1 — dış PR'lar incelenmeden birleştirilmez
+  - İmza onayı (Approver): YKSAMI1 — her sürüm imzası yayıncının onayıyla
+    atılır (SignPath kullanıldığında ekranda ayrıca onay ister)
+- **Ne imzalanır:** yalnızca bu depodan derlenen dosyalar —
+  `YIKIMLient_*_x64-setup.exe` (NSIS kurulumu) ve içindeki uygulama exe'si.
+  Başkasının kapalı kaynak bileşeni imzalanmaz; indirilen üçüncü taraf
+  kütüphaneler (ör. oyun sürümleri, Java) imza dışıdır.
+- **Gizlilik:** Bu program, kullanıcı veya kurulumu yapan kişi açıkça
+  istemedikçe bilgisayarınızdaki hiçbir bilgiyi başka bir sisteme iletmez.
 
 ---
 

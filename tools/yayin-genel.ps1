@@ -26,6 +26,39 @@ if (-not (Test-Path $exe)) { Write-Host "WINDOWS SETUP YOK: $exe"; exit 1 }
 $sig = "$exe.sig"
 if (-not (Test-Path $sig)) { Write-Host "IMZA DOSYASI YOK: $sig"; exit 1 }
 
+# [2a/7] WINDOWS KOD IMZASI (SmartScreen uyarisini azaltir)
+# Sertifika tanimliysa (env YIKIM_IMZA_PFX veya YIKIM_IMZA_PFX_B64) kurulum
+# exe'si imzalanir; sertifika yoksa adim sessizce gecer (yayin eski gibi
+# devam eder). Kod imzasi dosyayi degistirdigi icin updater .sig dosyasi
+# imzadan SONRA yeniden uretilir (aksi halde guncelleme dogrulamasi bozulur).
+# Detay: docs/IMZA.md
+$kurulumImzaliMi = $false
+if ($env:YIKIM_IMZA_PFX -or $env:YIKIM_IMZA_PFX_B64) {
+  & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $kok "tools\imza.ps1") -Dosyalar @($exe) 2>&1 | ForEach-Object { Write-Host "  $_" }
+  if ($LASTEXITCODE -ne 0) { Write-Host "KOD IMZASI BASARISIZ"; exit 1 }
+  $kurulumImzaliMi = (Get-AuthenticodeSignature -LiteralPath $exe).Status -eq "Valid"
+}
+if ($kurulumImzaliMi) {
+  # Kod imzasi dosyayi degistirir -> Tauri updater .sig dosyasi imzalandiktan
+  # SONRA yeniden uretilmeli (aksi halde guncelleme dogrulamasi bozulur).
+  # `tauri signer sign` hem .sig dosyasini yazar hem imzayi ekrana basar.
+  $anahtar = if ($env:YIKIM_IMZA_ANAHTAR) { $env:YIKIM_IMZA_ANAHTAR } else { Join-Path $kok "tools\updater-private.key" }
+  $imzaOncesi = (Get-Item "$exe.sig").LastWriteTimeUtc
+  & npx --no-install tauri signer sign -f $anahtar --app-version $V $exe 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "  [2a/7] UYARI: updater .sig uretilemedi"; $LASTEXITCODE
+  } else {
+    $imzaSonrasi = (Get-Item "$exe.sig").LastWriteTimeUtc
+    if ($imzaSonrasi -gt $imzaOncesi) {
+      Write-Host "  [2a/7] kod imzasi tamam -> updater .sig yeniden uretildi"
+    } else {
+      Write-Host "  [2a/7] UYARI: .sig zamani degismedi, elle kontrol et"
+    }
+  }
+} else {
+  Write-Host "  [2a/7] kod imzasi atlandi (YIKIM_IMZA_PFX / YIKIM_IMZA_PFX_B64 tanimli degil)"
+}
+
 Write-Host "[1/7] commit + push"
 git add -A 2>&1 | Out-Null
 git commit -q -m $Mesaj 2>&1 | Out-Null

@@ -1,0 +1,195 @@
+name: Windows Sign
+
+# WINDOWS PAKETI + KOD IMZASI (SmartScreen)
+#
+# Bu akış Windows kurulum exe'sini GitHub'da DERLER ve (sertifika varsa)
+# IMZALAR. Imza sekmede dosyanin SHA'si degistigi icin Tauri updater `.sig`
+# dosyasi imzalandiktan SONRA yeniden üretilir.
+#
+# Imza kipleri (depo degiskenleri ile seçilir - detay: docs/IMZA.md):
+#   IMZA_YOK (varsayilan) : sadece derler, imzasiz artifact üretir.
+#   SIGNPATH              : SignPath (ücretsiz OSS sertifikasi) ile imzalar.
+#       secrets.SIGNPATH_API_TOKEN
+#       vars.SIGNPATH_ENABLED=true
+#       vars.SIGNPATH_ORGANIZATION_ID / SIGNPATH_PROJECT_SLUG /
+#            SIGNPATH_SIGNING_POLICY_SLUG / SIGNPATH_ARTIFACT_CONFIGURATION_SLUG
+#   PFX                   : elindeki .pfx ile imzalar.
+#       secrets.YIKIM_IMZA_PFX_B64 (base64 .pfx), secrets.YIKIM_IMZA_PFX_PAROLA
+#
+# "release" girdisi true ise (veya vars.YIKIM_WINDOWS_CI_UPLOAD == '1') imzalı
+# kurulum exe'si + .sig + SHA256SUMS GitHub release'ine yüklenir (--clobber).
+# Varsayilan: yalnizca workflow artifact olarak durur (paylaşima karismaz).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Imzali Windows paketini GitHub release'ine yukle"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write # release'e asset yüklemek için
+  actions: read # SignPath connector'ün workflow run + artifact okuması için
+
+jobs:
+  build-sign:
+    name: Windows derle + imzala
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Surumu dogrula
+        shell: bash
+        run: |
+          V=$(echo "${GITHUB_REF_NAME}" | sed 's/^v//')
+          echo "surum=$V" >> "$GITHUB_OUTPUT"
+          CONF=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "$CONF" != "$V" ]; then
+            echo "SÜRÜM UYUŞMAZ: tag=$V, tauri.conf.json=$CONF"
+            exit 1
+          fi
+        id: surum
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Bagimliliklar
+        run: npm ci
+
+      # ---- 1) DERLEME (imzasiz) ----
+      # Updater artefaktlari (.sig) da bu adimda üretilir; imzadan sonra
+      # dosya degistigi için tekrar üretilecek.
+      - name: Windows paketini derle (nsis)
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: |
+          V="${{ steps.surum.outputs.surum }}"
+          echo "EXE=src-tauri/target/release/bundle/nsis/YIKIMLient_${V}_x64-setup.exe" >> "$GITHUB_ENV"
+          npx tauri build --bundles nsis
+
+      - name: Paket var mi
+        shell: bash
+        run: |
+          if [ ! -f "$EXE" ]; then
+            echo "kurulum exe'si bulunamadi: $EXE"
+            exit 1
+          fi
+          sha256sum "$EXE"
+
+      # ---- 2) IMZA (SignPath) ----
+      - name: Imzasiz kurulum exe'sini yükle (SignPath girdisi)
+        id: signpath-girdi
+        if: ${{ vars.SIGNPATH_ENABLED == 'true' && secrets.SIGNPATH_API_TOKEN != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: yikimlient-installer-unsigned
+          path: ${{ env.EXE }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Kurulum exe'sini imzala (SignPath)
+        if: ${{ vars.SIGNPATH_ENABLED == 'true' && secrets.SIGNPATH_API_TOKEN != '' }}
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.signpath-girdi.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: imzali
+
+      - name: Imzali kurulum exe'sini yerine koy
+        if: ${{ vars.SIGNPATH_ENABLED == 'true' && secrets.SIGNPATH_API_TOKEN != '' }}
+        shell: bash
+        run: |
+          AD=$(basename "$EXE")
+          if [ -f "imzali/$AD" ]; then
+            cp -f "imzali/$AD" "$EXE"
+            echo "imzali kurulum exe'si yerine kondu"
+          else
+            echo "imzali dosya bulunamadi: imzali/$AD" && exit 1
+          fi
+
+      # ---- 2b) IMZA (PFX) ----
+      - name: PFX ile imzala
+        if: ${{ vars.SIGNPATH_ENABLED != 'true' && secrets.YIKIM_IMZA_PFX_B64 != '' }}
+        shell: pwsh
+        env:
+          YIKIM_IMZA_PFX_B64: ${{ secrets.YIKIM_IMZA_PFX_B64 }}
+          YIKIM_IMZA_PFX_PAROLA: ${{ secrets.YIKIM_IMZA_PFX_PAROLA }}
+        run: |
+          & (Join-Path $env:GITHUB_WORKSPACE "tools\imza.ps1") -Dosyalar @("${{ env.EXE }}") 2>&1 | ForEach-Object { Write-Host "  $_" }
+          if ($LASTEXITCODE -ne 0) { throw "kod imzasi basarisiz" }
+
+      # ---- 3) KONTROL ----
+      - name: Imza durumunu raporla
+        id: rapor
+        shell: pwsh
+        run: |
+          $imza = Get-AuthenticodeSignature -LiteralPath "${{ env.EXE }}"
+          $durum = $imza.Status.ToString()
+          Write-Host "imza durumu: $durum / imzalayan: $($imza.SignerCertificate.Subject)"
+          $imzali = if ($durum -eq "NotSigned") { "false" } else { "true" }
+          "imzali=$imzali" >> $env:GITHUB_OUTPUT
+          "durum=$durum" >> $env:GITHUB_OUTPUT
+
+      # ---- 4) UPDATER .sig (imza dosyayi degistirir) ----
+      - name: Updater .sig dosyasini yenile
+        if: steps.rapor.outputs.imzali == 'true'
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: |
+          V="${{ steps.surum.outputs.surum }}"
+          npx tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" --app-version "$V" "$EXE"
+          echo "--- yeni .sig:"; cat "$EXE.sig"
+
+      - name: SHA256SUMS
+        shell: bash
+        run: |
+          V="${{ steps.surum.outputs.surum }}"
+          H=$(sha256sum "$EXE" | awk '{print $1}')
+          echo "$H  $(basename "$EXE")" > "YIKIMLient_${V}_windows.sha256.txt"
+          cat "YIKIMLient_${V}_windows.sha256.txt"
+
+      - name: Artifact olarak yükle (her zaman)
+        uses: actions/upload-artifact@v4
+        with:
+          name: yikimlient-windows-${{ steps.surum.outputs.surum }}
+          path: |
+            ${{ env.EXE }}
+            ${{ env.EXE }}.sig
+            YIKIMLient_${{ steps.surum.outputs.surum }}_windows.sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      # ---- 5) RELEASE'E YÜKLE (elle istenirse) ----
+      - name: Release'e yükle (imzali paket)
+        if: ${{ inputs.release == true || vars.YIKIM_WINDOWS_CI_UPLOAD == '1' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V="${{ steps.surum.outputs.surum }}"
+          gh release upload "v$V" "$EXE" "$EXE.sig" "YIKIMLient_${V}_windows.sha256.txt" --clobber
+          echo "release'e yüklendi: v$V"
