@@ -50,13 +50,18 @@ jobs:
         id: surum
         shell: bash
         run: |
-          V=$(echo "${GITHUB_REF_NAME}" | sed 's/^v//')
-          echo "surum=$V" >> "$GITHUB_OUTPUT"
           CONF=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          if [ "$CONF" != "$V" ]; then
-            echo "SÜRÜM UYUŞMAZ: tag=$V, tauri.conf.json=$CONF"
-            exit 1
+          if [[ "$GITHUB_REF_NAME" == v* ]]; then
+            V=$(echo "$GITHUB_REF_NAME" | sed 's/^v//')
+            if [ "$CONF" != "$V" ]; then
+              echo "SÜRÜM UYUŞMAZ: tag=$V, tauri.conf.json=$CONF"
+              exit 1
+            fi
+          else
+            # workflow_dispatch (elle çalıştırma): tag yok, sürümü ayar dosyasından al
+            V="$CONF"
           fi
+          echo "surum=$V" >> "$GITHUB_OUTPUT"
           echo "surum dogrulandi: $V"
 
       - uses: actions/setup-node@v4
