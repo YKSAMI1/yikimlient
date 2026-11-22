@@ -5,6 +5,15 @@
 > yazılımın tamamı `tools/imza.ps1`, `tools/yayin-genel.ps1` ve
 > `.github/workflows/sign-windows.yml` içinde.
 
+## Hemen yapılacaklar (5 dakika)
+
+1. GitHub → Settings → Security → **2FA'yı aç** (SignPath şartı).
+2. https://signpath.org/apply formunu doldur (hazır metin aşağıda,
+   "Hazır başvuru metni" bölümünde) — ya da `oss-support@signpath.org` adresine
+   aynı metni gönder.
+3. Cevap gelene kadar beklerken (birkaç gün) şu yayına kadar bir şey
+   yapmana gerek yok: altyapı hazır, sonraki sürüm otomatik imzalı çıkar.
+
 ---
 
 ## 1) Sorun ne?
@@ -54,6 +63,11 @@ ikinci seçenek. İki yol da bu depoya hazır.
 | `tools/yayin-genel.ps1` | Sertifika tanımlıysa kurulum exe'sini **otomatik imzalar**, sonra updater `.sig` dosyasını yeniden üretir |
 | `.github/workflows/sign-windows.yml` | GitHub'da Windows paketini derler + SignPath **veya** PFX ile imzalar; imza sonrası `.sig` yenilenir |
 | `ui/mock-harness.html` | (ilgili yok) |
+
+> Not: GitHub Actions'ın bilinen sınırı — `if:` koşullarında `secrets`
+> kullanılamaz. Bu yüzden imza kipini **depo değişkenleri** (vars) açıyor:
+> `SIGNPATH_ENABLED=true` (SignPath) veya `YIKIM_PFX_ENABLED=true` (PFX).
+> Sırlar (API token / base64 .pfx) yalnızca `env:` ile verilir.
 
 > Not: **İmza dosyanın SHA'sini değiştirir**. Bu yüzden imza işleminden SONRA
 > Tauri updater `.sig` dosyası mutlaka yeniden üretilmeli — iki yerde de
