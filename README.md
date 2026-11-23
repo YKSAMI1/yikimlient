@@ -125,6 +125,8 @@ npm run dist          # src-tauri/target/release/bundle/ altına çıkar
   *ücretsiz kod imzası SignPath.io tarafından sağlanır, sertifika SignPath
   Foundation'a aittir* — bu cümle, SignPath Foundation sertifikası kullanılmaya
   başlandığında burada görünür. Ayrıntılar ve kurulum: `docs/IMZA.md`.
+  (English, for SignPath review: *Free code signing provided by SignPath.io,
+  certificate by SignPath Foundation*.)
 - **İmzalayan/birim:** `tools/yayin-genel.ps1` (yerel) ve
   `.github/workflows/sign-windows.yml` (CI). İki yol da sertifika tanımlıysa
   imzalar, değilse yayını bozmayıp imzasız devam eder.
