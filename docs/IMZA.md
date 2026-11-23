@@ -14,7 +14,10 @@
 3. Cevap gelene kadar beklerken (birkaç gün) şu yayına kadar bir şey
    yapmana gerek yok: altyapı hazır, sonraki sürüm otomatik imzalı çıkar.
 
----
+> **Durum (23 Kasım 2026): başvuru gönderildi, cevap bekleniyor.**
+> Onay gelince aşağıdaki "Onaydan sonra (10 dk)" listesini uygula — sonraki
+> sürüm otomatik imzalı çıkar. Reddedilirse: gerekçeyi sor, eksikse tamamla,
+> yeterse `docs/IMZA.md` Yol B (Certum ~€49) veya Yol C (OV) kullan.
 
 ## 1) Sorun ne?
 
@@ -118,6 +121,26 @@ açık kaynak + tamamı otomatik derleme + yayın sayfası var.
    (imzalanır, sadece artifact olarak durur).
 7. Yayına almak için `release: true` (veya depo değişkeni
    `YIKIM_WINDOWS_CI_UPLOAD=1`) — imzalı exe + `.sig` + SHA256SUMS yüklenir.
+
+### Onaydan sonra — 10 dakikalık kontrol listesi
+
+1. SignPath'te **Project** aç (Repository URL + Trusted Build System: GitHub.com).
+2. İki **Signing policy** oluştur: `test-signing` ve `release-signing`
+   (origin verification açık, dallar: `main`).
+3. Bir **Artifact configuration** oluştur (slug örn. `yikimlient-installer`,
+   tür: Portable Executable, parametre: `version`).
+4. SignPath'ta **API token** oluştur (submitter yetkisiyle).
+5. GitHub **Settings → Secrets and variables → Actions**:
+   - Secret: `SIGNPATH_API_TOKEN`
+   - Variables: `SIGNPATH_ENABLED=true`, `SIGNPATH_ORGANIZATION_ID`,
+     `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG`,
+     `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG=yikimlient-installer`
+6. **İlk deneme:** Actions → Windows Sign → Run workflow → `release: false`
+   (çalışır, SignPath'te onay verirsin, imzalı exe artifact olarak iner).
+7. **Yayına alma:** `release: true` (veya değişken `YIKIM_WINDOWS_CI_UPLOAD=1`)
+   → imzalı exe + `.sig` + SHA256SUMS release'e yüklenir.
+   Yerel yayım devam edecekse `tools/imza.ps1` + `yayin-genel.ps1` hâlâ
+   çalışır (sertifika çevre değişkenleriyle).
 
 ### Hazır başvuru metni (İngilizce)
 
